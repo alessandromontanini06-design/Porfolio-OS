@@ -100,7 +100,7 @@ export default async function handler(req, res) {
   if (typeof data === "string") {
     try { data = JSON.parse(data); } catch { res.status(400).json({ error: "Dati non leggibili." }); return; }
   }
-  if (!data || typeof data !== "object" || !Array.isArray(data.columns)) {
+  if (!data || typeof data !== "object" || !Array.isArray(data.colonne || data.columns)) {
     res.status(400).json({ error: "Dati mancanti o nel formato sbagliato." });
     return;
   }
