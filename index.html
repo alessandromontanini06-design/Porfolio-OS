@@ -86,6 +86,10 @@ button{cursor:pointer}
 .hero .eyebrow{color:rgba(255,255,255,.75)}
 .hero h1{font-size:clamp(2.3rem,7.4vw,8.6rem);font-stretch:125%;font-weight:900;letter-spacing:-.055em;line-height:.86;text-transform:uppercase}
 .hero h1 .ln{display:block;overflow:hidden;padding:.02em 0 .06em}
+.hero .eyebrow{overflow-wrap:anywhere}
+@media (max-width:480px){.hero h1{font-stretch:100%;font-size:10.5vw;letter-spacing:-.04em}body .chip{white-space:normal}}
+.log li span{overflow-wrap:anywhere;min-width:0}
+html,body{overflow-x:clip}
 .hero h1 .ch{display:inline-block;will-change:transform}
 .hero h1 .ghost{color:transparent;-webkit-text-stroke:1.5px rgba(255,255,255,.9)}
 .hero-row{display:flex;justify-content:space-between;align-items:flex-end;gap:28px;flex-wrap:wrap}
@@ -227,6 +231,9 @@ table{border-collapse:collapse;width:100%}
 .kpi{background:var(--panel);padding:20px 22px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .kpi .v{font-family:var(--f-display);font-stretch:118%;font-size:clamp(1.5rem,2.6vw,2.4rem);font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .kpi .v.txt{font-size:clamp(1.05rem,1.7vw,1.5rem);letter-spacing:-.02em;line-height:1.15}
+.kpis.mk{grid-template-columns:repeat(3,minmax(0,1fr))}
+.kpis.mk .kpi .v.txt{font-size:1rem;overflow-wrap:anywhere}
+@media (max-width:760px){.kpis.mk{grid-template-columns:1fr}}
 @media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.84rem}
 .legend span{display:inline-flex;align-items:center;gap:7px}
@@ -390,7 +397,7 @@ table{border-collapse:collapse;width:100%}
 
 <main class="wrap" id="work">
   <section class="sec" id="carica">
-    <div class="sec-h"><span class="idx">01</span><h2>Carica</h2><p>Il file viene letto nel tuo browser e le macro non vengono mai eseguite. Solo se usi la correzione con IA, un estratto del foglio viene inviato a Gemini.</p></div>
+    <div class="sec-h"><span class="idx">01</span><h2>Carica</h2><p>Il file viene letto nel tuo browser e le macro non vengono mai eseguite. Solo se usi la correzione con IA, un estratto del foglio viene inviato a Claude.</p></div>
     <div class="drop" id="drop">
       <div>
         <h3>Trascina qui<br>il tuo file</h3>
@@ -428,9 +435,9 @@ table{border-collapse:collapse;width:100%}
   <section class="sec" id="mappa">
     <div class="sec-h"><span class="idx">03</span><h2>Mappa</h2><p>Per ogni colonna: cosa ho capito, quanto sono sicuro e perché. Se sbaglio, correggi dal menu, oppure lascia che l'IA sistemi il file per te.</p></div>
     <div class="card ai" id="aiCard">
-      <div class="head"><h3>Correzione con IA</h3><span class="chip"><i></i>Gemini · proposte da confermare</span></div>
+      <div class="head"><h3>Correzione con IA</h3><span class="chip"><i></i>Claude · proposte da confermare</span></div>
       <div id="aiBody"></div>
-      <p class="caption">A Gemini arrivano solo le intestazioni, le prime righe e le righe sospette del foglio, non il file intero. I calcoli restano nel tuo browser.</p>
+      <p class="caption">A Claude arrivano solo le intestazioni, le prime righe e le righe sospette del foglio, non il file intero. I calcoli restano nel tuo browser.</p>
     </div>
     <div class="card">
       <div class="tablewrap">
@@ -471,8 +478,13 @@ table{border-collapse:collapse;width:100%}
       <div id="matbox" hidden><div class="corr" id="corr"></div></div>
     </div>
     <div class="card">
-      <div class="head"><h3>Metriche per asset</h3><span class="eyebrow">Sharpe con tasso privo di rischio 0%</span></div>
+      <div class="head"><h3>Contesto macro</h3><span class="chip hist"><i></i>Dati ufficiali</span></div>
+      <div id="macro"></div>
+    </div>
+    <div class="card">
+      <div class="head"><h3>Metriche per asset</h3><span class="eyebrow">Clicca un numero per la ricevuta</span></div>
       <div class="tablewrap"><table class="mt" id="metrics"></table></div>
+      <p class="caption" id="metricsCap"></p>
     </div>
     <div class="next" id="next"></div>
   </section>
@@ -819,7 +831,7 @@ const COLORS=["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(-
 const NET_COLORS=["#8592FF","#FFB547","#4FD1E8","#3FD8A0","#FF7A9A","#C792FF"];
 const color=i=>COLORS[i%COLORS.length];
 const fmtSize=b=>b<1024?b+" B":b<1048576?fmtN(b/1024,0)+" KB":fmtN(b/1048576,1)+" MB";
-const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,corrView:"net",scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null};
+const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,corrView:"net",scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null,macro:null,rfSrc:"ecb"};
 
 /* ---------- Scroll morbido ---------- */
 let lenis=null;
@@ -1219,7 +1231,7 @@ $("#confirmBtn").addEventListener("click",e=>{
     .add(()=>{G.set(w,{clearProps:"all"});w.style.display="none";if(lenis)lenis.start();});
 });
 
-/* ---------- Correzione con IA (Gemini tramite la funzione server /api/fix) ---------- */
+/* ---------- Correzione con IA (Claude tramite la funzione server /api/fix) ---------- */
 const AI_URL="/api/fix";
 const colLetter=i=>{let s="";i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;};
 const colIndex=l=>{let n=0;for(const ch of String(l).toUpperCase().trim()){const c=ch.charCodeAt(0)-64;if(c<1||c>26)return -1;n=n*26+c;}return n-1;};
@@ -1255,7 +1267,7 @@ function validateAI(j){
     return Number.isInteger(r)&&r>=1&&r<=raw.length&&ci>=0&&S.aiAllowedRows&&S.aiAllowedRows.has(r)&&(p.value===null||p.value===undefined||Number.isFinite(Number(p.value)));
   }).map(p=>{const ci=colIndex(p.col),r=Number(p.row);return {row:r,col:String(p.col).toUpperCase(),idx:ci,from:cellText((raw[r-1]||[])[ci]),value:p.value==null?null:Number(p.value),why:String(p.why||"")};})
     .filter(p=>p.value!==null||p.from!=="");
-  return {summary:String(j.summary||""),roles,cells,model:j.model||"Gemini"};
+  return {summary:String(j.summary||""),roles,cells,model:j.model||"Claude"};
 }
 async function requestFix(){
   S.ai={status:"loading"};renderAI();
@@ -1296,7 +1308,7 @@ function renderAI(){
   const el=$("#aiBody");if(!el)return;const a=S.ai;
   const auto=`<label class="toggle"><input type="checkbox" id="aiAuto"${aiAuto()?" checked":""}>Correggi automaticamente quando carico un file</label>`;
   if(!a){el.innerHTML=`<p class="lead">L'IA rilegge il foglio, riconosce le colonne dubbie e gli errori di battitura, e ti propone le correzioni. Tu le applichi con un clic.</p><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center"><button type="button" class="btn primary" id="aiRun" data-mag>Fai sistemare il file all'IA</button>${auto}</div>`;return;}
-  if(a.status==="loading"){const A=an();el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Gemini sta rileggendo ${A.cols.length} colonne e le righe sospette. Può volerci fino a un minuto…</span></div>`;return;}
+  if(a.status==="loading"){const A=an();el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Claude sta rileggendo ${A.cols.length} colonne e le righe sospette. Può volerci fino a un minuto…</span></div>`;return;}
   if(a.status==="error"){el.innerHTML=`<p style="color:var(--muted)">${esc(a.msg)}</p><div><button type="button" class="btn" id="aiRun">Riprova</button></div>`;return;}
   if(a.status==="applied"){el.innerHTML=`<p class="lead">Applicate ${a.n} ${a.n===1?"correzione":"correzioni"}. Le trovi nel controllo qualità con l'etichetta IA.</p><div><button type="button" class="btn" id="aiUndo">Annulla le correzioni</button></div>`;return;}
   const n=a.roles.length+a.cells.length;
@@ -1327,7 +1339,9 @@ function showLab(instant){
   S.lab={st:ds.assets.map(a=>P.stats(a,f,ds.dates)),W:ds.assets.map(a=>P.wealth(a,ds.dates.length)),C:ds.assets.map(a=>ds.assets.map(b=>P.corr(a,b)))};
   S.labFx={};
   $("#lab").hidden=false;$("#navLab").classList.remove("off");
+  if(!S.macro||S.macro.status!=="ready"||S.macro.key!==ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]))S.macro=null;
   renderLab();reveal($("#lab"));
+  if(!S.macro)fetchMacro().then(()=>{if(S.macro)S.macro.key=ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]);});
   if(HAS_G){
     ST.refresh();
     ST.create({trigger:"#kpis",start:"top 90%",once:true,onEnter:()=>countAll()});
@@ -1346,6 +1360,57 @@ function countAll(){
     const o={v:0};G.to(o,{v:to,duration:1.4,ease:"power3.out",onUpdate:()=>{el.textContent=Math.round(o.v).toLocaleString("it-IT");}});
   });
 }
+/* ---------- Dati macro ufficiali (BCE, FRED facoltativo) tramite /api/rates ---------- */
+const ym=d=>`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;
+function macroFor(src){
+  const m=S.macro&&S.macro.status==="ready"&&S.macro.data[src];if(!m)return null;
+  const rp=m.rf.points,cp=m.cpi.points;if(!rp.length||cp.length<2)return null;
+  const rf=rp.reduce((s,x)=>s+x.v,0)/rp.length/100,months=cp.length-1,infl=Math.pow(cp[cp.length-1].v/cp[0].v,12/months)-1;
+  return {rf,infl,months,rfName:m.rf.name,cpiName:m.cpi.name,source:m.rf.source,rfSeries:m.rf.series,cpiSeries:m.cpi.series,n:rp.length,from:rp[0].p,to:rp[rp.length-1].p,c0:cp[0],c1:cp[cp.length-1]};
+}
+async function fetchMacro(){
+  const ds=S.ds;S.macro={status:"loading"};renderMacro();
+  try{
+    const r=await fetch(`/api/rates?from=${ym(ds.dates[0])}&to=${ym(ds.dates[ds.dates.length-1])}`,{signal:AbortSignal.timeout(25000)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||`Errore ${r.status}`);
+    S.macro={status:"ready",data:j};
+    if(!j[S.rfSrc])S.rfSrc=j.ecb?"ecb":j.fred?"fred":"zero";
+  }catch(e){
+    S.macro={status:"error",msg:e instanceof TypeError?"I dati della BCE si caricano nella versione del sito pubblicata su Vercel.":String(e.message||e)};
+  }
+  if(S.lab){renderMacro();renderMetrics();}
+}
+function renderMacro(){
+  const el=$("#macro");if(!el)return;const M=S.macro;
+  if(!M||M.status==="loading"){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Scarico tassi e inflazione ufficiali per il periodo del dataset…</span></div>`;return;}
+  if(M.status==="error"){el.innerHTML=`<p style="color:var(--muted)">${esc(M.msg)} Lo Sharpe usa un tasso privo di rischio dello 0%.</p>`;return;}
+  const opts=[["ecb","BCE · Euribor 3 mesi"],["fred","FRED · T-bill USA 3 mesi"],["zero","Nessuno (0%)"]].filter(o=>o[0]==="zero"||M.data[o[0]]);
+  const mm=macroFor(S.rfSrc);
+  el.innerHTML=`<div class="head"><span class="eyebrow">Tasso privo di rischio e inflazione</span><div class="seg" role="group" aria-label="Fonte del tasso privo di rischio">${opts.map(o=>`<button type="button" data-rf="${o[0]}" aria-pressed="${S.rfSrc===o[0]}">${o[1]}</button>`).join("")}</div></div>
+    ${mm?`<div class="kpis mk">
+      <div class="kpi"><span class="eyebrow">Tasso privo di rischio medio</span><button type="button" class="cellbtn v" style="font-family:var(--f-display);font-size:1.8rem;font-weight:800" data-rc="macro-rf">${fmtPct(mm.rf,2)}</button><span class="caption">${esc(mm.rfName)}</span></div>
+      <div class="kpi"><span class="eyebrow">Inflazione media annua</span><button type="button" class="cellbtn v" style="font-family:var(--f-display);font-size:1.8rem;font-weight:800" data-rc="macro-infl">${fmtPct(mm.infl,2)}</button><span class="caption">${esc(mm.cpiName)}</span></div>
+      <div class="kpi"><span class="eyebrow">Fonte</span><span class="v txt">${esc(mm.source)}</span><span class="caption">${mm.n} mesi · ${mm.from} – ${mm.to}</span></div>
+    </div>`:`<p style="color:var(--muted)">Sharpe calcolato con tasso privo di rischio dello 0%. Il rendimento reale richiede i dati sull'inflazione: scegli la BCE o la FRED.</p>`}
+    ${(M.data.errors||[]).length?`<p class="caption">${esc(M.data.errors.join(" "))}</p>`:""}`;
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-rf]");if(!b)return;S.rfSrc=b.dataset.rf;renderMacro();renderMetrics();});
+function renderMetrics(){
+  const ds=S.ds,L=S.lab,f=ds.freq.f,mm=macroFor(S.rfSrc),rf=mm?mm.rf:0;
+  const cell=(key,val,cls="")=>`<button type="button" class="cellbtn ${cls}" data-rc="${key}">${val}</button>`;
+  const pending=S.macro&&S.macro.status==="loading";
+  $("#metrics").innerHTML=`<thead><tr><th>Asset</th><th>Rend. annuo</th><th>Rend. reale</th><th>Volatilità</th><th>Sharpe</th><th>Max drawdown</th><th>Periodo peggiore</th><th>Oss.</th></tr></thead><tbody>${
+    ds.assets.map((a,i)=>{const s=L.st[i];
+      if(s.n<2)return `<tr><td><span class="an"><i style="background:${color(i)}"></i>${esc(a.name)}</span></td><td colspan="7" style="text-align:left;color:var(--muted)">Dati insufficienti</td></tr>`;
+      const sh=s.vol>0?(s.mean*f-rf)/s.vol:NaN,real=mm?(1+s.cagr)/(1+mm.infl)-1:NaN;
+      return `<tr><td><span class="an"><i style="background:${color(i)}"></i>${esc(a.name)}</span><span class="cl mono">${ROLE_SHORT[a.role]} · col. ${a.col}</span></td>
+      <td>${cell("cagr-"+i,fmtPct(s.cagr,1,true),s.cagr<0?"neg":"")}</td>
+      <td>${mm?cell("real-"+i,fmtPct(real,1,true),real<0?"neg":""):`<span class="cl">${pending?"…":"—"}</span>`}</td>
+      <td>${cell("vol-"+i,fmtPct(s.vol))}</td><td>${cell("sharpe-"+i,fmtN(sh))}</td>
+      <td>${cell("mdd-"+i,fmtPct(s.mdd),"neg")}</td><td>${cell("worst-"+i,`${fmtPct(s.worst)} <span style="color:var(--faint)">${fmtDate(ds.dates[s.worstK],f)}</span>`)}</td><td class="mono">${s.n}</td></tr>`;}).join("")}</tbody>`;
+  const cap=$("#metricsCap");if(cap)cap.textContent=mm?`Sharpe con tasso privo di rischio medio ${fmtPct(mm.rf,2)} (${mm.rfName}). Rendimento reale al netto dell'inflazione media ${fmtPct(mm.infl,2)}.`:"Sharpe con tasso privo di rischio 0%.";
+}
 function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;
   $("#labSource").textContent=`${S.source.name} · foglio «${an().name}» · ${ds.assets.length} asset dal ${fmtDate(ds.dates[0],f)} al ${fmtDate(ds.dates[ds.dates.length-1],f)}.`;
@@ -1355,13 +1420,8 @@ function renderLab(){
   ].map(k=>`<div class="kpi"><span class="eyebrow">${k[0]}</span><span class="v${k[2]?"":" txt"}"${k[2]&&HAS_G?` data-count="${k[1]}"`:""}>${esc(typeof k[1]==="number"?(k[2]&&HAS_G?0:k[1]).toLocaleString("it-IT"):k[1])}</span></div>`).join("");
   $("#legend").innerHTML=ds.assets.map((a,i)=>`<span><i style="background:${color(i)}"></i>${esc(a.name)}</span>`).join("");
   drawChart(false);
-  const cell=(key,val,cls="")=>`<button type="button" class="cellbtn ${cls}" data-rc="${key}">${val}</button>`;
-  $("#metrics").innerHTML=`<thead><tr><th>Asset</th><th>Rend. annuo</th><th>Volatilità</th><th>Sharpe</th><th>Max drawdown</th><th>Periodo peggiore</th><th>Oss.</th></tr></thead><tbody>${
-    ds.assets.map((a,i)=>{const s=L.st[i];
-      if(s.n<2)return `<tr><td><span class="an"><i style="background:${color(i)}"></i>${esc(a.name)}</span></td><td colspan="6" style="text-align:left;color:var(--muted)">Dati insufficienti</td></tr>`;
-      return `<tr><td><span class="an"><i style="background:${color(i)}"></i>${esc(a.name)}</span><span class="cl mono">${ROLE_SHORT[a.role]} · col. ${a.col}</span></td>
-      <td>${cell("cagr-"+i,fmtPct(s.cagr,1,true),s.cagr<0?"neg":"")}</td><td>${cell("vol-"+i,fmtPct(s.vol))}</td><td>${cell("sharpe-"+i,fmtN(s.sharpe))}</td>
-      <td>${cell("mdd-"+i,fmtPct(s.mdd),"neg")}</td><td>${cell("worst-"+i,`${fmtPct(s.worst)} <span style="color:var(--faint)">${fmtDate(ds.dates[s.worstK],f)}</span>`)}</td><td class="mono">${s.n}</td></tr>`;}).join("")}</tbody>`;
+  renderMetrics();
+  renderMacro();
   renderMatrix();
   const caps=P.capabilities(ds),get=n=>caps.find(c=>c.name.startsWith(n));
   const NX=[
@@ -1514,13 +1574,20 @@ function receipt(key){
     return {title:`Correlazione · ${a.name} / ${b.name}`,value:fmtN(c.r),formula:"ρ = Σ (xᵢ − x̄)(yᵢ − ȳ) / √[ Σ (xᵢ − x̄)² · Σ (yᵢ − ȳ)² ]\nx, y = rendimenti di periodo dei due asset",
       kv:[["Coppie di rendimenti usate",c.n],["Regola","solo periodi in cui entrambi hanno un valore"],["Lettura",Number.isFinite(c.r)?(Math.abs(c.r)>=.7?"legame forte":Math.abs(c.r)>=.3?"legame moderato":"legame debole")+(c.r<0?", opposto":""):"—"]]};
   }
+  const mm=macroFor(S.rfSrc),rf=mm?mm.rf:0;
+  if(kind==="macro"&&mm){
+    return parts[1]==="rf"
+      ?{title:`Tasso privo di rischio medio · ${mm.rfName}`,value:fmtPct(mm.rf,2),formula:"rf = media dei valori mensili del periodo / 100",kv:[["Serie",mm.rfSeries],["Fonte",mm.source],["Mesi usati",mm.n],["Periodo",`${mm.from} – ${mm.to}`]]}
+      :{title:`Inflazione media annua · ${mm.cpiName}`,value:fmtPct(mm.infl,2),formula:"π = (Indice finale / Indice iniziale)^(12 / mesi) − 1",kv:[["Serie",mm.cpiSeries],["Fonte",mm.source],["Indice iniziale",`${fmtN(mm.c0.v)} · ${mm.c0.p}`],["Indice finale",`${fmtN(mm.c1.v)} · ${mm.c1.p}`],["Mesi",mm.months]]};
+  }
   const i=+parts[1],a=ds.assets[i],s=L.st[i];
   const base=[["Osservazioni (rendimenti)",s.n],["Periodo",`${fmtDate(s.from,f)} – ${fmtDate(s.to,f)}`],["Frequenza",`${ds.freq.label} · fattore f = ${f}`],["Valori mancanti esclusi",s.skipped],["Origine",`col. ${a.col} · ${ROLE_SHORT[a.role]}`]];
   const src=a.role==="price"?"rᵢ = Pᵢ / Pᵢ₋₁ − 1   (dai prezzi)\n":a.role==="retpct"?"rᵢ = valore / 100   (dai punti %)\n":"rᵢ = valore   (rendimenti decimali)\n";
   const M={
     cagr:{t:"Rendimento annuo composto (CAGR)",v:fmtPct(s.cagr,2,true),fx:src+"CAGR = [ Π (1 + rᵢ) ]^(f / n) − 1",kv:[["Rendimento totale",fmtPct(s.total,1,true)],["n",s.n],["f",f]]},
     vol:{t:"Volatilità annualizzata",v:fmtPct(s.vol,2),fx:src+"σ = √[ Σ (rᵢ − r̄)² / (n − 1) ] · √f",kv:[["Deviazione standard di periodo",fmtPct(s.sd,2)],["Rendimento medio di periodo",fmtPct(s.mean,3)]]},
-    sharpe:{t:"Indice di Sharpe",v:fmtN(s.sharpe),fx:src+"Sharpe = (r̄ · f − rf) / σ\nrf = 0% (ipotesi, modificabile nel Modulo 2)",kv:[["Rendimento medio annualizzato",fmtPct(s.mean*f,2)],["Volatilità annualizzata",fmtPct(s.vol,2)],["Tasso privo di rischio","0% · ipotesi"]]},
+    sharpe:{t:"Indice di Sharpe",v:fmtN(s.vol>0?(s.mean*f-rf)/s.vol:NaN),fx:src+"Sharpe = (r̄ · f − rf) / σ",kv:[["Rendimento medio annualizzato",fmtPct(s.mean*f,2)],["Volatilità annualizzata",fmtPct(s.vol,2)],["Tasso privo di rischio",mm?`${fmtPct(rf,2)} · ${mm.rfName}`:"0% · nessun dato macro"]]},
+    real:{t:"Rendimento reale annuo",v:mm?fmtPct((1+s.cagr)/(1+mm.infl)-1,2,true):"—",fx:src+"Reale = (1 + CAGR) / (1 + π) − 1\nπ = inflazione media annua del periodo",kv:[["CAGR nominale",fmtPct(s.cagr,2,true)],["Inflazione media annua",mm?`${fmtPct(mm.infl,2)} · ${mm.cpiName}`:"—"]]},
     mdd:{t:"Massimo drawdown",v:fmtPct(s.mdd,2),fx:src+"Wₜ = Π (1 + rᵢ)   fino a t\nDD = min ( Wₜ / max(W₀…Wₜ) − 1 )",kv:[["Picco",fmtDate(ds.dates[s.mddPeak],f)],["Minimo",fmtDate(ds.dates[s.mddTrough],f)]]},
     worst:{t:"Periodo peggiore",v:fmtPct(s.worst,2),fx:src+"min(rᵢ)",kv:[["Data",fmtDate(ds.dates[s.worstK],f)],["Periodo migliore",`${fmtPct(s.best,2,true)} · ${fmtDate(ds.dates[s.bestK],f)}`]]}
   }[kind];
