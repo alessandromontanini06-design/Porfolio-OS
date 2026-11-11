@@ -10,21 +10,25 @@ const hits = new Map();
 const ROLES = ["date", "price", "ret", "retpct", "ignore"];
 let cachedModel = null;
 
-// Elenca i modelli disponibili per questa chiave e sceglie il "flash" più recente.
-async function pickModel(key) {
+// Elenca i modelli "flash" disponibili per questa chiave, dal più recente.
+// I modelli "lite" vanno in fondo come ultima riserva.
+async function listModels(key) {
   try {
     const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
-    if (!r.ok) return null;
+    if (!r.ok) return [];
     const j = await r.json();
     const names = (j.models || [])
       .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
       .map(m => String(m.name || "").replace(/^models\//, ""))
-      .filter(n => /flash/.test(n) && !/(lite|image|tts|audio|live|thinking|exp|preview)/.test(n));
+      .filter(n => /flash/.test(n) && !/(image|tts|audio|live|thinking|exp|preview)/.test(n));
     const ver = n => (n.match(/(\d+(?:\.\d+)?)/) || [0, 0])[1] * 1;
-    names.sort((a, b) => ver(b) - ver(a));
-    return names[0] || null;
-  } catch { return null; }
+    const lite = n => (/lite/.test(n) ? 1 : 0);
+    names.sort((a, b) => lite(a) - lite(b) || ver(b) - ver(a));
+    return names;
+  } catch { return []; }
 }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const BUSY = new Set([429, 500, 503]);
 
 const SCHEMA = {
   type: "OBJECT",
@@ -140,10 +144,17 @@ export default async function handler(req, res) {
   );
   try {
     let r = await call(model);
-    // Se Google ha ritirato il modello, ne sceglie da solo uno "flash" disponibile.
-    if (r.status === 404) {
-      const alt = await pickModel(key);
-      if (alt && alt !== model) { model = alt; cachedModel = alt; r = await call(model); }
+    // Modello sovraccarico: un nuovo tentativo dopo una breve pausa.
+    if (BUSY.has(r.status)) { await wait(1200); r = await call(model); }
+    // Modello ritirato o ancora sovraccarico: prova gli altri "flash" disponibili.
+    if (r.status === 404 || BUSY.has(r.status)) {
+      const tried = new Set([model]);
+      for (const alt of (await listModels(key)).filter(n => !tried.has(n)).slice(0, 3)) {
+        tried.add(alt);
+        const r2 = await call(alt);
+        if (r2.ok) { r = r2; model = alt; cachedModel = alt; break; }
+        r = r2;
+      }
     }
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
