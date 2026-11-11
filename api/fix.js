@@ -1,70 +1,27 @@
-// Funzione server di Vercel: riceve un estratto del foglio e chiede a Gemini
+// Funzione server di Vercel: riceve un estratto del foglio e chiede a Claude
 // di proporre correzioni. La chiave resta qui sul server, nella variabile
-// d'ambiente GEMINI_API_KEY, e non arriva mai al browser.
+// d'ambiente ANTHROPIC_API_KEY, e non arriva mai al browser.
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
 const WINDOW_MS = 60 * 60 * 1000;                       // finestra di un'ora
 const LIMIT = Number(process.env.AI_HOURLY_LIMIT || 20); // richieste per IP all'ora
 const MAX_BODY = 60_000;                                 // caratteri massimi in ingresso
 const hits = new Map();
 
+// Modello: si sceglie con la variabile CLAUDE_MODEL su Vercel.
+// "claude-haiku-5-5" è il più economico; "claude-opus-5-5" il più capace.
+const MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
+
 const ROLES = ["date", "price", "ret", "retpct", "ignore"];
-let cachedModel = null;
+const Proposal = z.object({
+  summary: z.string(),
+  roles: z.array(z.object({ col: z.string(), role: z.enum(ROLES), why: z.string() })),
+  cells: z.array(z.object({ row: z.number().int(), col: z.string(), value: z.number().nullable(), why: z.string() }))
+});
 
-// Elenca i modelli "flash" disponibili per questa chiave, dal più recente.
-// I modelli "lite" vanno in fondo come ultima riserva.
-async function listModels(key) {
-  try {
-    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
-    if (!r.ok) return [];
-    const j = await r.json();
-    const names = (j.models || [])
-      .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
-      .map(m => String(m.name || "").replace(/^models\//, ""))
-      .filter(n => /flash/.test(n) && !/(image|tts|audio|live|thinking|exp|preview)/.test(n));
-    const ver = n => (n.match(/(\d+(?:\.\d+)?)/) || [0, 0])[1] * 1;
-    const lite = n => (/lite/.test(n) ? 1 : 0);
-    names.sort((a, b) => lite(a) - lite(b) || ver(b) - ver(a));
-    return names;
-  } catch { return []; }
-}
-const wait = ms => new Promise(r => setTimeout(r, ms));
-const BUSY = new Set([429, 500, 503]);
-
-const SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    summary: { type: "STRING" },
-    roles: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          col: { type: "STRING" },
-          role: { type: "STRING", enum: ROLES },
-          why: { type: "STRING" }
-        },
-        required: ["col", "role", "why"]
-      }
-    },
-    cells: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          row: { type: "INTEGER" },
-          col: { type: "STRING" },
-          value: { type: "NUMBER", nullable: true },
-          why: { type: "STRING" }
-        },
-        required: ["row", "col", "why"]
-      }
-    }
-  },
-  required: ["summary", "roles", "cells"]
-};
-
-function buildPrompt(data) {
-  return `Sei un analista quantitativo che pulisce dati finanziari prima di un'analisi.
+const SYSTEM = `Sei un analista quantitativo che pulisce dati finanziari prima di un'analisi.
 Ricevi un estratto di un foglio Excel: le colonne con l'interpretazione proposta da un motore a regole, le prime righe del foglio e alcune righe sospette con il loro contesto.
 
 Ruoli possibili per una colonna:
@@ -81,98 +38,60 @@ Regole:
 4. Non correggere valori plausibili anche se estremi: crolli reali come quelli del 2008 o di marzo 2020 sono dati veri.
 5. Ogni proposta ha una spiegazione di una frase, in italiano.
 6. "summary" riassume in una o due frasi, in italiano, cosa hai trovato.
-Se non serve alcuna correzione, restituisci liste vuote.
+Se non serve alcuna correzione, restituisci liste vuote.`;
 
-DATI:
-${JSON.stringify(data)}`;
-}
+const client = new Anthropic({ timeout: 45_000, maxRetries: 1 });
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "Usa una richiesta POST." });
-    return;
-  }
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) {
-    res.status(500).json({ error: "La chiave Gemini non è configurata sul server." });
-    return;
-  }
+  if (req.method !== "POST") { res.status(405).json({ error: "Usa una richiesta POST." }); return; }
+  if (!process.env.ANTHROPIC_API_KEY) { res.status(500).json({ error: "La chiave di Claude non è configurata sul server." }); return; }
 
   // Solo il tuo sito può usare questa funzione (se ALLOWED_ORIGIN è impostata).
   const allowed = (process.env.ALLOWED_ORIGIN || "").split(",").map(s => s.trim()).filter(Boolean);
   const origin = req.headers.origin || "";
-  if (allowed.length && !allowed.includes(origin)) {
-    res.status(403).json({ error: "Richiesta da un sito non autorizzato." });
-    return;
-  }
+  if (allowed.length && !allowed.includes(origin)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
 
   // Limite di richieste per indirizzo IP.
   const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "anonimo";
   const now = Date.now();
   const recent = (hits.get(ip) || []).filter(t => now - t < WINDOW_MS);
-  if (recent.length >= LIMIT) {
-    res.status(429).json({ error: "Hai raggiunto il limite di correzioni per quest'ora. Riprova più tardi." });
-    return;
-  }
-  recent.push(now);
-  hits.set(ip, recent);
+  if (recent.length >= LIMIT) { res.status(429).json({ error: "Hai raggiunto il limite di correzioni per quest'ora. Riprova più tardi." }); return; }
+  recent.push(now); hits.set(ip, recent);
 
   let data = req.body;
-  if (typeof data === "string") {
-    try { data = JSON.parse(data); } catch { res.status(400).json({ error: "Dati non leggibili." }); return; }
-  }
-  if (!data || typeof data !== "object" || !Array.isArray(data.colonne || data.columns)) {
-    res.status(400).json({ error: "Dati mancanti o nel formato sbagliato." });
-    return;
-  }
-  if (JSON.stringify(data).length > MAX_BODY) {
-    res.status(413).json({ error: "L'estratto del foglio è troppo grande." });
-    return;
-  }
+  if (typeof data === "string") { try { data = JSON.parse(data); } catch { res.status(400).json({ error: "Dati non leggibili." }); return; } }
+  if (!data || typeof data !== "object" || !Array.isArray(data.colonne || data.columns)) { res.status(400).json({ error: "Dati mancanti o nel formato sbagliato." }); return; }
+  const payload = JSON.stringify(data);
+  if (payload.length > MAX_BODY) { res.status(413).json({ error: "L'estratto del foglio è troppo grande." }); return; }
 
-  let model = process.env.GEMINI_MODEL || cachedModel || "gemini-3.8-flash";
-  const call = m => fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: buildPrompt(data) }] }],
-        generationConfig: { temperature: 0.1, responseMimeType: "application/json", responseSchema: SCHEMA }
-      })
-    }
-  );
   try {
-    let r = await call(model);
-    // Modello sovraccarico: un nuovo tentativo dopo una breve pausa.
-    if (BUSY.has(r.status)) { await wait(1200); r = await call(model); }
-    // Modello ritirato o ancora sovraccarico: prova gli altri "flash" disponibili.
-    if (r.status === 404 || BUSY.has(r.status)) {
-      const tried = new Set([model]);
-      for (const alt of (await listModels(key)).filter(n => !tried.has(n)).slice(0, 3)) {
-        tried.add(alt);
-        const r2 = await call(alt);
-        if (r2.ok) { r = r2; model = alt; cachedModel = alt; break; }
-        r = r2;
-      }
-    }
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const msg = j && j.error && j.error.message ? ` ${j.error.message}` : "";
-      res.status(502).json({ error: `Gemini ha risposto con un errore (${r.status}).${msg}` });
+    const response = await client.messages.parse({
+      model: MODEL,
+      max_tokens: 4000,
+      system: SYSTEM,
+      output_config: { effort: "low", format: zodOutputFormat(Proposal) },
+      messages: [{ role: "user", content: `DATI DEL FOGLIO:\n${payload}` }]
+    });
+    if (response.stop_reason === "refusal") { res.status(502).json({ error: "L'IA ha rifiutato di analizzare questo foglio." }); return; }
+    const out = response.parsed_output;
+    if (!out) { res.status(502).json({ error: "La risposta dell'IA non è valida. Riprova." }); return; }
+    res.status(200).json({
+      summary: out.summary,
+      roles: out.roles.slice(0, 40),
+      cells: out.cells.slice(0, 60),
+      model: MODEL
+    });
+  } catch (error) {
+    if (error instanceof Anthropic.AuthenticationError) { res.status(500).json({ error: "La chiave di Claude non è valida." }); return; }
+    if (error instanceof Anthropic.PermissionDeniedError) { res.status(500).json({ error: "La chiave di Claude non ha accesso a questo modello." }); return; }
+    if (error instanceof Anthropic.RateLimitError) { res.status(503).json({ error: "Troppe richieste a Claude in questo momento. Riprova tra un minuto." }); return; }
+    if (error instanceof Anthropic.APIError) {
+      const s = error.status;
+      if (s === 400 && /credit|balance/i.test(String(error.message))) { res.status(503).json({ error: "Il credito di Claude è esaurito: la correzione IA è sospesa." }); return; }
+      if (s >= 500) { res.status(503).json({ error: "Claude è momentaneamente sovraccarico. Riprova tra qualche minuto." }); return; }
+      res.status(502).json({ error: `Claude ha risposto con un errore (${s}).` });
       return;
     }
-    const parts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
-    const text = parts.map(p => p.text || "").join("");
-    let out;
-    try { out = JSON.parse(text); } catch { res.status(502).json({ error: "La risposta dell'IA non è valida. Riprova." }); return; }
-    res.status(200).json({
-      summary: String(out.summary || ""),
-      roles: Array.isArray(out.roles) ? out.roles.slice(0, 40) : [],
-      cells: Array.isArray(out.cells) ? out.cells.slice(0, 60) : [],
-      model
-    });
-  } catch (e) {
-    res.status(502).json({ error: "Non riesco a contattare Gemini. Riprova tra poco." });
+    res.status(502).json({ error: "Non riesco a contattare Claude. Riprova tra poco." });
   }
 }
