@@ -1407,11 +1407,15 @@ async function rebuildFromPrices(){
   const pos=u.posizioni.map((p,i)=>({...p,simbolo:String(((document.getElementById("und-sym-"+i)||{}).value)||p.simbolo).trim().toUpperCase()})).filter(p=>p.simbolo);
   S.und={...u,posizioni:pos,status:"rebuilding",err:null};renderAI();
   try{
-    const r=await fetch("/api/prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbols:pos.map(p=>p.simbolo)}),signal:AbortSignal.timeout(90000)});
-    const j=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(j.error||`Il server ha risposto con un errore (${r.status}).`);
+    // Un ETF per richiesta: la rete di Vercel conserva ogni serie 24 ore e la condivide tra tutti i visitatori.
+    const series=[];
+    for(const p of pos){
+      const r=await fetch(`/api/prices?symbol=${encodeURIComponent(p.simbolo)}`,{signal:AbortSignal.timeout(30000)});
+      const j=await r.json().catch(()=>({}));
+      series.push(r.ok&&!j.error?j:{symbol:p.simbolo,error:j.error||`Errore ${r.status} per ${p.simbolo}.`});
+    }
     const ok=[],bad=[];
-    (j.series||[]).forEach((s,i)=>{(s.error?bad:ok).push({p:pos[i],s});});
+    series.forEach((s,i)=>{(s.error?bad:ok).push({p:pos[i],s});});
     if(!ok.length)throw new Error(bad.map(b=>b.s.error).join(" ")||"Nessun prezzo scaricato.");
     const maps=ok.map(o=>new Map(o.s.points.map(x=>[x.d.slice(0,7),x])));
     const months=[...maps[0].keys()].filter(m=>maps.every(mp=>mp.has(m))).sort().slice(-121);
@@ -1422,7 +1426,7 @@ async function rebuildFromPrices(){
     const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted})),missing:bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error}))};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},true);
     S.portfolio=pf;
-    S.aiLog=[`File ricostruito: ${ok.length} strumenti, ${months.length} mesi di prezzi da Alpha Vantage (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}, nella valuta di quotazione).`,
+    S.aiLog=[`File ricostruito: ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi da Alpha Vantage (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}, nella valuta di quotazione).`,
       ...pf.missing.map(m=>`Non scaricato: ${m.nome} (${m.simbolo}). ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
     renderQuality(S.ds);
   }catch(e){
