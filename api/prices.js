@@ -1,5 +1,6 @@
 // Funzione server di Vercel: storico mensile dei prezzi da Alpha Vantage.
-// POST { symbols: ["SWDA.LON", ...] }  -> prezzi di chiusura mensili rettificati
+// GET  ?symbol=SWDA.LON                -> prezzi di chiusura mensili rettificati (con cache di Vercel)
+// POST { symbols: ["SWDA.LON", ...] }  -> più serie insieme (compatibilità)
 // POST { search: "SWDA" }              -> simboli candidati
 // La chiave resta sul server (ALPHAVANTAGE_API_KEY). I dati restano in memoria 24 ore,
 // per non consumare le poche richieste giornaliere del piano gratuito.
@@ -52,12 +53,43 @@ async function search(q, key) {
   return v;
 }
 
+// La richiesta arriva dal tuo sito? Per i POST il browser manda "Origin"; per i GET dello stesso sito
+// manda "Sec-Fetch-Site: same-origin" e il "Referer".
+function fromOwnSite(req, allowed) {
+  if (!allowed.length) return true;
+  const h = req.headers;
+  if (allowed.includes(h.origin || "")) return true;
+  if (h["sec-fetch-site"] === "same-origin") return true;
+  return allowed.some(a => String(h.referer || "").startsWith(a + "/"));
+}
+
 export default async function handler(req, res) {
-  if (req.method !== "POST") { res.status(405).json({ error: "Usa una richiesta POST." }); return; }
   const key = process.env.ALPHAVANTAGE_API_KEY;
-  if (!key) { res.status(500).json({ error: "La chiave di Alpha Vantage non è configurata sul server." }); return; }
   const allowed = (process.env.ALLOWED_ORIGIN || "").split(",").map(s => s.trim()).filter(Boolean);
-  if (allowed.length && !allowed.includes(req.headers.origin || "")) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
+  const noStore = () => res.setHeader("Cache-Control", "no-store");
+
+  // GET /api/prices?symbol=SWDA.LON  ->  una serie, conservata 24 ore dalla rete di Vercel
+  // e servita a tutti i visitatori: ogni ETF consuma al massimo una richiesta al giorno.
+  if (req.method === "GET") {
+    const symbol = String((req.query && req.query.symbol) || "").trim().toUpperCase();
+    if (!SYM.test(symbol)) { noStore(); res.status(400).json({ symbol, error: "Simbolo non valido, per esempio SWDA.LON." }); return; }
+    if (!key) { noStore(); res.status(500).json({ symbol, error: "La chiave di Alpha Vantage non è configurata sul server." }); return; }
+    if (!fromOwnSite(req, allowed)) { noStore(); res.status(403).json({ symbol, error: "Richiesta da un sito non autorizzato." }); return; }
+    try {
+      const s = await monthly(symbol, key);
+      if (s.error) { noStore(); res.status(/Limite/.test(s.error) ? 429 : 404).json(s); return; }
+      res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=172800");
+      res.status(200).json(s);
+    } catch {
+      noStore(); res.status(502).json({ symbol, error: "Non riesco a contattare Alpha Vantage. Riprova tra poco." });
+    }
+    return;
+  }
+
+  noStore();
+  if (req.method !== "POST") { res.status(405).json({ error: "Usa GET o POST." }); return; }
+  if (!key) { res.status(500).json({ error: "La chiave di Alpha Vantage non è configurata sul server." }); return; }
+  if (!fromOwnSite(req, allowed)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
