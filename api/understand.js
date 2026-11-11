@@ -41,7 +41,7 @@ Tipi:
 
 Per ogni posizione:
 - "ticker": il codice come appare nel file.
-- "simbolo": il simbolo per Alpha Vantage nel formato TICKER.BORSA, scegliendo la borsa dove lo strumento è più probabilmente quotato e scambiato: .LON per Londra, .DEX per Xetra, .PAR per Parigi, .AMS per Amsterdam; nessun suffisso per gli Stati Uniti. L'utente confermerà.
+- "simbolo": il simbolo per Alpha Vantage nel formato TICKER.BORSA, scegliendo la borsa dove lo strumento è più probabilmente quotato e scambiato: .LON per Londra, .DEX per Xetra, .PAR per Parigi, .AMS per Amsterdam; nessun suffisso per gli Stati Uniti. Borsa Italiana non è coperta: per gli ETF comprati a Milano usa la quotazione di Londra o di Xetra. Attenzione, il ticker di Milano può essere diverso: gli iShares con prefisso "CS" a Milano a Londra perdono la "S" (CSNDX diventa CNDX.LON, CSSPX diventa CSPX.LON); gli ETF Xtrackers come XXSC sono su Xetra (XXSC.DEX). L'utente confermerà.
 - "valore": il valore in euro come numero, se presente, altrimenti null.
 - "pesoAttuale" e "pesoTarget": in forma decimale (85,6% = 0.856), se presenti, altrimenti null.
 
