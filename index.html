@@ -1261,7 +1261,7 @@ async function requestFix(){
   S.ai={status:"loading"};renderAI();
   let payload;try{payload=aiPayload();}catch(e){S.ai={status:"error",msg:"Non riesco a preparare l'estratto del foglio."};renderAI();return;}
   try{
-    const ctrl=new AbortController(),to=setTimeout(()=>ctrl.abort(),35000);
+    const ctrl=new AbortController(),to=setTimeout(()=>ctrl.abort(),60000);
     const r=await fetch(AI_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),signal:ctrl.signal});
     clearTimeout(to);
     const j=await r.json().catch(()=>({}));
@@ -1296,7 +1296,7 @@ function renderAI(){
   const el=$("#aiBody");if(!el)return;const a=S.ai;
   const auto=`<label class="toggle"><input type="checkbox" id="aiAuto"${aiAuto()?" checked":""}>Correggi automaticamente quando carico un file</label>`;
   if(!a){el.innerHTML=`<p class="lead">L'IA rilegge il foglio, riconosce le colonne dubbie e gli errori di battitura, e ti propone le correzioni. Tu le applichi con un clic.</p><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center"><button type="button" class="btn primary" id="aiRun" data-mag>Fai sistemare il file all'IA</button>${auto}</div>`;return;}
-  if(a.status==="loading"){const A=an();el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Gemini sta rileggendo ${A.cols.length} colonne e le righe sospette…</span></div>`;return;}
+  if(a.status==="loading"){const A=an();el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Gemini sta rileggendo ${A.cols.length} colonne e le righe sospette. Può volerci fino a un minuto…</span></div>`;return;}
   if(a.status==="error"){el.innerHTML=`<p style="color:var(--muted)">${esc(a.msg)}</p><div><button type="button" class="btn" id="aiRun">Riprova</button></div>`;return;}
   if(a.status==="applied"){el.innerHTML=`<p class="lead">Applicate ${a.n} ${a.n===1?"correzione":"correzioni"}. Le trovi nel controllo qualità con l'etichetta IA.</p><div><button type="button" class="btn" id="aiUndo">Annulla le correzioni</button></div>`;return;}
   const n=a.roles.length+a.cells.length;
