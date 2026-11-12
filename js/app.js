@@ -589,7 +589,7 @@ async function rebuildFromPrices(){
     // Un ETF per richiesta: la rete di Vercel conserva ogni serie 24 ore e la condivide tra tutti i visitatori.
     const series=[];
     for(const p of pos){
-      const r=await fetch(`/api/prices?symbol=${encodeURIComponent(p.simbolo)}`,{signal:AbortSignal.timeout(30000)});
+      const r=await fetch(`/api/prices?symbol=${encodeURIComponent(p.simbolo)}&v=2`,{signal:AbortSignal.timeout(30000)});
       const j=await r.json().catch(()=>({}));
       series.push(r.ok&&!j.error?j:{symbol:p.simbolo,error:j.error||`Errore ${r.status} per ${p.simbolo}.`});
     }
@@ -1484,7 +1484,7 @@ async function getJSON(url){
 }
 function bnLoad(sym){
   const cur=S.bnData[sym];if(cur)return cur.loading?cur.pr:Promise.resolve();
-  const pr=Promise.all([getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}`),S.fx?Promise.resolve(S.fx):getJSON("/api/fx?ccy=USD")]).then(([d,fx])=>{
+  const pr=Promise.all([getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}&v=2`),S.fx?Promise.resolve(S.fx):getJSON("/api/fx?ccy=USD")]).then(([d,fx])=>{
     S.bnData[sym]=d;if(!fx.error){S.fx=fx;S.fxErr=null;}else if(!S.fx)S.fxErr=fx.error;
     if(current==="bench")renderBench();if(current==="stress"&&S.stress)renderStress();if(current==="lab"&&S.lab)renderReal();
   });

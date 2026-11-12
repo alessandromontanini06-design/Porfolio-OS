@@ -40,7 +40,7 @@ async function monthly(symbol, key) {
   const meta = res.data["Meta Data"] || {};
   const cur = await currencyOf(symbol, key);
   const v = { symbol, adjusted, points, currency: cur.currency, currencySource: cur.from, info: String(meta["1. Information"] || ""), source: "Alpha Vantage" };
-  cache.set("m:" + symbol, { t: Date.now(), v });
+  if (cur.currency) cache.set("m:" + symbol, { t: Date.now(), v }); // senza valuta non si conserva: al prossimo giro si riprova
   return v;
 }
 
@@ -52,11 +52,16 @@ async function currencyOf(symbol, key) {
   if (/\.(SWX|SW)$/.test(symbol)) return { currency: "CHF", from: "borsa" };
   if (/\.TRT$/.test(symbol)) return { currency: "CAD", from: "borsa" };
   if (!symbol.includes(".")) return { currency: "USD", from: "borsa" };
-  try {
-    const s = await search(symbol.split(".")[0], key);
-    const m = (s.matches || []).find(x => String(x.symbol).toUpperCase() === symbol);
-    if (m && m.currency) return { currency: String(m.currency).toUpperCase(), from: "ricerca Alpha Vantage" };
-  } catch {}
+  // la ricerca subito dopo lo storico può cadere nel limite al minuto: un secondo tentativo dopo una pausa
+  for (let k = 0; k < 2; k++) {
+    try {
+      const s = await search(symbol.split(".")[0], key);
+      const m = (s.matches || []).find(x => String(x.symbol).toUpperCase() === symbol);
+      if (m && m.currency) return { currency: String(m.currency).toUpperCase(), from: "ricerca Alpha Vantage" };
+      if (!s.error) break;
+    } catch {}
+    await wait(1500);
+  }
   return { currency: null, from: "sconosciuta" };
 }
 
@@ -95,7 +100,7 @@ export default async function handler(req, res) {
     try {
       const s = await monthly(symbol, key);
       if (s.error) { noStore(); res.status(/Limite/.test(s.error) ? 429 : 404).json(s); return; }
-      res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=172800");
+      res.setHeader("Cache-Control", s.currency ? "public, s-maxage=86400, stale-while-revalidate=172800" : "public, s-maxage=120");
       res.status(200).json(s);
     } catch {
       noStore(); res.status(502).json({ symbol, error: "Non riesco a contattare Alpha Vantage. Riprova tra poco." });
