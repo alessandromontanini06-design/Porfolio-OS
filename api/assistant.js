@@ -56,7 +56,7 @@ export default async function handler(req, res) {
   const messages = body && Array.isArray(body.messages) ? body.messages : null;
   if (!messages || !messages.length || messages.length > 40) { res.status(400).json({ error: "Conversazione mancante o troppo lunga: ricomincia la chat." }); return; }
   const clean = messages.map(m => m.role === "user" ? { role: "user", text: String(m.text || "").slice(0, 2000) }
-    : m.role === "assistant" ? { role: "assistant", text: String(m.text || "").slice(0, 4000), calls: Array.isArray(m.calls) ? m.calls.slice(0, 6).map(c => ({ id: String(c.id), name: String(c.name), args: c.args && typeof c.args === "object" ? c.args : {} })) : [] }
+    : m.role === "assistant" ? { role: "assistant", text: String(m.text || "").slice(0, 4000), calls: Array.isArray(m.calls) ? m.calls.slice(0, 6).map(c => ({ id: String(c.id), name: String(c.name), args: c.args && typeof c.args === "object" ? c.args : {}, ...(typeof c.sig === "string" && c.sig.length < 20000 ? { sig: c.sig } : {}) })) : [] }
     : m.role === "tool" ? { role: "tool", id: String(m.id), name: String(m.name), result: m.result } : null).filter(Boolean);
   if (JSON.stringify(clean).length > 80_000) { res.status(413).json({ error: "La conversazione è troppo lunga: ricomincia la chat." }); return; }
   const ctx = body.context ? `\n\nContesto attuale dell'app: ${String(body.context).slice(0, 600)}` : "";
