@@ -564,7 +564,19 @@ body.chat-on .orb-say{display:none}
 @media (max-width:640px){.labs-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lab-tile{min-height:180px}.lab-d{display:none}}
 /* Telefono: titolo e marchio */
 .brand{white-space:nowrap}
-@media (max-width:480px){.hero-tile h1{font-size:7.4vw!important}.brand{font-size:.85rem}.status .chip.live{display:none}}
+@media (max-width:480px){.hero-tile h1{font-size:8.6vw!important}.brand{font-size:.85rem}.status .chip.live{display:none}}
 /* Titolo della home: la riga lime pulsa di luce */
 .hero-tile h1 .lime{animation:limeglow 3.6s ease-in-out infinite}
 @keyframes limeglow{0%,100%{text-shadow:0 0 0 rgba(212,255,58,0)}50%{text-shadow:0 0 28px rgba(212,255,58,.55),0 0 70px rgba(212,255,58,.25)}}
+
+/* Home: titolo a tutta larghezza, senza riquadro, particelle dietro */
+.hero-full{display:flex;flex-direction:column;justify-content:space-between;gap:clamp(18px,3vh,36px);min-height:calc(100vh - 150px);padding:clamp(8px,2vh,24px) 0 clamp(14px,3vh,30px);background:none;border:0;box-shadow:none}
+.hero-full h1{font-size:clamp(2.6rem,8.6vw,9.4rem);line-height:.86;letter-spacing:-.045em;margin:auto 0;filter:drop-shadow(0 10px 40px rgba(11,6,22,.65))}
+.hero-full h1 .lime{text-shadow:none;animation:none}
+.hero-full h1{animation:heroglow 4.5s ease-in-out infinite}
+@keyframes heroglow{0%,100%{filter:drop-shadow(0 10px 40px rgba(11,6,22,.65)) drop-shadow(0 0 0 rgba(212,255,58,0))}50%{filter:drop-shadow(0 10px 40px rgba(11,6,22,.65)) drop-shadow(0 0 34px rgba(212,255,58,.32))}}
+.hero-full .hero-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.hero-full p.sub{font-size:clamp(1rem,1.3vw,1.2rem);max-width:52ch;color:#CFC5EA}
+.hero-full .lbl{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.06em;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;backdrop-filter:blur(10px);max-width:340px}
+@media (max-width:760px){.hero-full{min-height:calc(100vh - 170px)}.hero-full .lbl{display:none}}
+@media (prefers-reduced-motion:reduce){.hero-full h1{animation:none}}

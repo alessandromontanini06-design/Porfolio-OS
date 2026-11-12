@@ -120,7 +120,7 @@ if(HAS_G){
 const Morph={on:false,shape(){},cur:{x:0,y:0,s:1,a:1},goal:{x:0,y:0,s:1,a:1},mx:0,my:0,vis:true};
 function morphPlace(name){
   const narrow=window.innerWidth<820;
-  const P={home:narrow?{x:0,y:1.6,s:.72,a:.55}:{x:2.75,y:.15,s:1.05,a:1},scan:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.4,y:1.4,s:.72,a:.34},map:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.6,y:-1.1,s:.7,a:.3},lab:{x:0,y:0,s:1.3,a:.16},risk:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.3,y:-1.3,s:.72,a:.32},sim:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},stress:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.3,s:.75,a:.3},opt:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},bench:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3}};
+  const P={home:narrow?{x:0,y:.6,s:.85,a:.45}:{x:1.5,y:.05,s:1.4,a:.62},scan:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.4,y:1.4,s:.72,a:.34},map:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.6,y:-1.1,s:.7,a:.3},lab:{x:0,y:0,s:1.3,a:.16},risk:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.3,y:-1.3,s:.72,a:.32},sim:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},stress:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.3,s:.75,a:.3},opt:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},bench:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3}};
   return P[name]||P.home;
 }
 function morphShape(name){
