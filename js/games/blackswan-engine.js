@@ -52,7 +52,7 @@ export function createGame(data, cfg = {}) {
     navHist: [capital], holdHist: [capital], retHist: [], holdRet: [], eqHist: [eqShare(V, capital)], cashHist: [w.cash],
     decisions: [], log: [], fees: 0, turnover: 0, realized: { gainsSold: 0, lossesSold: 0, gainsHeld: 0, lossesHeld: 0 },
     objectives: cfg.objectives || makeObjectives(cfg.seed || 1), breaches: { cash: 0, conc: 0 }, over: false, failed: null,
-    news: (NEWS[data.crisis] || []), events: [], lastEvent: -99
+    news: (data.news || NEWS[data.crisis] || []), events: [], lastEvent: -99
   };
 }
 

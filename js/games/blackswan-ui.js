@@ -1,6 +1,7 @@
 /* BLACK SWAN: THE LAST PORTFOLIO · interfaccia
    Si carica solo quando entri nel gioco. Tutti i numeri vengono dal motore (blackswan-engine.js) sui dati storici reali. */
 import * as B from "./blackswan-engine.js";
+import * as S from "./blackswan-sim.js";
 
 const CRISES = [
   { id: "dotcom", yr: "2000", name: "Bolla dot-com", sub: "2000 – 2002", brief: "Marzo 2000. Internet promette di cambiare tutto e i titoli tecnologici valgono cifre mai viste. Poi gli utili non arrivano, il credito si stringe, arrivano l'11 settembre, Enron e WorldCom. Tre anni di ribassi, con rimbalzi che illudono.", macro: "Tassi Fed dal 6,5% all'1%; euro sotto la parità col dollaro e poi in forte rialzo." },
@@ -20,7 +21,7 @@ const eur = v => Number.isFinite(v) ? Math.round(v).toLocaleString("it-IT", { us
 const pct = (v, d = 1, s = false) => Number.isFinite(v) ? (s && v > 0 ? "+" : "") + (v * 100).toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d }) + "%" : "—";
 const sfx = (k, ...a) => { const S = ctx && ctx.SFX; if (S && S.on && typeof S[k] === "function") S[k](...a); };
 const REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const SAVE = "bs-save-v1";
+const SAVE = "bs-save-v1", RUN = "bs-run-v1", REC = "bs-records-v1";
 
 export function open(c) {
   ctx = c;
@@ -40,13 +41,14 @@ function close() {
 /* ---------- Menu e briefing ---------- */
 function menu() {
   stop();
-  const saved = loadSave();
+  const saved = loadSave(), run = loadRun();
   $("#bs-root").innerHTML = `<div class="bs-menu">
     <div class="bs-brand"><span class="bs-swan" aria-hidden="true"></span><div><h1>BLACK SWAN</h1><p>THE LAST PORTFOLIO · <em>Every decision has a price.</em></p></div><button class="bs-x" data-bs="exit" aria-label="Esci dal gioco">✕</button></div>
     <p class="bs-lead">Gestisci un portafoglio da <b>1.000.000 €</b> dentro una crisi finanziaria vera, giorno per giorno. I prezzi sono quelli storici, le decisioni sono tue, ogni scelta ha un costo. Sopravvivi, proteggi il capitale, rispetta i vincoli.</p>
-    ${saved ? `<button class="bs-resume" data-bs="resume"><span>Partita salvata</span><b>${esc(CRISES.find(c => c.id === saved.crisis)?.name || saved.crisis)}</b><small>${esc(saved.date || "")} · riprendi da dove eri</small></button>` : ""}
+    ${saved ? `<button class="bs-resume" data-bs="resume"><span>Partita salvata</span><b>${esc(saved.run ? `Run ${S.DIFFICULTY[saved.run.diff].name} · ondata ${saved.run.wave + 1}` : CRISES.find(c => c.id === saved.crisis)?.name || saved.crisis)}</b><small>${esc(saved.date || "")} · riprendi da dove eri</small></button>` : ""}
     <div class="bs-crises">${CRISES.map((c, i) => `<button class="bs-crisis" data-crisis="${c.id}" style="--i:${i}"><span class="yr">${c.yr}</span><b>${esc(c.name)}</b><small>${c.sub}</small></button>`).join("")}</div>
-    <p class="bs-src">Dati giornalieri reali convertiti in euro: Kenneth French Data Library (azioni USA e Europa, rendimento totale), FRED (Nasdaq-100, Treasury 10 anni, cambio), BCE (Euribor). Le notizie sono fatti storici. Modalità roguelike con crisi simulate: in arrivo.</p>
+    <p class="bs-src">Dati giornalieri reali convertiti in euro: Kenneth French Data Library (azioni USA e Europa, rendimento totale), FRED (Nasdaq-100, Treasury 10 anni, cambio), BCE (Euribor). Le notizie sono fatti storici.</p>
+    ${rogueMenu(run)}
   </div>`;
 }
 async function briefing(id) {
@@ -84,10 +86,84 @@ function allocUI() {
 }
 const sumW = w => B.ASSETS.reduce((s, a) => s + w[a], 0) || 1;
 
+/* ---------- Roguelike: crisi SIMULATE ---------- */
+function rogueMenu(run) {
+  const rec = loadRecords();
+  return `<section class="bs-rogue">
+    <div class="bs-rogue-h"><span class="bs-sim">SIMULATED</span><h2>ROGUELIKE</h2>
+      <p>Tre ondate di crisi <b>generate da un modello</b>, non storiche. Il capitale passa da un'ondata all'altra; se vieni liquidato la run finisce. Tra un'ondata e l'altra scegli un vantaggio. Stesso seme, stesso scenario.</p></div>
+    ${run && !run.over ? `<button class="bs-resume" data-bs="runresume"><span>Run in corso · SIMULATED</span><b>${S.DIFFICULTY[run.diff].name} · ondata ${run.wave + 1} di 3</b><small>capitale ${eur(run.capital)} · seme ${run.seed}</small></button>` : ""}
+    <div class="bs-diffs">${Object.values(S.DIFFICULTY).map((D, i) => `<button class="bs-diff d-${D.id}" data-diff="${D.id}" style="--i:${i}"><b>${D.name}</b><small>${D.sub}</small><span>punteggio ×${String(D.mult).replace(".", ",")}</span>${rec[D.id] ? `<em>record ${rec[D.id]}</em>` : ""}</button>`).join("")}</div>
+    <details class="bs-model" id="bsModelD"><summary>Il modello e le probabilità, difficoltà per difficoltà</summary><div id="bsModel"><p class="dim">Calcolo…</p></div></details>
+  </section>`;
+}
+function modelTable() {
+  const el = $("#bsModel"); if (!el || el.dataset.ok) return; el.dataset.ok = "1";
+  const Ds = Object.values(S.DIFFICULTY), st = Object.fromEntries(Ds.map(D => [D.id, S.difficultyStats(D.id, 60)])), p = v => pct(v, 1);
+  const rows = [
+    ["Da calma a stress, in un mese", D => p(S.monthly(D.P.cs))], ["Da stress a crollo, in un mese", D => p(S.monthly(D.P.sc))], ["Da stress di nuovo a calma, in un mese", D => p(S.monthly(D.P.sx))],
+    ["Uscita dal crollo verso la ripresa, in un mese", D => p(S.monthly(D.P.xr))], ["Doppio minimo: dalla ripresa a un nuovo crollo, in un mese", D => p(S.monthly(D.P.rx))],
+    ["Giorno di panico (al giorno, durante il crollo)", D => p(D.jump[2])], ["Perdita media di un giorno di panico", D => p(-D.jumpSize)], ["Volatilità annua nel crollo", D => p(D.crashVol)],
+    ["Crisi inflazionistica (obbligazioni senza rifugio)", D => p(D.infl)], ["Limite di drawdown rispetto alle crisi storiche", D => (D.dd >= 0 ? "+" : "−") + Math.abs(Math.round(D.dd * 100)) + " punti"],
+    ["Esito: calo massimo mediano delle azioni USA", D => p(st[D.id].medianDD)], ["Esito: calo nel 10% degli scenari peggiori", D => p(st[D.id].worstDecileDD)], ["Esito: scenari con almeno un crollo", D => p(st[D.id].pCrash)], ["Esito: giorni di crollo in media", D => Math.round(st[D.id].avgCrashDays)]
+  ];
+  el.innerHTML = `<p>Un fattore di mercato giornaliero cambia regime con una catena di Markov. Rendimento atteso e volatilità annui: calma +9% / 13%, stress −15% / 25%, crollo −90% / variabile, ripresa +50% / 30%. Azioni USA = fattore + rumore; Europa ×1,1; Tecnologia ×1,35; obbligazioni ×−0,25 nelle crisi deflazionistiche, ×+0,25 in quelle inflazionistiche. Il cigno nero arriva sempre, tra il 15% e il 45% di ogni ondata. Le righe «Esito» sono misurate su 60 scenari generati.</p>
+    <div class="bs-tbl"><table><tr><th></th>${Ds.map(D => `<th>${D.name}</th>`).join("")}</tr>${rows.map(r => `<tr><td>${r[0]}</td>${Ds.map(D => `<td>${r[1](D)}</td>`).join("")}</tr>`).join("")}</table></div>`;
+}
+function runState(run) {
+  const D = S.DIFFICULTY[run.diff], cfg = S.waveConfig(run);
+  return { crisis: { id: "sim", yr: `#${run.wave + 1}`, name: `Ondata ${run.wave + 1}/${D.waves} · ${D.name}`, sub: "SIMULATED" }, run, data: S.generateScenario(run.seed, run.diff, run.wave),
+    seed: cfg.seed, profile: "bilanciato", weights: { ...B.PROFILES.bilanciato }, pac: 0, pacBonus: cfg.pacBonus, objectives: cfg.objectives, capital: cfg.capital, costRate: cfg.costRate };
+}
+function runBriefing(run) {
+  stop(); saveRun(run); R = runState(run);
+  const D = S.DIFFICULTY[run.diff], perks = S.PERKS.filter(p => run.perks.includes(p.id));
+  $("#bs-root").innerHTML = `<div class="bs-brief sim">
+    <div class="bs-brief-top"><button class="bs-back" data-bs="menu">← Menu</button><span class="bs-tag">MISSION BRIEFING · <span class="bs-sim">SIMULATED</span></span><button class="bs-x" data-bs="exit" aria-label="Esci">✕</button></div>
+    <div class="bs-brief-grid">
+      <div class="bs-story"><span class="yr">${R.crisis.yr}</span><h2>${esc(R.crisis.name)}</h2>
+        <p>Scenario generato dal modello, seme <b>${run.seed}</b>. Capitale di partenza <b>${eur(run.capital)}</b>${run.wave ? " (quello con cui hai chiuso l'ondata precedente)" : ""}. Il tipo di crisi resta sconosciuto finché non si manifesta: se le obbligazioni ti proteggeranno lo scoprirai solo dentro la crisi.</p>
+        <p class="macro"><b>Regola:</b> il cigno nero arriva sempre, tra il 15% e il 45% dell'ondata. ${esc(D.sub)}</p>
+        <div class="bs-run-bar">${[0, 1, 2].map(i => `<span class="${i < run.wave ? "done" : i === run.wave ? "now" : ""}">${i < run.wave ? `${run.scores[i]} pt` : `Ondata ${i + 1}`}</span>`).join("")}</div>
+        ${perks.length ? `<div class="bs-perk-own">${perks.map(p => `<span title="${esc(p.d)}">✦ ${esc(p.t)}</span>`).join("")}</div>` : ""}
+        <div class="bs-load"><i class="ok"></i>${R.data.dates.length - 1} giorni simulati pronti</div></div>
+      <div class="bs-setup">
+        <h3>Obiettivi di questa ondata <small>seme ${R.seed}</small></h3>
+        <ul class="bs-obj">${R.objectives.map(o => `<li class="${o.hard ? "hard" : o.side ? "side" : ""}"><b>${o.hard ? "VINCOLO" : o.side ? "MISSIONE" : "OBIETTIVO"}</b>${esc(o.t)}</li>`).join("")}</ul>
+        <h3>Allocazione iniziale</h3>
+        <div class="bs-prof">${Object.keys(B.PROFILES).map(p => `<button data-prof="${p}" aria-pressed="${p === R.profile}">${p}</button>`).join("")}</div>
+        <div class="bs-alloc" id="bsAlloc"></div>
+        <label class="bs-pac">Piano di accumulo mensile <input type="number" min="0" step="500" value="0" id="bsPac"> €${R.pacBonus ? ` <small class="up">+${eur(R.pacBonus)} di bonus</small>` : ""}</label>
+        <button class="bs-go" data-bs="start" id="bsStart">ENTRA NELL'ONDATA ${run.wave + 1}</button>
+        <p class="bs-fine">SCENARIO SIMULATO: prezzi, notizie e tassi sono generati, non storici. Costi ${pct(R.costRate, 2)} per operazione.</p>
+      </div></div></div>`;
+  allocUI();
+}
+function perkPicker(run) {
+  const ch = S.perkChoices(run.seed, run.wave, run.perks);
+  return `<div class="bs-perks"><h3>Ondata ${run.wave} superata · scegli un vantaggio per l'ondata ${run.wave + 1}</h3><div>${ch.map(p => `<button data-perk="${p.id}"><b>✦ ${esc(p.t)}</b><small>${esc(p.d)}</small></button>`).join("")}</div></div>`;
+}
+function runSummary(run) {
+  stop(); const D = S.DIFFICULTY[run.diff], tot = S.runScore(run), rec = loadRecords(), best = !rec[run.diff] || tot > rec[run.diff];
+  if (best) { rec[run.diff] = tot; try { localStorage.setItem(REC, JSON.stringify(rec)); } catch { } }
+  clearRun(); sfx(run.failed ? "lose" : "win");
+  $("#bs-root").innerHTML = `<div class="bs-aut bs-runend">
+    <div class="bs-aut-h"><div><span class="bs-tag">FINE DELLA RUN · <span class="bs-sim">SIMULATED</span> · ${D.name}</span><h2>${run.failed ? "RUN TERMINATA" : "RUN COMPLETATA"}</h2></div><button class="bs-x" data-bs="exit" aria-label="Esci">✕</button></div>
+    <div class="bs-score"><span>RUN SCORE</span><b>${tot}</b><small>somma delle ondate × ${String(D.mult).replace(".", ",")} (difficoltà)${best ? " · <em class='up'>nuovo record</em>" : ` · record ${rec[run.diff]}`}</small>
+      <ul>${run.scores.map((s, i) => `<li><span>Ondata ${i + 1}${run.failed && i === run.scores.length - 1 ? " · liquidato" : ""}</span><i><em style="width:${Math.min(100, s / 10)}%"></em></i><b>${s}</b></li>`).join("")}</ul></div>
+    <div class="bs-aut-k">${[["Capitale finale", eur(run.navs[run.navs.length - 1])], ["Ondate superate", `${run.failed ? run.scores.length - 1 : run.scores.length} di 3`], ["Vantaggi", run.perks.length ? run.perks.map(id => S.PERKS.find(p => p.id === id).t).join(", ") : "nessuno"], ["Seme", run.seed]].map(x => `<div><span>${x[0]}</span><b>${esc(x[1])}</b></div>`).join("")}</div>
+    <div class="bs-aut-go"><button class="go" data-diff="${run.diff}">Nuova run ${D.name}</button><button data-bs="menu">Menu</button><button data-bs="exit">Esci</button></div>
+    <p class="bs-src">Il punteggio di ogni ondata è il SURVIVAL SCORE, che premia il rischio controllato e non il rendimento puro: la difficoltà moltiplica il totale perché cambia l'ambiente, non il rischio che scegli di prendere.</p></div>`;
+}
+function loadRun() { try { return JSON.parse(localStorage.getItem(RUN) || "null"); } catch { return null; } }
+function saveRun(run) { try { localStorage.setItem(RUN, JSON.stringify(run)); } catch { } }
+function clearRun() { try { localStorage.removeItem(RUN); } catch { } }
+function loadRecords() { try { return JSON.parse(localStorage.getItem(REC) || "{}") || {}; } catch { return {}; } }
+
 /* ---------- Partita ---------- */
 function startGame(restore) {
-  const data = DATA.get(R.crisis.id);
-  const cfg = { capital: 1e6, weights: R.weights, pac: R.pac, seed: R.seed, objectives: R.objectives };
+  const data = R.data || DATA.get(R.crisis.id);
+  const cfg = { capital: R.capital || 1e6, costRate: R.costRate, weights: R.weights, pac: R.pac, seed: R.seed, objectives: R.objectives };
   R.cfg = cfg; R.g = restore ? B.simulate(data, cfg, restore.decisions, restore.t) : B.createGame(data, cfg);
   R.playing = false; R.speed = 0; R.untilEvent = false; R.timer = 0; R.event = null; R.marks = [];
   if (restore) R.g.decisions.forEach(d => R.marks.push({ t: d.t, kind: "dec" }));
@@ -95,13 +171,13 @@ function startGame(restore) {
 }
 function intro() {
   const C = R.crisis, ov = document.createElement("div"); ov.className = "bs-intro";
-  ov.innerHTML = `<div class="l1">${C.yr}</div><div class="l2">${esc(C.name)}</div><div class="l3">Capitale: 1.000.000 € · ${R.g.n - 1} giorni di borsa</div><div class="l4" id="bsCd">3</div>`;
-  $("#bs-root").appendChild(ov); let n = 3; sfx("beep", false);
-  const iv = setInterval(() => { n--; const el = ov.querySelector("#bsCd"); if (n > 0) { el.textContent = n; sfx("beep", false); } else { clearInterval(iv); el.textContent = "LIVE"; sfx("beep", true); setTimeout(() => { ov.remove(); play(0); }, 450); } }, REDUCE ? 250 : 800);
+  ov.innerHTML = `<div class="l1">${C.yr}</div><div class="l2">${esc(C.name)}</div><div class="l3">${R.data ? `<span class="bs-sim">SIMULATED</span> · ` : ""}Capitale: ${eur(R.g.capital)} · ${R.g.n - 1} giorni di borsa</div><div class="l4" id="bsCd">3</div>`;
+  $("#bs-root").appendChild(ov); let n = 3; const r0 = R; sfx("beep", false);
+  const iv = setInterval(() => { n--; const el = ov.querySelector("#bsCd"); if (n > 0) { el.textContent = n; sfx("beep", false); } else { clearInterval(iv); el.textContent = "LIVE"; sfx("beep", true); setTimeout(() => { ov.remove(); if (R === r0 && $("#bsCC")) play(0); }, 450); } }, REDUCE ? 250 : 800);
 }
 function cockpit() {
   $("#bs-root").innerHTML = `<div class="bs-cc" id="bsCC">
-    <header class="bs-hd"><div class="bs-logo"><span class="bs-swan sm"></span>BLACK SWAN</div>
+    <header class="bs-hd"><div class="bs-logo"><span class="bs-swan sm"></span>BLACK SWAN${R.data ? `<span class="bs-sim">SIMULATED</span>` : ""}</div>
       <div class="bs-clock"><span id="bsCrisis">${esc(R.crisis.name)}</span><b id="bsDate"></b><small id="bsDay"></small></div>
       <div class="bs-ctl" role="group" aria-label="Tempo">
         <button data-bs="pause" id="bsPlay" title="Spazio">▶</button>${SPEEDS.map((s, i) => `<button data-speed="${i}" title="Tasto ${s.k}">${s.l}</button>`).join("")}
@@ -144,11 +220,12 @@ function tick() {
   if (ev.some(e => e.kind === "news")) sfx("alarm");
   if (g.t % 3 === 0 || ev.length || !R.playing || R.speed === 0) render();
   if (ev.some(e => e.kind === "collapse")) shake("crash"); else if (ev.some(e => e.kind === "recovery")) shake("pump");
-  if (big) { stop(); render(); return big.kind === "fail" ? setTimeout(finish, 1600) : decision(big); }
+  if (big) { stop(); render(); return big.kind === "fail" ? later(finish, 1600) : decision(big); }
   if (ev.length && R.untilEvent) { stop(); render(); }
-  if (g.over) { stop(); render(); setTimeout(finish, 900); }
+  if (g.over) { stop(); render(); later(finish, 900); }
   if (g.t % 25 === 0) saveGame();
 }
+function later(fn, ms) { const r = R; setTimeout(() => { if (R === r) fn(); }, ms); } // i timer valgono solo per la partita che li ha creati
 function shake(k) { const el = $("#bsCC"); if (!el || REDUCE) return; el.classList.remove("fx-crash", "fx-pump"); void el.offsetWidth; el.classList.add("fx-" + k); if (k === "crash") sfx("crash"); else sfx("gain"); }
 function feed(e) {
   const ul = $("#bsFeed"); if (!ul) return;
@@ -179,7 +256,7 @@ function render() {
   if (P >= 75 && R.playing && g.t % 8 === 0) sfx("tone", 55, .25, "sine", .12);
   $("#bsObj").innerHTML = g.objectives.map(o => { const st = objState(g, o); return `<li class="${st.c}"><i></i><span>${esc(o.t)}</span><small>${esc(st.txt)}</small></li>`; }).join("");
   $("#bsAssets").innerHTML = B.ASSETS.map(a => { const r = g.data.assets[a].r[g.t] || 0, w = g.V[a] / g.nav; return `<div class="bs-as"><span><i style="background:${COLORS[a]}"></i>${NAMES[a]}</span><b>${eur(g.V[a])}</b><small class="${r >= 0 ? "up" : "dn"}">${pct(r, 2, true)} oggi</small><div class="w"><i style="width:${(w * 100).toFixed(1)}%;background:${COLORS[a]}"></i></div><em>${pct(w, 0)}</em></div>`; }).join("");
-  $("#bsVitals").innerHTML = [["Mercato USA dal massimo", pct(m.dd, 1), m.dd < -.2 ? "dn" : ""], ["Ultima settimana", pct(m.r5, 1, true), m.r5 < 0 ? "dn" : "up"], ["Volatilità 20 giorni", pct(m.vol, 0), m.vol > .35 ? "dn" : ""], ["Giorni rossi di fila", m.down, m.down >= 4 ? "dn" : ""], ["Liquidità", pct(g.V.cash / g.nav, 1), ""], ["Costi pagati", eur(g.fees), ""]].map(x => `<div><span>${x[0]}</span><b class="${x[2]}">${x[1]}</b></div>`).join("");
+  $("#bsVitals").innerHTML = [["Mercato USA dal massimo", pct(m.dd, 1), m.dd < -.2 ? "dn" : ""], ["Ultima settimana", pct(m.r5, 1, true), m.r5 < 0 ? "dn" : "up"], ["Volatilità 20 giorni", pct(m.vol, 0), m.vol > .35 ? "dn" : ""], ["Giorni rossi di fila", m.down, m.down >= 4 ? "dn" : ""], ["Liquidità", pct(g.V.cash / g.nav, 1), ""], ["Costi pagati", eur(g.fees), ""], ...(R.run && R.run.perks.includes("radar") ? [["Radar: regime", String(g.data.regime[g.t]).toUpperCase(), g.data.regime[g.t] === "crollo" || g.data.regime[g.t] === "stress" ? "dn" : "up"]] : [])].map(x => `<div><span>${x[0]}</span><b class="${x[2]}">${x[1]}</b></div>`).join("");
   drawChart(); if ($("#bsWar")) warRender();
 }
 function objState(g, o) {
@@ -228,8 +305,8 @@ const EVENT_CHOICES = {
 function decision(e) {
   const box = document.createElement("div"); box.className = `bs-event k-${e.kind}`; box.setAttribute("role", "alertdialog"); box.setAttribute("aria-label", e.title);
   const ch = EVENT_CHOICES[e.kind] || EVENT_CHOICES.news, g = R.g, dd = g.nav / g.peak - 1, lim = (g.objectives.find(o => o.id === "maxdd") || {}).lim || .3;
-  let left = 15;
-  box.innerHTML = `<div class="bs-ev-in"><div class="bs-ev-top"><span>${e.kind === "news" ? "ULTIM'ORA" : "ALLERTA"} · ${g.data.dates[e.t]}</span><b id="bsEvT">${left}</b></div>
+  let left = R.run && R.run.perks.includes("calm") ? 30 : 15;
+  box.innerHTML = `<div class="bs-ev-in"><div class="bs-ev-top"><span>${e.kind === "news" ? (R.data ? "NOTIZIA SIMULATA" : "ULTIM'ORA") : "ALLERTA"} · ${g.data.dates[e.t]}</span><b id="bsEvT">${left}</b></div>
     <h3>${esc(e.title)}</h3><p>${esc(e.text)}</p>
     <div class="bs-ev-stats"><div><span>Portafoglio</span><b>${eur(g.nav)}</b></div><div><span>Drawdown</span><b class="dn">${pct(dd, 1)}</b></div><div><span>Margine al limite</span><b>${pct(lim + dd, 1)}</b></div><div><span>Liquidità</span><b>${eur(g.V.cash)}</b></div></div>
     <div class="bs-ev-ch">${ch.map((c, i) => `<button data-ev="${i}"><b>${i + 1} · ${esc(c[0])}</b><small>${esc(c[2])}</small></button>`).join("")}</div>
@@ -284,7 +361,8 @@ function warRender(full) {
 /* ---------- Fine partita: autopsia e replay ---------- */
 function finish() {
   stop(); if (!R || R.done) return; R.done = true; clearSave();
-  const g = R.g, F = B.finalize(g), imp = B.decisionImpact(g.data, R.cfg, g.decisions).filter(x => x.type !== "hold");
+  const g = R.g, F = B.finalize(g); if (R.run) { S.endWave(R.run, F); if (R.run.over) clearRun(); else { R.run.needPerk = true; saveRun(R.run); } }
+  const imp = B.decisionImpact(g.data, R.cfg, g.decisions).filter(x => x.type !== "hold");
   const good = [...imp].sort((a, b) => b.delta - a.delta).filter(x => x.delta > 0).slice(0, 3), bad = [...imp].sort((a, b) => a.delta - b.delta).filter(x => x.delta < 0).slice(0, 3);
   const rank = F.failed ? "LIQUIDATO" : F.score >= 850 ? "LEGGENDA" : F.score >= 700 ? "GESTORE D'ÉLITE" : F.score >= 550 ? "SOPRAVVISSUTO" : F.score >= 400 ? "FERITO" : "NAUFRAGO";
   sfx(F.failed || F.score < 500 ? "lose" : "win");
@@ -298,7 +376,7 @@ function finish() {
   if (!lessons.length) lessons.push("Le tue decisioni hanno avuto effetti misti: guarda l'impatto di ciascuna qui sotto.");
   const P = F.parts;
   $("#bs-root").innerHTML = `<div class="bs-aut">
-    <div class="bs-aut-h"><div><span class="bs-tag">POST-CRISIS AUTOPSY · ${esc(R.crisis.name)}</span><h2>${rank}</h2></div><button class="bs-x" data-bs="exit" aria-label="Esci">✕</button></div>
+    <div class="bs-aut-h"><div><span class="bs-tag">POST-CRISIS AUTOPSY · ${R.data ? `<span class="bs-sim">SIMULATED</span> · ` : ""}${esc(R.crisis.name)}</span><h2>${rank}</h2></div><button class="bs-x" data-bs="exit" aria-label="Esci">✕</button></div>
     <div class="bs-aut-top">
       <div class="bs-score"><span>SURVIVAL SCORE</span><b id="bsScore">0</b><small>su 1.000 (+50 missione)</small>
         <ul>${[["Rischio-rendimento (Sortino vs fermo)", P.riskAdj, 300], ["Controllo del drawdown", P.drawdown, 250], ["Obiettivi", P.objectives, 200], ["Disciplina", P.discipline, 150], ["Costo della liquidità", P.cashDrag, 100]].map(x => `<li><span>${x[0]}</span><i><em style="width:${x[1] / x[2] * 100}%"></em></i><b>${x[1]}/${x[2]}</b></li>`).join("")}</ul></div>
@@ -312,8 +390,8 @@ function finish() {
       <div><h3>Analisi comportamentale</h3>${F.behavior.items.map(x => `<div class="bh ${x.level}"><span>${x.t}</span><i><em style="width:${Math.max(4, x.v * 100)}%"></em></i><b>${x.level}</b><small>${esc(x.d)}</small></div>`).join("")}<p class="dim">Indicatori didattici calcolati solo dalle tue decisioni, non diagnosi.</p></div>
     </div>
     <div class="bs-lessons"><h3>Lezioni</h3>${lessons.map(l => `<p>${esc(l)}</p>`).join("")}</div>
-    <div class="bs-aut-go"><button data-bs="again" class="go">Rigioca la stessa crisi (stessi obiettivi)</button><button data-bs="menu">Un'altra crisi</button><button data-bs="exit">Esci</button></div>
-    <p class="bs-src">Metodologia: SURVIVAL SCORE = Sortino rispetto a chi resta fermo (300) + drawdown rispetto a chi resta fermo (250) + obiettivi (200) + disciplina comportamentale (150) + costo della liquidità in eccesso (100); se il portafoglio è liquidato, 30% delle prime componenti. Dati storici reali, decisioni simulate, costi 0,10%, tasse non modellate.</p>
+    ${R.run ? (R.run.over ? `<div class="bs-aut-go"><button data-bs="runend" class="go">${R.run.failed ? "Run terminata: vedi il risultato" : "Run completata: vedi il risultato"}</button></div>` : perkPicker(R.run)) : `<div class="bs-aut-go"><button data-bs="again" class="go">Rigioca la stessa crisi (stessi obiettivi)</button><button data-bs="menu">Un'altra crisi</button><button data-bs="exit">Esci</button></div>`}
+    <p class="bs-src">Metodologia: SURVIVAL SCORE = Sortino rispetto a chi resta fermo (300) + drawdown rispetto a chi resta fermo (250) + obiettivi (200) + disciplina comportamentale (150) + costo della liquidità in eccesso (100); se il portafoglio è liquidato, 30% delle prime componenti. ${R.data ? "SCENARIO SIMULATO generato dal modello dichiarato nel menu" : "Dati storici reali"}, decisioni simulate, costi ${pct(R.g.cfg.costRate, 2)}, tasse non modellate.</p>
   </div>`;
   const sc = $("#bsScore"), o = { v: 0 }; if (window.gsap && !REDUCE) window.gsap.to(o, { v: F.score, duration: 1.8, ease: "power3.out", onUpdate: () => { sc.textContent = Math.round(o.v); } }); else sc.textContent = F.score;
   R.final = F; drawAut(g.t); $("#bsReplay").addEventListener("input", e => drawAut(+e.target.value));
@@ -337,11 +415,12 @@ function drawAut(T) {
 }
 
 /* ---------- Salvataggio ---------- */
-function saveGame() { try { if (!R || !R.g || R.done) return; localStorage.setItem(SAVE, JSON.stringify({ crisis: R.crisis.id, seed: R.seed, weights: R.weights, pac: R.pac, objectives: R.objectives, t: R.g.t, date: R.g.data.dates[R.g.t], decisions: R.g.decisions.map(({ t, date, eqBefore, eqAfter, nav, ctx, ...d }) => ({ ...d, t })) })); } catch { } }
+function saveGame() { try { if (!R || !R.g || R.done) return; localStorage.setItem(SAVE, JSON.stringify({ run: R.run || null, crisis: R.crisis.id, seed: R.seed, weights: R.weights, pac: R.pac, objectives: R.objectives, t: R.g.t, date: R.g.data.dates[R.g.t], decisions: R.g.decisions.map(({ t, date, eqBefore, eqAfter, nav, ctx, ...d }) => ({ ...d, t })) })); } catch { } }
 function loadSave() { try { return JSON.parse(localStorage.getItem(SAVE) || "null"); } catch { return null; } }
 function clearSave() { try { localStorage.removeItem(SAVE); } catch { } }
 async function resume() {
   const s = loadSave(); if (!s) return menu();
+  if (s.run) { R = runState(s.run); R.weights = s.weights; R.pac = s.pac; startGame({ decisions: s.decisions, t: s.t }); return; }
   R = { crisis: CRISES.find(c => c.id === s.crisis), seed: s.seed, weights: s.weights, pac: s.pac, objectives: s.objectives };
   $("#bs-root").innerHTML = `<div class="bs-menu"><div class="bs-load"><i></i>Ricostruisco la partita…</div></div>`;
   try { await loadData(s.crisis); startGame({ decisions: s.decisions, t: s.t }); } catch (e) { $("#bs-root").innerHTML = `<div class="bs-menu"><p>${esc(e.message)}</p><button data-bs="menu">Indietro</button></div>`; }
@@ -350,7 +429,9 @@ async function resume() {
 /* ---------- Comandi ---------- */
 document.addEventListener("click", e => {
   if (!document.body.classList.contains("bs-on")) return;
-  const b = e.target.closest("[data-bs],[data-crisis],[data-prof],[data-speed],[data-q],[data-ev],[data-wq]"); if (!b) return;
+  const b = e.target.closest("[data-bs],[data-crisis],[data-prof],[data-speed],[data-q],[data-ev],[data-wq],[data-diff],[data-perk]"); if (!b) return;
+  if (b.dataset.diff) { return runBriefing(S.newRun(b.dataset.diff, Math.floor(Math.random() * 1e6) + 1)); }
+  if (b.dataset.perk) { const run = R.run; run.perks.push(b.dataset.perk); delete run.needPerk; return runBriefing(run); }
   if (b.dataset.crisis) return briefing(b.dataset.crisis);
   if (b.dataset.prof) { R.profile = b.dataset.prof; R.weights = { ...B.PROFILES[R.profile] }; document.querySelectorAll("[data-prof]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); return allocUI(); }
   if (b.dataset.speed) return play(+b.dataset.speed);
@@ -359,7 +440,9 @@ document.addEventListener("click", e => {
   if (b.dataset.wq) { const [k, a, p] = b.dataset.wq.split(":"); return doDecision(k === "sell" ? { type: "sellPct", asset: a, pct: +p } : { type: "buy", asset: a, pct: +p }, `${k === "sell" ? "Vendi" : "Compra"} ${NAMES[a]}`); }
   const k = b.dataset.bs;
   if (k === "exit") close(); else if (k === "menu") menu(); else if (k === "resume") resume();
-  else if (k === "start") { R.pac = Math.max(0, +($("#bsPac").value) || 0); const s = sumW(R.weights); B.ASSETS.forEach(a => { R.weights[a] /= s; }); startGame(); }
+  else if (k === "runend") runSummary(R.run);
+  else if (k === "runresume") { const run = loadRun(); if (!run) return menu(); if (run.needPerk) { R = { run }; $("#bs-root").innerHTML = `<div class="bs-menu">${perkPicker(run)}<button data-bs="menu" class="bs-back">← Menu</button></div>`; } else runBriefing(run); }
+  else if (k === "start") { R.pac = Math.max(0, +($("#bsPac").value) || 0) + (R.pacBonus || 0); const s = sumW(R.weights); B.ASSETS.forEach(a => { R.weights[a] /= s; }); startGame(); }
   else if (k === "pause") { R.playing ? pause() : play(R.speed); }
   else if (k === "next") { R.untilEvent = true; R.playing = true; loop(); ui(); }
   else if (k === "day") { stop(); tick(); ui(); }
@@ -372,6 +455,7 @@ document.addEventListener("click", e => {
   else if (k === "save") { saveGame(); close(); }
   else if (k === "again") { const c = R.crisis.id, o = { ...R }; R = { crisis: o.crisis, seed: o.seed, profile: o.profile, weights: o.weights, pac: o.pac, objectives: o.objectives }; startGame(); }
 });
+document.addEventListener("toggle", e => { if (e.target && e.target.id === "bsModelD" && e.target.open) modelTable(); }, true);
 document.addEventListener("input", e => {
   if (!document.body.classList.contains("bs-on") || !R) return;
   const a = e.target.dataset && e.target.dataset.w; if (a) { R.weights[a] = +e.target.value / 100; document.querySelectorAll("#bsAlloc label").forEach((l, i) => { l.querySelector("b").textContent = Math.round(R.weights[B.ASSETS[i]] * 100 / sumW(R.weights)) + "%"; }); return; }

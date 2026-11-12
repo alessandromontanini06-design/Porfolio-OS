@@ -78,9 +78,12 @@ if(FINE&&!REDUCE){
   document.body.classList.add("has-cur");
   const cur=$("#cur"),ring=cur.querySelector(".r"),dot=cur.querySelector(".d");
   let mx=-100,my=-100,rx=-100,ry=-100;
-  window.addEventListener("pointermove",e=>{mx=e.clientX;my=e.clientY;dot.style.transform=`translate(${mx}px,${my}px)`;
-    cur.classList.toggle("big",!!e.target.closest("a,button,label,select,[data-rc],.net canvas,.drop"));},{passive:true});
-  const loop=()=>{rx+=(mx-rx)*.18;ry+=(my-ry)*.18;ring.style.transform=`translate(${rx}px,${ry}px)`;requestAnimationFrame(loop);};loop();
+  window.addEventListener("pointermove",e=>{mx=e.clientX;my=e.clientY;dot.style.transform=`translate(${mx}px,${my}px)`;cur.classList.remove("out");
+    if(rx<-50){rx=mx;ry=my;}
+    cur.classList.toggle("big",!!(e.target.closest&&e.target.closest("a,button,label,select,[data-rc],.net canvas,.drop")));},{passive:true});
+  document.documentElement.addEventListener("mouseleave",()=>cur.classList.add("out"));
+  window.addEventListener("blur",()=>cur.classList.add("out"));
+  const loop=()=>{rx+=(mx-rx)*.35;ry+=(my-ry)*.35;ring.style.transform=`translate(${rx}px,${ry}px)`;requestAnimationFrame(loop);};loop();
   document.addEventListener("pointermove",e=>{
     const t=e.target.closest&&e.target.closest(".tile:not(.ghost),.kpi,.next .card");
     document.querySelectorAll(".tilt").forEach(x=>{if(x!==t){x.style.transform="";x.classList.remove("tilt");}});
@@ -117,15 +120,65 @@ function heroIntro(){
   G.from(".topbar",{y:-60,opacity:0,duration:.9,ease:"expo.out",delay:.4});
 }
 if(HAS_G){
-  /* Intro: contatore a tutto schermo, poi la tenda si alza */
+  /* Avvio: un mercato si disegna dal vivo (crollo e rimbalzo), implode in un punto, esplode in un'onda d'urto,
+     il titolo appare e due serrande si aprono sulla home. Clic o tasto per accelerare; più breve dalla seconda visita. */
   const ld=document.createElement("div");ld.className="loader";ld.setAttribute("aria-hidden","true");
-  ld.innerHTML=`<div class="ld-top"><span>Portfolio OS</span><span>Avvio del sistema</span></div><div><div class="ld-mid"><div class="ld-num">000</div><ul class="ld-log"><li>Lettura delle celle</li><li>Collegamento alle IA</li><li>Dati BCE e prezzi</li><li>Particelle pronte</li></ul></div><div class="ld-bar"><i></i></div></div>`;
+  let seen=false;try{seen=sessionStorage.getItem("pos-boot")==="1";sessionStorage.setItem("pos-boot","1");}catch{}
+  const K=seen?.5:1,today=new Date().toLocaleDateString("it-IT",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});
+  ld.innerHTML=`<div class="ld-sh t"></div><div class="ld-sh b"></div><canvas class="ld-cv"></canvas>
+    <div class="ld-ui"><div class="ld-top"><span>PORTFOLIO OS <em>v4</em></span><span>${today}</span><span>FINANCIAL INTELLIGENCE LAB</span></div>
+    <div><div class="ld-mid"><div class="ld-num">000</div><ul class="ld-log"></ul></div><div class="ld-bar"><i></i></div></div></div>
+    <div class="ld-title"><span class="a">PORTFOLIO</span><span class="b">OS</span></div><div class="ld-skip">clic per entrare</div>`;
   document.body.appendChild(ld);
-  const lis=ld.querySelectorAll("li"),num=ld.querySelector(".ld-num"),bar=ld.querySelector(".ld-bar i"),o={v:0};
-  G.timeline({onComplete:()=>ld.remove()})
-    .to(o,{v:100,duration:1.6,ease:"power2.inOut",onUpdate:()=>{const v=Math.round(o.v);num.textContent=String(v).padStart(3,"0");bar.style.width=v+"%";lis.forEach((li,i)=>li.classList.toggle("on",v>=(i+1)*24));}})
-    .to(ld,{clipPath:"circle(0% at 50% 100%)",duration:1.1,ease:"expo.inOut"},"+=.1")
-    .add(heroIntro,"-=.6");
+  const LOG=["Kernel statistico · 166 test superati","Rischio: VaR storico, Cornish-Fisher, Kupiec","Dati: BCE · FRED · Kenneth French","BLACK SWAN: 5 crisi reali, giorno per giorno","Quanta online"];
+  const cv=ld.querySelector(".ld-cv"),cx=cv.getContext("2d"),dpr=Math.min(2,window.devicePixelRatio||1),num=ld.querySelector(".ld-num"),bar=ld.querySelector(".ld-bar i"),log=ld.querySelector(".ld-log");
+  let W=0,H=0;const size=()=>{W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0);};size();window.addEventListener("resize",size);
+  // percorso: passeggiata casuale con un crollo e un rimbalzo, normalizzata 0..1
+  const N=200,raw=[];let lv=0,sd=11;const rnd=()=>{sd=(sd*16807)%2147483647;return sd/2147483647-.5;};
+  for(let i=0;i<N;i++){const f=i/N;lv+=rnd()*.07+(f>.55&&f<.66?-.075:f>.66?.03:.01);raw.push(lv);}
+  const lo=Math.min(...raw),hi=Math.max(...raw),pts=raw.map((y,i)=>({x:i/(N-1),y:(y-lo)/(hi-lo||1)}));
+  const sparks=Array.from({length:320},()=>({a:Math.random()*6.283,r:.15+Math.random()*1.1,w:.6+Math.random()*2.2,c:["#D4FF3A","#A47BFF","#47E5FF","#FF7AD9"][Math.random()*4|0]}));
+  const o={v:0,c:0,x:0};let shown=0;
+  const draw=()=>{
+    cx.clearRect(0,0,W,H);
+    const L=W*.07,R=W*.93,T=H*.17,B=H*.6,mx=W/2,my=H/2,n=Math.max(2,Math.round(o.v/100*N)),e=o.c*o.c;
+    const P=i=>{const p=pts[i],x=L+(R-L)*p.x,y=B-(B-T)*p.y;return[x+(mx-x)*e,y+(my-y)*e];};
+    cx.globalAlpha=.5*(1-o.x);cx.strokeStyle="rgba(160,140,255,.12)";cx.lineWidth=1;cx.beginPath();
+    for(let x=L;x<=R+1;x+=(R-L)/12){cx.moveTo(x,T-40);cx.lineTo(x,B+40);}for(let y=T-40;y<=B+41;y+=(B-T+80)/6){cx.moveTo(L,y);cx.lineTo(R,y);}cx.stroke();
+    if(o.x<1){
+      cx.globalAlpha=1-o.x;
+      const g=cx.createLinearGradient(0,T,0,B);g.addColorStop(0,"rgba(212,255,58,.22)");g.addColorStop(1,"rgba(212,255,58,0)");
+      cx.beginPath();for(let i=0;i<n;i++){const[x,y]=P(i);i?cx.lineTo(x,y):cx.moveTo(x,y);}
+      const[lx]=P(n-1),[fx]=P(0);cx.lineTo(lx,B+(my-B)*e);cx.lineTo(fx,B+(my-B)*e);cx.closePath();cx.fillStyle=g;cx.globalAlpha=(1-o.x)*(1-o.c);cx.fill();
+      cx.globalAlpha=1-o.x;cx.lineWidth=2.4;cx.strokeStyle="#D4FF3A";cx.shadowColor="#D4FF3A";cx.shadowBlur=20;cx.beginPath();
+      for(let i=0;i<n;i++){const[x,y]=P(i);i?cx.lineTo(x,y):cx.moveTo(x,y);}cx.stroke();
+      const[hx,hy]=P(n-1),pu=4+2.5*Math.sin(performance.now()/90)+o.c*10;cx.fillStyle="#fff";cx.shadowColor="#fff";cx.beginPath();cx.arc(hx,hy,pu,0,6.283);cx.fill();cx.shadowBlur=0;
+      if(o.c===0&&n<N){cx.font="600 12px "+getComputedStyle(document.body).getPropertyValue("--f-mono");cx.fillStyle="#D4FF3A";cx.fillText((1e6*(.7+pts[n-1].y*.6)).toLocaleString("it-IT",{maximumFractionDigits:0})+" €",hx+12,hy-10);}
+    }
+    if(o.x>0){
+      const M=Math.hypot(W,H)*.62,k=1-o.x;
+      for(let j=0;j<3;j++){const rr=M*Math.max(0,o.x-j*.08);cx.globalAlpha=k*(.9-j*.25);cx.lineWidth=3-j;cx.strokeStyle=j?"#A47BFF":"#D4FF3A";cx.shadowColor=cx.strokeStyle;cx.shadowBlur=30;cx.beginPath();cx.arc(mx,my,rr,0,6.283);cx.stroke();}
+      cx.shadowBlur=0;
+      sparks.forEach(s=>{const d=M*s.r*o.x,x=mx+Math.cos(s.a)*d,y=my+Math.sin(s.a)*d;cx.globalAlpha=k;cx.strokeStyle=s.c;cx.lineWidth=s.w;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x-Math.cos(s.a)*18*k,y-Math.sin(s.a)*18*k);cx.stroke();});
+    }
+    cx.globalAlpha=1;
+  };
+  G.ticker.add(draw);
+  const end=()=>{G.ticker.remove(draw);window.removeEventListener("resize",size);ld.remove();};
+  const tl=G.timeline({onComplete:end});
+  tl.to(o,{v:100,duration:1.6*K,ease:"power1.inOut",onUpdate:()=>{const v=Math.round(o.v);num.textContent=String(v).padStart(3,"0");bar.style.width=v+"%";
+      while(shown<LOG.length&&v>=(shown+1)*19){const li=document.createElement("li");li.textContent=LOG[shown++];log.appendChild(li);}}})
+    .to(".ld-ui",{opacity:0,y:-20,duration:.35,ease:"power2.in"})
+    .to(o,{c:1,duration:.5*K,ease:"power3.in"},"<")
+    .add(()=>ld.classList.add("boom"))
+    .to(o,{x:1,duration:1.1*K,ease:"expo.out"})
+    .fromTo(".ld-title span",{opacity:0,scale:1.8,filter:"blur(18px)"},{opacity:1,scale:1,filter:"blur(0px)",duration:.8*K,ease:"expo.out",stagger:.08},"<")
+    .to(".ld-title",{scale:1.25,opacity:0,filter:"blur(10px)",duration:.6,ease:"expo.in"},"-=.35")
+    .to(".ld-sh.t",{yPercent:-100,duration:1,ease:"expo.inOut"},"<.25")
+    .to(".ld-sh.b",{yPercent:100,duration:1,ease:"expo.inOut"},"<")
+    .to(".ld-skip",{opacity:0,duration:.2},"<")
+    .add(heroIntro,"-=.65");
+  const skip=()=>{tl.timeScale(4);};ld.addEventListener("click",skip);window.addEventListener("keydown",skip,{once:true});
 }
 
 /* ---------- Oggetto di particelle che si trasforma a ogni scena ---------- */
