@@ -580,3 +580,28 @@ body.chat-on .orb-say{display:none}
 .hero-full .lbl{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.06em;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;backdrop-filter:blur(10px);max-width:340px}
 @media (max-width:760px){.hero-full{min-height:calc(100vh - 170px)}.hero-full .lbl{display:none}}
 @media (prefers-reduced-motion:reduce){.hero-full h1{animation:none}}
+
+/* Salto tra le sezioni */
+.warp{position:fixed;inset:0;z-index:35;pointer-events:none;overflow:hidden;opacity:0}
+.warp.go{animation:warpvis 1s ease-out forwards}
+.warp i{position:absolute;left:50%;top:50%;display:block;border-radius:50%;transform:translate(-50%,-50%)}
+.warp .w-lines{width:240vmax;height:240vmax;background:repeating-conic-gradient(from 0deg,rgba(212,255,58,.0) 0deg 2.2deg,rgba(212,255,58,.22) 2.2deg 2.6deg,rgba(164,123,255,0) 2.6deg 5.4deg,rgba(164,123,255,.28) 5.4deg 5.8deg);-webkit-mask:radial-gradient(circle,transparent 0 12%,#000 34%,transparent 62%);mask:radial-gradient(circle,transparent 0 12%,#000 34%,transparent 62%);mix-blend-mode:screen}
+.warp.go .w-lines{animation:warplines 1s cubic-bezier(.2,.7,.2,1) forwards}
+.warp .w-ring{width:20vmax;height:20vmax;border:2px solid rgba(212,255,58,.85);box-shadow:0 0 40px rgba(212,255,58,.6),inset 0 0 40px rgba(123,60,255,.6)}
+.warp.go .w-ring{animation:warpring .85s cubic-bezier(.2,.8,.2,1) forwards}
+.warp .w-flash{inset:0;left:0;top:0;transform:none;border-radius:0;width:100%;height:100%;background:radial-gradient(60% 60% at 50% 50%,rgba(150,95,255,.35),transparent 70%)}
+.warp.go .w-flash{animation:warpflash .7s ease-out forwards}
+@keyframes warpvis{0%{opacity:1}75%{opacity:1}100%{opacity:0}}
+@keyframes warplines{0%{transform:translate(-50%,-50%) scale(.35) rotate(0deg);opacity:0}25%{opacity:1}100%{transform:translate(-50%,-50%) scale(1.25) rotate(18deg);opacity:0}}
+@keyframes warpring{0%{transform:translate(-50%,-50%) scale(.1);opacity:1}100%{transform:translate(-50%,-50%) scale(7);opacity:0}}
+@keyframes warpflash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
+/* titolo della sezione: glitch cromatico all'ingresso */
+.scene-title h2.glitch{animation:glitch .8s steps(1,end)}
+@keyframes glitch{
+  0%{text-shadow:4px 0 rgba(212,255,58,.9),-4px 0 rgba(123,60,255,.9);transform:translateX(-3px) skewX(-4deg);clip-path:inset(0 0 55% 0)}
+  12%{text-shadow:-6px 0 rgba(212,255,58,.9),6px 0 rgba(71,229,255,.8);transform:translateX(4px) skewX(3deg);clip-path:inset(40% 0 0 0)}
+  24%{text-shadow:3px 0 rgba(255,92,138,.8),-3px 0 rgba(123,60,255,.9);transform:none;clip-path:inset(0 0 20% 0)}
+  36%{text-shadow:-2px 0 rgba(212,255,58,.8),2px 0 rgba(71,229,255,.7);clip-path:inset(15% 0 30% 0)}
+  50%{text-shadow:1px 0 rgba(212,255,58,.5),-1px 0 rgba(123,60,255,.5);clip-path:none}
+  100%{text-shadow:none;transform:none;clip-path:none}}
+@media (prefers-reduced-motion:reduce){.warp{display:none}.scene-title h2.glitch{animation:none}}

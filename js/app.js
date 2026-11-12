@@ -31,6 +31,7 @@ function go(name,opts={}){
   const prev=$("#scene-"+current),nxt=$("#scene-"+name);current=name;
   document.querySelectorAll(".dock button[data-go]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.go===name)));
   $("#sceneChip").textContent=SCENE_L[name];movePill();Morph.shape(name);
+  if(prev&&prev!==nxt){if(Morph.burst)Morph.burst(.9);warp(nxt);}
   if(prev&&prev!==nxt){
     if(HAS_G)G.to(prev,{opacity:0,y:-36,scale:.97,filter:"blur(8px)",duration:.35,ease:"power2.in",onComplete:()=>{prev.hidden=true;G.set(prev,{clearProps:"all"});}});
     else prev.hidden=true;
@@ -41,6 +42,15 @@ function go(name,opts={}){
     G.fromTo(items,{y:70,opacity:0,rotateX:-10,transformPerspective:900},{y:0,opacity:1,rotateX:0,duration:1,ease:"expo.out",stagger:.055,delay:prev&&prev!==nxt?.22:0,clearProps:"transform,opacity"});
   }
   onEnter(name);
+}
+/* salto tra le sezioni: linee di velocità dal centro, anello di luce e titolo che entra con un glitch */
+const warpEl=document.createElement("div");warpEl.className="warp";warpEl.setAttribute("aria-hidden","true");warpEl.innerHTML="<i class='w-lines'></i><i class='w-ring'></i><i class='w-flash'></i>";document.body.appendChild(warpEl);
+function warp(nxt){
+  if(REDUCE||!HAS_G)return;
+  warpEl.classList.remove("go");void warpEl.offsetWidth;warpEl.classList.add("go");
+  clearTimeout(warp.t);warp.t=setTimeout(()=>warpEl.classList.remove("go"),1100);
+  const h=nxt&&nxt.querySelector(".scene-title h2");
+  if(h){h.classList.remove("glitch");void h.offsetWidth;h.classList.add("glitch");setTimeout(()=>h.classList.remove("glitch"),900);}
 }
 function onEnter(name){
   quantaScene(name);
@@ -174,35 +184,87 @@ function morphData(){
   if(Morph.on){Morph.tgt.set(morphShape(current));}
   const lbl=$("#flowLabel");if(lbl)lbl.textContent=`${Morph.N||0} particelle · si trasformano in ogni sezione · dati di «${S.source?S.source.name:"esempio"}»`;
 }
+/* Le particelle: uno shader su misura (luce additiva, scintillio, respiro, onda d'urto al clic, spinta del mouse)
+   e un'esplosione che si ricompone a ogni cambio di sezione. */
+const MORPH_VS=`
+attribute vec3 color;attribute float aRand;attribute float aSize;
+uniform float uTime,uPix,uAlpha,uBurst,uAspect,uMouseOn,uPulseR,uPulseA,uCalm;uniform vec2 uMouse,uPulseC;
+varying vec3 vColor;varying float vAlpha;varying float vHot;
+void main(){
+  vec3 p=position;
+  float n=sin(p.x*1.7+uTime*.9+aRand*6.28)*cos(p.y*1.3-uTime*.7)*sin(p.z*1.5+uTime*.6);
+  p+=normalize(p+vec3(1e-4))*n*(.05*uCalm+uBurst*1.1);
+  vec4 mv=modelViewMatrix*vec4(p,1.);vec4 clip=projectionMatrix*mv;vec2 ndc=clip.xy/clip.w;
+  vec2 dm=ndc-uMouse;float dist=length(dm*vec2(uAspect,1.));float f=smoothstep(.38,0.,dist)*uMouseOn;
+  clip.xy+=normalize(dm+1e-5)*f*.09*clip.w;
+  float r=length((ndc-uPulseC)*vec2(uAspect,1.));float ring=exp(-pow((r-uPulseR)*10.,2.))*uPulseA;
+  clip.xy+=normalize(ndc-uPulseC+1e-5)*ring*.07*clip.w;
+  gl_Position=clip;
+  float tw=.62+.38*sin(uTime*(1.6+aRand*1.8)+aRand*40.);
+  vHot=clamp(ring*1.2+f*.9+uBurst*.7,0.,1.);
+  gl_PointSize=aSize*uPix*(320./-mv.z)*(1.+ring*1.6+f*1.1+uBurst*.9);
+  vColor=mix(color,vec3(.86,1.,.3),vHot*.85);
+  vAlpha=uAlpha*tw*(.45+.55*smoothstep(-15.,-6.5,mv.z));
+}`;
+const MORPH_FS=`
+varying vec3 vColor;varying float vAlpha;varying float vHot;
+void main(){float d=length(gl_PointCoord-.5);float a=smoothstep(.5,0.,d);float core=smoothstep(.16,0.,d);
+  gl_FragColor=vec4(vColor*(.75+core*(.9+vHot)),a*vAlpha);}`;
 function morphInit(){
   const cv=$("#morph");if(!window.THREE)return;
   let renderer;try{renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,powerPreference:"high-performance"});}catch(e){return;}
   const T=THREE,scene=new T.Scene(),cam=new T.PerspectiveCamera(45,1,.1,100);cam.position.set(0,0,9.5);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
-  const N=window.innerWidth<700?2600:5600,pos=new Float32Array(N*3),col=new Float32Array(N*3),tgt=new Float32Array(N*3),spd=new Float32Array(N);
+  const PIX=Math.min(window.devicePixelRatio||1,2);renderer.setPixelRatio(PIX);
+  const N=window.innerWidth<700?2600:6400,pos=new Float32Array(N*3),col=new Float32Array(N*3),tgt=new Float32Array(N*3),spd=new Float32Array(N),rnd=new Float32Array(N),siz=new Float32Array(N);
   for(let i=0;i<N;i++){const u=Math.random(),v=Math.random(),th=u*Math.PI*2,ph=Math.acos(2*v-1),r=6+Math.random()*4;
-    pos[i*3]=r*Math.sin(ph)*Math.cos(th);pos[i*3+1]=r*Math.sin(ph)*Math.sin(th);pos[i*3+2]=r*Math.cos(ph);spd[i]=.035+Math.random()*.05;
-    const L=i%4===0,q=Math.random();col[i*3]=L?.83:.55+q*.3;col[i*3+1]=L?1:.38+q*.2;col[i*3+2]=L?.23:1;}
+    pos[i*3]=r*Math.sin(ph)*Math.cos(th);pos[i*3+1]=r*Math.sin(ph)*Math.sin(th);pos[i*3+2]=r*Math.cos(ph);spd[i]=.035+Math.random()*.05;rnd[i]=Math.random();
+    /* palette: viola profondo, lavanda, ciano raro, lime per le "stelle" */
+    const q=Math.random(),k=i%9;
+    if(k===0){col[i*3]=.83;col[i*3+1]=1;col[i*3+2]=.23;}else if(k===4){col[i*3]=.28;col[i*3+1]=.9;col[i*3+2]=1;}else{col[i*3]=.45+q*.35;col[i*3+1]=.3+q*.25;col[i*3+2]=1;}
+    siz[i]=Math.random()<.04?.2+Math.random()*.12:.07+Math.random()*.07;}
   const geo=new T.BufferGeometry();geo.setAttribute("position",new T.BufferAttribute(pos,3));geo.setAttribute("color",new T.BufferAttribute(col,3));
-  const tc=document.createElement("canvas");tc.width=tc.height=32;const tx=tc.getContext("2d"),gr=tx.createRadialGradient(16,16,0,16,16,16);
-  gr.addColorStop(0,"rgba(255,255,255,1)");gr.addColorStop(.35,"rgba(255,255,255,.6)");gr.addColorStop(1,"rgba(255,255,255,0)");tx.fillStyle=gr;tx.fillRect(0,0,32,32);
-  const mat=new T.PointsMaterial({size:.07,map:new T.CanvasTexture(tc),vertexColors:true,transparent:true,depthWrite:false,blending:T.AdditiveBlending,sizeAttenuation:true});
-  const group=new T.Group();group.add(new T.Points(geo,mat));scene.add(group);
-  Object.assign(Morph,{on:true,renderer,scene,cam,group,geo,pos,tgt,spd,N,mat});
+  geo.setAttribute("aRand",new T.BufferAttribute(rnd,1));geo.setAttribute("aSize",new T.BufferAttribute(siz,1));
+  const U={uTime:{value:0},uPix:{value:PIX},uAlpha:{value:1},uBurst:{value:0},uAspect:{value:1},uMouse:{value:new T.Vector2(9,9)},uMouseOn:{value:0},uPulseC:{value:new T.Vector2(0,0)},uPulseR:{value:0},uPulseA:{value:0},uCalm:{value:REDUCE?0:1}};
+  const mat=new T.ShaderMaterial({uniforms:U,vertexShader:MORPH_VS,fragmentShader:MORPH_FS,transparent:true,depthWrite:false,blending:T.AdditiveBlending});
+  const group=new T.Group();group.add(new T.Points(geo,mat));
+  /* alone: un disco di luce viola dietro le particelle, che si accende nelle transizioni */
+  const hc=document.createElement("canvas");hc.width=hc.height=256;const hx=hc.getContext("2d"),hg=hx.createRadialGradient(128,128,0,128,128,128);
+  hg.addColorStop(0,"rgba(150,95,255,.55)");hg.addColorStop(.35,"rgba(110,50,240,.22)");hg.addColorStop(1,"rgba(80,20,200,0)");hx.fillStyle=hg;hx.fillRect(0,0,256,256);
+  const halo=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(hc),transparent:true,depthWrite:false,blending:T.AdditiveBlending,opacity:.5}));halo.scale.set(13,13,1);
+  scene.add(halo);scene.add(group);const HB={v:.5};
+  Object.assign(Morph,{on:true,renderer,scene,cam,group,geo,pos,tgt,spd,N,mat,U,halo});
   Morph.shape=name=>{Morph.tgt.set(morphShape(name));Morph.goal=morphPlace(name);};
+  /* esplosione: le particelle schizzano verso l'esterno e si ricompongono nella forma della nuova sezione */
+  Morph.burst=(power=1)=>{
+    if(REDUCE||!HAS_G)return;
+    const p=Morph.pos;for(let i=0;i<N;i++){const o=i*3,x=p[o],y=p[o+1],z=p[o+2],l=Math.hypot(x,y,z)||1,k=(1.2+Math.random()*2.6)*power;p[o]+=x/l*k;p[o+1]+=y/l*k;p[o+2]+=z/l*k;}
+    G.killTweensOf(U.uBurst);G.fromTo(U.uBurst,{value:power},{value:0,duration:1.6,ease:"expo.out"});
+    G.killTweensOf(cam);G.fromTo(cam,{fov:45+14*power},{fov:45,duration:1.4,ease:"expo.out",onUpdate:()=>cam.updateProjectionMatrix()});
+    G.killTweensOf(HB);G.fromTo(HB,{v:1},{v:.5,duration:1.6,ease:"power2.out"});
+  };
+  /* onda d'urto dove clicchi (sullo sfondo, non sui pulsanti) */
+  window.addEventListener("pointerdown",e=>{
+    if(REDUCE||!HAS_G||e.target.closest("button,a,input,select,textarea,label,[data-rc],.card,.kpi,.chat,.drawer"))return;
+    U.uPulseC.value.set(e.clientX/window.innerWidth*2-1,-(e.clientY/window.innerHeight*2-1));
+    G.killTweensOf([U.uPulseR,U.uPulseA]);G.fromTo(U.uPulseR,{value:0},{value:1.9,duration:1.5,ease:"power2.out"});G.fromTo(U.uPulseA,{value:1.2},{value:0,duration:1.5,ease:"power1.in"});
+  },{passive:true});
   Morph.shape(current);Morph.cur={...Morph.goal};morphData();
-  const size=()=>{const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();Morph.goal=morphPlace(current);};
+  const size=()=>{const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();U.uAspect.value=w/h;Morph.goal=morphPlace(current);};
   window.addEventListener("resize",size);size();
-  window.addEventListener("pointermove",e=>{Morph.mx=e.clientX/window.innerWidth*2-1;Morph.my=e.clientY/window.innerHeight*2-1;},{passive:true});
+  let mouseT=0;
+  window.addEventListener("pointermove",e=>{Morph.mx=e.clientX/window.innerWidth*2-1;Morph.my=e.clientY/window.innerHeight*2-1;U.uMouse.value.set(Morph.mx,-Morph.my);mouseT=performance.now();},{passive:true});
   let t0=performance.now();
   const loop=now=>{
     const dt=Math.min(3,(now-t0)/16.67);t0=now;
     if(!document.hidden){
       const p=Morph.pos,t=Morph.tgt,time=now/1000;
-      for(let i=0;i<N;i++){const k=Math.min(1,spd[i]*dt),o=i*3;p[o]+=(t[o]-p[o])*k;p[o+1]+=(t[o+1]-p[o+1])*k+Math.sin(time*1.3+i)*.0015;p[o+2]+=(t[o+2]-p[o+2])*k;}
+      for(let i=0;i<N;i++){const k=Math.min(1,spd[i]*dt),o=i*3;p[o]+=(t[o]-p[o])*k;p[o+1]+=(t[o+1]-p[o+1])*k;p[o+2]+=(t[o+2]-p[o+2])*k;}
       geo.attributes.position.needsUpdate=true;
+      U.uTime.value=REDUCE?0:time;
+      U.uMouseOn.value+=((FINE&&!REDUCE&&now-mouseT<2500?1:0)-U.uMouseOn.value)*.06*dt;
       const c=Morph.cur,g=Morph.goal,e=.05*dt;c.x+=(g.x-c.x)*e;c.y+=(g.y-c.y)*e;c.s+=(g.s-c.s)*e;c.a+=(g.a-c.a)*e;
-      group.position.set(c.x+Morph.mx*.25,c.y-Morph.my*.2,0);group.scale.setScalar(c.s);mat.opacity=c.a;
+      group.position.set(c.x+Morph.mx*.25,c.y-Morph.my*.2,0);group.scale.setScalar(c.s);U.uAlpha.value=c.a;
+      halo.position.set(group.position.x,group.position.y,-2.5);halo.scale.setScalar(12*c.s*(1+.04*Math.sin(time*.8)));halo.material.opacity=HB.v*(.25+.75*c.a);
       group.rotation.y+=REDUCE?0:.0022*dt;group.rotation.x+=((current==="lab"?.1:Morph.my*.25)-group.rotation.x)*.04;
       renderer.render(scene,cam);
     }
