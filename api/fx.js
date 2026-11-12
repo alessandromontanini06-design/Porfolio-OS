@@ -3,7 +3,7 @@
 // Serve a riportare in euro i benchmark quotati in dollari. Nessuna chiave; cache di 24 ore.
 
 const ECB = "https://data-api.ecb.europa.eu/service/data/EXR";
-const CCY = /^(USD|GBP|CHF|JPY)$/;
+const CCY = /^(USD|GBP|CHF|JPY|CAD)$/;
 const cache = new Map();
 const TTL = 24 * 60 * 60 * 1000;
 
@@ -15,7 +15,8 @@ export default async function handler(req, res) {
   if (hit && Date.now() - hit.t < TTL) { res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=172800"); res.status(200).json(hit.v); return; }
   try {
     const key = `M.${ccy}.EUR.SP00.E`;
-    const r = await fetch(`${ECB}/${key}?format=csvdata&detail=dataonly&startPeriod=1999-01`, { signal: AbortSignal.timeout(15_000) });
+    // la BCE a volte risponde lenta (anche 20-30 s): tempo massimo generoso, poi la cache di 24 ore della rete Vercel evita di riaspettare
+    const r = await fetch(`${ECB}/${key}?format=csvdata&detail=dataonly&startPeriod=1999-01`, { signal: AbortSignal.timeout(28_000) });
     if (!r.ok) throw new Error(`BCE ${r.status}`);
     const lines = (await r.text()).trim().split(/\r?\n/), head = lines.shift().split(",");
     const iP = head.indexOf("TIME_PERIOD"), iV = head.indexOf("OBS_VALUE");

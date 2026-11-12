@@ -559,7 +559,7 @@ function renderUnderstand(el){
       <div class="tablewrap"><table class="mt pos"><thead><tr><th>Strumento</th><th>Simbolo per i prezzi</th><th>Valore</th><th>Peso attuale</th><th>Peso target</th></tr></thead><tbody>
       ${u.posizioni.map((p,i)=>`<tr><td><span class="an">${esc(p.nome)}</span><span class="cl mono">${esc(p.ticker)}</span></td><td><input class="sym" id="und-sym-${i}" value="${esc(p.simbolo)}" aria-label="Simbolo di ${esc(p.nome)}" spellcheck="false"></td><td class="mono">${p.valore==null?"—":fmtN(p.valore)+" €"}</td><td class="mono">${pc(p.pesoAttuale)}</td><td class="mono">${pc(p.pesoTarget)}</td></tr>`).join("")}
       </tbody></table></div>
-      <p class="caption">Il simbolo è proposto dall'IA (formato TICKER.BORSA: .LON Londra, .DEX Xetra). Correggilo se serve: lo storico arriva da Alpha Vantage, nella valuta di quotazione.</p>
+      <p class="caption">Il simbolo è proposto dall'IA (formato TICKER.BORSA: .LON Londra, .DEX Xetra). Correggilo se serve: lo storico arriva da Alpha Vantage e viene convertito in euro con il cambio BCE di fine mese.</p>
       ${scart}${err}<div class="row" style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn primary" id="undRebuild" data-mag>Scarica lo storico e ricostruisci il file</button><button type="button" class="btn" id="undDismiss">Ignora</button></div>`;
     return;
   }
@@ -596,16 +596,26 @@ async function rebuildFromPrices(){
     const ok=[],bad=[];
     series.forEach((s,i)=>{(s.error?bad:ok).push({p:pos[i],s});});
     if(!ok.length)throw new Error(bad.map(b=>b.s.error).join(" ")||"Nessun prezzo scaricato.");
-    const maps=ok.map(o=>new Map(o.s.points.map(x=>[x.d.slice(0,7),x])));
-    const months=[...maps[0].keys()].filter(m=>maps.every(mp=>mp.has(m))).sort().slice(-121);
+    /* tutto in euro: ogni serie nella sua valuta di quotazione viene convertita con il cambio BCE di fine mese
+       (pence GBX → sterline ÷ 100, poi ÷ unità di valuta per 1 euro) */
+    const ccyOf=s=>{const c=String(s.currency||"").toUpperCase();return c==="GBX"||c==="GBP"?"GBP":c||null;};
+    const need=[...new Set(ok.map(o=>ccyOf(o.s)).filter(c=>c&&c!=="EUR"))],fxm={},fxErr=[];
+    for(const c of need){const j=await getJSON(`/api/fx?ccy=${c}`);if(j.error||!j.points)fxErr.push(`${c}: ${j.error||"cambio non disponibile"}`);else fxm[c]=new Map(j.points.map(x=>[x.p,x.v]));}
+    if(fxErr.length)throw new Error(`Non riesco a convertire in euro (${fxErr.join("; ")}). Riprova tra poco.`);
+    const unknown=ok.filter(o=>!ccyOf(o.s)).map(o=>o.p.simbolo);
+    const maps=ok.map(o=>{const c=ccyOf(o.s),pence=String(o.s.currency||"").toUpperCase()==="GBX",m=new Map();
+      o.s.points.forEach(x=>{const k=x.d.slice(0,7);let v=x.v/(pence?100:1);if(c&&c!=="EUR"){const r=fxm[c].get(k);if(!(r>0))return;v/=r;}m.set(k,{d:x.d,v:+v.toFixed(6)});});return m;});
+    const months=[...maps[0].keys()].filter(m=>maps.every(mp=>mp.has(m))).sort();
     if(months.length<13)throw new Error("Lo storico comune degli strumenti è troppo corto (meno di un anno). Prova a cambiare i simboli.");
     const aoa=[["Data",...ok.map(o=>o.p.ticker||o.p.nome)]];
     months.forEach(m=>{const d=maps[0].get(m).d;aoa.push([`${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}`,...maps.map(mp=>mp.get(m).v)]);});
     const orig=S.source.name,scartati=u.scartati||[];
-    const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted})),missing:bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error}))};
+    const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null})),missing:bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},true);
     S.portfolio=pf;
-    S.aiLog=[`File ricostruito: ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi da Alpha Vantage (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}, nella valuta di quotazione).`,
+    S.aiLog=[`File ricostruito: ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi da Alpha Vantage (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
+      `Valute di quotazione: ${ok.map(o=>`${o.p.ticker||o.p.nome} ${o.s.currency||"sconosciuta"}`).join(", ")}.`,
+      ...(unknown.length?[`Valuta non determinata per ${unknown.join(", ")}: lasciata com'è, verifica il simbolo.`]:[]),
       ...pf.missing.map(m=>`Non scaricato: ${m.nome} (${m.simbolo}). ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
     renderQuality(S.ds);
   }catch(e){
@@ -915,7 +925,7 @@ function renderRisk(){
     ["Sortino",btn("rk-sortino-p",fmtN(PR.sortino)),`rendimento per unità di rischio al ribasso`],
     ["Drawdown più lungo",btn("rk-ddlen-p",unitN(PR.longest,f)),PR.ongoing?"non ancora recuperato":`sotto il massimo, poi recuperato`]
   ].map(k=>`<div class="kpi"><span class="eyebrow">${k[0]}</span>${k[1]}<span class="sub">${k[2]}</span></div>`).join("");
-  drawHist(PR,f);drawContrib();drawUnderwater(PR,f);renderRiskTable();
+  drawHist(PR,f);drawContrib();drawUnderwater(PR,f);renderRiskTable();renderRiskPro();
   if(current==="risk")Morph.shape("risk");
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-rw]");if(!b)return;S.riskW=b.dataset.rw;renderRisk();if(current==="sim")renderSim();if(current==="stress")renderStress();if(current==="bench")renderBench();});
@@ -936,6 +946,29 @@ function drawHist(PR,f){
   $("#riskHist").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Istogramma dei rendimenti di periodo del portafoglio">${g}</svg>`;
   $("#histUnit").textContent=`rendimenti ${S.ds.freq.adj} · ${PR.n} osservazioni`;
   $("#histCap").textContent=`In rosso i ${PR.tail95} ${UNIT[f]?UNIT[f][1]:"periodi"} peggiori (il 5%). Asimmetria ${fmtN(PR.skew)}, curtosi in eccesso ${fmtN(PR.kurt)}: ${PR.kurt>1?"le perdite estreme sono più frequenti che in una distribuzione normale.":"code vicine a quelle di una distribuzione normale."}`;
+}
+/* Qualità statistica: quanto sono affidabili i numeri del rischio */
+function renderRiskPro(){
+  const R=S.risk,PR=R.PR,f=S.ds.freq.f,el=$("#riskPro");if(!el||!PR.n||PR.n<6)return;
+  const win={252:250,52:104,12:60,4:20,1:10}[f]||60;R.BT=P.varBacktest(R.pa.ret,win,.05);
+  const c=(k,v,cl="")=>`<button type="button" class="cellbtn ${cl}" data-rc="rk-${k}-p">${v}</button>`,bt=R.BT;
+  const sig=PR.srLo>0?"positivo con il 95% di confidenza":PR.srHi<0?"negativo con il 95% di confidenza":"non distinguibile da zero con questi dati";
+  el.innerHTML=`<div class="head"><div><span class="eyebrow">Portafoglio · ${R.wLabel}</span><h3 style="margin-top:4px">Quanto sono affidabili questi numeri</h3></div><span class="chip hist"><i></i>statistica</span></div>
+    <div class="pro-grid">
+      <div class="pro"><span class="eyebrow">Sharpe e incertezza</span>
+        <div class="pro-v">${c("sr",fmtN(PR.srAnn))}<small>IC 95%: ${fmtN(PR.srLo)} – ${fmtN(PR.srHi)}</small></div>
+        <div class="pro-bar" title="Scala da −1 a 3: la riga sottile è lo zero, la barra viola l'intervallo di confidenza, il segno lime lo Sharpe stimato"><i style="left:${Math.max(0,Math.min(100,(PR.srLo+1)/4*100))}%;width:${Math.max(1,Math.min(100,(PR.srHi-PR.srLo)/4*100))}%"></i><b style="left:${Math.max(0,Math.min(100,(PR.srAnn+1)/4*100))}%"></b><em style="left:25%"></em></div>
+        <p>Su ${unitN(PR.n,f)} lo Sharpe è <b>${sig}</b>. Probabilità che sia davvero sopra zero: ${c("psr",PR.psr>.999?"> 99,9%":fmtPct(PR.psr,1))}.</p></div>
+      <div class="pro"><span class="eyebrow">VaR 95% · tre metodi</span>
+        <table class="mt mc-t pro-t"><tbody><tr><td>Storico</td><td>${c("var95",fmtPct(-PR.var95,1),"neg")}</td></tr><tr><td>Normale</td><td>${c("vpar",fmtPct(-PR.varParam95,1),"neg")}</td></tr><tr><td>Cornish-Fisher</td><td>${c("vcf",fmtPct(-PR.varCF95,1),"neg")}</td></tr></tbody></table>
+        <p>${PR.varCF95>PR.varParam95*1.1?"Le code sono più spesse di una normale: il metodo normale sottostima la perdita.":"Le tre stime sono vicine: la distribuzione è poco lontana da una normale."}</p></div>
+      <div class="pro"><span class="eyebrow">Il VaR ha funzionato? · Kupiec</span>
+        ${bt.error?`<p>${esc(bt.error)}</p>`:`<div class="pro-v">${c("bt",`${bt.x} / ${bt.n}`)}<small>superamenti, attesi ${fmtN(bt.expected,1)}</small></div>
+        <p class="${bt.ok?"up":"dn"}" style="font-weight:700">${bt.ok?"✓ Modello non rifiutato":"✗ Modello rifiutato"} (p = ${fmtN(bt.p,2)})</p>
+        <p>VaR stimato ogni ${UNIT[f]?UNIT[f][0]:"periodo"} sui ${unitN(win,f)} precedenti e confrontato con la perdita successiva, fuori campione.</p>`}</div>
+      <div class="pro"><span class="eyebrow">Drawdown in profondità</span>
+        <table class="mt mc-t pro-t"><tbody><tr><td>Ulcer index</td><td>${c("ulcer",fmtPct(PR.ulcer,1))}</td></tr><tr><td>Tempo sott'acqua</td><td>${c("uw",fmtPct(PR.underwater,0))}</td></tr><tr><td>Calo medio</td><td>${c("uw",fmtPct(PR.avgDD,1),"neg")}</td></tr><tr><td>Omega</td><td>${c("omega",fmtN(PR.omega))}</td></tr></tbody></table></div>
+    </div>`;
 }
 function drawContrib(){
   const R=S.risk,ds=S.ds,maxv=Math.max(...R.w,...R.RC.pct.map(x=>Math.max(0,x)),.01);
@@ -991,7 +1024,15 @@ function riskReceipt(m,who){
     rc:{t:"Contributo al rischio",v:fmtPct(R.RC.pct[i],1),fx:"RCᵢ = wᵢ · (Σw)ᵢ / σₚ   (la somma dei contributi è σₚ)\nquota = RCᵢ / σₚ",kv:[["Peso nel portafoglio",fmtPct(R.w[i],1)],["Volatilità dell'asset",fmtPct(R.RC.sig[i],2)],["Volatilità del portafoglio",fmtPct(R.RC.volP,2)],["Periodi comuni usati",R.cov.common]]},
     volp:{t:"Volatilità del portafoglio",v:fmtPct(R.RC.volP,2),fx:"σₚ = √( wᵀ Σ w ) · √f\nΣ = matrice di covarianza sui periodi comuni",kv:[["Periodi comuni usati",R.cov.common]]},
     neff:{t:"Asset effettivi",v:fmtN(R.RC.neff,2),fx:"N_eff = 1 / Σ wᵢ²   (inverso dell'indice di Herfindahl)",kv:[["Indice di Herfindahl",fmtN(R.RC.hhi,3)],["Asset nel file",ds.assets.length]]},
-    div:{t:"Rapporto di diversificazione",v:fmtN(R.RC.divRatio),fx:"DR = Σ wᵢ σᵢ / σₚ\n1 = nessun beneficio; più è alto, più la diversificazione riduce il rischio",kv:[["Volatilità del portafoglio",fmtPct(R.RC.volP,2)]]}
+    div:{t:"Rapporto di diversificazione",v:fmtN(R.RC.divRatio),fx:"DR = Σ wᵢ σᵢ / σₚ\n1 = nessun beneficio; più è alto, più la diversificazione riduce il rischio",kv:[["Volatilità del portafoglio",fmtPct(R.RC.volP,2)]]},
+    sr:{t:"Sharpe con intervallo di confidenza",v:`${fmtN(st.srAnn)} (${fmtN(st.srLo)} – ${fmtN(st.srHi)})`,fx:"SR = (r̄ − rf/f) / s · √f\nVar(SR) = [1 + SR²/2 − γ₃·SR + (γ₄/4)·SR²] / (n − 1)   (Mertens 2002, SR di periodo)\nIC 95% = SR ± 1,96 · √Var · √f",kv:[["Errore standard (annuo)",fmtN(st.srSE,3)],["Asimmetria γ₃",fmtN(st.skew)],["Curtosi in eccesso γ₄",fmtN(st.kurt)],["Osservazioni",st.n]]},
+    psr:{t:"Probabilistic Sharpe Ratio",v:fmtPct(st.psr,1),fx:"PSR = Φ( SR / σ(SR) )   (Bailey e López de Prado 2012)\nprobabilità che lo Sharpe vero sia maggiore di zero, tenendo conto di campione, asimmetria e code",kv:[["Sharpe annuo",fmtN(st.srAnn)],["Errore standard",fmtN(st.srSE,3)]]},
+    vpar:{t:"VaR 95% parametrico (normale)",v:fmtPct(-st.varParam95,2),fx:"VaR = −(μ − 1,645 · σ)\nipotizza rendimenti a campana",kv:[["Media di periodo",fmtPct(st.mean,3)],["Deviazione standard",fmtPct(st.sd,3)]]},
+    vcf:{t:"VaR 95% Cornish-Fisher",v:fmtPct(-st.varCF95,2),fx:"z_CF = z + (z² − 1)γ₃/6 + (z³ − 3z)γ₄/24 − (2z³ − 5z)γ₃²/36,  z = −1,645\nVaR = −(μ + z_CF · σ)   corregge la normale per asimmetria e code spesse",kv:[["z corretto",fmtN(st.zcf,3)],["Asimmetria γ₃",fmtN(st.skew)],["Curtosi in eccesso γ₄",fmtN(st.kurt)]]},
+    bt:{t:"Backtest del VaR (test di Kupiec)",v:R.BT&&!R.BT.error?`${R.BT.x} superamenti su ${R.BT.n}`:"—",fx:"ogni periodo: VaR storico 95% stimato sui periodi precedenti (finestra mobile), poi confronto con la perdita reale\nLR = −2 ln[ (1−p)^(n−x) p^x ] + 2 ln[ (1−x/n)^(n−x) (x/n)^x ] ~ χ²(1)",kv:R.BT&&!R.BT.error?[["Attesi (5%)",fmtN(R.BT.expected,1)],["Frequenza osservata",fmtPct(R.BT.rate,1)],["Finestra di stima",unitN(R.BT.win,f)],["LR",fmtN(R.BT.lr,3)],["p-value",fmtN(R.BT.p,3)],["Esito",R.BT.ok?"il modello non è rifiutato al 5%":"rifiutato: il VaR storico sbaglia la frequenza delle perdite"]]:[["Nota",R.BT?R.BT.error:"—"]]},
+    ulcer:{t:"Ulcer index",v:fmtPct(st.ulcer,2),fx:"UI = √( media(DDₜ²) )   (Martin 1987)\npesa di più i cali profondi e lunghi",kv:[["Pain index (calo medio, tutti i periodi)",fmtPct(st.pain,2)]]},
+    uw:{t:"Tempo sott'acqua",v:fmtPct(st.underwater,0),fx:"quota dei periodi sotto il massimo precedente",kv:[["Calo medio quando sott'acqua",fmtPct(st.avgDD,2)],["Drawdown più lungo",unitN(st.longest,f)]]},
+    omega:{t:"Omega ratio",v:fmtN(st.omega),fx:"Ω = Σ max(rᵢ − τ, 0) / Σ max(τ − rᵢ, 0),   τ = rf / f\nconfronta tutti i guadagni con tutte le perdite, senza ipotesi di normalità",kv:[["Soglia τ di periodo",fmtPct(st.mar,3)]]}
   }[m]||{t:m,v:"—",fx:"",kv:[]};
   const who2=m==="rc"?ds.assets[i].name:name;
   return {title:`${M.t} · ${who2}`,value:M.v,formula:src+M.fx,kv:[...M.kv,["Osservazioni",st.n],["Frequenza",`${ds.freq.label} · f = ${f}`],["Pesi del portafoglio",R.wLabel]]};
@@ -1038,7 +1079,7 @@ function renderSim(){
   const k3=R.monthly<0&&R.depleted>0?["Capitale esaurito",btn("dep",fmtPct(R.depleted,0)),"dei percorsi finisce i soldi prima della fine"]:["Probabilità di perdita",btn("loss",fmtPct(R.probLoss,0)),`di finire sotto i ${fmtEur(R.invested)} versati`];
   $("#mcKpis").innerHTML=[
     [`Mediana dopo ${yrs}`,btn("med",fmtEur(pf[3])),real?"in euro di oggi, al netto dell'inflazione":"metà dei percorsi finisce sopra"],
-    ["Che probabilità hai?",btn("goal",R.goal>0?fmtPct(real?R.probGoalReal:R.probGoal,0):"—"),R.goal>0?`di arrivare a ${fmtEur(R.goal)}${real?" in euro di oggi":""}`:"imposta un obiettivo"],
+    ["Che probabilità hai?",btn("goal",R.goal>0?fmtPct(real?R.probGoalReal:R.probGoal,0):"—"),R.goal>0?`di arrivare a ${fmtEur(R.goal)}${real?" in euro di oggi":""} · ±${fmtN(1.96*Math.sqrt((real?R.probGoalReal:R.probGoal)*(1-(real?R.probGoalReal:R.probGoal))/R.n)*100,1)} punti di errore di simulazione`:"imposta un obiettivo"],
     k3,
     ["Scenario sfavorevole",btn("p-0",fmtEur(pf[0])),"5 percorsi su 100 finiscono più in basso"]
   ].map(k=>`<div class="kpi"><span class="eyebrow">${k[0]}</span>${k[1]}<span class="sub">${k[2]}</span></div>`).join("");
@@ -1113,7 +1154,7 @@ function mcReceipt(m,arg){
   const fx="Wₜ = Wₜ₋₁ · (1 + r̃ₜ) · (1 − c)^(1/f) + v · 12/f\nr̃ₜ = rendimento estratto dalla storia del portafoglio";
   if(m==="p"){const i=+arg,L=["5°","10°","25°","50°","75°","90°","95°"][i];return {title:`Capitale finale · ${L} percentile`,value:fmtEur(R.pFinal[i]),formula:fx+`\nP${L} = quantile dei ${R.n} capitali finali (interpolazione lineare)`,kv:[["In euro di oggi",fmtEur(R.pFinalReal[i])],["Inflazione",fmtPct(R.infl,2)],...base]};}
   if(m==="med")return mcReceipt("p","3");
-  if(m==="goal")return {title:"Probabilità di raggiungere l'obiettivo",value:fmtPct(real?R.probGoalReal:R.probGoal,1),formula:fx+"\nProb = (percorsi con W_T ≥ obiettivo) / percorsi totali",kv:[["Obiettivo",fmtEur(R.goal)+(real?" in euro di oggi":"")],["Probabilità nominale",fmtPct(R.probGoal,1)],["Probabilità in euro di oggi",fmtPct(R.probGoalReal,1)],...base]};
+  if(m==="goal")return {title:"Probabilità di raggiungere l'obiettivo",value:fmtPct(real?R.probGoalReal:R.probGoal,1),formula:fx+"\nProb = (percorsi con W_T ≥ obiettivo) / percorsi totali\nerrore di simulazione = √(p(1 − p) / n);  IC 95% = p ± 1,96 · errore",kv:[["Obiettivo",fmtEur(R.goal)+(real?" in euro di oggi":"")],["Errore standard (nominale)",`${fmtN(R.probGoalSE*100,2)} punti`],["Probabilità nominale",fmtPct(R.probGoal,1)],["Probabilità in euro di oggi",fmtPct(R.probGoalReal,1)],...base]};
   if(m==="loss")return {title:"Probabilità di perdita",value:fmtPct(R.probLoss,1),formula:fx+"\nProb = (percorsi con W_T < capitale versato) / percorsi totali",kv:[["Capitale versato",fmtEur(R.invested)],...base]};
   if(m==="dep")return {title:"Percorsi che esauriscono il capitale",value:fmtPct(R.depleted,1),formula:fx+"\nesaurito se Wₜ ≤ 0 con prelievi attivi; da lì i prelievi si fermano",kv:base};
   return {title:"Simulazione",value:"—",formula:fx,kv:base};
@@ -1438,7 +1479,7 @@ const BENCHES=[
   {id:"custom",name:"Personalizzato",desc:""}];
 S.bnData={};S.fx=null;
 async function getJSON(url){
-  try{const r=await fetch(url,{signal:AbortSignal.timeout(30000)}),j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||`Errore del server (${r.status}).`};}
+  try{const r=await fetch(url,{signal:AbortSignal.timeout(40000)}),j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||`Errore del server (${r.status}).`};}
   catch(e){return {error:e instanceof TypeError?"I benchmark si scaricano dal sito pubblicato su Vercel.":"Il server non ha risposto in tempo. Riprova."};}
 }
 function bnLoad(sym){
@@ -1546,7 +1587,7 @@ function renderBnTable(){
   const bs=S.bnRes.bs,c=(k,v,cl="")=>`<button type="button" class="cellbtn ${cl}" data-rc="bn-${k}-r">${v}</button>`;
   const two=[["cagr","CAGR",x=>fmtPct(x,1,true)],["tot","Rendimento totale",x=>fmtPct(x,1,true)],["vol","Volatilità",x=>fmtPct(x,1)],["sharpe","Sharpe",x=>fmtN(x)],["mdd","Max drawdown",x=>fmtPct(x,1)]];
   const key={cagr:["cagrP","cagrB"],tot:["totP","totB"],vol:["volP","volB"],sharpe:["sharpeP","sharpeB"],mdd:["mddP","mddB"]};
-  const rel=[["beta","Beta",fmtN(bs.beta)],["alpha","Alpha di Jensen (annuo)",fmtPct(bs.alpha,2,true)],["r2","R² (quanto spiega il mercato)",fmtPct(bs.r2,0)],["te","Tracking error",fmtPct(bs.te,1)],["ir","Information ratio",fmtN(bs.ir)],["up","Cattura nei rialzi",fmtPct(bs.up,0)],["down","Cattura nei ribassi",fmtPct(bs.down,0)],["hit","Periodi sopra il benchmark",fmtPct(bs.hit,0)]];
+  const rel=[["beta","Beta (IC 95%)",`${fmtN(bs.beta)} (${fmtN(bs.betaLo)} – ${fmtN(bs.betaHi)})`],["alpha","Alpha di Jensen (annuo)",`${fmtPct(bs.alpha,2,true)} · ${bs.pAlpha<.05?"significativo":"non significativo"} (p ${fmtN(bs.pAlpha,2)})`],["r2","R² (quanto spiega il mercato)",fmtPct(bs.r2,0)],["te","Tracking error",fmtPct(bs.te,1)],["ir","Information ratio",fmtN(bs.ir)],["up","Cattura nei rialzi",fmtPct(bs.up,0)],["down","Cattura nei ribassi",fmtPct(bs.down,0)],["hit","Periodi sopra il benchmark",fmtPct(bs.hit,0)]];
   $("#bnTable").innerHTML=`<thead><tr><th>Misura</th><th>Portafoglio</th><th>${esc(S.bnRes.src.label)}</th></tr></thead><tbody>${two.map(([k,l,fm])=>`<tr><td>${l}</td><td>${c(k+"P",fm(bs[key[k][0]]))}</td><td>${c(k+"B",fm(bs[key[k][1]]))}</td></tr>`).join("")}
     ${rel.map(([k,l,v])=>`<tr><td>${l}</td><td colspan="2" style="text-align:center">${c(k,v)}</td></tr>`).join("")}</tbody>`;
 }
@@ -1577,8 +1618,8 @@ function bnReceipt(m){
   const base=[["Benchmark",R.src.label],["Periodi in comune",bs.n],["Periodo",`${al.keys[0]} – ${al.keys[al.keys.length-1]}`],["Portafoglio",R.label],["Frequenza",`f = ${fc}`]];
   const M={
     active:["Rendimento annuo in più",fmtPct(bs.active,2,true),"CAGRₚ − CAGRᵦ",[["CAGR portafoglio",fmtPct(bs.cagrP,2,true)],["CAGR benchmark",fmtPct(bs.cagrB,2,true)]]],
-    beta:["Beta",fmtN(bs.beta,3),"β = cov(rₚ, rᵦ) / var(rᵦ)",[["Correlazione",fmtN(bs.corr,3)]]],
-    alpha:["Alpha di Jensen",fmtPct(bs.alpha,2,true),"α = (r̄ₚ − rf/f − β·(r̄ᵦ − rf/f)) · f",[["Beta",fmtN(bs.beta,3)],["Tasso privo di rischio",fmtPct(R.rf,2)]]],
+    beta:["Beta",fmtN(bs.beta,3),"β = cov(rₚ, rᵦ) / var(rᵦ)   (regressione OLS dei rendimenti in eccesso)\nIC 95% = β ± t₀,₉₇₅(n−2) · SE(β),  SE(β) = sₑ / √Σ(rᵦ − r̄ᵦ)²",[["IC 95%",`${fmtN(bs.betaLo,3)} – ${fmtN(bs.betaHi,3)}`],["Errore standard",fmtN(bs.seBeta,3)],["p-value di β = 1",fmtN(bs.pBeta1,3)],["Correlazione",fmtN(bs.corr,3)],["Volatilità residua (annua)",fmtPct(bs.resVol,2)]]],
+    alpha:["Alpha di Jensen",fmtPct(bs.alpha,2,true),"α = (r̄ₚ − rf/f − β·(r̄ᵦ − rf/f)) · f   (intercetta della regressione OLS)\nt = α / SE(α) con n − 2 gradi di libertà;  significativo se p < 0,05",[["IC 95%",`${fmtPct(bs.alphaLo,2,true)} – ${fmtPct(bs.alphaHi,2,true)}`],["Errore standard (annuo)",fmtPct(bs.seAlpha,2)],["t",fmtN(bs.tAlpha,2)],["p-value",fmtN(bs.pAlpha,3)],["Gradi di libertà",bs.df],["Beta",fmtN(bs.beta,3)],["Tasso privo di rischio",fmtPct(R.rf,2)]]],
     r2:["R²",fmtPct(bs.r2,1),"R² = ρ²   quota della variabilità spiegata dal benchmark",[["Correlazione",fmtN(bs.corr,3)]]],
     te:["Tracking error",fmtPct(bs.te,2),"TE = sd(rₚ − rᵦ) · √f",[]],
     ir:["Information ratio",fmtN(bs.ir),"IR = media(rₚ − rᵦ) · f / TE",[["Tracking error",fmtPct(bs.te,2)]]],
@@ -1663,7 +1704,7 @@ function renderReal(){
         :src.loading?`<span class="eyebrow">Confronto con l'indice</span><span style="color:var(--muted)">Scarico lo storico di ${esc(src.sym||"S&P 500")}…</span>`
         :`<span class="eyebrow">Confronto con l'indice</span><span style="color:var(--muted)">${esc(src.error||"Scegli un indice nella sezione Benchmark.")}</span>`}
       </div></div>
-    <p class="caption" style="margin-top:12px">Il valore segue i rendimenti degli strumenti nei dati e aggiunge ogni versamento a fine ${UNIT[f]?UNIT[f][0]:"periodo"}. ${S.source.kind==="rebuilt"?"I rendimenti sono quelli di mercato, nella valuta di quotazione dello storico: l'effetto del cambio non è incluso, quindi il valore può differire un po' da quello del tuo broker.":"I rendimenti vengono dai prezzi del file: se sono prezzi medi pagati, il valore è una stima."}${un.length?` Transazioni non collegate (strumento non nei dati): ${esc(un.join(", "))}.`:""}${pp.before?` ${pp.before} transazioni sono prima dell'inizio dei dati e sono contate dal primo periodo.`:""} TIR e rendimento ponderato su meno di un anno o due possono cambiare molto: non sono previsioni.</p>`;
+    <p class="caption" style="margin-top:12px">Il valore segue i rendimenti degli strumenti nei dati e aggiunge ogni versamento a fine ${UNIT[f]?UNIT[f][0]:"periodo"}. ${S.source.kind==="rebuilt"?"I rendimenti sono quelli di mercato convertiti in euro con il cambio BCE di fine mese; il valore può differire un po' da quello del tuo broker (prezzi di fine mese, borsa diversa).":"I rendimenti vengono dai prezzi del file: se sono prezzi medi pagati, il valore è una stima."}${un.length?` Transazioni non collegate (strumento non nei dati): ${esc(un.join(", "))}.`:""}${pp.before?` ${pp.before} transazioni sono prima dell'inizio dei dati e sono contate dal primo periodo.`:""} TIR e rendimento ponderato su meno di un anno o due possono cambiare molto: non sono previsioni.</p>`;
   drawReal();
 }
 function drawReal(){

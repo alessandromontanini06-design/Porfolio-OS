@@ -18,7 +18,7 @@ const YM = /^(19|20)\d{2}-(0[1-9]|1[0-2])$/;
 
 async function ecbSeries(s, from, to) {
   const url = `${ECB}/${s.flow}/${s.key}?format=csvdata&detail=dataonly&startPeriod=${from}&endPeriod=${to}`;
-  const r = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  const r = await fetch(url, { signal: AbortSignal.timeout(28_000) });
   if (!r.ok) throw new Error(`BCE ${r.status}`);
   const lines = (await r.text()).trim().split(/\r?\n/);
   const head = lines.shift().split(",");

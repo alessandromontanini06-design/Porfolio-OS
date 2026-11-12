@@ -38,9 +38,26 @@ async function monthly(symbol, key) {
     .sort((a, b) => (a.d < b.d ? -1 : 1));
   if (!points.length) return { symbol, error: `Nessun prezzo disponibile per ${symbol}.` };
   const meta = res.data["Meta Data"] || {};
-  const v = { symbol, adjusted, points, info: String(meta["1. Information"] || ""), source: "Alpha Vantage" };
+  const cur = await currencyOf(symbol, key);
+  const v = { symbol, adjusted, points, currency: cur.currency, currencySource: cur.from, info: String(meta["1. Information"] || ""), source: "Alpha Vantage" };
   cache.set("m:" + symbol, { t: Date.now(), v });
   return v;
+}
+
+// Valuta di quotazione: dalla borsa quando è certa, altrimenti dalla ricerca di Alpha Vantage.
+// Londra quota ETF in sterline, pence (GBX) o dollari: lì serve la ricerca.
+const EUR_X = /\.(DEX|FRK|ETR|PAR|AMS|MIL|MCE|BRU|LIS|VIE|HEL|DUB)$/;
+async function currencyOf(symbol, key) {
+  if (EUR_X.test(symbol)) return { currency: "EUR", from: "borsa" };
+  if (/\.(SWX|SW)$/.test(symbol)) return { currency: "CHF", from: "borsa" };
+  if (/\.TRT$/.test(symbol)) return { currency: "CAD", from: "borsa" };
+  if (!symbol.includes(".")) return { currency: "USD", from: "borsa" };
+  try {
+    const s = await search(symbol.split(".")[0], key);
+    const m = (s.matches || []).find(x => String(x.symbol).toUpperCase() === symbol);
+    if (m && m.currency) return { currency: String(m.currency).toUpperCase(), from: "ricerca Alpha Vantage" };
+  } catch {}
+  return { currency: null, from: "sconosciuta" };
 }
 
 async function search(q, key) {

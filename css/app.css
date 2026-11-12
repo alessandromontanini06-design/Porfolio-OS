@@ -493,3 +493,19 @@ body.chat-on .orb-btn{opacity:0;transform:scale(.4);pointer-events:none}
 .tilt{transition:transform .25s cubic-bezier(.2,.7,.2,1);will-change:transform}
 @media (max-width:480px){.chip{white-space:normal}.hero-tile h1{font-size:10.5vw}.dock button{padding:9px 12px;font-size:.8rem}.dock button .n{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Qualità statistica (Rischio) */
+.pro-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:6px}
+.pro{border:1px solid var(--line);border-radius:18px;padding:14px 16px;background:var(--raise);display:flex;flex-direction:column;gap:10px;min-width:0}
+.pro p{margin:0;font-size:.84rem;color:var(--muted);line-height:1.45}
+.pro p b{color:var(--fg)}
+.pro-v{display:flex;flex-direction:column;gap:2px}
+.pro-v .cellbtn{font-family:var(--f-display);font-weight:900;font-size:1.9rem;align-self:flex-start;margin:0;padding:0;border-bottom-width:1px}
+.pro-v small{font-family:var(--f-mono);font-size:.74rem;color:var(--muted)}
+.pro-bar{position:relative;height:16px;border-radius:8px;background:color-mix(in oklab,var(--line) 60%,transparent)}
+.pro-bar i{position:absolute;top:3px;bottom:3px;border-radius:6px;background:color-mix(in oklab,var(--accent) 45%,transparent)}
+.pro-bar b{position:absolute;top:-2px;width:4px;height:20px;border-radius:2px;background:var(--lime);transform:translateX(-50%)}
+.pro-bar em{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--muted)}
+.pro-t td{padding:7px 4px}
+@media (max-width:1100px){.pro-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.pro-grid{grid-template-columns:1fr}}

@@ -307,9 +307,44 @@ function riskStats(ret,f,rfAnnual){
   const win=Math.max(1,Math.round(f));let best12=NaN,worst12=NaN,best12K=null,worst12K=null;
   if(n>win)for(let j=win-1;j<n;j++){let g=1;for(let t=j-win+1;t<=j;t++)g*=1+r[t];g-=1;
     if(!(g<=best12)){best12=g;best12K=idx[j];}if(!(g>=worst12)){worst12=g;worst12K=idx[j];}}
+  /* Sharpe con la sua incertezza (Mertens 2002, valido anche con code spesse e asimmetria) e Probabilistic Sharpe Ratio (Bailey & López de Prado) */
+  const sp=sd>0?(mean-mar)/sd:NaN,varSp=(1+.5*sp*sp-skew*sp+(kurt/4)*sp*sp)/(n-1),srSE=Math.sqrt(Math.max(0,varSp))*Math.sqrt(f),srAnn=sp*Math.sqrt(f);
+  /* VaR al 95%: storico (sopra), parametrico normale e Cornish-Fisher (corregge per asimmetria e curtosi) */
+  const z=-1.6448536269514722,zcf=z+(z*z-1)*skew/6+(z**3-3*z)*kurt/24-(2*z**3-5*z)*skew*skew/36;
+  /* drawdown in dettaglio: Ulcer index, Pain index, tempo sott'acqua, calo medio */
+  const dv=idx.map(k=>dd[k]),under=dv.filter(x=>x<-1e-12);
+  const up=r.reduce((a,x)=>a+Math.max(0,x-mar),0),dn=r.reduce((a,x)=>a+Math.max(0,mar-x),0);
   return {n,mean,sd,var95:-q05,var99:-q01,cvar95:-tailMean(q05),cvar99:-tailMean(q01),q05,q01,
     tail95:s.filter(x=>x<=q05).length,mar,downDev,sortino:downDev>0?(mean*f-rfA)/downDev:NaN,skew,kurt,
-    pctPos:r.filter(x=>x>0).length/n,dd,mdd,troughK,peakAtTrough,recK,longest,lStart,lEnd,ongoing,win,best12,best12K,worst12,worst12K,sorted:s};
+    pctPos:r.filter(x=>x>0).length/n,dd,mdd,troughK,peakAtTrough,recK,longest,lStart,lEnd,ongoing,win,best12,best12K,worst12,worst12K,sorted:s,
+    srAnn,srSE,srLo:srAnn-1.959964*srSE,srHi:srAnn+1.959964*srSE,psr:varSp>0?normCdf(sp/Math.sqrt(varSp)):NaN,
+    varParam95:-(mean+z*sd),varCF95:-(mean+zcf*sd),zcf,
+    ulcer:Math.sqrt(dv.reduce((a,x)=>a+x*x,0)/dv.length),pain:dv.reduce((a,x)=>a-x,0)/dv.length,underwater:under.length/dv.length,
+    avgDD:under.length?under.reduce((a,x)=>a+x,0)/under.length:0,omega:dn>0?up/dn:NaN};
+}
+/* ===== Distribuzioni per i test statistici ===== */
+function normCdf(x){ // Φ(x), errore < 1e-7 (W. J. Cody, approssimazione razionale di erfc)
+  const z=Math.abs(x)/Math.SQRT2,t=1/(1+.5*z),y=t*Math.exp(-z*z-1.26551223+t*(1.00002368+t*(.37409196+t*(.09678418+t*(-.18628806+t*(.27886807+t*(-1.13520398+t*(1.48851587+t*(-.82215223+t*.17087277)))))))));
+  return x>=0?1-y/2:y/2;
+}
+function lgamma(x){const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,.1208650973866179e-2,-.5395239384953e-5];let y=x,t=x+5.5;t-=(x+.5)*Math.log(t);let s=1.000000000190015;for(const ci of c)s+=ci/++y;return -t+Math.log(2.5066282746310005*s/x);}
+function betacf(a,b,x){let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;if(Math.abs(d)<1e-30)d=1e-30;d=1/d;let h=d;
+  for(let m=1;m<=200;m++){const m2=2*m;let aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<1e-30)d=1e-30;c=1+aa/c;if(Math.abs(c)<1e-30)c=1e-30;d=1/d;h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<1e-30)d=1e-30;c=1+aa/c;if(Math.abs(c)<1e-30)c=1e-30;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<3e-12)break;}
+  return h;}
+function ibeta(a,b,x){if(x<=0)return 0;if(x>=1)return 1;const bt=Math.exp(lgamma(a+b)-lgamma(a)-lgamma(b)+a*Math.log(x)+b*Math.log(1-x));return x<(a+1)/(a+b+2)?bt*betacf(a,b,x)/a:1-bt*betacf(b,a,1-x)/b;}
+function tCdf(t,df){const x=df/(df+t*t),p=.5*ibeta(df/2,.5,x);return t>0?1-p:p;}
+const pTwoSided=(t,df)=>2*(1-tCdf(Math.abs(t),df));
+function tInv975(df){let a=0,b=20;for(let k=0;k<80;k++){const m=(a+b)/2;if(tCdf(m,df)<.975)a=m;else b=m;}return (a+b)/2;} // quantile 97,5% della t di Student
+const chi2p1=lr=>lr<=0?1:2*(1-normCdf(Math.sqrt(lr))); // p-value di una χ² con 1 grado di libertà
+/* Backtest del VaR storico fuori campione: ogni periodo il VaR è stimato sui "win" periodi precedenti,
+   poi si conta quante volte la perdita lo supera. Test di Kupiec (proportion of failures). */
+function varBacktest(ret,win,alpha){
+  alpha=alpha||.05;const r=ret.filter(Number.isFinite);let n=0,x=0;const hits=[];
+  for(let t=win;t<r.length;t++){const s=r.slice(t-win,t).sort((a,b)=>a-b),v=-quantile(s,alpha);n++;if(r[t]<-v){x++;hits.push(t);}}
+  if(n<20)return {n,error:`Servono almeno ${win+20} periodi per il backtest: ce ne sono ${r.length}.`};
+  const ph=x/n,ll0=(n-x)*Math.log(1-alpha)+x*Math.log(alpha),ll1=(x?x*Math.log(ph):0)+(n-x?(n-x)*Math.log(1-ph):0),lr=-2*(ll0-ll1),p=chi2p1(lr);
+  return {n,x,expected:n*alpha,rate:ph,alpha,win,lr,p,ok:p>=.05};
 }
 function covMatrix(assets){
   const T=assets[0].ret.length,common=[];
@@ -404,7 +439,9 @@ function monteCarlo(o){
     pcts:MC_PCT,fan,final:finSorted,finalReal:finReal,invested,
     pFinal:pct(fin),pFinalReal:pct(fin).map(v=>v/defl(years)),
     probGoal:goal>0?share(v=>v>=goal):NaN,probGoalReal:goal>0?finReal.filter(v=>v>=goal).length/n:NaN,goal,
-    probLoss:share(v=>v<invested),depleted:depleted/n,mean:finSorted.reduce((a,b)=>a+b,0)/n,
+    probLoss:share(v=>v<invested),
+    /* errore standard di una proporzione stimata su n percorsi: √(p(1−p)/n) */
+    probGoalSE:goal>0?Math.sqrt(share(v=>v>=goal)*(1-share(v=>v>=goal))/n):NaN,probLossSE:Math.sqrt(share(v=>v<invested)*(1-share(v=>v<invested))/n),depleted:depleted/n,mean:finSorted.reduce((a,b)=>a+b,0)/n,
     mddMedian:quantile(Array.from(mdd).sort((a,b)=>a-b),.5),mddP5:quantile(Array.from(mdd).sort((a,b)=>a-b),.05)};
 }
 /* ===== Stress test: crisi storiche sui dati reali e shock ipotetici ===== */
@@ -539,9 +576,15 @@ function benchStats(p,b,fc,rf){
   const sel=(c)=>{const P0=[],B0=[];b.forEach((x,i)=>{if(c(x)){P0.push(p[i]);B0.push(x);}});return P0.length?mean(P0)/mean(B0):NaN;};
   const win=Math.max(2,Math.round(fc)),roll=[];for(let j=win-1;j<n;j++){let gp=1,gb=1;for(let t=j-win+1;t<=j;t++){gp*=1+p[t];gb*=1+b[t];}roll.push(gp/gb-1);}
   const corrPB=cv/(sd(p)*sd(b));
+  /* regressione OLS dei rendimenti in eccesso: rₚ − rf/f = α + β·(rᵦ − rf/f) + ε → errori standard, t e p-value */
+  const rfp=rf/fc,ap=(mp-rfp)-beta*(mb-rfp),Sxx=b.reduce((s,x)=>s+(x-mb)**2,0),xbar=mb-rfp;
+  const s2=p.reduce((s,x,i)=>s+((x-rfp)-ap-beta*(b[i]-rfp))**2,0)/(n-2),seB=Math.sqrt(s2/Sxx),seA=Math.sqrt(s2*(1/n+xbar*xbar/Sxx)),df=n-2;
+  const tA=ap/seA,tB=(beta-1)/seB,tcrit=tInv975(df);
   return {n,fc,cagrP:cagr(p),cagrB:cagr(b),totP:grow(p)-1,totB:grow(b)-1,volP:sd(p)*Math.sqrt(fc),volB:sd(b)*Math.sqrt(fc),mddP:mdd(p),mddB:mdd(b),
-    sharpeP:(mp*fc-rf)/(sd(p)*Math.sqrt(fc)),sharpeB:(mb*fc-rf)/(sd(b)*Math.sqrt(fc)),beta,alpha:(mp-rf/fc-beta*(mb-rf/fc))*fc,corr:corrPB,r2:corrPB*corrPB,
-    te,ir:te>0?mean(act)*fc/te:NaN,active:cagr(p)-cagr(b),up:sel(x=>x>0),down:sel(x=>x<0),hit:act.filter(x=>x>0).length/n,win,roll};
+    sharpeP:(mp*fc-rf)/(sd(p)*Math.sqrt(fc)),sharpeB:(mb*fc-rf)/(sd(b)*Math.sqrt(fc)),beta,alpha:ap*fc,corr:corrPB,r2:corrPB*corrPB,
+    te,ir:te>0?mean(act)*fc/te:NaN,active:cagr(p)-cagr(b),up:sel(x=>x>0),down:sel(x=>x<0),hit:act.filter(x=>x>0).length/n,win,roll,
+    df,seAlpha:seA*fc,tAlpha:tA,pAlpha:pTwoSided(tA,df),alphaLo:(ap-tcrit*seA)*fc,alphaHi:(ap+tcrit*seA)*fc,
+    seBeta:seB,betaLo:beta-tcrit*seB,betaHi:beta+tcrit*seB,pBeta1:pTwoSided(tB,df),resVol:Math.sqrt(s2*fc)};
 }
 /* il benchmark come "asset" su tutta la sua storia, per le crisi fuori dal file */
 function benchAsset(px){
@@ -587,6 +630,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows};
+export const POS={parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
