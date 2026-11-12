@@ -67,17 +67,23 @@ async function geminiModels() {
     .sort((a, b) => ver(b) - ver(a));
 }
 async function geminiCall(body, ms) {
+  // ms è il tempo TOTALE concesso a Gemini (tutti i tentativi insieme): oltre, si passa alla riserva.
+  const deadline = Date.now() + ms, left = () => deadline - Date.now();
   const tryModel = m => http("gemini", `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`,
-    { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: JSON.stringify(body) }, ms);
+    { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+      // i modelli Gemini 3 ragionano prima di rispondere: per la chat basta un ragionamento breve, molto più veloce
+      body: JSON.stringify(/^gemini-3/.test(m) ? { ...body, generationConfig: { ...(body.generationConfig || {}), thinkingConfig: { thinkingLevel: "low" } } } : body) }, Math.max(1000, left()));
   // Prima il modello che ha funzionato l'ultima volta; l'elenco dei modelli si chiede solo se serve.
   const first = geminiModel || "gemini-3.6-flash";
   try { const j = await tryModel(first); geminiModel = first; return { j, model: first }; }
   catch (e) {
-    if (!e.retry) throw e;
+    // Un tempo scaduto vuol dire Gemini lento: inutile provare altri modelli, meglio la riserva.
+    if (!e.retry || /tempo|timeout|abort/i.test(String(e.message)) || left() < 4000) throw e;
     let others = [];
     try { others = (await geminiModels()).filter(m => m !== first).slice(0, 2); } catch {}
     let last = e;
     for (const m of others) {
+      if (left() < 4000) break;
       try { const j = await tryModel(m); geminiModel = m; return { j, model: m }; }
       catch (e2) { last = e2; if (!e2.retry) break; }
     }
@@ -215,11 +221,12 @@ const newId = () => `call_${Date.now().toString(36)}_${(callSeq++).toString(36)}
 export async function chat({ system, messages, tools, order }) {
   const prov = (order || ["gemini", "groq"]).filter(p => has[p] && p !== "claude");
   if (!prov.length) throw new ProviderError("nessuno", "Nessuna chiave IA gratuita configurata (Gemini o Groq).", false);
-  const started = Date.now(), BUDGET = 45_000, errors = [];
-  for (const p of prov) {
+  // 40 s in tutto (il browser aspetta 55 s): la prima IA ha al massimo 16 s, poi tocca alla riserva.
+  const started = Date.now(), BUDGET = 40_000, errors = [];
+  for (const [n, p] of prov.entries()) {
     const left = BUDGET - (Date.now() - started);
     if (left < 5000) break;
-    const ms = Math.min(25_000, left);
+    const ms = n < prov.length - 1 ? Math.min(16_000, left) : left;
     try {
       if (p === "gemini") {
         const { j, model } = await geminiCall({
