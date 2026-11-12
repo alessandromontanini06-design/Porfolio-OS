@@ -24,7 +24,11 @@ const Understanding = z.object({
 });
 
 const SYSTEM = `Sei un analista finanziario che prepara i dati per un'analisi quantitativa.
-Ricevi le prime righe di uno o più fogli di un file (righe e lettere di colonna come in Excel). Capisci che tipo di file è e restituisci SOLO ciò che serve all'analisi degli investimenti.
+Ricevi le prime righe di tutti i fogli di un file (righe e lettere di colonna come in Excel; le celle vuote sono omesse). Capisci che tipo di file è e restituisci SOLO ciò che serve all'analisi degli investimenti.
+
+Attenzione ai file personali di monitoraggio ("tracker"): spesso hanno transazioni, PAC, quote possedute, versato, valore del portafoglio e storici costruiti con prezzi medi pagati. Il valore del portafoglio cresce anche per i soldi aggiunti, quindi NON è una serie di prezzi: usarlo darebbe rendimenti gonfiati. Le quote, il versato, gli importi e i guadagni non sono mai prezzi.
+Per questi file scegli "riepilogo_portafoglio" con le posizioni attuali (ticker, ISIN se c'è, valore, peso attuale e target), così l'app scarica i prezzi di mercato veri. Scegli "serie_storica" solo se c'è un foglio con prezzi di mercato o rendimenti datati, senza versamenti dentro.
+Se il campo "analisiMotore" di un foglio dice che contiene versamenti o quote, consideralo un indizio forte.
 
 Tipi:
 - "serie_storica": date una sotto l'altra con prezzi o rendimenti di uno o più asset. Compila "serie": la lettera della colonna data e, per ogni asset, la lettera di colonna, il nome e il tipo ("price" = prezzi o valori, "ret" = rendimenti decimali, "retpct" = rendimenti in punti percentuali). Ignora colonne di note, flussi, volumi, totali, commenti.
@@ -33,7 +37,7 @@ Tipi:
 - "altro": nessuno dei precedenti.
 
 Per ogni posizione:
-- "ticker": il codice come appare nel file.
+- "ticker": il codice come appare nel file (per esempio "SWDA"). Se c'è l'ISIN usalo solo per capire che strumento è.
 - "simbolo": il simbolo per Alpha Vantage nel formato TICKER.BORSA, scegliendo la borsa dove lo strumento è più probabilmente quotato e scambiato: .LON per Londra, .DEX per Xetra, .PAR per Parigi, .AMS per Amsterdam; nessun suffisso per gli Stati Uniti. Borsa Italiana non è coperta: per gli ETF comprati a Milano usa la quotazione di Londra o di Xetra. Attenzione, il ticker di Milano può essere diverso: gli iShares con prefisso "CS" a Milano a Londra perdono la "S" (CSNDX diventa CNDX.LON, CSSPX diventa CSPX.LON); gli ETF Xtrackers come XXSC sono su Xetra (XXSC.DEX). L'utente confermerà.
 - "valore": il valore in euro come numero, se presente, altrimenti null.
 - "pesoAttuale" e "pesoTarget": in forma decimale (85,6% = 0.856), se presenti, altrimenti null.
@@ -51,7 +55,7 @@ export default async function handler(req, res) {
   const data = readBody(req);
   if (!data || !Array.isArray(data.fogli) || !data.fogli.length) { res.status(400).json({ error: "Dati mancanti o nel formato sbagliato." }); return; }
   const payload = JSON.stringify(data);
-  if (payload.length > 80_000) { res.status(413).json({ error: "L'estratto del file è troppo grande." }); return; }
+  if (payload.length > 90_000) { res.status(413).json({ error: "L'estratto del file è troppo grande." }); return; }
   try {
     const out = await json({ name: "understand", system: SYSTEM, user: `FILE:\n${payload}`, schema: Understanding });
     res.status(200).json({ ...out.data, posizioni: out.data.posizioni.slice(0, 10), model: out.model, provider: out.provider, cached: !!out.cached });
