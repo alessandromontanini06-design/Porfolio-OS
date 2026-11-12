@@ -12,7 +12,8 @@ AI Financial Intelligence Lab: carichi un Excel o un CSV di prezzi o rendimenti 
 | Simulazioni | Monte Carlo con bootstrap storico, bootstrap a blocchi o distribuzione normale; versamenti o prelievi mensili, costi, inflazione; ventaglio dei percentili, distribuzione finale, probabilità di raggiungere un obiettivo, di perdita e di esaurire il capitale. Seme fisso: risultati riproducibili. |
 | Stress test | Libreria di crisi (dot-com, 2008, debito euro 2011, COVID 2020, inflazione 2022) rivissute solo con i dati del file: perdita massima, tempo per il minimo e per il recupero, rendimento e contributo alla perdita di ogni asset, correlazioni in crisi, confronto tra crisi. Le crisi fuori dai dati non vengono stimate. Shock personalizzati per asset, con propagazione agli altri asset tramite la covarianza storica (Σ_UK · Σ_KK⁻¹ · s). |
 | Frontiera | Frontiera efficiente di Markowitz (min wᵀΣw − λ·μᵀw con limiti di peso, gradiente proiettato accelerato), nuvola di portafogli casuali, linea di allocazione del capitale. Ottimizzatore: massimo Sharpe, minima volatilità, risk parity, pesi uguali, volatilità o rendimento target; peso minimo e massimo, vendite allo scoperto. Confronto prima/dopo e pesi ottimizzati riutilizzabili in Rischio, Simulazioni e Stress test. |
-| Quanta | Analista IA in chat. Capisce la domanda e chiama gli strumenti del motore (metriche, rischio, confronto tra allocazioni, correlazioni, macro, Monte Carlo, crisi storiche, stress test, ottimizzazione): non calcola e non inventa numeri. |
+| Benchmark | Confronto con S&P 500 (SPY), Nasdaq-100 (QQQ), MSCI World (URTH), Euro Stoxx 50 (FEZ), un simbolo qualsiasi o una colonna del file: crescita di 100, rendimento attivo, beta, alpha di Jensen, R², tracking error, information ratio, cattura nei rialzi e ribassi, finestre mobili di 12 mesi. Prezzi rettificati (dividendi inclusi) convertiti in euro con il cambio BCE. Il benchmark copre anche le crisi fuori dal file, mostrate nello Stress test come mercato, non come portafoglio. |
+| Quanta | Analista IA in chat. Capisce la domanda e chiama gli strumenti del motore (metriche, rischio, confronto tra allocazioni, correlazioni, macro, Monte Carlo, crisi storiche, stress test, ottimizzazione, benchmark): non calcola e non inventa numeri. |
 
 ## Struttura
 
@@ -24,6 +25,7 @@ AI Financial Intelligence Lab: carichi un Excel o un CSV di prezzi o rendimenti 
 | `api/understand.js` | Capisce che tipo di file è (serie storica o riepilogo di portafoglio) e tiene solo gli asset. |
 | `api/assistant.js` | Quanta: il modello sceglie gli strumenti, il browser li esegue sui dati confermati. |
 | `api/rates.js` | Euribor 3 mesi e HICP dalla BCE (e T-bill e CPI USA dalla FRED, se c'è la chiave). |
+| `api/fx.js` | Cambio ufficiale BCE di fine mese (dollari per 1 euro, dal 1999), per riportare in euro i benchmark. Nessuna chiave, cache di 24 ore. |
 | `api/prices.js` | Storico mensile dei prezzi da Alpha Vantage, con cache di 24 ore. |
 | `package.json` | Dipendenze del server (SDK di Anthropic e zod). Vercel le installa da solo. |
 
@@ -47,7 +49,7 @@ Dopo ogni modifica delle variabili: Deployments → ⋯ sull'ultima → Redeploy
 Carica su GitHub i file modificati sovrascrivendo quelli vecchi: Vercel ripubblica da solo.
 
 ## Sviluppo locale e test
-- `node tools/test-engine.mjs` esegue i test del motore quantitativo: casi con risultato noto per numeri e date, CAGR, volatilità, covarianza, correlazione, VaR, CVaR, drawdown e recupero, contributo al rischio, importazione con date duplicate e valori mancanti, Monte Carlo (montante, inflazione, costi, prelievi, riproducibilità, velocità), crisi storiche (finestre, contributi, recupero, dati parziali o assenti) e shock condizionati, frontiera e ottimizzatore (varianza minima e tangenza analitiche, vincoli, target, risk parity, vendite allo scoperto).
+- `node tools/test-engine.mjs` esegue i test del motore quantitativo: casi con risultato noto per numeri e date, CAGR, volatilità, covarianza, correlazione, VaR, CVaR, drawdown e recupero, contributo al rischio, importazione con date duplicate e valori mancanti, Monte Carlo (montante, inflazione, costi, prelievi, riproducibilità, velocità), crisi storiche (finestre, contributi, recupero, dati parziali o assenti) e shock condizionati, frontiera e ottimizzatore (varianza minima e tangenza analitiche, vincoli, target, risk parity, vendite allo scoperto), benchmark (beta, alpha, tracking error, information ratio, cambio in euro, allineamento mensile e giornaliero, crisi sullo storico dell'indice).
 - `node tools/build.js` ricrea `index.html` da `portfolio-os.html`.
 - `node tools/serve.mjs` apre un'anteprima su http://localhost:5181 con i dati veri della BCE e risposte IA simulate.
 
