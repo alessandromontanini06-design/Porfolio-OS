@@ -8,6 +8,7 @@ AI Financial Intelligence Lab: carichi un Excel o un CSV di prezzi o rendimenti 
 |---|---|
 | Scansione e Mappa | Riconoscimento di date, prezzi e rendimenti; controllo qualità (date duplicate o non valide, buchi nel calendario, valori mancanti, rendimenti anomali); correzione manuale delle colonne; correzione e ricostruzione con l'IA. |
 | Laboratorio | CAGR, rendimento reale, volatilità, Sharpe con tasso BCE, drawdown, correlazioni (rete 3D o matrice), portafoglio dell'utente e ribilanciamento. |
+| Il tuo rendimento reale | Se il file contiene le transazioni (data, strumento, importo, tipo), il Laboratorio mostra il rendimento dell'investitore con i versamenti veri: TIR (XIRR), valore stimato, versato, guadagno, rendimento ponderato nel tempo (TWR) e "con gli stessi versamenti nell'indice". Vᵢ,ₜ = Vᵢ,ₜ₋₁ · (1 + rᵢ,ₜ) + versamenti a fine periodo. La "Crescita di 100 €" resta il confronto tra strumenti senza versamenti. |
 | Rischio | VaR e CVaR storici 95%, Sortino, Calmar, asimmetria, curtosi, drawdown nel tempo e più lungo, contributo di ogni asset al rischio, asset effettivi, rapporto di diversificazione. |
 | Simulazioni | Monte Carlo con bootstrap storico, bootstrap a blocchi o distribuzione normale; versamenti o prelievi mensili, costi, inflazione; ventaglio dei percentili, distribuzione finale, probabilità di raggiungere un obiettivo, di perdita e di esaurire il capitale. Seme fisso: risultati riproducibili. |
 | Stress test | Libreria di crisi (dot-com, 2008, debito euro 2011, COVID 2020, inflazione 2022) rivissute solo con i dati del file: perdita massima, tempo per il minimo e per il recupero, rendimento e contributo alla perdita di ogni asset, correlazioni in crisi, confronto tra crisi. Le crisi fuori dai dati non vengono stimate. Shock personalizzati per asset, con propagazione agli altri asset tramite la covarianza storica (Σ_UK · Σ_KK⁻¹ · s). |
@@ -19,7 +20,10 @@ AI Financial Intelligence Lab: carichi un Excel o un CSV di prezzi o rendimenti 
 
 | File | Cosa fa |
 |---|---|
-| `index.html` | Tutta l'app. I calcoli girano nel browser. |
+| `index.html` | Struttura della pagina, meta per la condivisione e librerie (SheetJS, Three.js, GSAP). |
+| `css/app.css` | Tutti gli stili e il design system (colori, tipografia, componenti). |
+| `js/engine.js` | Motore di calcolo deterministico come modulo ES: nessuna dipendenza dalla pagina, lo stesso codice gira nel browser e nei test. |
+| `js/app.js` | Interfaccia: scene, grafici, ricevute, IA. Importa il motore. |
 | `api/_lib/llm.js` | Centralino delle IA: Claude, Gemini e Groq con riserve automatiche, tempi massimi, cache di un'ora e limite di richieste all'ora. |
 | `api/fix.js` | Riceve un estratto del foglio e chiede all'IA le correzioni. |
 | `api/understand.js` | Capisce che tipo di file è (serie storica o riepilogo di portafoglio) e tiene solo gli asset. |
@@ -46,12 +50,13 @@ AI Financial Intelligence Lab: carichi un Excel o un CSV di prezzi o rendimenti 
 Dopo ogni modifica delle variabili: Deployments → ⋯ sull'ultima → Redeploy.
 
 ## Aggiornare l'app
-Carica su GitHub i file modificati sovrascrivendo quelli vecchi: Vercel ripubblica da solo.
+Carica su GitHub i file modificati sovrascrivendo quelli vecchi: Vercel ripubblica da solo. `index.html`, `css/` e `js/` vanno caricati **insieme**: la pagina carica gli altri due.
 
 ## Sviluppo locale e test
-- `node tools/test-engine.mjs` esegue i test del motore quantitativo: casi con risultato noto per numeri e date, CAGR, volatilità, covarianza, correlazione, VaR, CVaR, drawdown e recupero, contributo al rischio, importazione con date duplicate e valori mancanti, Monte Carlo (montante, inflazione, costi, prelievi, riproducibilità, velocità), crisi storiche (finestre, contributi, recupero, dati parziali o assenti) e shock condizionati, frontiera e ottimizzatore (varianza minima e tangenza analitiche, vincoli, target, risk parity, vendite allo scoperto), benchmark (beta, alpha, tracking error, information ratio, cambio in euro, allineamento mensile e giornaliero, crisi sullo storico dell'indice).
-- `node tools/build.js` ricrea `index.html` da `portfolio-os.html`.
+- `node tools/test-engine.mjs` esegue i test del motore quantitativo: casi con risultato noto per numeri e date, CAGR, volatilità, covarianza, correlazione, VaR, CVaR, drawdown e recupero, contributo al rischio, importazione con date duplicate e valori mancanti, Monte Carlo (montante, inflazione, costi, prelievi, riproducibilità, velocità), crisi storiche (finestre, contributi, recupero, dati parziali o assenti) e shock condizionati, file con versamenti (tracker), TIR e rendimento ponderato nel tempo, frontiera e ottimizzatore (varianza minima e tangenza analitiche, vincoli, target, risk parity, vendite allo scoperto), benchmark (beta, alpha, tracking error, information ratio, cambio in euro, allineamento mensile e giornaliero, crisi sullo storico dell'indice).
+- `node tools/test-ui.mjs` apre il sito in Chrome senza finestra e lo attraversa come un utente: esempio, laboratorio, Rischio, Simulazioni, Stress test, Frontiera, Benchmark, ricevute, Quanta, telefono a 375 px, nessun errore JavaScript. Serve una volta `npm install` nella cartella `tools`.
 - `node tools/serve.mjs` apre un'anteprima su http://localhost:5181 con i dati veri della BCE e risposte IA simulate.
+- Non c'è un passaggio di build: si modificano direttamente i file in questa cartella (moduli ES nativi del browser).
 
 ## Privacy
 - Il file viene letto nel browser; i calcoli non lasciano mai il dispositivo.
