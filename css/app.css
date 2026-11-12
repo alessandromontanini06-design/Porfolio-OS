@@ -509,3 +509,62 @@ body.chat-on .orb-btn{opacity:0;transform:scale(.4);pointer-events:none}
 .pro-t td{padding:7px 4px}
 @media (max-width:1100px){.pro-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.pro-grid{grid-template-columns:1fr}}
+
+/* Quanta si presenta: fumetto e scia */
+.orb-say{position:fixed;z-index:61;left:0;top:0;max-width:300px;text-align:left;border:1px solid color-mix(in oklab,var(--lime) 55%,transparent);background:linear-gradient(135deg,rgba(39,18,82,.96),rgba(22,12,43,.96));color:#F5F1FF;border-radius:20px 20px 6px 20px;padding:12px 15px 13px;font:inherit;font-size:.9rem;line-height:1.4;box-shadow:0 20px 50px -18px rgba(0,0,0,.7),0 0 40px -10px rgba(212,255,58,.35);opacity:0;transform:translateY(8px) scale(.96);pointer-events:none;transition:opacity .35s,transform .45s cubic-bezier(.3,1.5,.5,1);cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.orb-say.r{border-radius:20px 20px 20px 6px}
+.orb-say.on{opacity:1;transform:none;pointer-events:auto}
+.orb-say .who{display:block;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:4px}
+.orb-say b{color:var(--lime)}
+.orb-say .go{display:inline-block;margin-top:8px;font-weight:800;color:var(--lime-ink);background:var(--lime);border-radius:999px;padding:4px 11px;font-size:.78rem}
+.orb-say:hover{border-color:var(--lime)}
+.orb-btn.roaming{animation:none;z-index:62}
+.orb-btn.roaming .orb{box-shadow:0 0 0 1px rgba(212,255,58,.6),0 0 50px rgba(212,255,58,.75),0 0 120px rgba(123,60,255,.9),inset 0 -8px 18px rgba(20,6,50,.7),inset 0 6px 14px rgba(255,255,255,.35)}
+.orb-btn.roaming .orb-tip{display:none}
+.orb-spark{position:fixed;z-index:59;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,#F4FFD0,rgba(212,255,58,.8) 35%,rgba(123,60,255,.5) 65%,transparent 70%);animation:sparkfade .7s ease-out forwards}
+@keyframes sparkfade{to{opacity:0;transform:scale(.2)}}
+body.chat-on .orb-say{display:none}
+@media (max-width:760px){.orb-say{font-size:.84rem}}
+
+/* Home: terminale BCE */
+.mkt{display:flex;flex-direction:column;gap:12px;justify-content:flex-start}
+.mkt-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.mkt-live{display:inline-flex;align-items:center;gap:7px;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.85)}
+.mkt-live i{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 10px var(--lime);animation:pulse 1.6s ease-in-out infinite}
+.mkt-rows{display:flex;flex-direction:column;gap:8px}
+.mkt-row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border-radius:14px;background:rgba(10,4,24,.35);border:1px solid rgba(255,255,255,.12)}
+.mkt-row.sk{height:52px;background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(255,255,255,.14),rgba(255,255,255,.06));background-size:200% 100%;animation:skel 1.4s linear infinite}
+@keyframes skel{to{background-position:-200% 0}}
+.mkt-row .k{display:block;font-weight:700;font-size:.86rem;color:#fff}
+.mkt-row .m{display:block;font-family:var(--f-mono);font-size:.62rem;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em}
+.mkt-row .sp svg{width:100%;height:30px;display:block}
+.mkt-row .vv{text-align:right;display:flex;flex-direction:column}
+.mkt-row .vv b{font-family:var(--f-display);font-size:1.15rem;color:#fff;font-variant-numeric:tabular-nums}
+.mkt-row .vv small{font-size:.66rem;color:rgba(255,255,255,.65);white-space:nowrap}
+.mkt-note{margin:0;font-size:.74rem;color:rgba(255,255,255,.7)}
+/* Home: i 10 laboratori */
+.labs{display:flex;flex-direction:column;gap:22px;padding:34px 0 10px}
+.labs-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.labs-head h2{font-family:var(--f-display);font-weight:900;font-size:clamp(2rem,5vw,4.4rem);line-height:.95;letter-spacing:-.04em;margin:8px 0 0;text-transform:uppercase}
+.labs-head h2 em{font-style:normal;color:var(--lime);text-shadow:0 0 40px rgba(212,255,58,.35)}
+.labs-head p{max-width:38ch;color:var(--muted);margin:0}
+.labs-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.lab-tile{--ac:var(--lime);position:relative;overflow:hidden;text-align:left;display:flex;flex-direction:column;gap:8px;min-height:210px;padding:18px 18px 16px;border-radius:24px;border:1px solid var(--line);background:linear-gradient(160deg,color-mix(in oklab,var(--ac) 14%,var(--solid)),var(--solid) 55%);color:var(--fg);transition:transform .45s cubic-bezier(.3,1.4,.5,1),border-color .3s,box-shadow .3s;isolation:isolate}
+.lab-tile::before{content:"";position:absolute;width:180px;height:180px;right:-60px;top:-60px;border-radius:50%;background:radial-gradient(circle,color-mix(in oklab,var(--ac) 55%,transparent),transparent 70%);opacity:.35;z-index:-1;transition:opacity .4s,transform .6s}
+.lab-tile:hover:not(:disabled){transform:translateY(-6px);border-color:var(--ac);box-shadow:0 24px 60px -22px color-mix(in oklab,var(--ac) 70%,transparent)}
+.lab-tile:hover:not(:disabled)::before{opacity:.75;transform:scale(1.25)}
+.lab-n{font-family:var(--f-display);font-weight:900;font-size:2.4rem;line-height:1;color:var(--ac);letter-spacing:-.04em}
+.lab-g{position:absolute;right:16px;top:18px;width:34px;height:34px;color:var(--ac);opacity:.9}
+.lab-tile b{font-family:var(--f-display);font-size:1rem;line-height:1.15;margin-top:auto}
+.lab-d{font-size:.8rem;color:var(--muted);line-height:1.4}
+.lab-s{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ac)}
+.lab-tile.soon{opacity:.55;cursor:default;filter:saturate(.6)}
+.lab-tile.soon .lab-s{color:var(--faint)}
+@media (max-width:1100px){.labs-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.labs-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lab-tile{min-height:180px}.lab-d{display:none}}
+/* Telefono: titolo e marchio */
+.brand{white-space:nowrap}
+@media (max-width:480px){.hero-tile h1{font-size:7.4vw!important}.brand{font-size:.85rem}.status .chip.live{display:none}}
+/* Titolo della home: la riga lime pulsa di luce */
+.hero-tile h1 .lime{animation:limeglow 3.6s ease-in-out infinite}
+@keyframes limeglow{0%,100%{text-shadow:0 0 0 rgba(212,255,58,0)}50%{text-shadow:0 0 28px rgba(212,255,58,.55),0 0 70px rgba(212,255,58,.25)}}

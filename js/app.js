@@ -43,6 +43,7 @@ function go(name,opts={}){
   onEnter(name);
 }
 function onEnter(name){
+  quantaScene(name);
   if(name==="scan"&&!S.scanPlayed)setTimeout(playScan,HAS_G?450:0);
   if(name==="risk")renderRisk();
   if(name==="sim")renderSim();
@@ -664,10 +665,12 @@ function renderPortfolio(){
 
 /* ---------- Laboratorio ---------- */
 function hideLab(){
+  setTimeout(renderLabs,0);
   disposeNet();S.lab=null;
   $("#lab").hidden=true;$("#labEmpty").hidden=false;$("#navLab").classList.add("off");$("#navRisk").classList.add("off");$("#navSim").classList.add("off");$("#navStress").classList.add("off");$("#navOpt").classList.add("off");$("#navBench").classList.add("off");S.risk=null;S.mc=null;S.stress=null;S.opt=null;S.optW=null;
 }
 function showLab(instant){
+  setTimeout(renderLabs,0);
   const ds=S.ds,f=ds.freq.f;
   S.lab={st:ds.assets.map(a=>P.stats(a,f,ds.dates)),W:ds.assets.map(a=>P.wealth(a,ds.dates.length)),C:ds.assets.map(a=>ds.assets.map(b=>P.corr(a,b)))};
   S.labFx={};
@@ -1969,8 +1972,112 @@ $("#closeDrawer").addEventListener("click",closeReceipt);
 $("#scrim").addEventListener("click",closeReceipt);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeReceipt();});
 
+/* ---------- Home: terminale con dati ufficiali BCE e mappa dei 10 laboratori ---------- */
+const LABS=[
+  {n:"01",t:"Portfolio Intelligence",d:"Metriche, rischio, contributi, benchmark e il tuo rendimento reale.",c:"var(--lime)",go:"lab",g:"M4 20 10 12l4 4 8-11"},
+  {n:"02",t:"Simulation Lab",d:"Monte Carlo con versamenti, prelievi, inflazione e probabilità di obiettivo.",c:"var(--c3)",go:"sim",g:"M3 18c5 0 6-12 9-12s4 8 9 8M3 18c5 0 7-6 9-6s5 3 9 3"},
+  {n:"03",t:"Crisis Room",d:"Dot-com, 2008, debito euro, COVID, inflazione 2022 e i tuoi shock.",c:"var(--bad)",go:"stress",g:"M3 6l6 8 4-4 8 10"},
+  {n:"04",t:"Quant Lab",d:"Frontiera efficiente, ottimizzatori, VaR a tre metodi, test statistici.",c:"var(--c2)",go:"opt",g:"M4 20C6 10 11 5 20 4M8 15h.01M13 10h.01M17 8h.01"},
+  {n:"05",t:"Strategy Arena",d:"Backtest e strategie a confronto nelle stesse condizioni.",c:"var(--warn)",soon:true,g:"M5 19l7-14 7 14M8 13h8"},
+  {n:"06",t:"Macro & Economy",d:"Curva dei tassi, inflazione, obbligazioni, duration.",c:"var(--good)",soon:true,g:"M3 17c4-8 8-10 18-10M3 21h18"},
+  {n:"07",t:"Behavioral Lab",d:"Panico, avversione alle perdite, market timing: provali sulla tua pelle.",c:"var(--c4)",soon:true,g:"M12 21c5-3 8-7 8-11a8 8 0 1 0-16 0c0 4 3 8 8 11z"},
+  {n:"08",t:"AI Research",d:"Quanta: fai domande, lei chiede i numeri al motore e te li spiega.",c:"var(--lime)",chat:true,g:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"},
+  {n:"09",t:"Financial Games",d:"Sopravvivi alle crisi, batti il mercato, sfide sui dati veri.",c:"var(--c5)",soon:true,g:"M6 12h4M8 10v4M15 11h.01M18 13h.01M3 9a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"},
+  {n:"10",t:"Academy & Workspace",d:"Formule, glossario, analisi salvate e report.",c:"var(--muted)",soon:true,g:"M4 5h7v14H4zM13 5h7v14h-7z"}
+];
+function renderLabs(){
+  const el=$("#labsGrid");if(!el)return;
+  el.innerHTML=LABS.map(l=>`<button type="button" class="lab-tile${l.soon?" soon":""}" style="--ac:${l.c}" ${l.soon?"disabled":l.chat?'data-labchat="1"':`data-lab="${l.go}"`}>
+    <span class="lab-n">${l.n}</span><svg class="lab-g" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="${l.g}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <b>${l.t}</b><span class="lab-d">${l.d}</span><span class="lab-s">${l.soon?"in arrivo":l.chat?"apri la chat →":S.lab?"apri →":"pronto · carica un file"}</span></button>`).join("");
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-lab]");if(b){if(S.lab)go(b.dataset.lab);else{go("map");showSay("map",5000);}return;}
+  if(e.target.closest("[data-labchat]")){QG.opened=true;openChat();}
+});
+const spark12=(pts,c)=>{if(pts.length<2)return "";const v=pts.map(x=>x.v),lo=Math.min(...v),hi=Math.max(...v),X=i=>i/(v.length-1)*100,Y=x=>26-(x-lo)/((hi-lo)||1)*22;
+  return `<svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path d="${v.map((x,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(x).toFixed(1)).join("")}" fill="none" stroke="${c}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;};
+async function loadMarket(){
+  const el=$("#mktRows");if(!el)return;
+  const now=new Date(),to=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,"0")}`,f=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-36,1)),from=`${f.getUTCFullYear()}-${String(f.getUTCMonth()+1).padStart(2,"0")}`;
+  const [r,fx]=await Promise.all([getJSON(`/api/rates?from=${from}&to=${to}`),getJSON("/api/fx?ccy=USD")]);
+  const rows=[],mon=p=>{const [y,m]=p.split("-");return `${["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"][+m-1]} ${y}`;};
+  const e=r&&r.ecb;
+  if(e&&e.rf.points.length){const p=e.rf.points,l=p[p.length-1],d=l.v-p[Math.max(0,p.length-13)].v;rows.push({k:"Euribor 3 mesi",v:`${fmtN(l.v,2)}%`,s:`${d>=0?"+":""}${fmtN(d,2)} pt in un anno`,m:mon(l.p),sp:spark12(p.slice(-13),"var(--lime)")});}
+  if(e&&e.cpi.points.length>12){
+    /* inflazione su 12 mesi all'ultimo dato pubblicato (la BCE può essere indietro di alcuni mesi: il mese è sempre mostrato) */
+    const p=e.cpi.points,l=p[p.length-1],[ly,lm]=l.p.split("-").map(Number),key=`${ly-1}-${String(lm).padStart(2,"0")}`,y=p.find(x=>x.p===key);
+    if(y){const yoy=p.map((x,i)=>{const [a,b]=x.p.split("-").map(Number),q=p.find(z=>z.p===`${a-1}-${String(b).padStart(2,"0")}`);return q?{v:x.v/q.v-1}:null;}).filter(Boolean);
+      rows.splice(1,0,{k:"Inflazione area euro",v:fmtPct(l.v/y.v-1,1),s:"HICP, su 12 mesi",m:mon(l.p),sp:spark12(yoy.slice(-13),"var(--c4)")});}}
+  if(fx&&fx.points&&fx.points.length){const p=fx.points,l=p[p.length-1],d=l.v/p[Math.max(0,p.length-13)].v-1;rows.push({k:"Euro / Dollaro",v:fmtN(l.v,4),s:`${d>=0?"+":""}${fmtPct(d,1)} in un anno`,m:mon(l.p),sp:spark12(p.slice(-13),"var(--c3)")});}
+  if(!rows.length){el.innerHTML=`<p class="mkt-note">Dati BCE momentaneamente non raggiungibili${r&&r.error&&/Vercel/.test(r.error)?" (funzionano sul sito pubblicato)":""}.</p>`;return;}
+  el.innerHTML=rows.map(x=>`<div class="mkt-row"><div><span class="k">${x.k}</span><span class="m">${x.m}</span></div><div class="sp">${x.sp}</div><div class="vv"><b>${x.v}</b><small>${x.s}</small></div></div>`).join("");
+  $("#mktNote").textContent="Fonte: Banca centrale europea, data-api.ecb.europa.eu. Ultimo dato mensile disponibile.";
+}
+
+/* ---------- Quanta si presenta: fumetti per sezione e qualche giro per lo schermo ---------- */
+const QTIPS={
+  home:{t:"Ciao, sono <b>Quanta</b>! Carica un file e chiedimi qualsiasi cosa sui tuoi investimenti.",q:null},
+  scan:{t:"Sto guardando il tuo file con il motore. Se qualcosa non torna, chiedimelo.",q:null},
+  map:{t:"Una colonna non ti è chiara? Te la spiego io.",q:null},
+  lab:{t:"Vuoi sapere quale asset ti fa rischiare di più?",q:"Qual è l'asset più rischioso?"},
+  risk:{t:"Il VaR ti sembra arabo? Te lo spiego con i <b>tuoi</b> numeri.",q:"Spiegami il VaR e il CVaR del mio portafoglio in parole semplici"},
+  sim:{t:"Chiedimi: «Con 300 € al mese quanto avrei tra 20 anni?»",q:"Con 300 € al mese quanto avrei tra 20 anni?"},
+  stress:{t:"Come avrebbe retto il tuo portafoglio nel 2008? Chiedimelo.",q:"Come ha retto il portafoglio nelle crisi?"},
+  opt:{t:"Ti trovo l'allocazione più efficiente con i tuoi vincoli.",q:"Qual è l'allocazione più efficiente con massimo 50% per asset?"},
+  bench:{t:"Hai battuto il mercato? Te lo dico con la statistica.",q:"Ho battuto l'S&P 500? L'alpha è significativo?"}
+};
+const QG={seen:new Set(),roams:0,opened:false,hideT:0,tl:null,pos:{x:0,y:0},lastInput:Date.now()};
+const say=document.createElement("button");say.type="button";say.className="orb-say";say.setAttribute("aria-live","polite");document.body.appendChild(say);
+const orbBtn=$("#chatBtn"),narrowUI=()=>window.innerWidth<760;
+["pointerdown","keydown","wheel"].forEach(ev=>window.addEventListener(ev,()=>{QG.lastInput=Date.now();},{passive:true}));
+function placeSay(){
+  const r=orbBtn.getBoundingClientRect(),left=r.left+r.width/2>window.innerWidth/2;
+  say.classList.toggle("r",!left);
+  const w=Math.min(300,window.innerWidth-40);say.style.maxWidth=w+"px";
+  const top=Math.max(12,Math.min(window.innerHeight-say.offsetHeight-12,r.top+r.height/2-say.offsetHeight/2));
+  say.style.top=top+"px";
+  say.style.left=(left?Math.max(12,r.left-say.offsetWidth-14):Math.min(window.innerWidth-say.offsetWidth-12,r.right+14))+"px";
+}
+function showSay(scene,ms){
+  const tip=QTIPS[scene]||QTIPS.home;if(document.body.classList.contains("chat-on"))return;
+  say.innerHTML=`<span class="who">Quanta</span>${tip.t}${tip.q&&S.lab?`<span class="go">Chiedimelo →</span>`:""}`;say.dataset.scene=scene;
+  say.classList.add("on");placeSay();clearTimeout(QG.hideT);QG.hideT=setTimeout(()=>say.classList.remove("on"),ms||6500);
+}
+say.addEventListener("click",()=>{const tip=QTIPS[say.dataset.scene]||{};say.classList.remove("on");openChat();if(tip.q&&S.lab)setTimeout(()=>askChat(tip.q),250);});
+function quantaScene(name){
+  if(QG.seen.has(name)||QG.opened&&name!=="home")return;
+  QG.seen.add(name);setTimeout(()=>{if(current===name&&!document.body.classList.contains("chat-on")&&!QG.tl)showSay(name);},name==="home"?6500:2600);
+}
+/* il giro: la sfera vola verso il contenuto lasciando una scia, dice una cosa utile e torna al suo posto */
+function setOrb(x,y){QG.pos={x,y};orbBtn.style.translate=`${x}px ${y}px`;if(say.classList.contains("on"))placeSay();}
+function orbSpark(){const r=orbBtn.getBoundingClientRect(),s=document.createElement("i");s.className="orb-spark";s.style.left=(r.left+r.width/2)+"px";s.style.top=(r.top+r.height/2)+"px";document.body.appendChild(s);setTimeout(()=>s.remove(),700);}
+function roam(){
+  if(!HAS_G||REDUCE||narrowUI()||QG.tl||QG.opened||document.hidden||document.body.classList.contains("chat-on")||$("#drawer").classList.contains("open"))return;
+  if(Date.now()-QG.lastInput<4000)return; // non disturbare mentre l'utente sta facendo qualcosa
+  const r=orbBtn.getBoundingClientRect(),W=window.innerWidth,H=window.innerHeight;
+  const tx=W*(.2+Math.random()*.25)-(r.left+r.width/2),ty=H*(.25+Math.random()*.25)-(r.top+r.height/2);
+  const mid={x:tx*.55+(Math.random()-.5)*W*.15,y:ty*.35-H*.18};
+  const o={x:0,y:0},sp=setInterval(orbSpark,45);QG.roams++;orbBtn.classList.add("roaming");
+  QG.tl=G.timeline({onComplete:()=>{clearInterval(sp);orbBtn.classList.remove("roaming");setOrb(0,0);QG.tl=null;}})
+    .to(o,{x:mid.x,y:mid.y,duration:1.1,ease:"power2.in",onUpdate:()=>setOrb(o.x,o.y)})
+    .to(o,{x:tx,y:ty,duration:1.1,ease:"power3.out",onUpdate:()=>setOrb(o.x,o.y)})
+    .add(()=>{clearInterval(sp);showSay(current,4800);})
+    .to(orbBtn,{scale:1.18,duration:.35,yoyo:true,repeat:3,ease:"sine.inOut"})
+    .to({},{duration:3.2})
+    .add(()=>{say.classList.remove("on");const s2=setInterval(orbSpark,45);setTimeout(()=>clearInterval(s2),1500);})
+    .to(o,{x:0,y:0,duration:1.5,ease:"expo.inOut",onUpdate:()=>setOrb(o.x,o.y)});
+}
+orbBtn.addEventListener("click",()=>{QG.opened=true;say.classList.remove("on");if(QG.tl){QG.tl.kill();QG.tl=null;orbBtn.classList.remove("roaming");G.set(orbBtn,{scale:1});setOrb(0,0);}});
+/* primo giro dopo ~35 s, poi ogni 55-80 s, al massimo 4 volte */
+(function schedule(first){setTimeout(()=>{roam();if(QG.roams<4&&!QG.opened)schedule(false);},first?35000:55000+Math.random()*25000);})(true);
+window.addEventListener("resize",()=>{if(say.classList.contains("on"))placeSay();});
+window.__quanta={roam:()=>{QG.lastInput=0;roam();},say:s=>showSay(s||current)}; // per i test automatici
+
 /* ---------- Avvio ---------- */
 load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);
 morphInit();
+renderLabs();loadMarket();
+quantaScene("home");
 requestAnimationFrame(movePill);
 if(!HAS_G)heroIntro();

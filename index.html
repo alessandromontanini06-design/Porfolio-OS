@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -77,12 +77,16 @@
             <div><b>04 Analizza</b><span>formule a vista</span></div>
           </div>
         </div>
-        <div class="tile violet s4">
-          <span class="eyebrow">Fonti</span>
-          <div class="big">0 numeri inventati</div>
-          <p>IA di Claude per capire il file, BCE per tassi e inflazione, Alpha Vantage per i prezzi. Calcoli deterministici nel tuo browser.</p>
+        <div class="tile violet s4 mkt" id="mkt" aria-label="Dati di mercato ufficiali della BCE">
+          <div class="mkt-head"><span class="eyebrow">Terminale · BCE</span><span class="mkt-live"><i></i>dati ufficiali</span></div>
+          <div class="mkt-rows" id="mktRows"><div class="mkt-row sk"></div><div class="mkt-row sk"></div><div class="mkt-row sk"></div></div>
+          <p class="mkt-note" id="mktNote">0 numeri inventati: tassi, inflazione e cambio arrivano dalla Banca centrale europea.</p>
         </div>
         <div class="s12 ticker" aria-label="Metriche del dataset caricato"><div class="tr" id="ticker"></div></div>
+        <div class="s12 labs" aria-label="I laboratori di Portfolio OS">
+          <div class="labs-head"><div><span class="eyebrow">Financial Intelligence Terminal</span><h2>10 laboratori.<br><em>Un solo portafoglio.</em></h2></div><p>Carichi i dati una volta: ogni laboratorio li usa, l'IA li interpreta, il motore fa i conti.</p></div>
+          <div class="labs-grid" id="labsGrid"></div>
+        </div>
       </div>
     </div>
   </section>
