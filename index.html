@@ -852,6 +852,10 @@ const MON=["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","di
 const DATE_HINT=/data|date|mese|month|periodo|period|anno|year|giorno|day|time/i;
 const RET_HINT=/rend|return|\bret\b|perf|var\.?\s*%|%/i;
 const PRICE_HINT=/prezz|price|close|chiusura|\bnav\b|valore|quota|indice|index|livello|level|\(eur\)|\(usd\)/i;
+/* flussi e quantità: versamenti, importi, quote possedute, guadagni */
+const FLOW_HINT=/versat|\bvers\b|investit|importo|flusso|contribut|deposit|prelev|guadagn|profit|\bp&l\b|\bquote\b|^q\s|quantit|\bshares\b|\bunits\b|commission|dividend|cedol|tass[ae]\b|saveback/i;
+/* valori di portafoglio: se nello stesso foglio ci sono versamenti, includono soldi aggiunti e non solo rendimento */
+const VALUE_HINT=/valor|\bval\b|patrimon|saldo|totale|total|net worth|portafoglio/i;
 const isBlank=v=>v===null||v===undefined||(typeof v==="string"&&v.trim()==="");
 const median=a=>{if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
 const fmtN=(x,d=2)=>Number.isFinite(x)?x.toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d}):"—";
@@ -936,8 +940,12 @@ function profile(c,name,raw){
     const p=v instanceof Date?null:parseNum(v);
     if(p){nn++;if(p.pct)npct++;nums.push(p.n);}else nums.push(null);
   }
+  /* prezzi a 0 prima del primo acquisto (tracker personali): mancanti, non prezzi nulli */
+  let leadZeros=0;
+  if(hintPrice&&!FLOW_HINT.test(name)){const fi=nums.findIndex(x=>x!==null&&x!==0);
+    if(fi>0&&nums.slice(0,fi).every(x=>x===null||x===0)&&nums.slice(fi).every(x=>x===null||x>0)){for(let i=0;i<fi;i++)if(nums[i]===0){nums[i]=null;leadZeros++;}}}
   const N=ne.length,dateFrac=nd/N,numFrac=nn/N;
-  const col={idx:c,letter:colLetter(c),name,nums,hintDate,dateFrac,numFrac,nonNull:N,sample:ne.slice(0,3).map(fmtRaw),conf:"bassa",suggest:null,reason:""};
+  const col={idx:c,letter:colLetter(c),name,nums,hintDate,dateFrac,numFrac,nonNull:N,sample:ne.slice(0,3).map(fmtRaw),conf:"bassa",suggest:null,reason:"",leadZeros};
   if(dateFrac>=0.8&&(hintDate||typeof ne[0]==="string"||ne[0] instanceof Date)){col.suggest="date";col.kind="date";return col;}
   if(numFrac<0.8){
     col.kind="text";col.suggest="ignore";col.conf="alta";
@@ -953,14 +961,21 @@ function profile(c,name,raw){
   const rel=[];for(let i=1;i<v.length;i++)if(v[i-1]!==0)rel.push(Math.abs(v[i]/v[i-1]-1));
   const medRel=median(rel),pctFrac=npct/nn,distinct=new Set(v).size;
   Object.assign(col,{min,max,maxAbs,meanAbs,both,medRel,pctFrac});
-  if(distinct<=3&&v.length>5){
+  /* serie cumulate (quote accumulate, versato totale): non scendono mai e restano ferme per molti periodi */
+  let flat=0,down=0;for(let i=1;i<v.length;i++){if(v[i]===v[i-1])flat++;else if(v[i]<v[i-1])down++;}
+  const cumul=v.length>8&&!down&&flat/(v.length-1)>=.25&&distinct>3;
+  if(FLOW_HINT.test(name)){col.suggest="ignore";col.conf="alta";col.flow=true;
+    col.reason="Versamenti, quantità o guadagni: non sono prezzi né rendimenti di mercato";
+  }else if(cumul){col.suggest="ignore";col.conf="alta";col.flow=true;
+    col.reason="Cresce solo a scalini e non scende mai: quote accumulate o versamenti cumulati, non un prezzo";
+  }else if(distinct<=3&&v.length>5){
     col.reason=`Solo ${distinct} valori diversi ripetuti: sembra un parametro o una categoria, non una serie storica`;
   }else if(pctFrac>0.5){
     col.suggest="ret";col.conf="alta";
     col.reason=`Valori con il simbolo % (da ${fmtPct(min,2)} a ${fmtPct(max,2)}): rendimenti, convertiti in decimali`;
   }else if(min>0&&!both&&medRel<0.2){
     col.suggest="price";col.conf=hintRet?"media":"alta";
-    col.reason=`Sempre positivi (da ${fmtN(min)} a ${fmtN(max)}) e variano poco da un periodo all'altro (mediana ${fmtPct(medRel)}): prezzi o valori`;
+    col.reason=`Sempre positivi (da ${fmtN(min)} a ${fmtN(max)}) e variano poco da un periodo all'altro (mediana ${fmtPct(medRel)}): prezzi o valori${leadZeros?`. I ${leadZeros} zeri iniziali sono trattati come mancanti (prima dell'acquisto)`:""}`;
   }else if(both&&maxAbs<=1&&meanAbs<0.15){
     col.suggest="ret";col.conf=hintPrice?"media":"alta";
     col.reason=`Positivi e negativi, vicini allo zero (da ${fmtN(min,3)} a ${fmtN(max,3)}): rendimenti in forma decimale`;
@@ -982,13 +997,18 @@ function analyzeSheet(name,aoa){
   for(let r=h+1;r<aoa.length;r++){const row=aoa[r];if(row.every(isBlank))continue;body.push({r,row});}
   const cols=[];
   for(let c=0;c<width;c++){const raw=body.map(b=>b.row[c]);if(raw.every(isBlank))continue;cols.push(profile(c,headers[c],raw));}
+  if(cols.some(c=>c.flow&&/versat|\bvers\b|investit|contribut|deposit/i.test(c.name)))cols.forEach(c=>{
+    if(c.suggest==="price"&&VALUE_HINT.test(c.name)&&!/prezz|price|close|chiusura|\bnav\b/i.test(c.name)){c.suggest=null;c.conf="bassa";c.flowValue=true;
+      c.reason="Valore del portafoglio che include i versamenti: i rendimenti sarebbero gonfiati dai soldi aggiunti. Servono i prezzi degli strumenti";}});
   const dc=cols.filter(c=>c.suggest==="date").sort((a,b)=>(b.dateFrac+(b.hintDate?.1:0))-(a.dateFrac+(a.hintDate?.1:0)));
   dc.forEach((c,i)=>{
     if(i===0){c.conf=c.dateFrac>=0.95?"alta":"media";c.reason=`Il ${Math.round(c.dateFrac*100)}% dei valori è una data valida`;}
     else{c.suggest=null;c.conf="bassa";c.reason="Una seconda colonna di date: scegli tu come usarla";}
   });
-  const score=cols.filter(c=>["price","ret","retpct"].includes(c.suggest)).length+(dc.length?3:0);
-  return {name,headerRow:h,body,cols,score,rowCount:aoa.length};
+  const nAsset=cols.filter(c=>["price","ret","retpct"].includes(c.suggest)).length,nFlow=cols.filter(c=>c.flow||c.flowValue).length;
+  const score=nAsset+(dc.length&&nAsset?3:dc.length?1:0);
+  /* "tracker" personale: molte colonne di versamenti, quote o valori → i numeri non sono rendimenti di mercato */
+  return {name,headerRow:h,body,cols,score,rowCount:aoa.length,tracker:nFlow>=2&&nFlow>=nAsset};
 }
 
 const FREQS=[{max:4,label:"giornaliera",adj:"giornaliere",f:252},{max:10,label:"settimanale",adj:"settimanali",f:52},{max:45,label:"mensile",adj:"mensili",f:12},{max:120,label:"trimestrale",adj:"trimestrali",f:4},{max:Infinity,label:"annuale",adj:"annuali",f:1}];
@@ -1616,7 +1636,8 @@ function load(sheets,source,fromUser){
   morphData();
   if(fromUser){S.scanPlayed=false;go("scan",{force:true});}
   if(source.kind!=="rebuilt")S.portfolio=null;
-  if(fromUser&&source.kind==="file"&&aiAuto()){if(S.ds&&S.ds.ok)requestFix();else requestUnderstand();}
+  /* file "tracker" (versamenti, quote, valori) o con molti fogli: prima l'IA capisce che file è, poi eventualmente ricostruisce con i prezzi veri */
+  if(fromUser&&source.kind==="file"&&aiAuto()){const tracker=S.sheets.some(s=>s.tracker);if(S.ds&&S.ds.ok&&!tracker&&S.sheets.length<3)requestFix();else requestUnderstand();}
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -1901,9 +1922,15 @@ document.addEventListener("change",e=>{if(e.target.id==="aiAuto"){try{localStora
 /* ---------- Ricostruzione del file: Claude capisce il file (/api/understand), i prezzi arrivano da /api/prices ---------- */
 const TIPO_L={serie_storica:"Serie storica",riepilogo_portafoglio:"Riepilogo di portafoglio",movimenti:"Movimenti",altro:"Altro"};
 function undPayload(){
-  return {file:S.source.name,nota:"celle[0] è la colonna A, celle[1] la colonna B, e così via",
-    fogli:S.raw.slice(0,4).map((aoa,i)=>({nome:S.sheets[i].name,righe:(aoa||[]).slice(0,40).map((r,ri)=>({riga:ri+1,celle:(r||[]).slice(0,14).map(cellText)}))}))};
+  /* tutti i fogli (fino a 12), solo le celle piene con la loro lettera di colonna; righe ridotte se il file è grande */
+  const sheetRows=(aoa,max)=>(aoa||[]).slice(0,max).map((r,ri)=>{const c={};(r||[]).forEach((v,ci)=>{if(v!==null&&v!==undefined&&String(v).trim()!=="")c[colLetterUI(ci)]=cellText(v);});return {riga:ri+1,celle:c};}).filter(x=>Object.keys(x.celle).length);
+  const build=max=>({file:S.source.name,nota:"celle è un oggetto lettera di colonna → valore; le celle vuote sono omesse. Per ogni foglio ci sono anche righe totali e colonne con un'intestazione.",
+    fogli:S.raw.slice(0,12).map((aoa,i)=>({nome:S.sheets[i].name,righeTotali:(aoa||[]).length,
+      analisiMotore:S.sheets[i].tracker?"contiene versamenti, quote o valori che crescono con i soldi aggiunti":"",righe:sheetRows(aoa,max)}))});
+  for(const max of [30,20,12,8]){const p=build(max);if(JSON.stringify(p).length<70000)return p;}
+  return build(5);
 }
+function colLetterUI(i){let s="";i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;}
 async function requestUnderstand(){
   S.ai=null;S.und={status:"loading"};renderAI();
   try{
@@ -1918,7 +1945,7 @@ async function requestUnderstand(){
 }
 function renderUnderstand(el){
   const u=S.und;
-  if(u.status==="loading"){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Claude sta leggendo ${Math.min(4,S.raw.length)} ${S.raw.length===1?"foglio":"fogli"} per capire che file è…</span></div>`;return;}
+  if(u.status==="loading"){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>L'IA sta leggendo ${Math.min(12,S.raw.length)} ${S.raw.length===1?"foglio":"fogli"} per capire che file è…</span></div>`;return;}
   if(u.status==="rebuilding"){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Scarico lo storico di ${u.posizioni.length} strumenti da Alpha Vantage e ricostruisco il file…</span></div>`;return;}
   if(u.status==="error"){el.innerHTML=`<p style="color:var(--muted)">${esc(u.msg)}</p><div class="row" style="display:flex;gap:10px"><button type="button" class="btn" id="aiUnderstand">Riprova</button><button type="button" class="btn" id="undDismiss">Chiudi</button></div>`;return;}
   const tipo=`<span class="chip hist"><i></i>${esc(TIPO_L[u.tipo]||u.tipo)}</span>`;
