@@ -8,7 +8,7 @@ const DATE_HINT=/data|date|mese|month|periodo|period|anno|year|giorno|day|time/i
 const RET_HINT=/rend|return|\bret\b|perf|var\.?\s*%|%/i;
 const PRICE_HINT=/prezz|price|close|chiusura|\bnav\b|valore|quota|indice|index|livello|level|\(eur\)|\(usd\)/i;
 /* flussi e quantità: versamenti, importi, quote possedute, guadagni */
-const FLOW_HINT=/versat|\bvers\b|investit|importo|flusso|contribut|deposit|prelev|guadagn|profit|\bp&l\b|\bquote\b|^q\s|quantit|\bshares\b|\bunits\b|commission|dividend|cedol|tass[ae]\b|saveback/i;
+const FLOW_HINT=/versat|versament|\bvers\b|investit|importo|flusso|contribut|deposit|prelev|guadagn|profit|\bp&l\b|\bquote\b|^q\s|quantit|\bshares\b|\bunits\b|commission|dividend|cedol|tass[ae]\b|saveback/i;
 /* valori di portafoglio: se nello stesso foglio ci sono versamenti, includono soldi aggiunti e non solo rendimento */
 const VALUE_HINT=/valor|\bval\b|patrimon|saldo|totale|total|net worth|portafoglio/i;
 const isBlank=v=>v===null||v===undefined||(typeof v==="string"&&v.trim()==="");
