@@ -1378,7 +1378,7 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("change",e=>{if(e.target.id==="stProp"&&S.st){S.st.prop=e.target.checked;renderShock(false);}});
 document.addEventListener("click",e=>{
-  const c=e.target.closest("[data-crisis]");if(c&&!c.disabled&&S.st){S.st.sel=c.dataset.crisis;document.querySelectorAll("[data-crisis]").forEach(b=>b.setAttribute("aria-pressed",String(b===c)));renderCrisisDetail();Morph.shape("stress");return;}
+  const c=e.target.closest("[data-crisis]");if(c&&!c.disabled&&S.st&&!c.closest("#bs-root")){S.st.sel=c.dataset.crisis;document.querySelectorAll("[data-crisis]").forEach(b=>b.setAttribute("aria-pressed",String(b===c)));renderCrisisDetail();Morph.shape("stress");return;}
   const p=e.target.closest("[data-stp]");if(!p||!S.st)return;
   const ds=S.ds,R=S.stress,k=p.dataset.stp;
   if(k==="all20")S.st.shock=ds.assets.map(()=>"-20");
@@ -2084,7 +2084,7 @@ async function loadMarket(){
 
 /* ---------- Financial Games ---------- */
 const GAMES=[
-  {id:"survive",n:"01",t:"Sopravvivi alla crisi",d:"Entri nel 2008 (o nel 2000, nel 2020, nel 2022) con 10.000 € nell'S&P 500. Il futuro è nascosto: ogni mese scegli azioni o contanti.",tag:"dati storici reali"},
+  {id:"blackswan",n:"01",t:"BLACK SWAN · The Last Portfolio",d:"Gestisci 1.000.000 € dentro una crisi vera, giorno per giorno: eventi, decisioni, War Room e un'autopsia finale di ogni tua scelta.",tag:"dati storici giornalieri reali"},
   {id:"frontier",n:"02",t:"Batti la frontiera",d:"Costruisci a mano il portafoglio più efficiente con i tuoi asset entro un limite di rischio. Il motore ti dà il voto.",tag:"i tuoi dati"},
   {id:"timing",n:"03",t:"Market Timing Challenge",d:"Indovina i mesi migliori per entrare e uscire.",soon:true},
   {id:"bubble",n:"04",t:"Bubble Detective",d:"Riconosci una bolla prima che scoppi.",soon:true},
@@ -2098,7 +2098,7 @@ function renderGames(){
     <span class="gm-tag">${g.soon?"in arrivo":g.id==="frontier"&&!S.lab?"serve un file nel laboratorio":g.tag}</span>${g.soon?"":`<span class="gm-play-b">Gioca →</span>`}</button>`).join("");
 }
 document.addEventListener("click",e=>{
-  const g=e.target.closest("[data-game]");if(g){GM.game=g.dataset.game;if(GM.game==="survive")svSetup();else fxStart();renderGames();return;}
+  const g=e.target.closest("[data-game]");if(g){if(g.dataset.game==="blackswan"){import("./games/blackswan-ui.js").then(m=>m.open({P,go,SFX})).catch(err=>alert("Non riesco a caricare il gioco: "+err.message));return;}GM.game=g.dataset.game;fxStart();renderGames();return;}
   if(e.target.closest("[data-gm-back]")){GM.game=null;GM.sv=null;renderGames();}
 });
 /* --- Suoni sintetizzati (nessun file esterno), disattivabili --- */
@@ -2120,154 +2120,7 @@ const SFX={ctx:null,on:(()=>{try{return localStorage.getItem("pos-sfx")!=="0";}c
 const svBest=()=>{try{return JSON.parse(localStorage.getItem("pos-sv-best")||"{}");}catch{return {};}};
 const svSaveBest=(id,s)=>{try{const b=svBest();if(!(b[id]>=s)){b[id]=s;localStorage.setItem("pos-sv-best",JSON.stringify(b));return true;}}catch{}return false;};
 
-/* --- Gioco 1: Sopravvivi alla crisi, in diretta --- */
-async function svSetup(){
-  svStop();const el=$("#gmPlay");el.hidden=false;
-  el.innerHTML=`<div class="card gm-panel"><div class="head"><div><span class="eyebrow">Gioco 01 · in diretta</span><h3 style="margin-top:4px">Sopravvivi alla crisi</h3></div><div class="gm-tools"><button type="button" class="btn sm" data-sfx>${SFX.on?"🔊 Suoni":"🔇 Muto"}</button><button type="button" class="btn sm" data-gm-back>← Tutti i giochi</button></div></div>
-    <p class="gm-lead">Hai <b>10.000 €</b> nell'S&P 500. Il tempo scorre da solo, <b>un mese al secondo</b>, il futuro è nascosto e le notizie sono quelle vere di quei giorni. Decidi al volo quanto tenere in azioni (tasti <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, <kbd>Spazio</kbd> per la pausa). Chi non tocca mai nulla è il tuo avversario.</p>
-    <div class="gm-crises" id="svPick"><p class="caption">Scarico lo storico dell'S&P 500 e il cambio euro/dollaro della BCE…</p></div>
-    <p class="caption">Dati storici reali: ETF SPY (S&P 500, dividendi inclusi) in euro con il cambio BCE di fine mese. Le notizie sono fatti storici. Le decisioni sono tue, i contanti rendono lo 0%.</p></div>`;
-  await bnLoad("SPY");if(!S.fx){const fx=await getJSON("/api/fx?ccy=USD");if(!fx.error)S.fx=fx;}
-  const d=S.bnData.SPY;if(!d||d.error||!S.fx){$("#svPick").innerHTML=`<p class="msg err">${esc((d&&d.error)||"Dati non disponibili in questo momento.")} Riprova tra poco.</p>`;return;}
-  GM.px=P.benchPrices(d.points,S.fx.points);const best=svBest();
-  $("#svPick").innerHTML=P.CRISES.map(c=>{const w=P.gameWindow(GM.px,c,3,36);return `<button type="button" class="gm-crisis" ${w.error?"disabled":`data-sv="${c.id}"`}><span>${c.m0.slice(0,4)}</span><b>${esc(c.name)}</b><small>${w.error?"fuori dallo storico":`${w.keys.length-1} mesi · ${best[c.id]?`record ${best[c.id].toLocaleString("it-IT")}`:"nessun record"}`}</small></button>`;}).join("");
-}
-function svNew(c){const w=P.gameWindow(GM.px,c,3,36);return {c,win:w,t:0,w:w.ret.map(()=>1),x:1,playing:false,speed:1100,timer:0,shown:new Set(),hold:0};}
-document.addEventListener("click",e=>{
-  const b=e.target.closest("[data-sv]");if(b){GM.sv=svNew(P.CRISES.find(x=>x.id===b.dataset.sv));svIntro();return;}
-  if(e.target.closest("[data-sfx]")){const on=SFX.toggle();e.target.closest("[data-sfx]").textContent=on?"🔊 Suoni":"🔇 Muto";if(on)SFX.beep(true);}
-});
-/* intro cinematografica: anno gigante, crisi, conto alla rovescia */
-function svIntro(){
-  const G0=GM.sv,c=G0.c,yr=c.m0.slice(0,4);
-  const ov=document.createElement("div");ov.className="sv-intro";ov.innerHTML=`<div class="sv-in-yr">${yr}</div><div class="sv-in-nm">${esc(c.name)}</div><div class="sv-in-tx">${esc(c.what)}</div><div class="sv-in-cd" id="svCd">3</div><button type="button" class="btn sm sv-in-skip">Salta</button>`;
-  document.body.appendChild(ov);requestAnimationFrame(()=>ov.classList.add("on"));
-  let n=3,done=false;const fin=()=>{if(done)return;done=true;clearInterval(iv);ov.classList.add("out");setTimeout(()=>ov.remove(),500);svBuild();svPlay();};
-  ov.querySelector(".sv-in-skip").addEventListener("click",fin);
-  SFX.beep(false);const iv=setInterval(()=>{n--;const cd=ov.querySelector("#svCd");if(n>0){cd.textContent=n;cd.classList.remove("pop");void cd.offsetWidth;cd.classList.add("pop");SFX.beep(false);}else{cd.textContent="VIA!";cd.classList.add("go");SFX.beep(true);setTimeout(fin,500);clearInterval(iv);}},REDUCE?300:900);
-}
-function svStop(){if(GM.sv&&GM.sv.timer){clearTimeout(GM.sv.timer);GM.sv.timer=0;}if(GM.sv)GM.sv.playing=false;}
-function svPlay(){const G0=GM.sv;if(!G0||G0.done)return;G0.playing=true;svLoop();svHudCtl();}
-function svPause(){svStop();svHudCtl();}
-function svLoop(){
-  const G0=GM.sv;if(!G0||!G0.playing||G0.done)return;
-  G0.timer=setTimeout(()=>{if(!GM.sv||GM.sv!==G0||!G0.playing)return;svTick();if(!G0.done)svLoop();},G0.speed+(G0.hold||0));G0.hold=0;
-}
-function svTick(){
-  const G0=GM.sv;if(G0.t>=G0.win.ret.length-1){svEnd();return;}
-  G0.t++;G0.w[G0.t]=G0.x;const r=G0.win.ret[G0.t],key=G0.win.keys[G0.t];
-  svUpdate(r);
-  const news=(P.CRISIS_NEWS[G0.c.id]||{})[key];
-  if(news&&!G0.shown.has(key)){G0.shown.add(key);svNews(news,key);G0.hold=2300;SFX.alarm();}
-  else if(r<=-.08){SFX.crash();}else if(r>=.06){SFX.gain();}else SFX.tick();
-  if(r<=-.08)svFx("crash");else if(r<=-.04)svFx("drop");else if(r>=.06)svFx("pump");
-  if(G0.t>=G0.win.ret.length-1){G0.timer=setTimeout(svEnd,900);G0.playing=false;}
-}
-function svFx(kind){
-  const p=$("#svPanel");if(!p||REDUCE)return;p.classList.remove("fx-crash","fx-drop","fx-pump");void p.offsetWidth;p.classList.add("fx-"+kind);
-  if(kind==="crash"&&Morph.burst)Morph.burst(.35);
-}
-function svNews(text,key){
-  const n=$("#svNews");if(!n)return;
-  n.innerHTML=`<span class="tag">ULTIM'ORA · ${key}</span><span class="tx">${esc(text)}</span>`;n.classList.remove("on");void n.offsetWidth;n.classList.add("on");
-  const log=$("#svLog");if(log){log.insertAdjacentHTML("afterbegin",`<li><b>${key}</b> ${esc(text)}</li>`);}
-}
-function svGauge(fg){
-  const a=Math.PI*(1-fg.value/100),x=60+48*Math.cos(a),y=62-48*Math.sin(a),col=fg.value<20?"#FF5C8A":fg.value<40?"#FF7A3D":fg.value<60?"#FFC24B":fg.value<80?"#9BE15D":"#5BF0A5";
-  return `<svg viewBox="0 0 120 72" aria-hidden="true"><defs><linearGradient id="fgg" x1="0" x2="1"><stop offset="0" stop-color="#FF5C8A"/><stop offset=".5" stop-color="#FFC24B"/><stop offset="1" stop-color="#5BF0A5"/></linearGradient></defs>
-    <path d="M12 62 A48 48 0 0 1 108 62" fill="none" stroke="url(#fgg)" stroke-width="10" stroke-linecap="round" opacity=".9"/>
-    <line x1="60" y1="62" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="60" cy="62" r="5" fill="#fff"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${col}"/></svg>`;
-}
-/* la schermata di gioco si costruisce una volta; ogni mese si aggiornano numeri, grafico, indicatore */
-function svBuild(){
-  const G0=GM.sv;
-  $("#gmPlay").innerHTML=`<div class="card gm-panel sv-live" id="svPanel">
-    <div class="sv-top"><div><span class="eyebrow" id="svPhase"></span><div class="sv-date"><b id="svMonth"></b><span id="svCount"></span></div></div>
-      <div class="gm-tools"><button type="button" class="btn sm" data-svspeed>Veloce ×2</button><button type="button" class="btn sm" data-svpause id="svPauseB">❚❚ Pausa</button><button type="button" class="btn sm" data-sfx>${SFX.on?"🔊":"🔇"}</button><button type="button" class="btn sm" data-gm-back>✕</button></div></div>
-    <div class="sv-prog"><i id="svProg"></i><em id="svCrisisBar"></em></div>
-    <div class="sv-news" id="svNews" aria-live="assertive"></div>
-    <div class="sv-grid">
-      <div class="sv-main"><div class="gm-hud sv-hud"><div><span>Il tuo portafoglio</span><b id="svV">10.000 €</b><small id="svVd"></small></div>
-          <div><span>Mercato nel mese</span><b id="svR">—</b><small>S&P 500 in euro</small></div>
-          <div><span>L'avversario: chi non tocca nulla</span><b id="svH">10.000 €</b><small id="svHd"></small></div></div>
-        <div class="chartbox" id="svChart"></div></div>
-      <aside class="sv-side"><div class="sv-fg"><span class="eyebrow">Paura o avidità</span><div id="svFg"></div><b id="svFgL"></b><small>indice del gioco: momento a 3 mesi e distanza dal massimo</small></div>
-        <div class="sv-logw"><span class="eyebrow">Notizie della partita</span><ul id="svLog"></ul></div></aside>
-    </div>
-    <div class="gm-ctrl sv-ctrl"><div class="gm-ch">${[[1,"1","100% azioni"],[.5,"2","50 / 50"],[0,"3","Tutto in contanti"]].map(([x,k,l])=>`<button type="button" data-svx="${x}" aria-pressed="${G0.x===x}"><kbd>${k}</kbd>${l}</button>`).join("")}</div>
-      <p class="caption">La scelta vale dal mese successivo. <kbd>Spazio</kbd> pausa · <kbd>→</kbd> un mese alla volta in pausa.</p></div></div>`;
-  const W=G0.win,n=W.keys.length;$("#svCrisisBar").style.left=(W.start/(n-1)*100)+"%";$("#svCrisisBar").style.width=Math.max(1,(W.end-W.start)/(n-1)*100)+"%";
-  svUpdate(NaN);
-}
-function svUpdate(r){
-  const G0=GM.sv,W=G0.win,n=W.keys.length,t=G0.t,{svg,res}=svChart(false),fg=P.fearGreed(W.ret,t);
-  const phase=t<W.start?"Prima della crisi":t<=W.end?"⚠ Crisi in corso":"Dopo il minimo";
-  $("#svPhase").textContent=`${G0.c.name} · ${phase}`;$("#svMonth").textContent=fmtDate(new Date(Date.UTC(+W.keys[t].slice(0,4),+W.keys[t].slice(5,7)-1,1)),12);$("#svCount").textContent=` mese ${t} di ${n-1}`;
-  $("#svProg").style.width=(t/(n-1)*100)+"%";$("#svChart").innerHTML=svg;
-  const setNum=(id,v)=>{const el=$(id);if(!el)return;const o={v:+(el.dataset.v||10000)};el.dataset.v=v;if(!HAS_G||REDUCE){el.textContent=fmtEur(v);return;}G.to(o,{v,duration:.5,ease:"power2.out",onUpdate:()=>{el.textContent=fmtEur(o.v);}});};
-  setNum("#svV",res.final);setNum("#svH",res.holdFinal);
-  const gap=res.final-res.holdFinal;$("#svVd").textContent=`${fmtPct(res.final/10000-1,1,true)} · ${Math.abs(gap)<1?"alla pari con l'avversario":gap>0?`avanti di ${fmtEur(gap)}`:`indietro di ${fmtEur(-gap)}`}`;$("#svVd").className=res.final>=res.holdFinal?"up":"dn";
-  $("#svHd").textContent=fmtPct(res.holdFinal/10000-1,1,true);
-  const R=$("#svR");R.textContent=Number.isFinite(r)?fmtPct(r,1,true):"—";R.className=!Number.isFinite(r)?"":r>=0?"up":"dn";
-  $("#svFg").innerHTML=svGauge(fg);$("#svFgL").textContent=fg.label;$("#svFgL").style.color=fg.value<40?"var(--bad)":fg.value<60?"var(--warn)":"var(--good)";
-}
-function svHudCtl(){const b=$("#svPauseB");if(b)b.textContent=GM.sv&&GM.sv.playing?"❚❚ Pausa":"▶ Riprendi";const s=document.querySelector("[data-svspeed]");if(s&&GM.sv)s.textContent=GM.sv.speed<800?"Normale ×1":"Veloce ×2";}
-function svChoose(x){const G0=GM.sv;if(!G0||G0.done)return;G0.x=x;document.querySelectorAll("[data-svx]").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.svx===x)));SFX.tone(x===0?440:x===1?990:700,.08,"triangle",.05);}
-function svChart(full){
-  const G0=GM.sv,n=G0.win.keys.length,res=P.survival(G0.win.ret.slice(0,(full?n:G0.t+1)),G0.w),VW=900,VH=320,ml=56,mr=14,mt=14,mb=28,iw=VW-ml-mr,ih=VH-mt-mb;
-  const all=[...res.path,...res.hold],hi=Math.max(...all,10000)*1.06,lo=Math.min(...all,10000)*.9,X=i=>ml+i/(n-1)*iw,Y=v=>mt+ih-(v-lo)/(hi-lo)*ih;
-  let g=`<rect x="${X(G0.win.start)}" y="${mt}" width="${Math.max(2,X(G0.win.end)-X(G0.win.start))}" height="${ih}" fill="var(--bad)" opacity=".1"/>`;
-  niceTicks(lo,hi,4).filter(v=>v>=lo&&v<=hi).forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--line)"/><text x="${ml-6}" y="${(Y(v)+4).toFixed(1)}" text-anchor="end">${fmtK(v)}</text>`;});
-  g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(10000)}" y2="${Y(10000)}" stroke="var(--muted)" stroke-dasharray="2 5" opacity=".6"/>`;
-  [0,Math.floor((n-1)/2),n-1].forEach(i=>{g+=`<text x="${X(i)}" y="${VH-8}" text-anchor="${i===0?"start":i===n-1?"end":"middle"}">${G0.win.keys[i]}</text>`;});
-  if(!full)g+=`<rect x="${X(G0.t)}" y="${mt}" width="${Math.max(0,X(n-1)-X(G0.t))}" height="${ih}" fill="url(#fog)"/><text x="${(X(G0.t)+X(n-1))/2}" y="${mt+ih/2}" text-anchor="middle" style="fill:var(--faint);font-size:15px;letter-spacing:.2em">FUTURO NASCOSTO</text>`;
-  const pts=a=>a.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1)).join("");
-  const last=res.path.length-1,ahead=res.path[last]>=res.hold[last];
-  g+=`<path d="${pts(res.path)}L${X(last).toFixed(1)},${Y(lo)}L${X(0)},${Y(lo)}Z" fill="var(--lime)" opacity=".08"/>`;
-  g+=`<path d="${pts(res.hold)}" fill="none" stroke="#FF7AD9" stroke-width="2" stroke-dasharray="6 5" opacity=".85"/><path d="${pts(res.path)}" fill="none" stroke="var(--lime)" stroke-width="3.2" stroke-linejoin="round"/>`;
-  g+=`<circle cx="${X(last)}" cy="${Y(res.hold[last])}" r="5" fill="#FF7AD9"/><circle cx="${X(last)}" cy="${Y(res.path[last])}" r="8" fill="var(--lime)" class="sv-dot${ahead?" ahead":""}"/>`;
-  return {svg:`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Il tuo portafoglio contro chi resta investito"><defs><linearGradient id="fog" x1="0" x2="1"><stop offset="0" stop-color="rgba(255,255,255,.07)"/><stop offset="1" stop-color="rgba(255,255,255,.01)"/></linearGradient></defs>${g}</svg>`,res};
-}
-document.addEventListener("click",e=>{
-  const x=e.target.closest("[data-svx]");if(x&&GM.sv){svChoose(+x.dataset.svx);return;}
-  if(e.target.closest("[data-svpause]")&&GM.sv){GM.sv.playing?svPause():svPlay();return;}
-  if(e.target.closest("[data-svspeed]")&&GM.sv){GM.sv.speed=GM.sv.speed<800?1100:550;svHudCtl();return;}
-  if(e.target.closest("[data-svagain]")&&GM.sv){GM.sv=svNew(GM.sv.c);svIntro();return;}
-  if(e.target.closest("[data-svother]")){svSetup();return;}
-  if(e.target.closest("[data-svshare]")&&GM.sv&&GM.sv.share){navigator.clipboard&&navigator.clipboard.writeText(GM.sv.share).then(()=>{e.target.closest("[data-svshare]").textContent="Copiato ✓";}).catch(()=>{});}
-});
-document.addEventListener("keydown",e=>{
-  if(current!=="games"||!GM.sv||GM.sv.done||!$("#svPanel")||(e.target.closest&&e.target.closest("input,textarea,select")))return;
-  const k=e.key;if(k==="1"||k==="2"||k==="3"){e.preventDefault();svChoose(k==="1"?1:k==="2"?.5:0);}
-  else if(k===" "){e.preventDefault();e.stopPropagation();GM.sv.playing?svPause():svPlay();}
-  else if(k==="ArrowRight"){e.preventDefault();e.stopPropagation();if(!GM.sv.playing)svTick();}
-},true);
-document.addEventListener("click",e=>{if(e.target.closest("[data-gm-back]"))svStop();},true);
-function svEnd(){
-  const G0=GM.sv;if(!G0||G0.done)return;svStop();G0.done=true;
-  const {svg,res}=svChart(true),k=G0.win.keys,A=P.survivalAwards(G0.win.ret,G0.w,res,G0.win),better=res.diff>=0,rec=svSaveBest(G0.c.id,A.score);
-  const BD={"Mano ferma":"Non hai mai toccato nulla: hai preso tutto il crollo e tutto il rimbalzo. È la strategia che in media batte quasi tutti gli investitori.",
-    "Venditore nel panico":"Hai ridotto le azioni subito dopo mesi pesanti, e il rimbalzo è arrivato senza di te. È l'errore più caro e più comune.",
-    "Market timer (fortunato?)":"Hai fatto meglio di chi è rimasto fermo. Prova un'altra crisi: indovinare due volte di fila è molto più difficile.",
-    "Spettatore prudente":"Sei rimasto fuori dal mercato per la maggior parte del tempo: meno paura, ma anche meno crescita.",
-    "Navigatore":"Hai cambiato rotta qualche volta senza grossi danni: risultato vicino a chi è rimasto fermo.",
-    "Rimbalzo perso":"Le tue uscite ti hanno fatto perdere una parte della ripresa."}[res.badge];
-  G0.share=`Ho giocato «${G0.c.name}» su Portfolio OS: ${fmtEur(res.final)} contro ${fmtEur(res.holdFinal)} di chi è rimasto fermo (${fmtPct(res.diff,1,true)}). Profilo: ${res.badge}. Punteggio ${A.score.toLocaleString("it-IT")}. https://porfolio-os-xi.vercel.app`;
-  $("#gmPlay").innerHTML=`<div class="card gm-panel gm-end"><div class="head"><div><span class="eyebrow">${esc(G0.c.name)} · ${k[0]} – ${k[k.length-1]}</span><h3 style="margin-top:4px">Fine partita</h3></div><button type="button" class="btn sm" data-gm-back>← Tutti i giochi</button></div>
-    <div class="sv-score"><div class="gm-badge"><span>Che investitore sei</span><b>${res.badge}</b><p>${BD}</p></div>
-      <div class="sv-pts"><span>Punteggio</span><b data-count-to="${A.score}">0</b><small>${rec?"🏆 Nuovo record!":`record: ${(svBest()[G0.c.id]||A.score).toLocaleString("it-IT")}`}</small><small>10.000 = come chi resta fermo · ±250 per traguardo</small></div></div>
-    <div class="sv-awards">${A.awards.length?A.awards.map((a,i)=>`<div class="aw${a.bad?" bad":""}" style="--i:${i}"><b>${a.bad?"✗":"★"} ${a.t}</b><span>${a.d}</span></div>`).join(""):`<div class="aw"><b>Nessun traguardo</b><span>Prova un'altra strategia.</span></div>`}</div>
-    <div class="gm-hud"><div><span>Tu</span><b>${fmtEur(res.final)}</b><small>${fmtPct(res.final/10000-1,1,true)} · calo massimo ${fmtPct(res.mdd,0)}</small></div>
-      <div><span>Chi è rimasto fermo</span><b>${fmtEur(res.holdFinal)}</b><small>${fmtPct(res.holdFinal/10000-1,1,true)} · calo massimo ${fmtPct(res.holdMdd,0)}</small></div>
-      <div><span>Differenza</span><b class="${better?"up":"dn"}">${better?"+":"−"}${fmtEur(Math.abs(res.final-res.holdFinal))}</b><small>${fmtPct(res.diff,1,true)} rispetto a restare fermo</small></div></div>
-    <div class="chartbox">${svg}</div>
-    <div class="gm-facts"><div><b>${res.switches}</b><span>cambi di rotta</span></div><div><b>${res.panic}</b><span>vendite dopo un mese ≤ −4%</span></div><div><b>${fmtPct(res.outShare,0)}</b><span>del tempo fuori dal mercato</span></div><div><b class="${res.missed>0?"dn":""}">${fmtPct(res.missed,1)}</b><span>persi nei 5 mesi migliori</span></div></div>
-    <p class="caption">I 5 mesi migliori: ${res.best.map(m=>`${k[m.t]} ${fmtPct(m.r,1,true)} (eri al ${fmtPct(m.x,0)})`).join(" · ")}. Dati storici reali, decisioni simulate, contanti allo 0%, nessun costo né tassa.</p>
-    <div class="gm-go"><button type="button" class="btn lime" data-svagain>Rigioca questa crisi</button><button type="button" class="btn" data-svother>Un'altra crisi</button><button type="button" class="btn" data-svshare>Copia il risultato</button></div></div>`;
-  const pts=document.querySelector("[data-count-to]");if(pts){const to=+pts.dataset.countTo,o={v:0};if(HAS_G&&!REDUCE)G.to(o,{v:to,duration:1.6,ease:"power3.out",onUpdate:()=>{pts.textContent=Math.round(o.v).toLocaleString("it-IT");}});else pts.textContent=to.toLocaleString("it-IT");}
-  (better?SFX.win:SFX.lose).call(SFX);if(Morph.burst)Morph.burst(better?1:.5);
-}
-
+window.__SFX=SFX; // condiviso con il modulo di BLACK SWAN
 /* --- Gioco 2: Batti la frontiera, 3 round a tempo; il file si carica dal gioco --- */
 const FX_ROUND_S=45;
 async function fxLoadFile(file){
