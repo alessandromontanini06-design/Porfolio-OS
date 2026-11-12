@@ -20,7 +20,7 @@ const fmtSize=b=>b<1024?b+" B":b<1048576?fmtN(b/1024,0)+" KB":fmtN(b/1048576,1)+
 const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,corrView:"net",scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null,macro:null,rfSrc:"ecb"};
 
 /* ---------- Scene e dock ---------- */
-const SCENES=["home","scan","map","lab","risk","sim","stress","opt","bench"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
+const SCENES=["home","scan","map","lab","risk","sim","stress","opt","bench","games"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",stress:"Stress test",opt:"Frontiera",bench:"Benchmark",games:"Giochi"};
 let current="home";
 function movePill(){
   const b=document.querySelector(`.dock button[data-go="${current}"]`),pill=$("#pillbg");if(!b||!pill)return;
@@ -61,6 +61,7 @@ function onEnter(name){
   if(name==="stress")renderStress();
   if(name==="opt")renderOpt();
   if(name==="bench")renderBench();
+  if(name==="games")renderGames();
   if(name==="lab"&&S.lab&&!S.labFx.done){S.labFx.done=true;setTimeout(()=>{countAll();drawChart(true);if(S.corrView==="net")buildNet();},HAS_G?380:0);}
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!b||b.disabled||b.classList.contains("off"))return;go(b.dataset.go);});
@@ -131,7 +132,7 @@ if(HAS_G){
 const Morph={on:false,shape(){},cur:{x:0,y:0,s:1,a:1},goal:{x:0,y:0,s:1,a:1},mx:0,my:0,vis:true};
 function morphPlace(name){
   const narrow=window.innerWidth<820;
-  const P={home:narrow?{x:0,y:.6,s:.85,a:.45}:{x:1.5,y:.05,s:1.4,a:.62},scan:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.4,y:1.4,s:.72,a:.34},map:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.6,y:-1.1,s:.7,a:.3},lab:{x:0,y:0,s:1.3,a:.16},risk:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.3,y:-1.3,s:.72,a:.32},sim:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},stress:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.3,s:.75,a:.3},opt:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},bench:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3}};
+  const P={home:narrow?{x:0,y:.6,s:.85,a:.45}:{x:1.5,y:.05,s:1.4,a:.62},scan:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.4,y:1.4,s:.72,a:.34},map:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.6,y:-1.1,s:.7,a:.3},lab:{x:0,y:0,s:1.3,a:.16},risk:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.3,y:-1.3,s:.72,a:.32},sim:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},stress:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.3,s:.75,a:.3},opt:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},bench:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},games:narrow?{x:0,y:2.2,s:.65,a:.3}:{x:3,y:-1,s:.85,a:.45}};
   return P[name]||P.home;
 }
 function morphShape(name){
@@ -236,7 +237,7 @@ function morphInit(){
   Object.assign(Morph,{on:true,renderer,scene,cam,group,geo,pos,tgt,spd,N,mat,U,halo});
   Morph.shape=name=>{Morph.tgt.set(morphShape(name));Morph.goal=morphPlace(name);};
   /* ogni sezione tinge le particelle del suo colore (casa e laboratorio restano viola e lime) */
-  const TINT={risk:[1,.48,.24],sim:[.28,.9,1],stress:[1,.76,.29],opt:[1,.48,.85],bench:[.36,.94,.65]};
+  const TINT={risk:[1,.48,.24],sim:[.28,.9,1],stress:[1,.76,.29],opt:[1,.48,.85],bench:[.36,.94,.65],games:[.48,.64,1]};
   Morph.tint=name=>{const t=TINT[name],v=U.uTint.value;if(!HAS_G){if(t)v.set(...t);U.uTintK.value=t?1:0;return;}if(t)G.to(v,{x:t[0],y:t[1],z:t[2],duration:1.2,ease:"power2.out"});G.to(U.uTintK,{value:t?1:0,duration:1.2,ease:"power2.out"});};
   /* esplosione: le particelle schizzano verso l'esterno e si ricompongono nella forma della nuova sezione */
   Morph.burst=(power=1)=>{
@@ -2048,17 +2049,17 @@ const LABS=[
   {n:"06",t:"Macro & Economy",d:"Curva dei tassi, inflazione, obbligazioni, duration.",c:"var(--good)",soon:true,g:"M3 17c4-8 8-10 18-10M3 21h18"},
   {n:"07",t:"Behavioral Lab",d:"Panico, avversione alle perdite, market timing: provali sulla tua pelle.",c:"var(--c4)",soon:true,g:"M12 21c5-3 8-7 8-11a8 8 0 1 0-16 0c0 4 3 8 8 11z"},
   {n:"08",t:"AI Research",d:"Quanta: fai domande, lei chiede i numeri al motore e te li spiega.",c:"var(--lime)",chat:true,g:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"},
-  {n:"09",t:"Financial Games",d:"Sopravvivi alle crisi, batti il mercato, sfide sui dati veri.",c:"var(--c5)",soon:true,g:"M6 12h4M8 10v4M15 11h.01M18 13h.01M3 9a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"},
+  {n:"09",t:"Financial Games",d:"Sopravvivi alle crisi mese per mese, batti la frontiera: sfide sui dati veri.",c:"#7AA2FF",go:"games",free:true,g:"M6 12h4M8 10v4M15 11h.01M18 13h.01M3 9a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"},
   {n:"10",t:"Academy & Workspace",d:"Formule, glossario, analisi salvate e report.",c:"var(--muted)",soon:true,g:"M4 5h7v14H4zM13 5h7v14h-7z"}
 ];
 function renderLabs(){
   const el=$("#labsGrid");if(!el)return;
-  el.innerHTML=LABS.map(l=>`<button type="button" class="lab-tile${l.soon?" soon":""}" style="--ac:${l.c}" ${l.soon?"disabled":l.chat?'data-labchat="1"':`data-lab="${l.go}"`}>
+  el.innerHTML=LABS.map(l=>`<button type="button" class="lab-tile${l.soon?" soon":""}" style="--ac:${l.c}" ${l.soon?"disabled":l.chat?'data-labchat="1"':`data-lab="${l.go}"${l.free?' data-free="1"':""}`}>
     <span class="lab-n">${l.n}</span><svg class="lab-g" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="${l.g}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <b>${l.t}</b><span class="lab-d">${l.d}</span><span class="lab-s">${l.soon?"in arrivo":l.chat?"apri la chat →":S.lab?"apri →":"pronto · carica un file"}</span></button>`).join("");
+    <b>${l.t}</b><span class="lab-d">${l.d}</span><span class="lab-s">${l.soon?"in arrivo":l.chat?"apri la chat →":S.lab||l.free?"apri →":"pronto · carica un file"}</span></button>`).join("");
 }
 document.addEventListener("click",e=>{
-  const b=e.target.closest("[data-lab]");if(b){if(S.lab)go(b.dataset.lab);else{go("map");showSay("map",5000);}return;}
+  const b=e.target.closest("[data-lab]");if(b){if(S.lab||b.dataset.free)go(b.dataset.lab);else{go("map");showSay("map",5000);}return;}
   if(e.target.closest("[data-labchat]")){QG.opened=true;openChat();}
 });
 const spark12=(pts,c)=>{if(pts.length<2)return "";const v=pts.map(x=>x.v),lo=Math.min(...v),hi=Math.max(...v),X=i=>i/(v.length-1)*100,Y=x=>26-(x-lo)/((hi-lo)||1)*22;
@@ -2081,6 +2082,123 @@ async function loadMarket(){
   $("#mktNote").textContent="Fonte: Banca centrale europea, data-api.ecb.europa.eu. Ultimo dato mensile disponibile.";
 }
 
+/* ---------- Financial Games ---------- */
+const GAMES=[
+  {id:"survive",n:"01",t:"Sopravvivi alla crisi",d:"Entri nel 2008 (o nel 2000, nel 2020, nel 2022) con 10.000 € nell'S&P 500. Il futuro è nascosto: ogni mese scegli azioni o contanti.",tag:"dati storici reali"},
+  {id:"frontier",n:"02",t:"Batti la frontiera",d:"Costruisci a mano il portafoglio più efficiente con i tuoi asset entro un limite di rischio. Il motore ti dà il voto.",tag:"i tuoi dati"},
+  {id:"timing",n:"03",t:"Market Timing Challenge",d:"Indovina i mesi migliori per entrare e uscire.",soon:true},
+  {id:"bubble",n:"04",t:"Bubble Detective",d:"Riconosci una bolla prima che scoppi.",soon:true},
+  {id:"div",n:"05",t:"Diversification Challenge",d:"Riduci il rischio senza sacrificare il rendimento.",soon:true}];
+const GM={game:null};
+function renderGames(){
+  if(GM.game){$("#gmHub").hidden=true;$("#gmPlay").hidden=false;return;}
+  $("#gmPlay").hidden=true;$("#gmHub").hidden=false;
+  $("#gmHub").innerHTML=GAMES.map(g=>`<button type="button" class="gm-card${g.soon?" soon":""}" ${g.soon?"disabled":`data-game="${g.id}"`}>
+    <span class="gm-n">${g.n}</span><b>${g.t}</b><span class="gm-d">${g.d}</span>
+    <span class="gm-tag">${g.soon?"in arrivo":g.id==="frontier"&&!S.lab?"serve un file nel laboratorio":g.tag}</span>${g.soon?"":`<span class="gm-play-b">Gioca →</span>`}</button>`).join("");
+}
+document.addEventListener("click",e=>{
+  const g=e.target.closest("[data-game]");if(g){GM.game=g.dataset.game;if(GM.game==="survive")svSetup();else fxStart();renderGames();return;}
+  if(e.target.closest("[data-gm-back]")){GM.game=null;GM.sv=null;renderGames();}
+});
+/* --- Gioco 1: Sopravvivi alla crisi --- */
+async function svSetup(){
+  const el=$("#gmPlay");el.hidden=false;
+  el.innerHTML=`<div class="card gm-panel"><div class="head"><div><span class="eyebrow">Gioco 01</span><h3 style="margin-top:4px">Sopravvivi alla crisi</h3></div><button type="button" class="btn sm" data-gm-back>← Tutti i giochi</button></div>
+    <p class="gm-lead">Hai <b>10.000 €</b> investiti nell'S&P 500. Il gioco parte qualche mese prima della crisi e prosegue fino a tre anni dopo il minimo. Ogni mese vedi solo il passato e scegli quanto tenere in azioni: il resto resta in contanti allo 0%. Alla fine ti confronti con chi non ha mai toccato nulla.</p>
+    <div class="gm-crises" id="svPick"><p class="caption">Scarico lo storico dell'S&P 500 e il cambio euro/dollaro della BCE…</p></div>
+    <p class="caption">Dati storici reali: ETF SPY (S&P 500, dividendi inclusi) in euro con il cambio BCE di fine mese. Le crisi sono vere, le tue decisioni no.</p></div>`;
+  await bnLoad("SPY");if(!S.fx){const fx=await getJSON("/api/fx?ccy=USD");if(!fx.error)S.fx=fx;}
+  const d=S.bnData.SPY;if(!d||d.error||!S.fx){$("#svPick").innerHTML=`<p class="msg err">${esc((d&&d.error)||"Dati non disponibili in questo momento.")} Riprova tra poco.</p>`;return;}
+  GM.px=P.benchPrices(d.points,S.fx.points);
+  $("#svPick").innerHTML=P.CRISES.map(c=>{const w=P.gameWindow(GM.px,c,3,36);return `<button type="button" class="gm-crisis" ${w.error?"disabled":`data-sv="${c.id}"`}><span>${c.m0.slice(0,4)}</span><b>${esc(c.name)}</b><small>${w.error?"fuori dallo storico":`${w.keys.length-1} mesi`}</small></button>`;}).join("");
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-sv]");if(!b)return;const c=P.CRISES.find(x=>x.id===b.dataset.sv),w=P.gameWindow(GM.px,c,3,36);
+  GM.sv={c,win:w,t:0,w:w.ret.map(()=>1),x:1};svRender();});
+function svStep(k){
+  const G0=GM.sv;if(!G0)return;
+  for(let i=0;i<k&&G0.t<G0.win.ret.length-1;i++){G0.t++;G0.w[G0.t]=G0.x;}
+  if(G0.t>=G0.win.ret.length-1){svEnd();return;}
+  svRender();
+}
+function svChart(full){
+  const G0=GM.sv,n=G0.win.keys.length,res=P.survival(G0.win.ret.slice(0,(full?n:G0.t+1)),G0.w),VW=900,VH=300,ml=56,mr=14,mt=14,mb=28,iw=VW-ml-mr,ih=VH-mt-mb;
+  const all=[...res.path,...res.hold],hi=Math.max(...all,10000)*1.05,lo=Math.min(...all,10000)*.92,X=i=>ml+i/(n-1)*iw,Y=v=>mt+ih-(v-lo)/(hi-lo)*ih;
+  let g=`<rect x="${X(G0.win.start)}" y="${mt}" width="${Math.max(2,X(G0.win.end)-X(G0.win.start))}" height="${ih}" fill="var(--bad)" opacity=".08"/>`;
+  niceTicks(lo,hi,4).filter(v=>v>=lo&&v<=hi).forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--line)"/><text x="${ml-6}" y="${(Y(v)+4).toFixed(1)}" text-anchor="end">${fmtK(v)}</text>`;});
+  [0,Math.floor((n-1)/2),n-1].forEach(i=>{g+=`<text x="${X(i)}" y="${VH-8}" text-anchor="${i===0?"start":i===n-1?"end":"middle"}">${G0.win.keys[i]}</text>`;});
+  if(!full)g+=`<rect x="${X(G0.t)}" y="${mt}" width="${X(n-1)-X(G0.t)}" height="${ih}" fill="url(#fog)"/><text x="${(X(G0.t)+X(n-1))/2}" y="${mt+ih/2}" text-anchor="middle" style="fill:var(--faint);font-size:14px">futuro nascosto</text>`;
+  const line=(a,st)=>`<path d="${a.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1)).join("")}" fill="none" ${st}/>`;
+  g+=line(res.hold,`stroke="var(--muted)" stroke-width="1.8" stroke-dasharray="5 4"`)+line(res.path,`stroke="var(--lime)" stroke-width="3"`);
+  const last=res.path.length-1;g+=`<circle cx="${X(last)}" cy="${Y(res.path[last])}" r="6" fill="var(--lime)"/>`;
+  return {svg:`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Il tuo portafoglio contro chi resta investito"><defs><linearGradient id="fog" x1="0" x2="1"><stop offset="0" stop-color="rgba(255,255,255,.06)"/><stop offset="1" stop-color="rgba(255,255,255,.01)"/></linearGradient></defs>${g}</svg>`,res};
+}
+function svRender(){
+  const G0=GM.sv,{svg,res}=svChart(false),k=G0.win.keys,t=G0.t,V=res.final,H=res.holdFinal,mk=G0.win.ret[t],phase=t<G0.win.start?"prima della crisi":t<=G0.win.end?"crisi in corso":"dopo il minimo";
+  $("#gmPlay").innerHTML=`<div class="card gm-panel"><div class="head"><div><span class="eyebrow">${esc(G0.c.name)} · ${phase}</span><h3 style="margin-top:4px">${k[t]} <span class="gm-mo">mese ${t} di ${k.length-1}</span></h3></div><button type="button" class="btn sm" data-gm-back>← Esci</button></div>
+    <div class="gm-hud"><div><span>Il tuo portafoglio</span><b>${fmtEur(V)}</b><small class="${V>=10000?"up":"dn"}">${fmtPct(V/10000-1,1,true)} dall'inizio</small></div>
+      <div><span>Mercato questo mese</span><b class="${!Number.isFinite(mk)?"":mk>=0?"up":"dn"}">${Number.isFinite(mk)?fmtPct(mk,1,true):"—"}</b><small>S&P 500 in euro</small></div>
+      <div><span>Chi non ha toccato nulla</span><b>${fmtEur(H)}</b><small>${fmtPct(H/10000-1,1,true)}</small></div></div>
+    <div class="chartbox">${svg}</div>
+    <div class="gm-ctrl"><span class="eyebrow">Per il prossimo mese tieni in azioni</span>
+      <div class="gm-ch">${[[1,"100% azioni"],[.5,"50 / 50"],[0,"Tutto in contanti"]].map(([x,l])=>`<button type="button" data-svx="${x}" aria-pressed="${G0.x===x}">${l}</button>`).join("")}</div>
+      <div class="gm-go"><button type="button" class="btn lime" data-svstep="1">Mese successivo →</button><button type="button" class="btn" data-svstep="6">Avanti 6 mesi</button></div>
+      <p class="caption">Tasto → o Spazio per avanzare. La linea tratteggiata è chi resta sempre investito.</p></div></div>`;
+}
+document.addEventListener("click",e=>{const x=e.target.closest("[data-svx]");if(x&&GM.sv){GM.sv.x=+x.dataset.svx;document.querySelectorAll("[data-svx]").forEach(b=>b.setAttribute("aria-pressed",String(b===x)));return;}
+  const s=e.target.closest("[data-svstep]");if(s)svStep(+s.dataset.svstep);
+  if(e.target.closest("[data-svagain]")&&GM.sv){const c=GM.sv.c,w=P.gameWindow(GM.px,c,3,36);GM.sv={c,win:w,t:0,w:w.ret.map(()=>1),x:1};svRender();}
+  if(e.target.closest("[data-svother]"))svSetup();});
+document.addEventListener("keydown",e=>{if(current!=="games"||!GM.sv||GM.sv.done||e.target.closest("input,textarea,select"))return;if(e.key==="ArrowRight"||e.key===" "){e.preventDefault();e.stopPropagation();svStep(1);}},true);
+function svEnd(){
+  const G0=GM.sv;G0.done=true;const {svg,res}=svChart(true),k=G0.win.keys,better=res.diff>=0;
+  const BD={"Mano ferma":"Non hai mai toccato nulla: hai preso tutto il crollo e tutto il rimbalzo. È la strategia che in media batte quasi tutti gli investitori.",
+    "Venditore nel panico":"Hai ridotto le azioni subito dopo mesi pesanti, e il rimbalzo è arrivato senza di te. È l'errore più caro e più comune.",
+    "Market timer (fortunato?)":"Hai fatto meglio di chi è rimasto fermo. Prova un'altra crisi: indovinare due volte di fila è molto più difficile.",
+    "Spettatore prudente":"Sei rimasto fuori dal mercato per la maggior parte del tempo: meno paura, ma anche meno crescita.",
+    "Navigatore":"Hai cambiato rotta qualche volta senza grossi danni: risultato vicino a chi è rimasto fermo.",
+    "Rimbalzo perso":"Le tue uscite ti hanno fatto perdere una parte della ripresa."}[res.badge];
+  $("#gmPlay").innerHTML=`<div class="card gm-panel gm-end"><div class="head"><div><span class="eyebrow">${esc(G0.c.name)} · ${k[0]} – ${k[k.length-1]}</span><h3 style="margin-top:4px">Risultato</h3></div><button type="button" class="btn sm" data-gm-back>← Tutti i giochi</button></div>
+    <div class="gm-badge"><span>Che investitore sei</span><b>${res.badge}</b><p>${BD}</p></div>
+    <div class="gm-hud"><div><span>Tu</span><b>${fmtEur(res.final)}</b><small>${fmtPct(res.final/10000-1,1,true)} · calo massimo ${fmtPct(res.mdd,0)}</small></div>
+      <div><span>Chi è rimasto fermo</span><b>${fmtEur(res.holdFinal)}</b><small>${fmtPct(res.holdFinal/10000-1,1,true)} · calo massimo ${fmtPct(res.holdMdd,0)}</small></div>
+      <div><span>Differenza</span><b class="${better?"up":"dn"}">${better?"+":"−"}${fmtEur(Math.abs(res.final-res.holdFinal))}</b><small>${fmtPct(res.diff,1,true)} rispetto a restare fermo</small></div></div>
+    <div class="chartbox">${svg}</div>
+    <div class="gm-facts"><div><b>${res.switches}</b><span>cambi di rotta</span></div><div><b>${res.panic}</b><span>vendite dopo un mese ≤ −4%</span></div><div><b>${fmtPct(res.outShare,0)}</b><span>del tempo fuori dal mercato</span></div><div><b class="${res.missed>0?"dn":""}">${fmtPct(res.missed,1)}</b><span>persi nei 5 mesi migliori</span></div></div>
+    <p class="caption">I 5 mesi migliori del periodo: ${res.best.map(m=>`${k[m.t]} ${fmtPct(m.r,1,true)} (eri al ${fmtPct(m.x,0)})`).join(" · ")}. Contanti allo 0%, nessun costo né tassa. Dati storici reali, decisioni simulate.</p>
+    <div class="gm-go"><button type="button" class="btn lime" data-svagain>Rigioca questa crisi</button><button type="button" class="btn" data-svother>Un'altra crisi</button></div></div>`;
+  if(Morph.burst)Morph.burst(better?.8:.5);
+}
+/* --- Gioco 2: Batti la frontiera --- */
+function fxStart(){
+  const el=$("#gmPlay");el.hidden=false;
+  if(!S.lab||!S.ds||S.ds.assets.length<2){el.innerHTML=`<div class="card gm-panel"><div class="head"><h3>Batti la frontiera</h3><button type="button" class="btn sm" data-gm-back>← Tutti i giochi</button></div><p class="gm-lead">Questo gioco usa i tuoi dati: carica un file con almeno due asset (o prova l'esempio) e costruisci il laboratorio.</p><div><button type="button" class="btn lime" data-go="home">Vai alla home</button></div></div>`;return;}
+  const inp=P.annualInputs(S.ds.assets,S.ds.freq.f);if(inp.common<12){el.innerHTML=`<div class="card gm-panel"><p>Servono almeno 12 periodi comuni a tutti gli asset.</p><button type="button" class="btn sm" data-gm-back>← Indietro</button></div>`;return;}
+  const vols=inp.C.map((r,i)=>Math.sqrt(r[i])).sort((a,b)=>a-b),maxVol=Math.round(vols[Math.floor(vols.length/2)]*100*.8)/100;
+  GM.fx={inp,maxVol,w:S.ds.assets.map(()=>Math.round(100/S.ds.assets.length)),done:false};fxRender();
+}
+function fxRender(){
+  const F=GM.fx,ds=S.ds,mm=macroFor(S.rfSrc),rf=mm?mm.rf:0,R=P.frontierScore(F.inp.mu,F.inp.C,F.w,F.maxVol,rf);
+  const VW=640,VH=300,ml=50,mr=14,mt=14,mb=34,iw=VW-ml-mr,ih=VH-mt-mb,pts=[...R.frontier,{vol:R.vol,ret:R.ret},...F.inp.mu.map((m,i)=>({vol:Math.sqrt(F.inp.C[i][i]),ret:m}))];
+  const x1=Math.max(...pts.map(p=>p.vol))*1.1,y0=Math.min(0,...pts.map(p=>p.ret)),y1=Math.max(...pts.map(p=>p.ret))*1.12,X=v=>ml+v/x1*iw,Y=v=>mt+ih-(v-y0)/(y1-y0)*ih;
+  let g=`<rect x="${ml}" y="${mt}" width="${X(F.maxVol)-ml}" height="${ih}" fill="var(--lime)" opacity=".06"/><line x1="${X(F.maxVol)}" x2="${X(F.maxVol)}" y1="${mt}" y2="${mt+ih}" stroke="var(--lime)" stroke-dasharray="5 4"/><text x="${X(F.maxVol)+6}" y="${mt+14}" style="fill:var(--lime)">limite ${fmtPct(F.maxVol,0)}</text>`;
+  niceTicks(0,x1,5).filter(v=>v<=x1).forEach(v=>{g+=`<text x="${X(v)}" y="${VH-12}" text-anchor="middle">${fmtPct(v,0)}</text>`;});
+  niceTicks(y0,y1,4).filter(v=>v>=y0&&v<=y1).forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${ml-6}" y="${Y(v)+4}" text-anchor="end">${fmtPct(v,0)}</text>`;});
+  if(F.done)g+=`<path d="${R.frontier.map((p,i)=>(i?"L":"M")+X(p.vol).toFixed(1)+","+Y(p.ret).toFixed(1)).join("")}" fill="none" stroke="var(--muted)" stroke-width="2.5"/><circle cx="${X(R.best.vol)}" cy="${Y(R.best.ret)}" r="8" fill="none" stroke="var(--fg)" stroke-width="2.5"/><text x="${X(R.best.vol)+12}" y="${Y(R.best.ret)-8}" style="fill:var(--fg);font-weight:700">ottimo</text>`;
+  F.inp.mu.forEach((m,i)=>{g+=`<circle cx="${X(Math.sqrt(F.inp.C[i][i]))}" cy="${Y(m)}" r="5" fill="${color(i)}"><title>${esc(ds.assets[i].name)}</title></circle>`;});
+  g+=`<circle cx="${X(R.vol)}" cy="${Y(R.ret)}" r="10" fill="${R.over?"var(--bad)":"var(--lime)"}" stroke="var(--solid)" stroke-width="2"/><text x="${X(R.vol)-12}" y="${Y(R.ret)-14}" text-anchor="end" style="fill:var(--fg);font-weight:800">tu</text>`;
+  $("#gmPlay").innerHTML=`<div class="card gm-panel"><div class="head"><div><span class="eyebrow">Gioco 02 · ${esc(S.source.name)}</span><h3 style="margin-top:4px">Batti la frontiera</h3></div><button type="button" class="btn sm" data-gm-back>← Tutti i giochi</button></div>
+    <p class="gm-lead">Obiettivo: il <b>massimo rendimento</b> con una volatilità <b>non oltre ${fmtPct(F.maxVol,0)}</b>. Muovi i cursori, poi chiedi il voto al motore.</p>
+    <div class="fx-grid"><div class="fx-sl">${ds.assets.map((a,i)=>`<label class="fx-row"><span class="nm"><i style="background:${color(i)}"></i>${esc(a.name)}</span><input type="range" min="0" max="100" step="1" value="${F.w[i]}" data-fxw="${i}" ${F.done?"disabled":""}><b>${fmtPct(R.w[i],0)}</b></label>`).join("")}
+      <div class="gm-hud fx-hud"><div><span>Rendimento atteso</span><b>${fmtPct(R.ret,1)}</b></div><div><span>Volatilità</span><b class="${R.over?"dn":""}">${fmtPct(R.vol,1)}</b><small>${R.over?"oltre il limite!":"entro il limite"}</small></div></div>
+      ${F.done?`<div class="gm-badge"><span>Il tuo voto</span><b>${R.score}/100</b><p>${R.over?"Hai superato il limite di rischio: in gara non vale.":R.score>=95?"Praticamente sulla frontiera: da quant!":R.score>=75?"Molto vicino all'ottimo.":"C'era margine: guarda i pesi dell'ottimo."} Ottimo: ${fmtPct(R.best.ret,1)} di rendimento con ${fmtPct(R.best.vol,1)} di volatilità (${ds.assets.map((a,i)=>`${esc(a.name)} ${fmtPct(R.best.w[i],0)}`).join(", ")}).</p></div>
+        <div class="gm-go"><button type="button" class="btn lime" data-fxagain>Riprova</button></div>`:`<div class="gm-go"><button type="button" class="btn lime" data-fxcheck>Dammi il voto</button></div>`}
+      </div><div class="chartbox"><svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Il tuo portafoglio sul piano rischio-rendimento">${g}</svg></div></div>
+    <p class="caption">Rendimenti attesi = medie storiche del file, rischio = covarianza storica (come nella sezione Frontiera). È una gara nel campione, non una previsione.</p></div>`;
+}
+document.addEventListener("input",e=>{const i=e.target.dataset&&e.target.dataset.fxw;if(i===undefined||!GM.fx)return;GM.fx.w[+i]=+e.target.value;clearTimeout(fxRender.t);fxRender.t=setTimeout(()=>{const a=document.activeElement&&document.activeElement.dataset.fxw;fxRender();if(a!==undefined){const el=document.querySelector(`[data-fxw="${a}"]`);if(el)el.focus();}},60);});
+document.addEventListener("click",e=>{if(e.target.closest("[data-fxcheck]")&&GM.fx){GM.fx.done=true;fxRender();if(Morph.burst)Morph.burst(.6);}if(e.target.closest("[data-fxagain]")&&GM.fx){GM.fx.done=false;fxRender();}});
+
 /* ---------- Quanta si presenta: fumetti per sezione e qualche giro per lo schermo ---------- */
 const QTIPS={
   home:{t:"Ciao, sono <b>Quanta</b>! Carica un file e chiedimi qualsiasi cosa sui tuoi investimenti.",q:null},
@@ -2091,7 +2209,8 @@ const QTIPS={
   sim:{t:"Chiedimi: «Con 300 € al mese quanto avrei tra 20 anni?»",q:"Con 300 € al mese quanto avrei tra 20 anni?"},
   stress:{t:"Come avrebbe retto il tuo portafoglio nel 2008? Chiedimelo.",q:"Come ha retto il portafoglio nelle crisi?"},
   opt:{t:"Ti trovo l'allocazione più efficiente con i tuoi vincoli.",q:"Qual è l'allocazione più efficiente con massimo 50% per asset?"},
-  bench:{t:"Hai battuto il mercato? Te lo dico con la statistica.",q:"Ho battuto l'S&P 500? L'alpha è significativo?"}
+  bench:{t:"Hai battuto il mercato? Te lo dico con la statistica.",q:"Ho battuto l'S&P 500? L'alpha è significativo?"},
+  games:{t:"Sai perché chi vende nel panico perde il rimbalzo? Gioca, poi chiedimelo.",q:null}
 };
 const QG={seen:new Set(),roams:0,opened:false,hideT:0,tl:null,pos:{x:0,y:0},lastInput:Date.now()};
 const say=document.createElement("button");say.type="button";say.className="orb-say";say.setAttribute("aria-live","polite");document.body.appendChild(say);

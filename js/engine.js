@@ -630,6 +630,34 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+/* ===== Financial Games: regole e punteggi, deterministici e verificabili ===== */
+/* Finestra di gioco attorno a una crisi: qualche mese prima, la crisi, poi il dopo (fino a "after" mesi o alla fine dei dati) */
+function gameWindow(px,crisis,before,after){
+  const keys=[...px.keys()].sort(),i0=keys.indexOf(crisis.m0),i1=keys.indexOf(crisis.m1);
+  if(i0<1||i1<0)return {error:"Il periodo non è nei dati dell'indice."};
+  const a=Math.max(0,i0-1-(before??3)),b=Math.min(keys.length-1,i1+(after??36)),win=keys.slice(a,b+1);
+  return {keys:win,ret:win.map((k,i)=>i?px.get(k)/px.get(win[i-1])-1:NaN),start:i0-a,end:i1-a};
+}
+/* Sopravvivi alla crisi: w[t] = quota in azioni scelta prima del mese t (il resto in contanti al tasso "cash" mensile). */
+function survival(ret,w,o){
+  o=o||{};const V0=o.initial||10000,cash=o.cash||0,n=ret.length;let V=V0,H=V0,pk=V0,hk=V0,mdd=0,hmdd=0,sw=0,panic=0,chase=0;
+  const path=[V0],hold=[V0],taken=[];
+  for(let t=1;t<n;t++){const r=Number.isFinite(ret[t])?ret[t]:0,x=Math.max(0,Math.min(1,w[t]??1));
+    V*=1+x*r+(1-x)*cash;H*=1+r;path.push(V);hold.push(H);pk=Math.max(pk,V);hk=Math.max(hk,H);mdd=Math.min(mdd,V/pk-1);hmdd=Math.min(hmdd,H/hk-1);
+    taken.push({t,r,x});
+    if(t>1){const prev=w[t-1]??1;if(Math.abs(x-prev)>1e-9)sw++;if(x<prev-1e-9&&ret[t-1]<=-.04)panic++;if(x>prev+1e-9&&ret[t-1]>=.04)chase++;}}
+  /* i 5 mesi migliori del periodo: quanto ne hai perso stando fuori */
+  const best=[...taken].sort((a,b)=>b.r-a.r).slice(0,5),missed=best.reduce((s,m)=>s+(1-m.x)*m.r,0),out=taken.reduce((s,m)=>s+(1-m.x),0)/Math.max(1,taken.length);
+  const diff=V/H-1,allIn=taken.every(m=>m.x>=1-1e-9);
+  const badge=allIn?"Mano ferma":panic>=2&&diff<-.02?"Venditore nel panico":diff>.05?"Market timer (fortunato?)":out>.6?"Spettatore prudente":diff>=-.02?"Navigatore":"Rimbalzo perso";
+  return {path,hold,final:V,holdFinal:H,diff,mdd,holdMdd:hmdd,switches:sw,panic,chase,missed,best,outShare:out,badge,months:n-1};
+}
+/* Batti la frontiera: quanto il portafoglio dell'utente si avvicina al massimo rendimento ottenibile entro il limite di volatilità */
+function frontierScore(mu,C,w,maxVol,rf){
+  const s=w.reduce((a,b)=>a+b,0)||1,ww=w.map(x=>x/s),me=pStats(ww,mu,C),O=optimize({mu,C,rf}),best=O.target("vol",maxVol);
+  const lo=Math.min(...mu),over=me.vol>maxVol+1e-9,eff=best.ret>lo?(me.ret-lo)/(best.ret-lo):1;
+  return {w:ww,ret:me.ret,vol:me.vol,best:{w:best.w,ret:best.ret,vol:best.vol},over,score:over?0:Math.round(100*Math.max(0,Math.min(1,eff))),gap:best.ret-me.ret,frontier:O.frontier};
+}
+export const POS={gameWindow,survival,frontierScore,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
