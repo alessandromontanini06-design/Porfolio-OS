@@ -652,12 +652,42 @@ function survival(ret,w,o){
   const badge=allIn?"Mano ferma":panic>=2&&diff<-.02?"Venditore nel panico":diff>.05?"Market timer (fortunato?)":out>.6?"Spettatore prudente":diff>=-.02?"Navigatore":"Rimbalzo perso";
   return {path,hold,final:V,holdFinal:H,diff,mdd,holdMdd:hmdd,switches:sw,panic,chase,missed,best,outShare:out,badge,months:n-1};
 }
+/* Fatti storici reali, per mese, mostrati come "ultim'ora" durante la partita (date verificabili). */
+const CRISIS_NEWS={
+  dotcom:{"2000-03":"10 marzo: il Nasdaq tocca il massimo storico a 5.048 punti","2000-04":"14 aprile: il Nasdaq perde il 9,7% in un solo giorno","2001-01":"3 gennaio: la Fed taglia i tassi a sorpresa","2001-09":"11 settembre: attentati a New York, Wall Street resta chiusa fino al 17","2001-12":"2 dicembre: Enron dichiara bancarotta","2002-07":"21 luglio: fallisce WorldCom, la più grande bancarotta USA fino ad allora","2002-10":"9 ottobre: l'S&P 500 tocca il minimo, quasi metà del valore persa dal picco","2003-03":"20 marzo: inizia la guerra in Iraq, poco dopo i mercati ripartono"},
+  gfc:{"2007-08":"9 agosto: BNP Paribas congela tre fondi legati ai mutui subprime","2008-03":"16 marzo: Bear Stearns venduta a JPMorgan con l'aiuto della Fed","2008-09":"15 settembre: fallisce Lehman Brothers. Il giorno dopo la Fed salva AIG","2008-10":"3 ottobre: il Congresso USA approva il piano TARP da 700 miliardi","2008-11":"23 novembre: il governo USA salva Citigroup","2009-03":"9 marzo: l'S&P 500 tocca il minimo a 676 punti","2010-05":"Primo salvataggio della Grecia; il 6 maggio il «flash crash» a Wall Street","2011-08":"5 agosto: S&P toglie la tripla A al debito degli Stati Uniti"},
+  euro:{"2011-05":"Grecia: si tratta il secondo salvataggio, lo spread sale","2011-08":"S&P declassa gli Stati Uniti; la BCE compra titoli italiani e spagnoli","2011-11":"16 novembre: dopo le dimissioni di Berlusconi nasce il governo Monti","2011-12":"21 dicembre: la BCE presta alle banche con le aste LTRO","2012-07":"26 luglio: Draghi, «faremo tutto il necessario per salvare l'euro»"},
+  covid:{"2020-02":"21-23 febbraio: focolai di COVID-19 in Lombardia e Veneto","2020-03":"Lockdown in Italia (9 marzo), pandemia per l'OMS (11 marzo), la Fed compra senza limiti (23 marzo)","2020-04":"20 aprile: il petrolio americano WTI scende sotto zero","2020-11":"9 novembre: Pfizer annuncia un vaccino efficace oltre il 90%","2022-02":"24 febbraio: la Russia invade l'Ucraina"},
+  infl:{"2022-02":"24 febbraio: la Russia invade l'Ucraina","2022-03":"16 marzo: la Fed alza i tassi per la prima volta dal 2018","2022-07":"21 luglio: la BCE alza i tassi per la prima volta in 11 anni","2022-10":"12 ottobre: l'S&P 500 tocca il minimo dell'anno","2023-03":"10 marzo: fallisce Silicon Valley Bank"}
+};
+/* Indicatore paura/avidità del gioco (0-100): momento a 3 mesi e distanza dal massimo a 12 mesi. È un indice del gioco, calcolato dai prezzi. */
+function fearGreed(ret,t){
+  let g3=1;for(let k=Math.max(1,t-2);k<=t;k++)if(Number.isFinite(ret[k]))g3*=1+ret[k];
+  let v=1,peak=1;const lv=[];for(let k=1;k<=t;k++){if(Number.isFinite(ret[k]))v*=1+ret[k];lv.push(v);}
+  const last=lv.slice(-12);peak=last.length?Math.max(...last):1;const dd=lv.length?lv[lv.length-1]/peak-1:0;
+  const x=Math.max(0,Math.min(100,50+300*(g3-1)+150*dd));
+  return {value:x,label:x<20?"Paura estrema":x<40?"Paura":x<60?"Neutrale":x<80?"Avidità":"Avidità estrema",mom3:g3-1,dd};
+}
+/* Traguardi della partita, dai dati e dalle scelte */
+function survivalAwards(ret,w,res,win){
+  const out=[],cr=[];for(let t=Math.max(1,win.start);t<=Math.min(ret.length-1,win.end);t++)cr.push(t);
+  let v=1,lo=Infinity,loT=1;for(let t=1;t<ret.length;t++){if(Number.isFinite(ret[t]))v*=1+ret[t];if(v<lo){lo=v;loT=t;}}
+  let worst=1;for(let t=1;t<ret.length;t++)if(ret[t]<ret[worst])worst=t;
+  if(cr.length&&cr.every(t=>(w[t]??1)>=1-1e-9))out.push({id:"diamond",t:"Mani di diamante",d:"Sempre al 100% durante tutta la crisi."});
+  if([loT,loT+1].some(t=>t<w.length&&(w[t]??1)>(w[t-1]??1)+1e-9))out.push({id:"bottom",t:"Hai comprato il minimo",d:"Hai aumentato le azioni proprio attorno al punto più basso."});
+  if((w[worst]??1)<=1e-9)out.push({id:"dodge",t:"Schivata",d:"Eri tutto in contanti nel mese peggiore."});
+  if(res.panic>=2)out.push({id:"paper",t:"Mani di carta",d:"Hai venduto più volte subito dopo un mese pesante.",bad:true});
+  if(res.best.filter(m=>m.x<.5).length>=3)out.push({id:"missed",t:"Rimbalzo perso",d:"Eri quasi fuori in almeno 3 dei 5 mesi migliori.",bad:true});
+  if(res.diff>0)out.push({id:"beat",t:"Hai battuto chi stava fermo",d:`Hai fatto ${(res.diff*100).toFixed(1).replace(".",",")}% in più.`});
+  const score=Math.round(10000*res.final/res.holdFinal)+out.reduce((s,a)=>s+(a.bad?-250:250),0);
+  return {awards:out,score,troughT:loT,worstT:worst};
+}
 /* Batti la frontiera: quanto il portafoglio dell'utente si avvicina al massimo rendimento ottenibile entro il limite di volatilità */
 function frontierScore(mu,C,w,maxVol,rf){
   const s=w.reduce((a,b)=>a+b,0)||1,ww=w.map(x=>x/s),me=pStats(ww,mu,C),O=optimize({mu,C,rf}),best=O.target("vol",maxVol);
   const lo=Math.min(...mu),over=me.vol>maxVol+1e-9,eff=best.ret>lo?(me.ret-lo)/(best.ret-lo):1;
   return {w:ww,ret:me.ret,vol:me.vol,best:{w:best.w,ret:best.ret,vol:best.vol},over,score:over?0:Math.round(100*Math.max(0,Math.min(1,eff))),gap:best.ret-me.ret,frontier:O.frontier};
 }
-export const POS={gameWindow,survival,frontierScore,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
