@@ -1,15 +1,8 @@
-// Funzione server di Vercel: Claude legge un estratto del file e capisce che cosa contiene.
+// Funzione server: l'IA legge un estratto del file e capisce che cosa contiene (Claude, poi Gemini e Groq come riserve).
 // Restituisce solo ciò che serve all'analisi (asset, prezzi, pesi) ed elenca ciò che ha scartato.
 // I numeri restano quelli del file: Claude classifica e collega, non calcola e non inventa.
-import Anthropic from "@anthropic-ai/sdk";
-import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { json, fromOwnSite, rateLimited, readBody, z } from "./_lib/llm.js";
 
-const WINDOW_MS = 60 * 60 * 1000;
-const LIMIT = Number(process.env.AI_HOURLY_LIMIT || 20);
-const MAX_BODY = 80_000;
-const hits = new Map();
-const MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
 
 const Understanding = z.object({
   tipo: z.enum(["serie_storica", "riepilogo_portafoglio", "movimenti", "altro"]),
@@ -51,49 +44,18 @@ Regole:
 - "scartati" elenca in breve gli elementi che hai escluso (per esempio "Fondo emergenza: liquidità").
 - "spiegazione": una o due frasi in italiano su cosa hai capito.`;
 
-const client = new Anthropic({ timeout: 45_000, maxRetries: 1 });
-
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Usa una richiesta POST." }); return; }
-  if (!process.env.ANTHROPIC_API_KEY) { res.status(500).json({ error: "La chiave di Claude non è configurata sul server." }); return; }
-  const allowed = (process.env.ALLOWED_ORIGIN || "").split(",").map(s => s.trim()).filter(Boolean);
-  if (allowed.length && !allowed.includes(req.headers.origin || "")) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
-
-  const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "anonimo";
-  const now = Date.now();
-  const recent = (hits.get(ip) || []).filter(t => now - t < WINDOW_MS);
-  if (recent.length >= LIMIT) { res.status(429).json({ error: "Hai raggiunto il limite di analisi per quest'ora. Riprova più tardi." }); return; }
-  recent.push(now); hits.set(ip, recent);
-
-  let data = req.body;
-  if (typeof data === "string") { try { data = JSON.parse(data); } catch { res.status(400).json({ error: "Dati non leggibili." }); return; } }
+  if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
+  if (rateLimited(req, "understand", Number(process.env.AI_HOURLY_LIMIT || 20))) { res.status(429).json({ error: "Hai raggiunto il limite di analisi per quest'ora. Riprova più tardi." }); return; }
+  const data = readBody(req);
   if (!data || !Array.isArray(data.fogli) || !data.fogli.length) { res.status(400).json({ error: "Dati mancanti o nel formato sbagliato." }); return; }
   const payload = JSON.stringify(data);
-  if (payload.length > MAX_BODY) { res.status(413).json({ error: "L'estratto del file è troppo grande." }); return; }
-
+  if (payload.length > 80_000) { res.status(413).json({ error: "L'estratto del file è troppo grande." }); return; }
   try {
-    const response = await client.messages.parse({
-      model: MODEL,
-      max_tokens: 4000,
-      system: SYSTEM,
-      output_config: { effort: "low", format: zodOutputFormat(Understanding) },
-      messages: [{ role: "user", content: `FILE:\n${payload}` }]
-    });
-    if (response.stop_reason === "refusal") { res.status(502).json({ error: "L'IA ha rifiutato di analizzare questo file." }); return; }
-    const out = response.parsed_output;
-    if (!out) { res.status(502).json({ error: "La risposta dell'IA non è valida. Riprova." }); return; }
-    out.posizioni = out.posizioni.slice(0, 10);
-    out.model = MODEL;
-    res.status(200).json(out);
-  } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError) { res.status(500).json({ error: "La chiave di Claude non è valida." }); return; }
-    if (error instanceof Anthropic.RateLimitError) { res.status(503).json({ error: "Troppe richieste a Claude in questo momento. Riprova tra un minuto." }); return; }
-    if (error instanceof Anthropic.APIError) {
-      if (error.status === 400 && /credit|balance/i.test(String(error.message))) { res.status(503).json({ error: "Il credito di Claude è esaurito: l'analisi IA è sospesa." }); return; }
-      if (error.status >= 500) { res.status(503).json({ error: "Claude è momentaneamente sovraccarico. Riprova tra qualche minuto." }); return; }
-      res.status(502).json({ error: `Claude ha risposto con un errore (${error.status}).` });
-      return;
-    }
-    res.status(502).json({ error: "Non riesco a contattare Claude. Riprova tra poco." });
+    const out = await json({ name: "understand", system: SYSTEM, user: `FILE:\n${payload}`, schema: Understanding });
+    res.status(200).json({ ...out.data, posizioni: out.data.posizioni.slice(0, 10), model: out.model, provider: out.provider, cached: !!out.cached });
+  } catch (e) {
+    res.status(503).json({ error: e.message || "Le IA non sono raggiungibili. Riprova tra poco." });
   }
 }

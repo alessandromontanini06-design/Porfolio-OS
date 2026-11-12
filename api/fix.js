@@ -1,18 +1,6 @@
-// Funzione server di Vercel: riceve un estratto del foglio e chiede a Claude
-// di proporre correzioni. La chiave resta qui sul server, nella variabile
-// d'ambiente ANTHROPIC_API_KEY, e non arriva mai al browser.
-import Anthropic from "@anthropic-ai/sdk";
-import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-
-const WINDOW_MS = 60 * 60 * 1000;                       // finestra di un'ora
-const LIMIT = Number(process.env.AI_HOURLY_LIMIT || 20); // richieste per IP all'ora
-const MAX_BODY = 60_000;                                 // caratteri massimi in ingresso
-const hits = new Map();
-
-// Modello: si sceglie con la variabile CLAUDE_MODEL su Vercel.
-// "claude-haiku-5-5" è il più economico; "claude-opus-5-5" il più capace.
-const MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
+// Funzione server: riceve un estratto del foglio e chiede all'IA di proporre correzioni.
+// Ordine: Claude (preciso, costo minimo) poi Gemini e Groq (gratuiti) come riserve automatiche.
+import { json, fromOwnSite, rateLimited, readBody, z } from "./_lib/llm.js";
 
 const ROLES = ["date", "price", "ret", "retpct", "ignore"];
 const Proposal = z.object({
@@ -40,58 +28,18 @@ Regole:
 6. "summary" riassume in una o due frasi, in italiano, cosa hai trovato.
 Se non serve alcuna correzione, restituisci liste vuote.`;
 
-const client = new Anthropic({ timeout: 45_000, maxRetries: 1 });
-
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Usa una richiesta POST." }); return; }
-  if (!process.env.ANTHROPIC_API_KEY) { res.status(500).json({ error: "La chiave di Claude non è configurata sul server." }); return; }
-
-  // Solo il tuo sito può usare questa funzione (se ALLOWED_ORIGIN è impostata).
-  const allowed = (process.env.ALLOWED_ORIGIN || "").split(",").map(s => s.trim()).filter(Boolean);
-  const origin = req.headers.origin || "";
-  if (allowed.length && !allowed.includes(origin)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
-
-  // Limite di richieste per indirizzo IP.
-  const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "anonimo";
-  const now = Date.now();
-  const recent = (hits.get(ip) || []).filter(t => now - t < WINDOW_MS);
-  if (recent.length >= LIMIT) { res.status(429).json({ error: "Hai raggiunto il limite di correzioni per quest'ora. Riprova più tardi." }); return; }
-  recent.push(now); hits.set(ip, recent);
-
-  let data = req.body;
-  if (typeof data === "string") { try { data = JSON.parse(data); } catch { res.status(400).json({ error: "Dati non leggibili." }); return; } }
-  if (!data || typeof data !== "object" || !Array.isArray(data.colonne || data.columns)) { res.status(400).json({ error: "Dati mancanti o nel formato sbagliato." }); return; }
+  if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
+  if (rateLimited(req, "fix", Number(process.env.AI_HOURLY_LIMIT || 20))) { res.status(429).json({ error: "Hai raggiunto il limite di correzioni per quest'ora. Riprova più tardi." }); return; }
+  const data = readBody(req);
+  if (!data || !Array.isArray(data.colonne || data.columns)) { res.status(400).json({ error: "Dati mancanti o nel formato sbagliato." }); return; }
   const payload = JSON.stringify(data);
-  if (payload.length > MAX_BODY) { res.status(413).json({ error: "L'estratto del foglio è troppo grande." }); return; }
-
+  if (payload.length > 60_000) { res.status(413).json({ error: "L'estratto del foglio è troppo grande." }); return; }
   try {
-    const response = await client.messages.parse({
-      model: MODEL,
-      max_tokens: 4000,
-      system: SYSTEM,
-      output_config: { effort: "low", format: zodOutputFormat(Proposal) },
-      messages: [{ role: "user", content: `DATI DEL FOGLIO:\n${payload}` }]
-    });
-    if (response.stop_reason === "refusal") { res.status(502).json({ error: "L'IA ha rifiutato di analizzare questo foglio." }); return; }
-    const out = response.parsed_output;
-    if (!out) { res.status(502).json({ error: "La risposta dell'IA non è valida. Riprova." }); return; }
-    res.status(200).json({
-      summary: out.summary,
-      roles: out.roles.slice(0, 40),
-      cells: out.cells.slice(0, 60),
-      model: MODEL
-    });
-  } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError) { res.status(500).json({ error: "La chiave di Claude non è valida." }); return; }
-    if (error instanceof Anthropic.PermissionDeniedError) { res.status(500).json({ error: "La chiave di Claude non ha accesso a questo modello." }); return; }
-    if (error instanceof Anthropic.RateLimitError) { res.status(503).json({ error: "Troppe richieste a Claude in questo momento. Riprova tra un minuto." }); return; }
-    if (error instanceof Anthropic.APIError) {
-      const s = error.status;
-      if (s === 400 && /credit|balance/i.test(String(error.message))) { res.status(503).json({ error: "Il credito di Claude è esaurito: la correzione IA è sospesa." }); return; }
-      if (s >= 500) { res.status(503).json({ error: "Claude è momentaneamente sovraccarico. Riprova tra qualche minuto." }); return; }
-      res.status(502).json({ error: `Claude ha risposto con un errore (${s}).` });
-      return;
-    }
-    res.status(502).json({ error: "Non riesco a contattare Claude. Riprova tra poco." });
+    const out = await json({ name: "fix", system: SYSTEM, user: `DATI DEL FOGLIO:\n${payload}`, schema: Proposal });
+    res.status(200).json({ ...out.data, roles: out.data.roles.slice(0, 40), cells: out.data.cells.slice(0, 60), model: out.model, provider: out.provider, cached: !!out.cached });
+  } catch (e) {
+    res.status(503).json({ error: e.message || "Le IA non sono raggiungibili. Riprova tra poco." });
   }
 }
