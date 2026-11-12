@@ -605,3 +605,48 @@ body.chat-on .orb-say{display:none}
   50%{text-shadow:1px 0 rgba(212,255,58,.5),-1px 0 rgba(123,60,255,.5);clip-path:none}
   100%{text-shadow:none;transform:none;clip-path:none}}
 @media (prefers-reduced-motion:reduce){.warp{display:none}.scene-title h2.glitch{animation:none}}
+
+/* ===== Identità delle sezioni =====
+   Ogni sezione ridefinisce il suo colore guida (--lime/--accent) solo al proprio interno: bottoni, numeri principali,
+   grafici, filtri e titoli cambiano insieme. In più un motivo di sfondo e una parola-simbolo dietro il titolo. */
+#scene-risk{--lime:#FF7A3D;--accent:#FF7A3D;--accent-soft:rgba(255,122,61,.13);--sx-rgb:255,122,61}
+#scene-sim{--lime:#47E5FF;--accent:#47E5FF;--accent-soft:rgba(71,229,255,.12);--sx-rgb:71,229,255}
+#scene-stress{--lime:#FFC24B;--accent:#FFC24B;--accent-soft:rgba(255,194,75,.13);--sx-rgb:255,194,75}
+#scene-opt{--lime:#FF7AD9;--accent:#FF7AD9;--accent-soft:rgba(255,122,217,.13);--sx-rgb:255,122,217}
+#scene-bench{--lime:#5BF0A5;--accent:#5BF0A5;--accent-soft:rgba(91,240,165,.12);--sx-rgb:91,240,165}
+#scene-lab,#scene-map,#scene-scan,#scene-home{--sx-rgb:212,255,58}
+body{--pill:#D4FF3A;--pill-rgb:212,255,58}
+body[data-scene="risk"]{--pill:#FF7A3D;--pill-rgb:255,122,61}
+body[data-scene="sim"]{--pill:#47E5FF;--pill-rgb:71,229,255}
+body[data-scene="stress"]{--pill:#FFC24B;--pill-rgb:255,194,75}
+body[data-scene="opt"]{--pill:#FF7AD9;--pill-rgb:255,122,217}
+body[data-scene="bench"]{--pill:#5BF0A5;--pill-rgb:91,240,165}
+.dock .pillbg{background:var(--pill);box-shadow:0 0 30px rgba(var(--pill-rgb),.5);transition:transform .55s cubic-bezier(.7,0,.2,1),width .55s cubic-bezier(.7,0,.2,1),background .5s,box-shadow .5s}
+.scene .card{transition:border-color .3s,box-shadow .3s}
+.scene .card:hover{border-color:rgba(var(--sx-rgb),.45);box-shadow:0 20px 60px -30px rgba(var(--sx-rgb),.55)}
+.scene .scene-title h2 em{text-shadow:0 0 50px rgba(var(--sx-rgb),.35)}
+/* parola-simbolo gigante, solo contorno, dietro il titolo */
+.scene-title{position:relative;isolation:isolate}
+.scene-title::after{position:absolute;right:-1vw;top:-2.5vw;z-index:-1;font-family:var(--f-display);font-weight:900;font-size:clamp(5rem,17vw,17rem);line-height:.8;letter-spacing:-.05em;color:transparent;-webkit-text-stroke:1.5px rgba(var(--sx-rgb),.22);pointer-events:none;white-space:nowrap}
+#scene-lab .scene-title::after{content:"μ σ"}
+#scene-risk .scene-title::after{content:"VaR"}
+#scene-sim .scene-title::after{content:"10⁴"}
+#scene-stress .scene-title::after{content:"2008"}
+#scene-opt .scene-title::after{content:"w*"}
+#scene-bench .scene-title::after{content:"β α"}
+#scene-map .scene-title::after{content:"A→Z"}
+@media (max-width:760px){.scene-title::after{font-size:28vw;top:-4vw;opacity:.7}}
+/* motivi di sfondo (fissi, tenui, dietro i contenuti) */
+.scene::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:0;transition:opacity .8s}
+.scene:not([hidden])::before{opacity:1}
+#scene-lab::before{background-image:radial-gradient(rgba(212,255,58,.16) 1px,transparent 1.6px);background-size:28px 28px;-webkit-mask:radial-gradient(80% 70% at 70% 20%,#000,transparent 75%);mask:radial-gradient(80% 70% at 70% 20%,#000,transparent 75%)}
+#scene-risk::before{background:repeating-linear-gradient(180deg,rgba(255,122,61,.07) 0 1px,transparent 1px 34px),radial-gradient(55% 50% at 0% 100%,rgba(255,92,138,.18),transparent 70%),radial-gradient(40% 40% at 100% 0%,rgba(255,122,61,.14),transparent 70%)}
+#scene-sim::before{background:repeating-radial-gradient(circle at 0% 100%,rgba(71,229,255,.08) 0 1px,transparent 1px 46px),radial-gradient(50% 50% at 100% 10%,rgba(71,229,255,.14),transparent 70%)}
+#scene-stress::before{background:repeating-linear-gradient(-45deg,rgba(255,194,75,.055) 0 14px,transparent 14px 34px),radial-gradient(70% 60% at 50% 120%,rgba(255,92,138,.22),transparent 70%);-webkit-mask:linear-gradient(180deg,#000,rgba(0,0,0,.35) 55%,#000);mask:linear-gradient(180deg,#000,rgba(0,0,0,.35) 55%,#000)}
+#scene-opt::before{background-image:linear-gradient(rgba(255,122,217,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(255,122,217,.09) 1px,transparent 1px);background-size:56px 56px;-webkit-mask:radial-gradient(70% 70% at 80% 30%,#000,transparent 75%);mask:radial-gradient(70% 70% at 80% 30%,#000,transparent 75%)}
+#scene-bench::before{background:repeating-linear-gradient(90deg,rgba(91,240,165,.06) 0 1px,transparent 1px 64px),linear-gradient(160deg,transparent 40%,rgba(91,240,165,.12) 70%,transparent 90%),radial-gradient(45% 45% at 100% 100%,rgba(71,229,255,.14),transparent 70%)}
+@media (prefers-reduced-motion:reduce){.scene::before{transition:none}}
+
+/* sul riquadro principale colorato, le variazioni restano leggibili */
+.kpi:first-child .up,.kpi:first-child .dn{color:var(--lime-ink);font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:2px}
+

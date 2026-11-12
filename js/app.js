@@ -31,6 +31,7 @@ function go(name,opts={}){
   const prev=$("#scene-"+current),nxt=$("#scene-"+name);current=name;
   document.querySelectorAll(".dock button[data-go]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.go===name)));
   $("#sceneChip").textContent=SCENE_L[name];movePill();Morph.shape(name);
+  document.body.dataset.scene=name;if(Morph.tint)Morph.tint(name);
   if(prev&&prev!==nxt){if(Morph.burst)Morph.burst(.9);warp(nxt);}
   if(prev&&prev!==nxt){
     if(HAS_G)G.to(prev,{opacity:0,y:-36,scale:.97,filter:"blur(8px)",duration:.35,ease:"power2.in",onComplete:()=>{prev.hidden=true;G.set(prev,{clearProps:"all"});}});
@@ -188,7 +189,7 @@ function morphData(){
    e un'esplosione che si ricompone a ogni cambio di sezione. */
 const MORPH_VS=`
 attribute vec3 color;attribute float aRand;attribute float aSize;
-uniform float uTime,uPix,uAlpha,uBurst,uAspect,uMouseOn,uPulseR,uPulseA,uCalm;uniform vec2 uMouse,uPulseC;
+uniform float uTime,uPix,uAlpha,uBurst,uAspect,uMouseOn,uPulseR,uPulseA,uCalm,uTintK;uniform vec2 uMouse,uPulseC;uniform vec3 uTint;
 varying vec3 vColor;varying float vAlpha;varying float vHot;
 void main(){
   vec3 p=position;
@@ -203,7 +204,7 @@ void main(){
   float tw=.62+.38*sin(uTime*(1.6+aRand*1.8)+aRand*40.);
   vHot=clamp(ring*1.2+f*.9+uBurst*.7,0.,1.);
   gl_PointSize=aSize*uPix*(320./-mv.z)*(1.+ring*1.6+f*1.1+uBurst*.9);
-  vColor=mix(color,vec3(.86,1.,.3),vHot*.85);
+  vec3 base=mix(color,uTint,uTintK*(.35+.4*step(.5,fract(aRand*7.))));vColor=mix(base,uTint*1.15+.08,vHot*.85);
   vAlpha=uAlpha*tw*(.45+.55*smoothstep(-15.,-6.5,mv.z));
 }`;
 const MORPH_FS=`
@@ -224,7 +225,7 @@ function morphInit(){
     siz[i]=Math.random()<.04?.2+Math.random()*.12:.07+Math.random()*.07;}
   const geo=new T.BufferGeometry();geo.setAttribute("position",new T.BufferAttribute(pos,3));geo.setAttribute("color",new T.BufferAttribute(col,3));
   geo.setAttribute("aRand",new T.BufferAttribute(rnd,1));geo.setAttribute("aSize",new T.BufferAttribute(siz,1));
-  const U={uTime:{value:0},uPix:{value:PIX},uAlpha:{value:1},uBurst:{value:0},uAspect:{value:1},uMouse:{value:new T.Vector2(9,9)},uMouseOn:{value:0},uPulseC:{value:new T.Vector2(0,0)},uPulseR:{value:0},uPulseA:{value:0},uCalm:{value:REDUCE?0:1}};
+  const U={uTime:{value:0},uPix:{value:PIX},uAlpha:{value:1},uBurst:{value:0},uAspect:{value:1},uMouse:{value:new T.Vector2(9,9)},uMouseOn:{value:0},uPulseC:{value:new T.Vector2(0,0)},uPulseR:{value:0},uPulseA:{value:0},uCalm:{value:REDUCE?0:1},uTint:{value:new T.Vector3(.83,1,.23)},uTintK:{value:0}};
   const mat=new T.ShaderMaterial({uniforms:U,vertexShader:MORPH_VS,fragmentShader:MORPH_FS,transparent:true,depthWrite:false,blending:T.AdditiveBlending});
   const group=new T.Group();group.add(new T.Points(geo,mat));
   /* alone: un disco di luce viola dietro le particelle, che si accende nelle transizioni */
@@ -234,6 +235,9 @@ function morphInit(){
   scene.add(halo);scene.add(group);const HB={v:.5};
   Object.assign(Morph,{on:true,renderer,scene,cam,group,geo,pos,tgt,spd,N,mat,U,halo});
   Morph.shape=name=>{Morph.tgt.set(morphShape(name));Morph.goal=morphPlace(name);};
+  /* ogni sezione tinge le particelle del suo colore (casa e laboratorio restano viola e lime) */
+  const TINT={risk:[1,.48,.24],sim:[.28,.9,1],stress:[1,.76,.29],opt:[1,.48,.85],bench:[.36,.94,.65]};
+  Morph.tint=name=>{const t=TINT[name],v=U.uTint.value;if(!HAS_G){if(t)v.set(...t);U.uTintK.value=t?1:0;return;}if(t)G.to(v,{x:t[0],y:t[1],z:t[2],duration:1.2,ease:"power2.out"});G.to(U.uTintK,{value:t?1:0,duration:1.2,ease:"power2.out"});};
   /* esplosione: le particelle schizzano verso l'esterno e si ricompongono nella forma della nuova sezione */
   Morph.burst=(power=1)=>{
     if(REDUCE||!HAS_G)return;
