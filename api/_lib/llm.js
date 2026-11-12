@@ -188,7 +188,8 @@ function toGemini(messages) {
     else if (m.role === "assistant") {
       const parts = [];
       if (m.text) parts.push({ text: m.text });
-      (m.calls || []).forEach(c => parts.push({ functionCall: { name: c.name, args: c.args || {} } }));
+      // Gemini 3 vuole indietro la firma di ogni sua chiamata; per chiamate nate da Groq si usa il segnaposto documentato.
+      (m.calls || []).forEach(c => parts.push({ functionCall: { name: c.name, args: c.args || {} }, thoughtSignature: c.sig || "skip_thought_signature_validator" }));
       if (parts.length) out.push({ role: "model", parts });
     } else if (m.role === "tool") {
       const part = { functionResponse: { name: m.name, response: { result: m.result } } };
@@ -228,7 +229,7 @@ export async function chat({ system, messages, tools, order }) {
           generationConfig: { temperature: 0.2 }
         }, ms);
         const parts = j.candidates?.[0]?.content?.parts || [];
-        const calls = parts.filter(x => x.functionCall).map(x => ({ id: x.functionCall.id || newId(), name: x.functionCall.name, args: x.functionCall.args || {} }));
+        const calls = parts.filter(x => x.functionCall).map(x => ({ id: x.functionCall.id || newId(), name: x.functionCall.name, args: x.functionCall.args || {}, ...(x.thoughtSignature ? { sig: x.thoughtSignature } : {}) }));
         const text = parts.filter(x => x.text).map(x => x.text).join("").trim();
         if (!calls.length && !text) throw new ProviderError("gemini", "risposta vuota", true);
         return { text, calls, provider: p, model };
