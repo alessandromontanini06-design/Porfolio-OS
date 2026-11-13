@@ -286,7 +286,10 @@ function columnBlocks(sheets,blocks,extra){
   for(const b of blocks||[]){
     const aoa=byName.get(b.foglio);if(!aoa){errors.push(`Il foglio «${b.foglio}» non esiste.`);continue;}
     const dc=colIdx(b.colonnaData);if(dc<0){errors.push(`«${b.foglio}»: colonna data «${b.colonnaData}» non valida.`);continue;}
-    const h=(b.rigaIntestazione||0)-1,r0=Math.max(0,b.primaRiga?b.primaRiga-1:h+1),r1=Math.min(aoa.length-1,b.ultimaRiga?b.ultimaRiga-1:aoa.length-1),rows=[];
+    const h=(b.rigaIntestazione||0)-1,r0=Math.max(0,b.primaRiga?b.primaRiga-1:h+1),rows=[];
+    /* l'ultima riga indicata è solo un punto di partenza: se le date continuano senza interruzioni, la tabella continua */
+    let r1=Math.min(aoa.length-1,b.ultimaRiga?b.ultimaRiga-1:aoa.length-1);
+    while(r1+1<aoa.length&&parseDate((aoa[r1+1]||[])[dc],true))r1++;
     for(let r=r0;r<=r1;r++){const d=parseDate((aoa[r]||[])[dc],true);if(d)rows.push({r,d});}
     if(rows.length<3){errors.push(`«${b.foglio}»: nella colonna ${b.colonnaData} ci sono solo ${rows.length} date valide.`);continue;}
     const gaps=[];for(let k=1;k<rows.length;k++)gaps.push(Math.abs(rows[k].d-rows[k-1].d)/864e5);const md=median(gaps);
