@@ -16,8 +16,8 @@ function rateLimited(req, bucket, perHour) {
   recent.push(now); hits.set(k, recent); return false;
 }
 
-const EXCH = { NA: ".AMS", GY: ".DEX", GR: ".DEX", GF: ".DEX", FP: ".PAR", LN: ".LON", US: "", UN: "", UW: "", UQ: "", UA: "", UP: "" };
-const ORDER = ["NA", "GY", "GR", "FP", "LN", "US", "UN", "UW", "UQ", "UA", "UP", "GF"];
+const EXCH = { IM: ".MIL", NA: ".AMS", GY: ".DEX", GR: ".DEX", GF: ".DEX", FP: ".PAR", LN: ".LON", US: "", UN: "", UW: "", UQ: "", UA: "", UP: "" };
+const ORDER = ["NA", "GY", "GR", "FP", "IM", "LN", "US", "UN", "UW", "UQ", "UA", "UP", "GF"];
 const cache = new Map(), TTL = 7 * 24 * 3600 * 1000;
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 

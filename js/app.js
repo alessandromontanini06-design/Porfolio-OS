@@ -832,7 +832,7 @@ function renderUnderstand(el){
       <div class="tablewrap"><table class="mt pos"><thead><tr><th>Strumento</th><th>Simbolo per i prezzi</th><th>Valore</th><th>Peso attuale</th><th>Peso target</th></tr></thead><tbody>
       ${u.posizioni.map((p,i)=>`<tr><td><span class="an">${esc(p.nome)}</span><span class="cl mono">${esc(p.ticker)}</span></td><td><input class="sym" id="und-sym-${i}" value="${esc(p.simbolo)}" aria-label="Simbolo di ${esc(p.nome)}" spellcheck="false"></td><td class="mono">${p.valore==null?"—":fmtN(p.valore)+" €"}</td><td class="mono">${pc(p.pesoAttuale)}</td><td class="mono">${pc(p.pesoTarget)}</td></tr>`).join("")}
       </tbody></table></div>
-      <p class="caption">Il simbolo è proposto ${u.local?"dal ticker scritto nel file":"dall'IA"} (formato TICKER.BORSA: .LON Londra, .DEX Xetra). Correggilo se serve: lo storico arriva da Alpha Vantage e viene convertito in euro con il cambio BCE di fine mese.</p>
+      <p class="caption">Il simbolo è proposto ${u.local?"dal ticker scritto nel file":"dall'IA"} (formato TICKER.BORSA: .LON Londra, .DEX Xetra). Correggilo se serve: lo storico arriva da Yahoo Finance (Alpha Vantage come riserva) e viene convertito in euro con il cambio BCE di fine mese.</p>
       ${scart}${err}<div class="row" style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn primary" id="undRebuild" data-mag>Scarica lo storico e ricostruisci il file</button><button type="button" class="btn" id="undDismiss">Ignora</button></div>`;
     return;
   }
@@ -878,7 +878,7 @@ async function rebuildFromPrices(){
     // Se un simbolo non scarica, si provano le altre quotazioni dello stesso ISIN.
     const series=[];
     /* limite al minuto del piano gratuito di Alpha Vantage: si aspetta e si riprova, fino a 4 volte per simbolo */
-    const fetchSym=async sym=>{for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=2`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
+    const fetchSym=async sym=>{for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=3`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
       if(j.error&&/limite/i.test(j.error)&&k<4){for(let w=20;w>0;w--){prog(`Limite al minuto di Alpha Vantage: riprovo ${sym} tra ${w} s…`);await new Promise(res=>setTimeout(res,1000));}continue;}return {r,j};}};
     for(const [n,p] of pos.entries()){
       let got=null,tried=[];
@@ -913,7 +913,7 @@ async function rebuildFromPrices(){
     const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},true);
     S.portfolio=pf;
-    S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi da Alpha Vantage (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
+    S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
       `Valute di quotazione: ${ok.map(o=>`${o.p.ticker||o.p.nome} ${o.s.currency||"sconosciuta"}`).join(", ")}.`,
       ...(unknown.length?[`Valuta non determinata per ${unknown.join(", ")}: lasciata com'è, verifica il simbolo.`]:[]),
       ...pf.missing.map(m=>`Non scaricato: ${m.nome}${m.simbolo?` (${m.simbolo})`:""}. ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
@@ -1055,7 +1055,7 @@ function tplApply(t){
 /* simboli nel formato di Alpha Vantage: i suffissi di Yahoo (.L, .DE, .PA, .AS, .MI) vengono tradotti */
 /* un solo modo di normalizzare i simboli, da qualunque fonte: «AMS:IWDA» → IWDA.AMS, suffissi Yahoo → Alpha Vantage, ISIN → da cercare */
 function normSym(p){const t=String(p.simbolo||"").trim().toUpperCase();if(!t||/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t))return "";if(/:/.test(t))return guessSymbol(t,"ETF",null)||"";if(/\./.test(t))return avSymbol(t);if(p.isin)return "";return guessSymbol(t,"ETF",null)||t;}
-function avSymbol(x){const t=String(x||"").trim().toUpperCase();const m=t.match(/^([A-Z0-9\-]+)\.(L|DE|F|PA|AS|SW)$/);if(!m)return t;return m[1]+"."+({L:"LON",DE:"DEX",F:"DEX",PA:"PAR",AS:"AMS",SW:"SWX"}[m[2]]);}
+function avSymbol(x){const t=String(x||"").trim().toUpperCase();const m=t.match(/^([A-Z0-9\-]+)\.(L|DE|F|PA|AS|SW|MI)$/);if(!m)return t;return m[1]+"."+({L:"LON",DE:"DEX",F:"DEX",PA:"PAR",AS:"AMS",SW:"SWX",MI:"MIL"}[m[2]]);}
 function guessSymbol(label,type,cur){
   const t=String(label).trim().toUpperCase();let m;
   if((m=t.match(/^(EPA|PAR|EURONEXT):([A-Z0-9]+)$/)))return m[2]+".PAR";
@@ -1952,7 +1952,7 @@ async function getJSON(url){
 }
 function bnLoad(sym){
   const cur=S.bnData[sym];if(cur)return cur.loading?cur.pr:Promise.resolve();
-  const pr=Promise.all([getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}&v=2`),S.fx?Promise.resolve(S.fx):getJSON("/api/fx?ccy=USD")]).then(([d,fx])=>{
+  const pr=Promise.all([getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}&v=3`),S.fx?Promise.resolve(S.fx):getJSON("/api/fx?ccy=USD")]).then(([d,fx])=>{
     S.bnData[sym]=d;if(!fx.error){S.fx=fx;S.fxErr=null;}else if(!S.fx)S.fxErr=fx.error;
     if(current==="bench")renderBench();if(current==="stress"&&S.stress)renderStress();if(current==="lab"&&S.lab)renderReal();
   });
