@@ -988,6 +988,15 @@ async function rebuildFromPrices(o={}){
         got={symbol:sym,error:j.error||`Errore ${r.status} per ${sym}.`};
         if(/limite giornaliero/i.test(got.error))break;
       }
+      /* il simbolo indicato (dal file o dall'IA) non esiste: se c'è l'ISIN, si cercano le sue quotazioni su OpenFIGI e si riprova */
+      if(got.error&&!/limite giornaliero/i.test(got.error)&&p.isin&&ISIN_RX.test(p.isin)&&!p.isinTried){p.isinTried=true;
+        prog(`${tried[tried.length-1]||p.simbolo} non trovato: cerco le quotazioni dell'ISIN ${p.isin}…`);
+        const j=await getJSON(`/api/isin?isin=${p.isin}`),r=(j.results||[])[0];
+        for(const s2 of (r&&r.simbolo?[r.simbolo,...(r.alternative||[])]:[]).filter(x=>!tried.includes(x)).slice(0,4)){
+          tried.push(s2);prog(`Scarico lo storico di ${p.ticker||p.nome} (${s2}) · ${n+1} di ${pos.length}…`);
+          const {r:r2,j:j2}=await fetchSym(s2);
+          if(r2.ok&&!j2.error&&j2.points&&j2.points.length){got=j2;p.simboloOrig=p.simbolo;p.simbolo=s2;break;}
+        }}
       if(got.error&&tried.length>1)got.error+=` (provati: ${tried.join(", ")})`;
       series.push(got);
     }
