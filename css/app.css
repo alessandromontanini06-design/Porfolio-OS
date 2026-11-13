@@ -537,7 +537,7 @@ body.chat-on .orb-btn{opacity:0;transform:scale(.4);pointer-events:none}
 .orb-spark{position:fixed;z-index:59;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,#F4FFD0,rgba(212,255,58,.8) 35%,rgba(123,60,255,.5) 65%,transparent 70%);animation:sparkfade .7s ease-out forwards}
 @keyframes sparkfade{to{opacity:0;transform:scale(.2)}}
 body.chat-on .orb-say{display:none}
-@media (max-width:760px){.orb-say{font-size:.84rem}}
+@media (max-width:760px){.orb-say{font-size:.8rem;padding:9px 12px;max-width:min(260px,calc(100vw - 110px))!important}.orb-say .go{margin-top:4px}}
 
 /* Home: terminale BCE */
 .mkt{display:flex;flex-direction:column;gap:12px;justify-content:flex-start}

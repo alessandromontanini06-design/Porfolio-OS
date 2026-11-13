@@ -2797,8 +2797,11 @@ function placeSay(){
 function showSay(scene,ms){
   const tip=QTIPS[scene]||QTIPS.home;if(document.body.classList.contains("chat-on"))return;
   say.innerHTML=`<span class="who">Quanta</span>${tip.t}${tip.q&&S.lab?`<span class="go">Chiedimelo →</span>`:""}`;say.dataset.scene=scene;
-  say.classList.add("on");placeSay();clearTimeout(QG.hideT);QG.hideT=setTimeout(()=>say.classList.remove("on"),ms||6500);
+  /* sul telefono il fumetto copre il contenuto: resta meno e sparisce appena si scorre */
+  const mob=window.innerWidth<760;
+  say.classList.add("on");placeSay();clearTimeout(QG.hideT);QG.hideT=setTimeout(()=>say.classList.remove("on"),mob?3500:(ms||6500));
 }
+window.addEventListener("scroll",()=>{if(window.innerWidth<760&&say.classList.contains("on"))say.classList.remove("on");},{passive:true});
 say.addEventListener("click",()=>{const tip=QTIPS[say.dataset.scene]||{};say.classList.remove("on");openChat();if(tip.q&&S.lab)setTimeout(()=>askChat(tip.q),250);});
 function quantaScene(name){
   if(QG.seen.has(name)||QG.opened&&name!=="home")return;
