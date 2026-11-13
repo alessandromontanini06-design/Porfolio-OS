@@ -398,6 +398,8 @@ function load(sheets,source,fromUser,opts={}){
   /* ruoli indicati dalla ricetta (IA, modello salvato o riconoscitori locali) */
   all.forEach((sh,i)=>{if(sh.roles)S.sheets[i].cols.forEach(c=>{const r=sh.roles[c.idx];if(r){c.suggest=r;c.conf="alta";c.reason=r==="date"?(opts.recipe?"Colonna data indicata dalla ricetta di lettura":"Colonna data riconosciuta"):(opts.recipe&&!opts.memory?"Serie indicata dall'IA dopo aver letto il file":opts.memory?"Serie del modello che hai già confermato":"Serie riconosciuta dalla struttura del file");}});});
   S.sheetIdx=virt.length?0:S.sheets.reduce((b,x,i)=>x.score>S.sheets[b].score?i:b,0);
+  /* file ricostruito: ogni colonna dice da dove vengono i suoi prezzi */
+  if(source.kind==="rebuilt"&&S.rb)S.sheets.forEach(A=>A.cols.forEach(c=>{const m=S.rb.cols.find(x=>x.name===c.name);if(m&&c.suggest==="price"){const k=[...m.map.keys()].sort();c.conf="alta";c.reason=`Prezzo di mercato di ${m.sym} (${m.src}${m.info?", "+m.info.split(" · ")[0]:""}), ${m.adj?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}${m.cur&&m.cur!=="EUR"?`, convertito da ${m.cur==="GBX"?"pence":m.cur} in euro con il cambio BCE`:", in euro"}, ${k.length} mesi dal ${k[0]}`;}}));
   /* nei tracker la liquidità cambia con versamenti e spese, non con il mercato: fuori dalle analisi salvo scelta diversa */
   if(S.wide)S.sheets.slice(0,S.wide.sheets.length).forEach(A=>A.cols.forEach(c=>{if(/^liquidit/i.test(c.name)&&c.suggest){c.suggest="ignore";c.conf="alta";c.reason="Saldi di conti e broker: cambiano con versamenti, spese e trasferimenti, non con il mercato";}}));
   initRoles();
@@ -535,25 +537,26 @@ function cellText(v){
   return String(v);
 }
 function renderScan(A,animate){
-  const raw=S.raw[S.sheetIdx]||[],maxR=Math.min(raw.length,13);
-  let width=0;for(let r=0;r<maxR;r++)width=Math.max(width,(raw[r]||[]).length);
+  const raw=S.raw[S.sheetIdx]||[],rebuilt=S.source&&S.source.kind==="rebuilt";
+  const rows=rebuilt?[0,...Array.from({length:Math.min(12,raw.length-1)},(_,k)=>raw.length-Math.min(12,raw.length-1)+k)]:Array.from({length:Math.min(raw.length,13)},(_,k)=>k),maxR=rows.length;
+  let width=0;for(const r of rows)width=Math.max(width,(raw[r]||[]).length);
   width=Math.max(1,Math.min(width,8));
   const colInfo=c=>{const col=A.cols.find(x=>x.idx===c);return col?{role:S.roles[c],known:true}:{role:null,known:false};};
   const L=i=>{let s="";i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;};
   let h=`<div class="colh" style="position:sticky;left:0;z-index:1"></div>`;
   for(let c=0;c<width;c++){const ci=colInfo(c),rc=ci.role?ROLE_COLOR[ci.role]:ci.known?"var(--warn)":"var(--faint)";h+=`<div class="colh" style="--rc:${rc};--c:${c}">${L(c)}<span class="tagr">${ci.role?ROLE_TAG[ci.role]:ci.known?"?":"vuota"}</span></div>`;}
-  for(let r=0;r<maxR;r++){
-    const row=raw[r]||[],kind=A.headerRow>=0&&r<A.headerRow?"pre":r===A.headerRow?"hdr":"data";
-    h+=`<div class="cell rn" style="--r:${r};--c:0">${r+1}</div>`;
+  for(let i=0;i<maxR;i++){
+    const r=rows[i],row=raw[r]||[],kind=A.headerRow>=0&&r<A.headerRow?"pre":r===A.headerRow?"hdr":"data";
+    h+=`<div class="cell rn" style="--r:${i};--c:0">${r+1}</div>`;
     for(let c=0;c<width;c++){
       const ci=colInfo(c),rc=ci.role?ROLE_COLOR[ci.role]:ci.known?"var(--warn)":"transparent";
       const cls=["cell",kind==="pre"?"pre":kind==="hdr"?"hdr":"",kind==="data"&&ci.role==="ignore"?"ign":"",kind==="data"&&ci.known&&ci.role==null?"q":""].join(" ");
       const tx=esc(cellText(row[c]));
-      h+=`<div class="${cls}" style="--r:${r};--c:${c};--rc:${kind==="pre"?"transparent":rc}" title="${tx}">${tx||"&nbsp;"}</div>`;
+      h+=`<div class="${cls}" style="--r:${i};--c:${c};--rc:${kind==="pre"?"transparent":rc}" title="${tx}">${tx||"&nbsp;"}</div>`;
     }
   }
   h+=`<div class="scanline" aria-hidden="true"></div>`;
-  $("#scanwrap").innerHTML=`<div class="scan${animate&&!REDUCE?" play":""}" style="grid-template-columns:44px repeat(${width},minmax(90px,auto))" role="img" aria-label="Anteprima delle prime righe del foglio con le colonne riconosciute">${h}</div>`;
+  $("#scanwrap").innerHTML=(rebuilt?rebuildBanner():"")+`<div class="scan${animate&&!REDUCE?" play":""}" style="grid-template-columns:44px repeat(${width},minmax(90px,auto))" role="img" aria-label="Anteprima delle prime righe del foglio con le colonne riconosciute">${h}</div>`;
 }
 function renderLog(A,ds,animate){
   const t0=performance.now(),L=[];
@@ -623,7 +626,7 @@ function renderMapping(A){
       <td class="mono samp">${c.sample.map(esc).join("<br>")}</td>
       <td>${spark(c)}</td>
       <td><select id="role-${c.idx}" data-col="${c.idx}" class="${need?"need":""}" aria-label="Interpretazione di ${esc(c.name)}">${need?`<option value="" selected disabled>Scegli…</option>`:""}${ROLES.map(r=>`<option value="${r.v}"${role===r.v?" selected":""}>${r.l}</option>`).join("")}</select></td>
-      <td><span class="conf ${conf}">${CONF_L[conf]}</span><small class="src">${{auto:"automatica",IA:"dall'IA",modello:"modello salvato",utente:"scelta da te"}[colSource(A,c)]}</small></td>
+      <td><span class="conf ${conf}">${CONF_L[conf]}</span><small class="src">${{auto:"automatica",IA:"dall'IA",modello:"modello salvato",utente:"scelta da te",mercato:"prezzi di mercato"}[colSource(A,c)]}</small></td>
       <td class="why">${esc(S.aiRoles[c.idx]?"Proposta dall'IA, applicata da te: "+S.aiRoles[c.idx]:S.touched[c.idx]?"Interpretazione scelta da te":c.reason)}</td>
     </tr>`;
   }).join("");
@@ -754,8 +757,26 @@ function undoAI(silent){
   initRoles();S.rawOrig=null;S.aiLog=[];S.aiRoles={};
   if(!silent){S.ai=null;hideLab();renderImport(false);morphData();}
 }
+/* riquadro della mappa e della scansione per un file ricostruito: da dove vengono i prezzi di ogni strumento */
+function rebuildRows(){
+  const pf=S.portfolio;if(!pf||!S.rb)return "";
+  return S.rb.cols.map(c=>{const k=[...c.map.keys()].sort(),y=S.youngRes&&S.youngRes[c.name];return `<tr><td><span class="an">${esc(c.name)}</span><span class="cl">${esc((c.info||c.nome||"").split(" · ")[0])}</span></td><td class="mono">${esc(c.sym)}${c.orig?`<span class="cl">al posto di ${esc(c.orig)}</span>`:""}</td><td>${esc(c.src)}</td><td class="mono">${esc(c.cur==="GBX"?"pence (GBX)":c.cur||"—")}</td><td class="mono">${k[0]||"—"} → ${k[k.length-1]||"—"}<br><span class="cl">${k.length} mesi${y==="proxy"?" · esteso con l'indice":""}${y==="exclude"?" · escluso":""}</span></td></tr>`;}).join("");
+}
+function rebuildBanner(){
+  const pf=S.portfolio,n=S.rb?S.rb.cols.length:0;if(!pf||!n)return "";
+  return `<div class="rb-banner"><b>Ricostruito con i prezzi di mercato</b><span>Dal tuo file «${esc(S.rb.origName)}» ho preso solo <b>quali strumenti</b> hai e <b>quanto</b>: ${n} ${n===1?"strumento":"strumenti"}. I prezzi sotto sono quelli di mercato di ogni strumento, in euro: qui vedi gli ultimi 12 mesi. Il dettaglio delle fonti è nella mappa.</span></div>`;
+}
 function renderAI(){
   const el=$("#aiBody");if(!el)return;const a=S.ai;
+  const rebuilt=S.source&&S.source.kind==="rebuilt"&&S.portfolio&&S.rb&&!S.und;
+  const h3=document.querySelector("#aiCard .head h3"),chip=document.querySelector("#aiCard .head .chip");
+  if(h3)h3.textContent=rebuilt?"Prezzi di mercato":"Lettura con IA";if(chip)chip.innerHTML=rebuilt?"<i></i>da dove vengono i numeri":"<i></i>Claude · proposte da confermare";
+  if(rebuilt){const M=S.portfolio.missing||[];
+    el.innerHTML=`<p style="margin:0 0 12px;line-height:1.5">Le analisi usano i prezzi di mercato di ogni strumento, non i valori del tuo file: versamenti, vendite e spostamenti di liquidità non falsano rischio e rendimenti. Il tuo rendimento personale (TIR) si calcola a parte, dalle tue transazioni.</p>
+      <div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>Simbolo</th><th>Fonte</th><th>Valuta di quotazione</th><th>Storico</th></tr></thead><tbody>${rebuildRows()}</tbody></table></div>
+      ${M.length?`<p class="caption">Non scaricati: ${M.map(m=>`${esc(m.nome)}${m.simbolo?` (${esc(m.simbolo)})`:""}: ${esc(m.err)}`).join(" · ")}</p>`:""}
+      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="rbOrig">Torna al file originale</button></div>`;
+    return;}
   if(S.recipe&&S.recipe.status==="loading"&&!S.und){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>L'IA sta leggendo la struttura di ${(S.fileSheets||[]).length} ${(S.fileSheets||[]).length===1?"foglio":"fogli"}: dove sono le date, quali righe sono asset, debiti, totali, cambi…</span></div>`;return;}
   if(S.recipe&&S.recipe.status==="done"&&!S.und){el.innerHTML=`<p class="lead">${esc(S.recipe.r.spiegazione)}</p>${(S.recipe.r.scartati||[]).length?`<p class="caption">Scartato: ${S.recipe.r.scartati.map(esc).join(" · ")}</p>`:""}<div class="row" style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="recipeOff">Usa la lettura automatica</button></div>`;return;}
   if(S.und){renderUnderstand(el);return;}
@@ -773,8 +794,9 @@ function renderAI(){
     ${n?`<ul class="props">${items}</ul><div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn primary" id="aiApply" data-mag>Applica tutte (${n})</button><button type="button" class="btn" id="aiDismiss">Ignora</button></div>`:""}`;
 }
 document.addEventListener("click",e=>{
-  const t=e.target.closest("#aiRun,#aiApply,#aiDismiss,#aiUndo,#aiUnderstand,#undApply,#undRebuild,#undDismiss,#recipeOff,#recipeRun,#tplForget");if(!t)return;
+  const t=e.target.closest("#aiRun,#aiApply,#aiDismiss,#aiUndo,#aiUnderstand,#undApply,#undRebuild,#undDismiss,#recipeOff,#recipeRun,#tplForget,#rbOrig");if(!t)return;
   if(t.id==="recipeOff")return recipeOff();
+  if(t.id==="rbOrig"&&S.rb&&S.fileSheets){const src=S.rb.origSource;S.autoRebuilt=src;load(S.fileSheets,src,false,{forceAuto:true});return;}
   if(t.id==="tplForget"){tplForget(S.fp);S.tpl=null;S.tplUsed=false;load(S.fileSheets,S.source,false,{forceAuto:true});if(aiAuto())requestRecipe();return;}
   if(t.id==="recipeRun")return requestRecipe();
   if(t.id==="aiUnderstand")requestUnderstand();
@@ -940,7 +962,7 @@ async function rebuildFromPrices(){
     if(fxErr.length)throw new Error(`Non riesco a convertire in euro (${fxErr.join("; ")}). Riprova tra poco.`);
     const unknown=ok.filter(o=>!ccyOf(o.s)).map(o=>o.p.simbolo);
     const maps=ok.map(o=>eurMap(o.s,fxm));
-    S.rb={cols:ok.map((o,i)=>({name:o.p.ticker||o.p.nome,map:maps[i],info:o.s.info||"",sym:o.p.simbolo})),fxm};S.youngRes={};
+    S.rb={cols:ok.map((o,i)=>({name:o.p.ticker||o.p.nome,nome:o.p.nome,map:maps[i],info:o.s.info||"",sym:o.p.simbolo,src:o.s.source||"Alpha Vantage",cur:o.s.currency||null,adj:!!o.s.adjusted,orig:o.p.simboloOrig||null,removed:o.s.vol&&o.s.vol.removed||0})),fxm,origName:S.source.name.replace(/ · ricostruito$/,""),origSource:S.source.kind==="file"?S.source:(S.rb&&S.rb.origSource)||S.source};S.youngRes={};
     findYoung();
     const aoa=rbAoa();
     if(aoa.length<14)throw new Error("Lo storico degli strumenti è troppo corto (meno di un anno). Prova a cambiare i simboli.");
@@ -969,6 +991,7 @@ function fixOpts(){const A=an();return {adjust:S.fix.adjust,exclude:S.fix.exclud
 const ASSETR=["price","ret","retpct"];
 function colSource(A,c){
   if(S.touched[c.idx])return "utente";
+  if(S.source&&S.source.kind==="rebuilt"&&c.suggest==="price")return "mercato";
   if(S.tplCols&&S.tplCols.has(c.idx))return "modello";
   if(A.virtual&&A.fromAI)return "IA";
   return "auto";
@@ -1016,6 +1039,7 @@ function importConfidence(checks,A){
   if(open)return {lv:"bassa",l:`${open} ${open===1?"conferma richiesta":"conferme richieste"}`};
   if(src==="modello")return {lv:"alta",l:"Alta · modello già confermato da te"};
   if(src==="concorde")return {lv:"alta",l:"Alta · IA e lettura automatica concordano"};
+  if(S.source&&S.source.kind==="rebuilt")return {lv:"alta",l:"Alta · prezzi di mercato scaricati per ogni strumento"};
   return {lv:checks.some(c=>c.done)?"alta":"media",l:checks.some(c=>c.done)?"Alta · verificata da te":"Media · lettura non verificata da una seconda fonte"};
 }
 function renderChecks(A,ds){
@@ -1243,7 +1267,7 @@ function renderMetrics(){
       return `<tr><td><span class="an"><i style="background:${color(i)}"></i>${esc(a.name)}</span><span class="cl mono">${ROLE_SHORT[a.role]} · col. ${a.col}</span></td>
       <td>${cell("cagr-"+i,fmtPct(s.cagr,1,true),s.cagr<0?"neg":"")}</td>
       <td>${mm?cell("real-"+i,fmtPct(real,1,true),real<0?"neg":""):`<span class="cl">${pending?"…":"—"}</span>`}</td>
-      <td>${cell("vol-"+i,fmtPct(s.vol))}${(()=>{const v=mktVol(a.name);return v?`<span class="cl mono" title="Volatilità dei rendimenti giornalieri di mercato, annualizzata (√252), come justETF">1a ${v.y1!=null?fmtPct(v.y1,1):"—"} · 3a ${v.y3!=null?fmtPct(v.y3,1):"—"} · 5a ${v.y5!=null?fmtPct(v.y5,1):"—"}</span>`:"";})()}</td><td>${cell("sharpe-"+i,fmtN(sh))}</td>
+      <td>${cell("vol-"+i,fmtPct(s.vol))}${(()=>{const v=mktVol(a.name);return v?`<span class="cl mono volw" title="Volatilità dei rendimenti giornalieri di mercato, annualizzata (√252), come justETF">1a ${v.y1!=null?fmtPct(v.y1,1):"—"} · 3a ${v.y3!=null?fmtPct(v.y3,1):"—"} · 5a ${v.y5!=null?fmtPct(v.y5,1):"—"}</span>`:"";})()}</td><td>${cell("sharpe-"+i,fmtN(sh))}</td>
       <td>${cell("mdd-"+i,fmtPct(s.mdd),"neg")}</td><td>${cell("worst-"+i,`${fmtPct(s.worst)} <span style="color:var(--faint)">${fmtDate(ds.dates[s.worstK],f)}</span>`)}</td><td class="mono">${s.n}</td></tr>`;}).join("")}</tbody>`;
   const cap=$("#metricsCap");if(cap)cap.textContent=mm?`Sharpe con tasso privo di rischio medio ${fmtPct(mm.rf,2)} (${mm.rfName}). Rendimento reale al netto dell'inflazione media ${fmtPct(mm.infl,2)}.`:"Sharpe con tasso privo di rischio 0%.";
 }
@@ -1276,6 +1300,8 @@ function renderLook(){
 }
 function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;
+  const starts=ds.assets.map(a=>({n:a.name,k:Math.max(0,a.first-1)})),late=starts.filter(s=>s.k>Math.min(...starts.map(x=>x.k))+1),gc=$("#growthNote");
+  if(gc)gc.textContent=late.length?`Le linee partono quando inizia lo storico di ciascuno strumento: ${starts.map(s=>`${s.n} dal ${fmtDate(ds.dates[s.k],f)}`).join(", ")}. Per confrontarle sullo stesso periodo usa le sezioni Rischio e Frontiera, che lavorano sui mesi comuni.`:"";
   $("#labSource").textContent=`${S.source.name} · foglio «${an().name}» · ${ds.assets.length} asset dal ${fmtDate(ds.dates[0],f)} al ${fmtDate(ds.dates[ds.dates.length-1],f)}.`;
   $("#kpis").innerHTML=[
     ["Asset",ds.assets.length,true],["Osservazioni",ds.nObs,true],

@@ -735,3 +735,8 @@ body[data-scene="bench"]{--pill:#5BF0A5;--pill-rgb:91,240,165}
 .look-kpi{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}.look-kpi>div{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
 .look-kpi b{font-family:var(--f-display);font-size:1.6rem}.look-kpi small{color:var(--muted);font-size:.78rem}
 @media (max-width:760px){.look-grid,.look-kpi{grid-template-columns:1fr}}
+
+/* volatilità di mercato sotto quella storica; riquadro del file ricostruito */
+#metrics .volw{display:block;margin-top:3px;font-size:.68rem;letter-spacing:.02em;white-space:nowrap}
+.rb-banner{display:flex;flex-direction:column;gap:4px;margin:0 0 12px;padding:12px 14px;border-radius:14px;border:1px solid color-mix(in oklab,var(--lime) 45%,transparent);background:color-mix(in oklab,var(--lime) 7%,transparent);font-size:.9rem}
+.rb-banner b:first-child{color:var(--lime)}.rb-banner span{color:var(--muted);line-height:1.45}.rb-banner span b{color:var(--fg)}

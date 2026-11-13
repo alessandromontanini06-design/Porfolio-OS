@@ -16,7 +16,7 @@ const median=a=>{if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y),m=s.len
 const fmtN=(x,d=2)=>Number.isFinite(x)?x.toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d}):"—";
 const fmtPct=(x,d=1,sign=false)=>Number.isFinite(x)?(sign&&x>0?"+":"")+(x*100).toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d})+"%":"—";
 const fmtDate=(d,f)=>!d?"—":(f&&f<=12?`${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`:`${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`);
-const fmtRaw=v=>v instanceof Date?fmtDate(new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate()))):String(v).trim().slice(0,22);
+const fmtRaw=v=>v instanceof Date?fmtDate(new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate()))):typeof v==="number"&&Number.isFinite(v)?v.toLocaleString("it-IT",{maximumFractionDigits:Math.abs(v)>=100?2:4}):String(v).trim().slice(0,22);
 
 function parseNum(v){
   if(typeof v==="number")return Number.isFinite(v)?{n:v,pct:false}:null;
