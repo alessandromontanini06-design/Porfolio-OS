@@ -1237,7 +1237,7 @@ async function fetchMacro(){
   }catch(e){
     S.macro={status:"error",msg:e instanceof TypeError?"I dati della BCE si caricano nella versione del sito pubblicata su Vercel.":String(e.message||e)};
   }
-  if(S.lab){renderMacro();renderMetrics();renderPortfolio();renderReal();if(current==="risk")renderRisk();}
+  if(S.lab){renderMacro();renderMetrics();renderPortfolio();renderReal();if(current==="risk")renderRisk();if(current==="opt")renderOpt();}
 }
 function renderMacro(){
   const el=$("#macro");if(!el)return;const M=S.macro;
@@ -1253,7 +1253,7 @@ function renderMacro(){
     </div>`:`<p style="color:var(--muted)">Sharpe calcolato con tasso privo di rischio dello 0%. Il rendimento reale richiede i dati sull'inflazione: scegli la BCE o la FRED.</p>`}
     ${(M.data.errors||[]).length?`<p class="caption">${esc(M.data.errors.join(" "))}</p>`:""}`;
 }
-document.addEventListener("click",e=>{const b=e.target.closest("[data-rf]");if(!b)return;S.rfSrc=b.dataset.rf;renderMacro();renderMetrics();renderPortfolio();renderReal();if(current==="risk")renderRisk();});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-rf]");if(!b)return;S.rfSrc=b.dataset.rf;renderMacro();renderMetrics();renderPortfolio();renderReal();if(current==="risk")renderRisk();if(current==="opt")renderOpt();});
 /* volatilità di mercato a 1, 3 e 5 anni dai prezzi giornalieri (come i siti di ETF), per gli strumenti scaricati */
 function mktVol(name){const p=S.portfolio&&S.portfolio.positions.find(x=>(x.ticker||x.nome)===name);return p&&p.vol&&(p.vol.y1||p.vol.y3||p.vol.y5)?{...p.vol,cur:p.currency,sym:p.yahoo||p.simbolo}:null;}
 function renderMetrics(){
@@ -1511,7 +1511,7 @@ function drawHist(PR,f){
   g+=`<line x1="${xc}" x2="${xc}" y1="${mt+18}" y2="${mt+ih}" stroke="var(--bad)" stroke-width="2"/><text x="${xc+6}" y="${mt+30}" style="fill:var(--bad);font-weight:600">CVaR ${fmtPct(-PR.cvar95,1)}</text>`;
   $("#riskHist").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Istogramma dei rendimenti di periodo del portafoglio">${g}</svg>`;
   $("#histUnit").textContent=`rendimenti ${S.ds.freq.adj} · ${PR.n} osservazioni`;
-  $("#histCap").textContent=`In rosso i ${PR.tail95} ${UNIT[f]?UNIT[f][1]:"periodi"} peggiori (il 5%). Asimmetria ${fmtN(PR.skew)}, curtosi in eccesso ${fmtN(PR.kurt)}: ${PR.kurt>1?"le perdite estreme sono più frequenti che in una distribuzione normale.":"code vicine a quelle di una distribuzione normale."}`;
+  $("#histCap").textContent=`In rosso i ${UNIT[f]?UNIT[f][1]:"periodi"} peggiori: ${PR.tail95}, il 5% del totale. Asimmetria ${fmtN(PR.skew)}, curtosi in eccesso ${fmtN(PR.kurt)}: ${PR.kurt>1?"le perdite estreme sono più frequenti che in una distribuzione normale.":"code vicine a quelle di una distribuzione normale."}`;
 }
 /* Qualità statistica: quanto sono affidabili i numeri del rischio */
 function renderRiskPro(){
@@ -1562,17 +1562,20 @@ function drawUnderwater(PR,f){
   }
   g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--muted)"/>`;
   $("#riskDD").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Drawdown del portafoglio nel tempo">${g}</svg>`;
-  $("#ddCap").textContent=PR.troughK!=null?`Il calo peggiore è iniziato a ${fmtDate(ds.dates[PR.peakAtTrough],f)} e ha toccato il fondo a ${fmtDate(ds.dates[PR.troughK],f)}; ${PR.recK!=null?`è stato recuperato a ${fmtDate(ds.dates[PR.recK],f)}.`:"non è ancora stato recuperato."}`:"Nessun calo dal massimo nel periodo.";
+  $("#ddCap").textContent=PR.troughK!=null?`Calo peggiore: inizio ${fmtDate(ds.dates[PR.peakAtTrough],f)}, punto più basso ${fmtDate(ds.dates[PR.troughK],f)}, ${PR.recK!=null?`recuperato ${fmtDate(ds.dates[PR.recK],f)}.`:"non ancora recuperato."}`:"Nessun calo dal massimo nel periodo.";
 }
 function renderRiskTable(){
   const R=S.risk,ds=S.ds,f=ds.freq.f,cell=(k,v,c="")=>`<button type="button" class="cellbtn ${c}" data-rc="${k}">${v}</button>`;
-  const row=(name,st,base,id,cls,sw)=>{if(!st.n||st.n<6)return `<tr><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">Dati insufficienti</td></tr>`;
+  const row=(name,st,base,id,cls,sw,sub)=>{if(!st.n||st.n<6)return `<tr><td>${name}</td><td colspan="9" style="text-align:left;color:var(--muted)">Dati insufficienti</td></tr>`;
     const cal=base.cagr/Math.abs(base.mdd);
-    return `<tr class="${cls}"><td><span class="an">${sw}${name}</span></td><td>${cell(`rk-var95-${id}`,fmtPct(-st.var95,1),"neg")}</td><td>${cell(`rk-cvar95-${id}`,fmtPct(-st.cvar95,1),"neg")}</td><td>${cell(`rk-sortino-${id}`,fmtN(st.sortino))}</td><td>${cell(`rk-calmar-${id}`,fmtN(cal))}</td><td>${cell(`rk-pos-${id}`,fmtPct(st.pctPos,0))}</td><td>${cell(`rk-w12-${id}`,fmtPct(st.worst12,1),st.worst12<0?"neg":"")}</td><td>${cell(`rk-skew-${id}`,fmtN(st.skew))}</td><td>${cell(`rk-kurt-${id}`,fmtN(st.kurt))}</td><td>${cell(`rk-ddlen-${id}`,unitN(st.longest,f))}</td></tr>`;};
+    return `<tr class="${cls}"><td><span class="an">${sw}${name}</span>${sub||""}</td><td>${cell(`rk-var95-${id}`,fmtPct(-st.var95,1),"neg")}</td><td>${cell(`rk-cvar95-${id}`,fmtPct(-st.cvar95,1),"neg")}</td><td>${cell(`rk-sortino-${id}`,fmtN(st.sortino))}</td><td>${cell(`rk-calmar-${id}`,fmtN(cal))}</td><td>${cell(`rk-pos-${id}`,fmtPct(st.pctPos,0))}</td><td>${cell(`rk-w12-${id}`,fmtPct(st.worst12,1),st.worst12<0?"neg":"")}</td><td>${cell(`rk-skew-${id}`,fmtN(st.skew))}</td><td>${cell(`rk-kurt-${id}`,fmtN(st.kurt))}</td><td>${cell(`rk-ddlen-${id}`,unitN(st.longest,f))}</td></tr>`;};
   const w12=UNIT[f]?`Peggiori ${unitN(Math.round(f),f)}`:"Peggiore anno";
   $("#riskTable").innerHTML=`<thead><tr><th>Asset</th><th>VaR 95%</th><th>CVaR 95%</th><th>Sortino</th><th>Calmar</th><th>Periodi positivi</th><th>${w12}</th><th>Asimmetria</th><th>Curtosi</th><th>Drawdown più lungo</th></tr></thead><tbody>
     ${row("Portafoglio",R.PR,R.PS,"p","pf",`<i style="background:var(--lime)"></i>`)}
-    ${ds.assets.map((a,i)=>row(esc(a.name),R.AR[i],S.lab.st[i],i,"",`<i style="background:${color(i)}"></i>`)).join("")}</tbody>`;
+    ${ds.assets.map((a,i)=>{const k0=a.ret.findIndex(Number.isFinite),st=R.AR[i];/* ogni asset usa tutto il suo storico: lo dico quando è diverso da quello del portafoglio */
+      const sub=st.n&&st.n!==R.PR.n&&k0>=0?`<span class="cl" style="display:block">${unitN(st.n,f)}, da ${fmtDate(ds.dates[k0],f)}</span>`:"";
+      return row(esc(a.name),st,S.lab.st[i],i,"",`<i style="background:${color(i)}"></i>`,sub);}).join("")}</tbody>`;
+  const cap=$("#riskTableCap");if(cap)cap.textContent=`Misure storiche: descrivono il passato e non prevedono le perdite future. VaR e CVaR al 95% sui rendimenti di periodo, senza ipotesi di distribuzione normale. Il portafoglio usa i ${unitN(R.PR.n,f)} in cui ci sono tutti gli asset; ogni asset usa tutto il suo storico${ds.assets.some((a,i)=>R.AR[i].n&&R.AR[i].n!==R.PR.n)?", indicato sotto il nome: le crisi più vecchie (per esempio il 2008) pesano solo sugli asset che le hanno vissute":""}.`;
 }
 function riskReceipt(m,who){
   const R=S.risk,ds=S.ds,f=ds.freq.f,isP=who==="p",i=+who,st=isP?R.PR:R.AR[i],base=isP?R.PS:S.lab.st[i],name=isP?"Portafoglio":ds.assets[i].name,per=PER[f]||"in un periodo";
@@ -1952,7 +1955,7 @@ function renderOpt(){
   if(!S.opIn){S.opIn={mode:"sharpe",target:null,min:0,max:100,short:false,prudent:true};$("#opMin").value=0;$("#opMax").value=100;$("#opShort").checked=false;$("#opPrudent").checked=true;}
   const I=S.opIn,base=opBase();
   document.querySelectorAll("#opMode [data-opm]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.opm===I.mode)));
-  const tgt=I.mode==="tvol"||I.mode==="tret";$("#opTargetL").style.visibility=tgt?"visible":"hidden";
+  const tgt=I.mode==="tvol"||I.mode==="tret";$("#opTargetL").style.display=tgt?"":"none";
   const R=opSolve({mode:I.mode,target:I.target==null?NaN:I.target/100,min:I.short?I.min/100:Math.max(0,I.min/100),max:I.max/100});
   if(!R.error&&tgt&&I.target==null){const b=opEval(base.w,R.inp,R.rf);I.target=+((I.mode==="tvol"?b.vol:b.ret)*100).toFixed(1);$("#opTarget").value=I.target;return renderOpt();}
   if(tgt){$("#opTargetLbl").textContent=I.mode==="tvol"?"Volatilità target (%)":"Rendimento target (%)";if(document.activeElement!==$("#opTarget"))$("#opTarget").value=I.target;}
@@ -1973,27 +1976,50 @@ function drawFrontier(){
   const O=S.opt,ds=S.ds,inp=O.inp,n=ds.assets.length,VW=900,VH=440,ml=58,mr=24,mt=18,mb=40,iw=VW-ml-mr,ih=VH-mt-mb;
   const cloud=S.opIn.short?[]:P.randomPortfolios(n,700,O.lo,O.hi,7).map(w=>P.pStats(w,inp.mu,inp.C));O.cloud=cloud;
   const F=O.O.frontier,assetsP=ds.assets.map((a,i)=>({vol:Math.sqrt(inp.C[i][i]),ret:inp.mu[i]}));
-  const pts=[...F,...assetsP,O.A,O.B,...cloud];let x1=Math.max(...pts.map(p=>p.vol))*1.08,y0=Math.min(0,...pts.map(p=>p.ret)),y1=Math.max(...pts.map(p=>p.ret));const yp=(y1-y0)*.08;y0-=yp;y1+=yp;
-  const X=v=>ml+v/x1*iw,Y=v=>mt+ih-(v-y0)/((y1-y0)||1)*ih;
-  let g="";niceTicks(0,x1,6).filter(v=>v>=0&&v<=x1).forEach(v=>{g+=`<line x1="${X(v)}" x2="${X(v)}" y1="${mt}" y2="${mt+ih}" stroke="var(--line)"/><text x="${X(v)}" y="${VH-20}" text-anchor="middle">${fmtPct(v,0)}</text>`;});
-  niceTicks(y0,y1,5).filter(v=>v>=y0&&v<=y1).forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${ml-8}" y="${Y(v)+4}" text-anchor="end">${fmtPct(Math.abs(v)<1e-9?0:v,0)}</text>`;});
+  /* assi zoomati sui dati: partire da 0% schiacciava tutto in un angolo */
+  const pts=[...F,...assetsP,O.A,O.B,...cloud],vs=pts.map(p=>p.vol),rs=pts.map(p=>p.ret);let x0=Math.min(...vs),x1=Math.max(...vs),y0=Math.min(...rs),y1=Math.max(...rs);
+  const xp=Math.max((x1-x0)*.1,.005),yp=Math.max((y1-y0)*.1,.005);x0=Math.max(0,x0-xp);x1+=xp;y0-=yp;y1+=yp;
+  const X=v=>ml+(v-x0)/((x1-x0)||1)*iw,Y=v=>mt+ih-(v-y0)/((y1-y0)||1)*ih;
+  const xd=x1-x0<.05?1:0,yd=y1-y0<.05?1:0;
+  let g="";niceTicks(x0,x1,6).filter(v=>v>=x0&&v<=x1).forEach(v=>{g+=`<line x1="${X(v)}" x2="${X(v)}" y1="${mt}" y2="${mt+ih}" stroke="var(--line)"/><text x="${X(v)}" y="${VH-20}" text-anchor="middle">${fmtPct(v,xd)}</text>`;});
+  niceTicks(y0,y1,5).filter(v=>v>=y0&&v<=y1).forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${ml-8}" y="${Y(v)+4}" text-anchor="end">${fmtPct(Math.abs(v)<1e-9?0:v,yd)}</text>`;});
   g+=`<text x="${ml+iw/2}" y="${VH-4}" text-anchor="middle">volatilità annua →</text><text transform="translate(14 ${mt+ih/2}) rotate(-90)" text-anchor="middle">rendimento atteso annuo →</text>`;
   cloud.forEach(p=>{g+=`<circle cx="${X(p.vol).toFixed(1)}" cy="${Y(p.ret).toFixed(1)}" r="2.2" fill="var(--c2)" opacity=".28"/>`;});
   const ms=O.O.maxSharpe,shp=ms.vol>0?(ms.ret-O.rf)/ms.vol:0;
-  if(shp>0){let xe=x1,ye=O.rf+shp*xe;if(ye>y1){xe=(y1-O.rf)/shp;ye=y1;}
-    g+=`<line x1="${X(0)}" y1="${Y(O.rf)}" x2="${X(xe).toFixed(1)}" y2="${Y(ye).toFixed(1)}" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="6 5" opacity=".9"/>`;}
+  if(shp>0){let xs=x0,ys=O.rf+shp*xs;if(ys<y0){xs=(y0-O.rf)/shp;ys=y0;}let xe=x1,ye=O.rf+shp*xe;if(ye>y1){xe=(y1-O.rf)/shp;ye=y1;}
+    if(xe>xs)g+=`<line x1="${X(xs).toFixed(1)}" y1="${Y(ys).toFixed(1)}" x2="${X(xe).toFixed(1)}" y2="${Y(ye).toFixed(1)}" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="6 5" opacity=".9"/>`;}
   let dF="";F.forEach((p,i)=>{dF+=(i?"L":"M")+X(p.vol).toFixed(1)+","+Y(p.ret).toFixed(1);});
   g+=`<path d="${dF}" fill="none" stroke="var(--lime)" stroke-width="3.5" stroke-linecap="round" pathLength="1" class="draw" style="--k:0"/>`;
-  assetsP.forEach((p,i)=>{g+=`<g class="pt"><circle cx="${X(p.vol)}" cy="${Y(p.ret)}" r="7" fill="${color(i)}" stroke="var(--solid)" stroke-width="2"/><text x="${X(p.vol)>VW-180?X(p.vol)-11:X(p.vol)+11}" y="${Y(p.ret)+(X(p.vol)>VW-180?18:4)}" text-anchor="${X(p.vol)>VW-180?"end":"start"}" style="fill:var(--fg);font-weight:600">${esc(ds.assets[i].name.length>22?ds.assets[i].name.slice(0,21)+"…":ds.assets[i].name)}</text><title>${esc(ds.assets[i].name)}: rendimento ${fmtPct(p.ret,1)}, volatilità ${fmtPct(p.vol,1)}</title></g>`;});
+  const LB=[];/* etichette da piazzare dopo, senza sovrapposizioni */
+  assetsP.forEach((p,i)=>{g+=`<g class="pt"><circle cx="${X(p.vol)}" cy="${Y(p.ret)}" r="7" fill="${color(i)}" stroke="var(--solid)" stroke-width="2"/><title>${esc(ds.assets[i].name)}: rendimento ${fmtPct(p.ret,1)}, volatilità ${fmtPct(p.vol,1)}</title></g>`;
+    LB.push({x:X(p.vol),y:Y(p.ret),r:8,t:ds.assets[i].name.length>22?ds.assets[i].name.slice(0,21)+"…":ds.assets[i].name,w:600});});
   const mv=O.O.minVar;g+=`<g class="pt"><circle cx="${X(mv.vol)}" cy="${Y(mv.ret)}" r="5" fill="var(--solid)" stroke="var(--lime)" stroke-width="2.5"/><title>Minima volatilità: ${fmtPct(mv.ret,1)} · ${fmtPct(mv.vol,1)}</title></g>`;
   if(shp>0)g+=`<g class="pt"><path d="${star(X(ms.vol),Y(ms.ret),9,4)}" fill="var(--warn)"/><title>Massimo Sharpe ${fmtN(shp)}: ${fmtPct(ms.ret,1)} · ${fmtPct(ms.vol,1)}</title></g>`;
   const a=O.A,b=O.B;
   g+=`<line x1="${X(a.vol)}" y1="${Y(a.ret)}" x2="${X(b.vol)}" y2="${Y(b.ret)}" stroke="var(--fg)" stroke-opacity=".5" stroke-width="1.5" stroke-dasharray="2 4"/>`;
-  g+=`<g class="pt"><rect x="${X(a.vol)-7}" y="${Y(a.ret)-7}" width="14" height="14" transform="rotate(45 ${X(a.vol)} ${Y(a.ret)})" fill="var(--fg)" stroke="var(--solid)" stroke-width="2"/><text x="${X(a.vol)+12}" y="${Y(a.ret)+18}" style="fill:var(--fg)">${O.base.label}</text><title>Prima (${O.base.label}): ${fmtPct(a.ret,1)} · ${fmtPct(a.vol,1)}</title></g>`;
-  g+=`<g class="pt"><circle cx="${X(b.vol)}" cy="${Y(b.ret)}" r="16" fill="var(--lime)" opacity=".22" class="endpt" style="--k:1"/><circle cx="${X(b.vol)}" cy="${Y(b.ret)}" r="8" fill="var(--lime)" stroke="var(--lime-ink)" stroke-width="2"/><text x="${X(b.vol)-12}" y="${Y(b.ret)-14}" text-anchor="end" style="fill:var(--fg);font-weight:700">${O.modeLabel}</text><title>Ottimizzato (${O.modeLabel}): ${fmtPct(b.ret,1)} · ${fmtPct(b.vol,1)}</title></g>`;
+  g+=`<g class="pt"><rect x="${X(a.vol)-7}" y="${Y(a.ret)-7}" width="14" height="14" transform="rotate(45 ${X(a.vol)} ${Y(a.ret)})" fill="var(--fg)" stroke="var(--solid)" stroke-width="2"/><title>Prima (${O.base.label}): ${fmtPct(a.ret,1)} · ${fmtPct(a.vol,1)}</title></g>`;
+  g+=`<g class="pt"><circle cx="${X(b.vol)}" cy="${Y(b.ret)}" r="16" fill="var(--lime)" opacity=".22" class="endpt" style="--k:1"/><circle cx="${X(b.vol)}" cy="${Y(b.ret)}" r="8" fill="var(--lime)" stroke="var(--lime-ink)" stroke-width="2"/><title>Ottimizzato (${O.modeLabel}): ${fmtPct(b.ret,1)} · ${fmtPct(b.vol,1)}</title></g>`;
+  LB.unshift({x:X(b.vol),y:Y(b.ret),r:12,t:O.modeLabel,w:700},{x:X(a.vol),y:Y(a.ret),r:10,t:O.base.label,w:400});
+  const obst=[...LB.map(l=>({x:l.x-l.r,y:l.y-l.r,w:2*l.r,h:2*l.r})),{x:X(mv.vol)-6,y:Y(mv.ret)-6,w:12,h:12},...(shp>0?[{x:X(ms.vol)-9,y:Y(ms.ret)-9,w:18,h:18}]:[])];
+  g+=placeLabels(LB,obst,{x:ml,y:mt,w:iw,h:ih});
   $("#opChart").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Frontiera efficiente: volatilità sull'asse orizzontale, rendimento atteso su quello verticale">${g}</svg>`;
   $("#opLegend").innerHTML=`<span><i style="background:var(--lime);height:4px"></i>frontiera efficiente</span>${cloud.length?`<span><i style="background:var(--c2);opacity:.5;height:8px;width:8px;border-radius:50%"></i>portafogli casuali</span>`:""}${shp>0?`<span><i style="background:var(--warn)"></i>linea di allocazione del capitale</span>`:""}<span><i style="background:var(--fg);height:8px;width:8px"></i>prima</span><span><i style="background:var(--lime);height:10px;width:10px;border-radius:50%"></i>ottimizzato</span>`;
-  $("#opCap").textContent=`Ogni punto della linea lime è il massimo rendimento storico ottenibile per quel livello di volatilità, con i vincoli scelti. I puntini sono ${cloud.length?cloud.length+" portafogli casuali: nessuno sta sopra la frontiera.":"nascosti con le vendite allo scoperto."} ${shp>0?`La linea tratteggiata parte dal tasso privo di rischio (${fmtPct(O.rf,2)}) e tocca la frontiera nel portafoglio a massimo Sharpe (stella).`:""}`;
+  $("#opCap").textContent=`Ogni punto della linea continua è il massimo rendimento storico ottenibile per quel livello di volatilità, con i vincoli scelti. I puntini sono ${cloud.length?cloud.length+" portafogli casuali: nessuno sta sopra la frontiera.":"nascosti con le vendite allo scoperto."} ${shp>0?`La linea tratteggiata parte dal tasso privo di rischio (${fmtPct(O.rf,2)}${x0>0?", a volatilità zero, fuori dal riquadro ingrandito":""}) e tocca la frontiera nel portafoglio a massimo Sharpe (stella).`:""}`;
+}
+/* piazza ogni etichetta nella prima posizione libera intorno al suo punto (destra, sinistra, sopra, sotto, diagonali) */
+function placeLabels(items,obst,B){
+  const hit=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+  const placed=[],H=13;let out="";
+  items.forEach(l=>{const w=l.t.length*6.9+4,g=l.r+4;
+    const C=[[g,-H/2,"start"],[-g,-H/2,"end"],[0,-g-H,"middle"],[0,g,"middle"],[g,-g-H+2,"start"],[-g,-g-H+2,"end"],[g,g-2,"start"],[-g,g-2,"end"]];
+    let best=null;
+    for(const [dx,dy,an] of C){const bx=an==="start"?l.x+dx:an==="end"?l.x+dx-w:l.x-w/2,box={x:bx,y:l.y+dy,w,h:H};
+      const out_=(box.x<B.x?B.x-box.x:0)+(box.x+w>B.x+B.w?box.x+w-B.x-B.w:0)+(box.y<B.y-6?B.y-6-box.y:0)+(box.y+H>B.y+B.h?box.y+H-B.y-B.h:0);
+      const cost=out_*40+[...obst,...placed].reduce((s,o)=>s+hit(box,o),0);
+      if(!best||cost<best.cost)best={cost,box,an,tx:an==="middle"?l.x:l.x+dx};if(cost===0)break;}
+    placed.push(best.box);
+    out+=`<text x="${best.tx.toFixed(1)}" y="${(best.box.y+H-3).toFixed(1)}" text-anchor="${best.an}" style="fill:var(--fg);font-weight:${l.w};paint-order:stroke;stroke:var(--solid);stroke-width:3px;stroke-linejoin:round">${esc(l.t)}</text>`;});
+  return out;
 }
 function star(cx,cy,R,r){let d="";for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r:R;d+=(i?"L":"M")+(cx+rr*Math.cos(a)).toFixed(1)+","+(cy+rr*Math.sin(a)).toFixed(1);}return d+"Z";}
 function renderOpCmp(){

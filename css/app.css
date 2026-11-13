@@ -364,7 +364,7 @@ table{border-collapse:collapse;width:100%}
 @media (max-width:900px){.st-two,.st-grid{grid-template-columns:1fr}.st-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.crises{grid-template-columns:repeat(2,minmax(0,1fr))}.st-row{grid-template-columns:minmax(0,1fr) 92px 80px}}
 /* Frontiera */
-.op-form{grid-template-columns:repeat(4,minmax(0,1fr))}
+.op-form{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .op-form .op-goal{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
 .op-form .op-goal .seg{align-self:flex-start;max-width:100%;overflow-x:auto;flex-wrap:wrap}
 .op-sw{align-self:end;padding-bottom:10px}
