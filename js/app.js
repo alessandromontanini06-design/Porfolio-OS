@@ -22,36 +22,69 @@ const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab
 /* ---------- Scene e dock ---------- */
 const SCENES=["home","scan","map","lab","risk","sim","stress","opt","bench","games"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",stress:"Stress test",opt:"Frontiera",bench:"Benchmark",games:"Giochi"};
 let current="home";
-function movePill(){
-  const b=document.querySelector(`.dock button[data-go="${current}"]`),pill=$("#pillbg");if(!b||!pill)return;
-  pill.style.width=b.offsetWidth+"px";pill.style.transform=`translateX(${b.offsetLeft-6}px)`;
+/* colore d'accento di ogni sezione (lo stesso del CSS) */
+const ACC={home:"212,255,58",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165",games:"122,162,255"};
+/* la pillola del dock insegue il pulsante attivo con una molla, anche mentre l'etichetta si allarga */
+const pillS={x:0,w:0,on:false,until:0};
+function movePill(){pillS.until=performance.now()+900;if(pillS.on)return;pillS.on=true;
+  const step=()=>{const b=document.querySelector(`.dock button[data-go="${current}"]`),pill=$("#pillbg");if(!b||!pill){pillS.on=false;return;}
+    const tx=b.offsetLeft-6,tw=b.offsetWidth,k=REDUCE||!pillS.w?1:.22;pillS.x+=(tx-pillS.x)*k;pillS.w+=(tw-pillS.w)*k;
+    pill.style.width=pillS.w.toFixed(1)+"px";pill.style.transform=`translateX(${pillS.x.toFixed(1)}px)`;
+    if(performance.now()<pillS.until||Math.abs(tx-pillS.x)>.5||Math.abs(tw-pillS.w)>.5)requestAnimationFrame(step);else pillS.on=false;};
+  requestAnimationFrame(step);
+  const d=$("#dock"),b=document.querySelector(`.dock button[data-go="${current}"]`);
+  if(d&&b&&d.scrollWidth>d.clientWidth)setTimeout(()=>d.scrollTo({left:b.offsetLeft-d.clientWidth/2+b.offsetWidth/2,behavior:REDUCE?"auto":"smooth"}),420);
 }
+const avail=n=>{const b=document.querySelector(`.dock [data-go="${n}"]`);return !!b&&!b.disabled&&!b.classList.contains("off");};
+const neighbor=(name,dir)=>{for(let i=SCENES.indexOf(name)+dir;i>=0&&i<SCENES.length;i+=dir)if(avail(SCENES[i]))return SCENES[i];return null;};
+/* gli elementi che entrano in scena uno dopo l'altro: tutto ciò che è visibile, anche dentro i riquadri dei risultati */
+function enterItems(sc){
+  const out=[];sc.querySelectorAll(":scope>.inner>*").forEach(el=>{
+    if(el.hidden)return;
+    if(el.classList.contains("bento"))out.push(...el.children);
+    else if(el.id&&/Box$/.test(el.id))out.push(...[...el.children].filter(k=>!k.hidden));
+    else out.push(el);});
+  return out;
+}
+/* pannello di passaggio: copre la sezione che esce, mostra numero e nome di quella che entra, poi si apre */
+const xfer=document.createElement("div");xfer.className="xfer";xfer.setAttribute("aria-hidden","true");
+xfer.innerHTML=`<div class="xf-p"></div><div class="xf-in"><span class="xf-n"></span><div class="xf-t"><small></small><b></b></div></div>`;document.body.appendChild(xfer);
 function go(name,opts={}){
   if(!SCENES.includes(name)||(name===current&&!opts.force))return;
-  const prev=$("#scene-"+current),nxt=$("#scene-"+name);current=name;
+  const from=current,prev=$("#scene-"+current),nxt=$("#scene-"+name);current=name;
   document.querySelectorAll(".dock button[data-go]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.go===name)));
   $("#sceneChip").textContent=SCENE_L[name];movePill();Morph.shape(name);
   document.body.dataset.scene=name;if(Morph.tint)Morph.tint(name);
-  if(prev&&prev!==nxt){if(Morph.burst)Morph.burst(.9);warp(nxt);}
-  if(prev&&prev!==nxt){
-    if(HAS_G)G.to(prev,{opacity:0,y:-36,scale:.97,filter:"blur(8px)",duration:.35,ease:"power2.in",onComplete:()=>{prev.hidden=true;G.set(prev,{clearProps:"all"});}});
-    else prev.hidden=true;
-  }
-  nxt.hidden=false;nxt.scrollTop=0;
-  if(HAS_G){
-    const items=nxt.querySelectorAll(".scene-title,.bento>*,.kpis,.next,#labEmpty");
-    G.fromTo(items,{y:70,opacity:0,rotateX:-10,transformPerspective:900},{y:0,opacity:1,rotateX:0,duration:1,ease:"expo.out",stagger:.055,delay:prev&&prev!==nxt?.22:0,clearProps:"transform,opacity"});
-  }
-  onEnter(name);
+  if(go.tl){go.tl.progress(1).kill();go.tl=null;}
+  const change=prev&&prev!==nxt;
+  const show=()=>{if(change){prev.hidden=true;if(HAS_G)G.set(prev,{clearProps:"all"});}nxt.hidden=false;nxt.scrollTop=0;onEnter(name);renderPager(name);};
+  if(!HAS_G||REDUCE||!change){show();if(HAS_G&&!REDUCE){const it=enterItems(nxt);G.fromTo(it,{y:60,opacity:0},{y:0,opacity:1,duration:.9,ease:"expo.out",stagger:.05,clearProps:"transform,opacity"});}return;}
+  if(Morph.burst)Morph.burst(.9);
+  const dir=SCENES.indexOf(name)>=SCENES.indexOf(from)?1:-1,p=xfer.querySelector(".xf-p"),inn=xfer.querySelectorAll(".xf-in>*");
+  xfer.style.setProperty("--xf",ACC[name]);
+  xfer.querySelector(".xf-n").textContent=String(SCENES.indexOf(name)+1).padStart(2,"0");
+  xfer.querySelector(".xf-t small").textContent=`${SCENE_L[from]}  ${dir>0?"→":"←"}  ${SCENE_L[name]}`;
+  xfer.querySelector(".xf-t b").textContent=SCENE_L[name];
+  let items=[];
+  go.tl=G.timeline({onComplete:()=>{go.tl=null;}})
+    .set(xfer,{visibility:"visible"})
+    .to(prev,{opacity:0,x:-70*dir,filter:"blur(6px)",duration:.28,ease:"power2.in"},0)
+    .fromTo(p,{xPercent:-115*dir},{xPercent:0,duration:.34,ease:"power3.in"},0)
+    .fromTo(inn,{opacity:0,x:90*dir},{opacity:1,x:0,duration:.4,ease:"expo.out",stagger:.05},.2)
+    .add(()=>{show();items=enterItems(nxt);G.set(items,{opacity:0,y:56});const h=nxt.querySelector(".scene-title h2");if(h){h.classList.remove("glitch");void h.offsetWidth;h.classList.add("glitch");setTimeout(()=>h.classList.remove("glitch"),900);}},.34)
+    .to(inn,{opacity:0,x:-70*dir,duration:.22,ease:"power2.in",stagger:.03},.58)
+    .to(p,{xPercent:115*dir,duration:.42,ease:"power3.inOut"},.62)
+    .add(()=>{G.to(items,{opacity:1,y:0,duration:.85,ease:"expo.out",stagger:.045,clearProps:"transform,opacity"});},.7)
+    .set(xfer,{visibility:"hidden"},1.05);
 }
-/* salto tra le sezioni: linee di velocità dal centro, anello di luce e titolo che entra con un glitch */
-const warpEl=document.createElement("div");warpEl.className="warp";warpEl.setAttribute("aria-hidden","true");warpEl.innerHTML="<i class='w-lines'></i><i class='w-ring'></i><i class='w-flash'></i>";document.body.appendChild(warpEl);
-function warp(nxt){
-  if(REDUCE||!HAS_G)return;
-  warpEl.classList.remove("go");void warpEl.offsetWidth;warpEl.classList.add("go");
-  clearTimeout(warp.t);warp.t=setTimeout(()=>warpEl.classList.remove("go"),1100);
-  const h=nxt&&nxt.querySelector(".scene-title h2");
-  if(h){h.classList.remove("glitch");void h.offsetWidth;h.classList.add("glitch");setTimeout(()=>h.classList.remove("glitch"),900);}
+/* in fondo a ogni sezione: da dove vieni, dove vai, a che punto sei */
+function renderPager(name){
+  const sc=$("#scene-"+name),inner=sc&&sc.querySelector(":scope>.inner");if(!inner)return;
+  let nav=inner.querySelector(":scope>.pager");if(!nav){nav=document.createElement("nav");nav.className="pager";nav.setAttribute("aria-label","Sezione precedente e successiva");inner.appendChild(nav);}
+  const pv=neighbor(name,-1),nx=neighbor(name,1),lockNext=!nx&&SCENES.indexOf(name)<SCENES.length-1?SCENES[SCENES.indexOf(name)+1]:null;
+  const card=(n,cls,arrow)=>n?`<button type="button" class="pg ${cls}" data-go="${n}" style="--t:${ACC[n]}"><span>${cls==="nx"?"":arrow+" "}${String(SCENES.indexOf(n)+1).padStart(2,"0")}${cls==="nx"?" "+arrow:""}</span><b>${SCENE_L[n]}</b></button>`:`<span class="pg ${cls} none"></span>`;
+  nav.innerHTML=card(pv,"pv","←")+`<div class="pg-dots" aria-hidden="true">${SCENES.map(s=>`<i class="${s===name?"on":avail(s)?"":"off"}" style="--t:${ACC[s]}"></i>`).join("")}</div>`
+    +(nx?card(nx,"nx","→"):lockNext?`<span class="pg nx locked"><span>${String(SCENES.indexOf(lockNext)+1).padStart(2,"0")} 🔒</span><b>${SCENE_L[lockNext]}</b><small>si sblocca costruendo il laboratorio</small></span>`:`<span class="pg nx none"></span>`);
 }
 function onEnter(name){
   quantaScene(name);
@@ -68,9 +101,9 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!
 window.addEventListener("resize",movePill);
 document.addEventListener("keydown",e=>{
   if(e.target.closest&&e.target.closest("input,select,textarea")||$("#drawer").classList.contains("open"))return;
-  const i=SCENES.indexOf(current);
-  if(e.key==="ArrowRight"&&i<SCENES.length-1){const n=SCENES[i+1];if(!((n==="lab"||n==="risk"||n==="sim"||n==="stress"||n==="opt"||n==="bench")&&!S.lab))go(n);}
-  if(e.key==="ArrowLeft"&&i>0)go(SCENES[i-1]);
+  if(document.body.classList.contains("bs-on"))return;
+  if(e.key==="ArrowRight"){const n=neighbor(current,1);if(n)go(n);}
+  if(e.key==="ArrowLeft"){const n=neighbor(current,-1);if(n)go(n);}
 });
 
 /* ---------- Cursore, luce sulle tessere, inclinazione 3D ---------- */
@@ -794,7 +827,7 @@ function showLab(instant,stay){
   const ds=S.ds,f=ds.freq.f;
   S.lab={st:ds.assets.map(a=>P.stats(a,f,ds.dates)),W:ds.assets.map(a=>P.wealth(a,ds.dates.length)),C:ds.assets.map(a=>ds.assets.map(b=>P.corr(a,b)))};
   S.labFx={};
-  $("#lab").hidden=false;$("#labEmpty").hidden=true;$("#navLab").classList.remove("off");$("#navRisk").classList.remove("off");$("#navSim").classList.remove("off");$("#navStress").classList.remove("off");$("#navOpt").classList.remove("off");$("#navBench").classList.remove("off");S.mc=null;S.mcIn=null;S.stress=null;S.st=null;S.opt=null;S.opIn=null;S.optW=null;if(S.riskW==="opt")S.riskW=null;
+  $("#lab").hidden=false;$("#labEmpty").hidden=true;$("#navLab").classList.remove("off");$("#navRisk").classList.remove("off");$("#navSim").classList.remove("off");$("#navStress").classList.remove("off");$("#navOpt").classList.remove("off");$("#navBench").classList.remove("off");renderPager(current);S.mc=null;S.mcIn=null;S.stress=null;S.st=null;S.opt=null;S.opIn=null;S.optW=null;if(S.riskW==="opt")S.riskW=null;
   if(!S.macro||S.macro.status!=="ready"||S.macro.key!==ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]))S.macro=null;
   renderLab();reveal($("#lab"));
   if(!S.macro)fetchMacro().then(()=>{if(S.macro)S.macro.key=ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]);});
@@ -2310,3 +2343,4 @@ renderLabs();loadMarket();
 quantaScene("home");
 requestAnimationFrame(movePill);
 if(!HAS_G)heroIntro();
+renderPager("home");
