@@ -185,16 +185,29 @@ function wideHeader(aoa){
   }
   return best;
 }
-function parseWideSheet(name,aoa){
+/* lettera di colonna Excel → indice (A=0); -1 se non valida */
+function colIdx(L){if(L==null)return -1;const t=String(L).toUpperCase().trim();if(!/^[A-Z]{1,3}$/.test(t))return -1;let n=0;for(const ch of t)n=n*26+ch.charCodeAt(0)-64;return n-1;}
+const lc=x=>String(x??"").trim().toLowerCase();
+/* hint (dall'IA, facoltativo): {rigaDate, colonnaNome, colonnaValuta, colonnaTipo, codiciValuta, sezioni, righeSpeciali, classiPerTipo} */
+function parseWideSheet(name,aoa,hint){
   aoa=(aoa||[]).map(r=>Array.isArray(r)?r:[]);
-  const H=wideHeader(aoa);if(!H)return null;
+  let H;
+  if(hint&&hint.rigaDate){const r=hint.rigaDate-1,cols=[];(aoa[r]||[]).forEach((v,c)=>{const d=v instanceof Date||typeof v==="string"?parseDate(v,true):typeof v==="number"&&v>20000&&v<80000?parseDate(v,true):null;if(d)cols.push({c,d});});H=cols.length>=2?{r,cols}:null;}
+  else H=wideHeader(aoa);
+  if(!H)return null;
   const first=H.cols[0].c,hdr=aoa[H.r],body=aoa.slice(H.r+1),left=[];
   for(let c=0;c<first;c++){const vals=body.map(r=>r[c]).filter(v=>typeof v==="string"&&v.trim()&&!parseNum(v)).map(v=>v.trim());left.push({c,vals,h:String(hdr[c]??"")});}
   const isCur=x=>x.vals.length>=3&&x.vals.filter(v=>CUR_CODE[v.toUpperCase()]).length/x.vals.length>=.8&&x.vals.every(v=>v.length<=4);
-  const curC=left.find(x=>/curr|valut|ccy/i.test(x.h)&&x.vals.length)||left.find(isCur)||null;
-  const typeC=left.find(x=>x!==curC&&/^(type|tipo|categ|class)/i.test(x.h.trim()))||null;
-  const labC=left.filter(x=>x!==curC&&x!==typeC).sort((a,b)=>b.vals.length-a.vals.length)[0];
+  const byLetter=L=>{const i=colIdx(L);return i>=0?{c:i,vals:body.map(r=>r[i]).filter(v=>typeof v==="string"&&v.trim()).map(v=>v.trim()),h:String(hdr[i]??"")}:null;};
+  const curC=hint?byLetter(hint.colonnaValuta):left.find(x=>/curr|valut|ccy/i.test(x.h)&&x.vals.length)||left.find(isCur)||null;
+  const typeC=hint?byLetter(hint.colonnaTipo):left.find(x=>x!==curC&&/^(type|tipo|categ|class)/i.test(x.h.trim()))||null;
+  const labC=hint&&colIdx(hint.colonnaNome)>=0?byLetter(hint.colonnaNome):left.filter(x=>x!==curC&&x!==typeC).sort((a,b)=>b.vals.length-a.vals.length)[0];
   if(!labC||labC.vals.length<2)return null;
+  const curMap={...CUR_CODE};(hint&&hint.codiciValuta||[]).forEach(x=>{if(x&&x.codice&&/^[A-Z]{3}$/.test(String(x.valuta||"").toUpperCase()))curMap[String(x.codice).trim().toUpperCase()]=String(x.valuta).toUpperCase();});
+  const SEC={posizioni:"",debiti:"debt",totali:"total",cambi:"fx",classi:"alloc",ignora:"skip"},ROW={posizione:"hold",debito:"debt",totale:"total",cambio:"fx",classe:"alloc",ignora:"skip"};
+  const secRole=new Map((hint&&hint.sezioni||[]).map(x=>[lc(x.etichetta),SEC[x.ruolo]]));
+  const rowRole=new Map((hint&&hint.righeSpeciali||[]).map(x=>[lc(x.etichetta),ROW[x.ruolo]]));
+  const clsOf=new Map((hint&&hint.classiPerTipo||[]).map(x=>[lc(x.tipo),x.classe]));
   /* le colonne della stessa data o dello stesso mese: vale l'ultima a destra (istantanea di fine mese) */
   const months=H.cols.map(x=>({c:x.c,k:x.d.toISOString().slice(0,7)}));
   const out={name,months:months.map(m=>m.k),hold:[],total:[],alloc:[],fx:[],debt:[],skipped:0};
@@ -204,9 +217,13 @@ function parseWideSheet(name,aoa){
     const vals=months.map(m=>{const p=row[m.c] instanceof Date?null:parseNum(row[m.c]);return p?p.n:null;});
     const nn=vals.filter(v=>v!==null).length;
     if(!lab){if(nn)out.skipped++;continue;}
-    if(!nn){sec=lab;mode=ALLOC_RX.test(lab)?"alloc":FXSEC_RX.test(lab)?"fx":DEBT_RX.test(lab)?"debt":mode==="alloc"||mode==="fx"?"":mode==="debt"?"":"";continue;}
+    if(!nn){sec=lab;if(secRole.has(lc(lab)))mode=secRole.get(lc(lab));else if(!hint)mode=ALLOC_RX.test(lab)?"alloc":FXSEC_RX.test(lab)?"fx":DEBT_RX.test(lab)?"debt":"";continue;}
     const cc=curC?String(row[curC.c]??"").trim().toUpperCase():"",type=typeC&&typeof row[typeC.c]==="string"?row[typeC.c].trim():"";
-    const item={label:lab,cur:CUR_CODE[cc]||null,type,sec,vals};
+    const item={label:lab,cur:curMap[cc]||null,type,sec,vals,cls:clsOf.get(lc(type))||null};
+    const forced=rowRole.get(lc(lab));
+    if(forced){if(forced!=="skip"){if(forced==="total"&&!item.cur&&curMap[lab.toUpperCase()])item.cur=curMap[lab.toUpperCase()];out[forced].push(item);}continue;}
+    if(mode==="skip")continue;
+    if(mode==="total"){out.total.push(item);continue;}
     if(mode==="fx"||(!item.cur&&FXROW_RX.test(lab.toUpperCase())))out.fx.push(item);
     else if(CUR_CODE[lab.toUpperCase()]&&lab.length>=3){item.cur=CUR_CODE[lab.toUpperCase()];out.total.push(item);}
     else if(TOTAL_RX.test(lab)||/^total/i.test(type))out.total.push(item);
@@ -216,18 +233,18 @@ function parseWideSheet(name,aoa){
   }
   return out.hold.length+out.alloc.length+out.total.length?out:null;
 }
-const CLASS_MAP=[[/etf|stock|azion|equity|shares/i,"Azioni ed ETF"],[/crypto|bitcoin|btc/i,"Crypto"],[/^re$|real ?estate|immob|apparta/i,"Immobili"],[/^pe$|private/i,"Private equity"],[/p2p|lending|bond|obblig|prestit|crowd/i,"Prestiti e obbligazioni"],[/pension|previd/i,"Previdenza"],[/cash|liquid|conto|deposit/i,"Liquidità"]];
+const CLASS_MAP=[[/etf|stock|azion|equity|shares/i,"Azioni ed ETF"],[/crypto|bitcoin|btc/i,"Crypto"],[/^re$|real ?estate|immob|apparta/i,"Immobili"],[/^pe$|private/i,"Private equity"],[/p2p|lending|bond|obblig|prestit|crowd/i,"Prestiti e obbligazioni"],[/pension|previd/i,"Previdenza"],[/cash|liquid|cont[oi]|deposit|bank|banca/i,"Liquidità"]];
 const CLASS_ORDER=["Azioni ed ETF","Previdenza","Crypto","Immobili","Private equity","Prestiti e obbligazioni","Altro","Liquidità"];
-function assetClass(h){for(const [rx,n] of CLASS_MAP)if(rx.test(h.type||""))return n;for(const [rx,n] of CLASS_MAP)if(rx.test(h.sec||""))return n;return "Altro";}
-function reshapeWide(sheets){
-  const parsed=(sheets||[]).map(s=>parseWideSheet(s.name,s.aoa)).filter(Boolean);
+function assetClass(h){if(h.cls)return h.cls;for(const [rx,n] of CLASS_MAP)if(rx.test(h.type||""))return n;for(const [rx,n] of CLASS_MAP)if(rx.test(h.sec||""))return n;return "Altro";}
+function reshapeWide(sheets,hints){
+  const parsed=(sheets||[]).filter(s=>!hints||hints[s.name]).map(s=>parseWideSheet(s.name,s.aoa,hints&&hints[s.name])).filter(Boolean);
   if(!parsed.length)return null;
   parsed.sort((a,b)=>a.months[0]<b.months[0]?-1:a.months[0]>b.months[0]?1:0);
   const months=[...new Set(parsed.flatMap(p=>p.months))].sort(),mi=new Map(months.map((m,i)=>[m,i])),N=months.length;
   /* ogni mese appartiene a un solo foglio: quello che contiene più mesi di quell'anno (la prima colonna di un foglio annuale
      spesso ripete la chiusura dell'anno prima, a volte con nomi già cambiati: contarla due volte raddoppierebbe le posizioni) */
   const owner=kind=>{const O=new Map(),cand=parsed.filter(p=>p[kind].length);months.forEach(m=>{const y=m.slice(0,4);let best=null,bs=-1;cand.forEach(p=>{if(!p.months.includes(m))return;const sc=p.months.filter(x=>x.slice(0,4)===y).length*1e4+p[kind].length;if(sc>=bs){bs=sc;best=p;}});O.set(m,best);});return O;};
-  const merge=(kind,key)=>{const M=new Map(),O=owner(kind);parsed.forEach(p=>p[kind].forEach(it=>{const k=key(it);if(!M.has(k))M.set(k,{...it,vals:new Array(N).fill(null)});const t=M.get(k);t.type=it.type||t.type;t.sec=it.sec||t.sec;it.vals.forEach((v,j)=>{if(v!==null&&O.get(p.months[j])===p)t.vals[mi.get(p.months[j])]=v;});}));return [...M.values()];};
+  const merge=(kind,key)=>{const M=new Map(),O=owner(kind);parsed.forEach(p=>p[kind].forEach(it=>{const k=key(it);if(!M.has(k))M.set(k,{...it,vals:new Array(N).fill(null)});const t=M.get(k);t.type=it.type||t.type;t.sec=it.sec||t.sec;t.cls=it.cls||t.cls;it.vals.forEach((v,j)=>{if(v!==null&&O.get(p.months[j])===p)t.vals[mi.get(p.months[j])]=v;});}));return [...M.values()];};
   const fx=merge("fx",x=>x.label.toUpperCase().replace(/[\s(].*$/,""));
   fx.forEach(f=>{let last=null;f.vals=f.vals.map(v=>v>0?(last=v):last);});
   const fxv=code=>{const f=fx.find(x=>x.label.toUpperCase().replace(/[\s(].*$/,"")===code);return f?f.vals:null;};
@@ -252,12 +269,94 @@ function reshapeWide(sheets){
   const nw=enough(nwv)?[{name:"Patrimonio netto (EUR)",v:nwv}]:[];
   const mk=(name,series)=>{const aoa=[["Data",...series.map(s=>s.name)]];months.forEach((m,i)=>{if(series.every(s=>s.v[i]==null))return;const [y,mo]=m.split("-").map(Number);aoa.push([new Date(y,mo,0),...series.map(s=>s.v[i]==null?null:Math.round(s.v[i]*100)/100)]);});return {name,aoa,virtual:true};};
   const out=[];
-  if(classes.length)out.push(mk("★ Classi di attivo · tutti gli anni",classes));
-  if(nw.length)out.push(mk("★ Patrimonio netto · tutti gli anni",nw));
+  /* le classi vengono prima solo se sono almeno due: altrimenti si parte dalle singole posizioni */
+  if(classes.length>=2)out.push(mk("★ Classi di attivo · tutti gli anni",classes));
   if(positions.length)out.push(mk("★ Posizioni · tutti gli anni",positions));
+  if(classes.length===1)out.push(mk("★ Classi di attivo · tutti gli anni",classes));
+  if(nw.length)out.push(mk("★ Patrimonio netto · tutti gli anni",nw));
   if(!out.length)return null;
   const detail=hold.map(h=>({label:h.label,type:h.type,sec:h.sec,cls:assetClass(h),cur:h.cur,eur:canEUR(h.cur)?conv(h):null}));
   return {sheets:out,months,detail,report:{sheets:parsed.map(p=>p.name),months:N,from:months[0],to:months[N-1],classes:classes.map(c=>c.name),classSrc,positions:positions.length,holdings:hold.length,debts:debt.length,totals:total.length,fx:usdeur?"i tassi di cambio scritti nel file":null,currencies:[...curs].filter(c=>c!=="?")}};
+}
+
+/* ---------- Ricetta di lettura (scritta dall'IA, eseguita qui): l'IA dice DOVE sono i dati, il motore li legge e li controlla ---------- */
+const COLROLE={prezzo:"price",valore:"price",rendimento_decimale:"ret",rendimento_percentuale:"retpct"};
+function columnBlocks(sheets,blocks,extra){
+  const byName=new Map(sheets.map(s=>[s.name,s.aoa||[]])),series=[...(extra||[])],errors=[];
+  for(const b of blocks||[]){
+    const aoa=byName.get(b.foglio);if(!aoa){errors.push(`Il foglio «${b.foglio}» non esiste.`);continue;}
+    const dc=colIdx(b.colonnaData);if(dc<0){errors.push(`«${b.foglio}»: colonna data «${b.colonnaData}» non valida.`);continue;}
+    const h=(b.rigaIntestazione||0)-1,r0=Math.max(0,b.primaRiga?b.primaRiga-1:h+1),r1=Math.min(aoa.length-1,b.ultimaRiga?b.ultimaRiga-1:aoa.length-1),rows=[];
+    for(let r=r0;r<=r1;r++){const d=parseDate((aoa[r]||[])[dc],true);if(d)rows.push({r,d});}
+    if(rows.length<3){errors.push(`«${b.foglio}»: nella colonna ${b.colonnaData} ci sono solo ${rows.length} date valide.`);continue;}
+    const gaps=[];for(let k=1;k<rows.length;k++)gaps.push(Math.abs(rows[k].d-rows[k-1].d)/864e5);const md=median(gaps);
+    for(const s of b.serie||[]){
+      const role=COLROLE[s.ruolo];if(!role)continue;
+      const c=colIdx(s.colonna);if(c<0){errors.push(`«${s.nome}»: colonna «${s.colonna}» non valida.`);continue;}
+      const pts=rows.map(x=>{const v=(aoa[x.r]||[])[c],p=v instanceof Date?null:parseNum(v);return [x.d,p?(role==="retpct"&&p.pct?p.n*100:p.n):null];});
+      const nn=pts.filter(p=>p[1]!=null).length;
+      if(nn<3){errors.push(`«${s.nome}» (colonna ${s.colonna} di «${b.foglio}»): solo ${nn} numeri, esclusa.`);continue;}
+      series.push({name:String(s.nome||s.colonna).trim(),role,pts,md,foglio:b.foglio});
+    }
+  }
+  if(!series.length)return {sheet:null,errors};
+  /* stesso nome in fogli diversi: si aggiunge il foglio */
+  const cnt=new Map();series.forEach(s=>cnt.set(s.name,(cnt.get(s.name)||0)+1));series.forEach(s=>{if(cnt.get(s.name)>1)s.name+=` · ${s.foglio}`;});
+  /* tutte mensili o più rade: si allineano per mese (fine mese); altrimenti per giorno */
+  const monthly=series.every(s=>s.md>=25),key=d=>monthly?d.toISOString().slice(0,7):d.toISOString().slice(0,10);
+  const keys=[...new Set(series.flatMap(s=>s.pts.map(p=>key(p[0]))))].sort(),ki=new Map(keys.map((k,i)=>[k,i]));
+  const aoa=[["Data",...series.map(s=>s.name)]];keys.forEach(k=>{const [y,m,d]=k.split("-").map(Number);aoa.push([monthly?new Date(y,m,0):new Date(y,m-1,d),...series.map(()=>null)]);});
+  series.forEach((s,j)=>s.pts.forEach(([d,v])=>{if(v!=null)aoa[1+ki.get(key(d))][1+j]=v;}));
+  return {sheet:{name:"★ Serie lette dall'IA",aoa,virtual:true,roles:["date",...series.map(s=>s.role)]},errors};
+}
+/* movimenti (acquisti e vendite): quantità nette e ultimo prezzo pagato per titolo */
+function txPositions(sheets,m){
+  const aoa=(sheets.find(s=>s.name===m.foglio)||{}).aoa;if(!aoa)return {errors:[`Il foglio «${m.foglio}» non esiste.`],positions:[],n:0};
+  const h=(m.rigaIntestazione||1)-1,cD=colIdx(m.colonnaData),cT=colIdx(m.colonnaTitolo),cQ=colIdx(m.colonnaQuantita),cP=colIdx(m.colonnaPrezzo),cA=colIdx(m.colonnaImporto),cO=colIdx(m.colonnaOperazione);
+  if(cT<0)return {errors:["Manca la colonna del titolo."],positions:[],n:0};
+  const P=new Map();let n=0;const num=(row,c)=>{if(c<0)return null;const p=parseNum(row[c]);return p?p.n:null;};
+  for(let r=h+1;r<aoa.length;r++){
+    const row=aoa[r]||[],t=String(row[cT]??"").trim();if(!t)continue;
+    const d=cD>=0?parseDate(row[cD],true):null,px=num(row,cP),amt=num(row,cA);let q=num(row,cQ);
+    if(q==null&&amt!=null&&px)q=Math.abs(amt)/px;if(q==null)continue;
+    const op=cO>=0?lc(row[cO]):"",sell=/vend|sell|sale|cession|uscit|rimbors|short/.test(op),buy=/acq|buy|purch|sottoscr|entrat|compr/.test(op);
+    const qty=sell?-Math.abs(q):buy?Math.abs(q):q;
+    const it=P.get(t)||{titolo:t,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
+    if(px>0&&(!it.lastD||!d||d>=it.lastD)){it.last=px;it.lastD=d;}
+    it.inv+=amt!=null?(qty<0?-1:1)*Math.abs(amt):px?qty*px:0;P.set(t,it);n++;
+  }
+  const positions=[...P.values()].filter(x=>x.q>1e-9).map(x=>({titolo:x.titolo,quantita:x.q,prezzo:x.last,valore:x.last?x.q*x.last:null,investito:x.inv,operazioni:x.n,data:x.lastD}));
+  return {errors:n?[]:["Nessun movimento leggibile."],positions,n,chiuse:[...P.values()].filter(x=>x.q<=1e-9).length};
+}
+/* tabella di rendimenti mensili: un anno per riga, dodici colonne di mesi (gen → dic) */
+function matrixSeries(sheets,blocks,errors){
+  const out=[];
+  for(const b of blocks||[]){
+    const aoa=(sheets.find(s=>s.name===b.foglio)||{}).aoa;if(!aoa){errors.push(`Il foglio «${b.foglio}» non esiste.`);continue;}
+    const cy=colIdx(b.colonnaAnno),c0=colIdx(b.colonnaGennaio),pct=b.ruolo==="rendimento_percentuale";
+    if(cy<0||c0<0){errors.push(`«${b.foglio}»: colonne dell'anno o di gennaio non valide.`);continue;}
+    const pts=[];
+    for(let r=Math.max(0,(b.primaRiga||1)-1);r<=Math.min(aoa.length-1,b.ultimaRiga?b.ultimaRiga-1:aoa.length-1);r++){
+      const row=aoa[r]||[],yp=parseNum(row[cy]),y=yp&&Number.isInteger(yp.n)&&yp.n>1900&&yp.n<2100?yp.n:null;if(!y)continue;
+      for(let m=0;m<12;m++){const p=parseNum(row[c0+m]);if(!p)continue;pts.push([new Date(Date.UTC(y,m+1,0)),pct?(p.pct?p.n*100:p.n):(p.pct?p.n:p.n)]);}
+    }
+    if(pts.length<3){errors.push(`«${b.nome}»: meno di tre mesi leggibili nella tabella.`);continue;}
+    out.push({name:String(b.nome).trim(),role:pct?"retpct":"ret",pts,md:30,foglio:b.foglio});
+  }
+  return out;
+}
+function applyRecipe(sheets,R){
+  const out={sheets:[],errors:[],wide:null,tx:null};if(!R)return out;
+  const groups=(R.serieInRiga||[]).filter(g=>g&&(g.fogli||[]).length);
+  if(groups.length){
+    const hints={};groups.forEach(g=>g.fogli.forEach(f=>{hints[f]=g;}));
+    const W=reshapeWide(sheets,hints);
+    if(W){out.wide=W;out.sheets.push(...W.sheets);}else out.errors.push("Nei fogli indicati con le date in riga non ho trovato date leggibili.");
+  }
+  const mx=matrixSeries(sheets,R.matriciRendimenti,out.errors);
+  if((R.serieInColonna||[]).length||mx.length){const C=columnBlocks(sheets,R.serieInColonna,mx);out.errors.push(...C.errors);if(C.sheet)out.sheets.unshift(C.sheet);}
+  if(R.movimenti){const T=txPositions(sheets,R.movimenti);out.tx={...T,valuta:R.movimenti.valuta||null};out.errors.push(...T.errors);}
+  return out;
 }
 
 const FREQS=[{max:4,label:"giornaliera",adj:"giornaliere",f:252},{max:10,label:"settimanale",adj:"settimanali",f:52},{max:45,label:"mensile",adj:"mensili",f:12},{max:120,label:"trimestrale",adj:"trimestrali",f:4},{max:Infinity,label:"annuale",adj:"annuali",f:1}];
@@ -782,6 +881,6 @@ function frontierScore(mu,C,w,maxVol,rf){
   const lo=Math.min(...mu),over=me.vol>maxVol+1e-9,eff=best.ret>lo?(me.ret-lo)/(best.ret-lo):1;
   return {w:ww,ret:me.ret,vol:me.vol,best:{w:best.w,ret:best.ret,vol:best.vol},over,score:over?0:Math.round(100*Math.max(0,Math.min(1,eff))),gap:best.ret-me.ret,frontier:O.frontier};
 }
-export const POS={reshapeWide,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={reshapeWide,applyRecipe,colIdx,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

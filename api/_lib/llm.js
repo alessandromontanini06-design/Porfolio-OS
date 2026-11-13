@@ -150,7 +150,7 @@ export async function json(task) {
       let raw, model;
       if (p === "claude") {
         const r = await claude.messages.parse({
-          model: CLAUDE_MODEL, max_tokens: 4000, system: task.system,
+          model: CLAUDE_MODEL, max_tokens: task.maxTokens || 4000, system: task.system,
           output_config: { effort: "low", format: zodOutputFormat(task.schema) },
           messages: [{ role: "user", content: task.user }]
         }, { timeout: ms });

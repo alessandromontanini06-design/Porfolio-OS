@@ -377,13 +377,17 @@ function renderTicker(){
 function reveal(){}
 
 /* ---------- Caricamento ---------- */
-function load(sheets,source,fromUser){
-  /* tracker a matrice (una riga per voce, una colonna per mese, un foglio per anno): prima li rimetto in colonna e li unisco */
-  S.wide=source.kind==="file"?P.reshapeWide(sheets):null;
-  const all=S.wide?[...S.wide.sheets,...sheets]:sheets;
+function load(sheets,source,fromUser,opts={}){
+  if(source.kind==="file"&&!opts.recipe){S.fileSheets=sheets;S.recipe=null;}
+  /* con la ricetta dell'IA: i suoi fogli ricostruiti; senza: i riconoscitori automatici (tracker a matrice) */
+  S.wide=opts.recipe?(opts.wide||null):source.kind==="file"?P.reshapeWide(sheets):null;
+  const virt=opts.recipe?(opts.virtual||[]):S.wide?S.wide.sheets:[];
+  const all=[...virt,...sheets];
   S.source=source;S.raw=all.map(s=>s.aoa);
   S.sheets=all.map(s=>P.analyzeSheet(s.name,s.aoa));
-  S.sheetIdx=S.wide?0:S.sheets.reduce((b,s,i)=>s.score>S.sheets[b].score?i:b,0);
+  /* ruoli decisi dall'IA per le colonne dei fogli che ha ricostruito */
+  all.forEach((sh,i)=>{if(sh.roles)S.sheets[i].cols.forEach(c=>{const r=sh.roles[c.idx];if(r){c.suggest=r;c.conf="alta";c.reason=r==="date"?"Colonna data indicata dall'IA":"Serie indicata dall'IA dopo aver letto il file";}});});
+  S.sheetIdx=virt.length?0:S.sheets.reduce((b,s,i)=>s.score>S.sheets[b].score?i:b,0);
   /* nei tracker la liquidità cambia con versamenti e spese, non con il mercato: fuori dalle analisi salvo scelta diversa */
   if(S.wide)S.sheets.slice(0,S.wide.sheets.length).forEach(A=>A.cols.forEach(c=>{if(/^liquidit/i.test(c.name)&&c.suggest){c.suggest="ignore";c.conf="alta";c.reason="Saldi di conti e broker: cambiano con versamenti, spese e trasferimenti, non con il mercato";}}));
   initRoles();hideLab();$("#fileErr").hidden=true;S.scanPlayed=false;resetAI();
@@ -391,9 +395,60 @@ function load(sheets,source,fromUser){
   morphData();
   if(fromUser){S.scanPlayed=false;go("scan",{force:true});}
   if(source.kind!=="rebuilt"){S.portfolio=null;S.tx=detectTx(sheets);}
-  if(S.wide){const u=wideSnapshot(S.wide);if(u){S.und=u;renderAI();}}
-  /* file "tracker" (versamenti, quote, valori) o con molti fogli: prima l'IA capisce che file è, poi eventualmente ricostruisce con i prezzi veri */
-  if(fromUser&&source.kind==="file"&&aiAuto()&&!S.wide){const tracker=S.sheets.some(s=>s.tracker);if(S.ds&&S.ds.ok&&!tracker&&S.sheets.length<3)requestFix();else requestUnderstand();}
+  const sym=new Map(((opts.recipe&&opts.recipe.simboli)||[]).map(x=>[String(x.titolo).trim().toLowerCase(),String(x.simbolo).trim().toUpperCase()]));
+  const u=opts.tx&&opts.tx.positions.length?txSnapshot(opts.tx,sym):S.wide?wideSnapshot(S.wide,sym):opts.recipe&&(opts.recipe.posizioni||[]).length?{status:"ready",tipo:"riepilogo_portafoglio",foglio:"",spiegazione:opts.recipe.spiegazione,posizioni:opts.recipe.posizioni.slice(0,20),scartati:opts.recipe.scartati||[]}:null;
+  if(u){S.und=u;renderAI();}
+  /* ogni file caricato: l'IA legge la struttura di tutti i fogli e scrive la ricetta; intanto resta la lettura automatica */
+  if(fromUser&&source.kind==="file"&&aiAuto())requestRecipe();
+  renderLog(an(),S.ds,false);
+}
+/* ---------- Lettura con l'IA: estratto strutturato → ricetta → il motore la esegue su tutto il file ---------- */
+function aiSample(){
+  const sheets=S.fileSheets||[],short=v=>{const t=cellText(v);return t.length>28?t.slice(0,27)+"…":t;};
+  const kind=v=>v===null||v===undefined||String(v).trim()===""?"e":v instanceof Date||typeof v==="number"?"d":P.parseNum(v)||P.parseDate(v,false)?"d":"s";
+  const build=(head,perSec,maxCols)=>({file:S.source.name,nota:"estratto: 'celle' è lettera di colonna → valore; 'dati' = quante celle numeriche o date ha la riga; le righe non elencate sono simili a quelle vicine.",
+    fogli:sheets.slice(0,24).map(sh=>{
+      const aoa=sh.aoa||[],w=aoa.reduce((m,r)=>Math.max(m,(r||[]).length),0),rows=[];let after=0;
+      const nonEmpty=aoa.map((r,i)=>[i,r||[]]).filter(([,r])=>r.some(v=>kind(v)!=="e")),tail=new Set(nonEmpty.slice(-2).map(x=>x[0]));
+      nonEmpty.forEach(([ri,r])=>{
+        const cells=r.map((v,ci)=>[ci,v,kind(v)]).filter(x=>x[2]!=="e"),str=cells.filter(x=>x[2]==="s").length,dat=cells.length-str;
+        const pick=list=>Object.fromEntries(list.map(([ci,v])=>[colLetterUI(ci),short(v)]));
+        if(ri<head){rows.push({riga:ri+1,celle:pick(cells.slice(0,maxCols)),...(cells.length>maxCols?{altre:cells.length-maxCols}:{})});return;}
+        const sec=str>0&&dat===0;if(sec)after=0;
+        const keep=sec||tail.has(ri)||(str>0&&after<perSec)||(str===0&&after<1);
+        if(!sec&&keep)after++;
+        if(keep)rows.push({riga:ri+1,celle:pick([...cells.filter(x=>x[2]==="s").slice(0,5),...cells.filter(x=>x[2]==="d").slice(0,2)].sort((a,b)=>a[0]-b[0])),dati:dat});
+      });
+      return {nome:sh.name,righe:aoa.length,colonne:w,estratto:rows};
+    })});
+  for(const [h,ps,mc] of [[14,3,30],[10,2,24],[8,1,18],[6,1,14],[4,0,10]]){const p=build(h,ps,mc);if(JSON.stringify(p).length<95000)return p;}
+  return build(3,0,8);
+}
+async function requestRecipe(){
+  S.recipe={status:"loading"};renderAI();renderLog(an(),S.ds,false);
+  const src=S.source;
+  try{
+    const r=await fetch("/api/recipe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(aiSample()),signal:AbortSignal.timeout(80000)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||`Il server ha risposto con un errore (${r.status}).`);
+    if(S.source!==src)return; // nel frattempo è stato caricato un altro file
+    const A=P.applyRecipe(S.fileSheets,j);
+    if(!A.sheets.length&&!(A.tx&&A.tx.positions.length)&&!(j.posizioni||[]).length){S.recipe={status:"empty",r:j,errors:A.errors};renderAI();renderLog(an(),S.ds,false);return;}
+    const prev=S.sheetIdx;load(S.fileSheets,S.source,false,{recipe:j,virtual:A.sheets,wide:A.wide,tx:A.tx});void prev;
+    S.recipe={status:"done",r:j,errors:A.errors};renderAI();renderLog(an(),S.ds,false);
+  }catch(e){
+    if(S.source!==src)return;
+    S.recipe={status:"error",msg:e.name==="TimeoutError"||e.name==="AbortError"?"L'IA non ha risposto in tempo":e instanceof TypeError?"La lettura con l'IA funziona nel sito pubblicato":String(e.message||e)};
+    renderAI();renderLog(an(),S.ds,false);
+  }
+}
+function recipeOff(){S.recipe=null;load(S.fileSheets,S.source,false);S.recipe={status:"off"};renderAI();renderLog(an(),S.ds,false);}
+/* movimenti: le posizioni aperte (quantità nette × ultimo prezzo) diventano un riepilogo da ricostruire con i prezzi storici */
+function txSnapshot(T,sym){
+  const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
+  return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
+    spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
+    posizioni:T.positions.map(p=>({nome:p.titolo,ticker:p.titolo,simbolo:sym.get(p.titolo.toLowerCase())||guessSymbol(p.titolo,"",T.valuta)||p.titolo,valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -470,6 +525,11 @@ function renderScan(A,animate){
 function renderLog(A,ds,animate){
   const t0=performance.now(),L=[];
   L.push(["ok",`Letto «${S.source.name}» · ${S.sheets.length} ${S.sheets.length===1?"foglio":"fogli"}${S.source.size?" · "+fmtSize(S.source.size):""}`]);
+  const RC=S.recipe;
+  if(RC&&RC.status==="loading")L.push(["warn",`L'IA sta leggendo la struttura di ${(S.fileSheets||[]).length} ${(S.fileSheets||[]).length===1?"foglio":"fogli"}: intanto vedi la lettura automatica`]);
+  else if(RC&&RC.status==="done"){L.push(["ok",`Struttura letta dall'IA: ${RC.r.spiegazione}`]);(RC.errors||[]).slice(0,4).forEach(e=>L.push(["warn","Controllo della ricetta: "+e]));}
+  else if(RC&&RC.status==="empty")L.push(["warn","L'IA non ha trovato dati da analizzare: resta la lettura automatica"]);
+  else if(RC&&RC.status==="error")L.push(["warn",`${RC.msg}: resta la lettura automatica`]);
   const W=S.wide&&S.wide.report;
   if(W){
     L.push(["ok",`Formato a matrice riconosciuto: date in orizzontale, una riga per voce, in ${W.sheets.length} fogli (${W.sheets.slice(0,4).join(", ")}${W.sheets.length>4?"…":""})`]);
@@ -656,6 +716,8 @@ function undoAI(silent){
 }
 function renderAI(){
   const el=$("#aiBody");if(!el)return;const a=S.ai;
+  if(S.recipe&&S.recipe.status==="loading"&&!S.und){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>L'IA sta leggendo la struttura di ${(S.fileSheets||[]).length} ${(S.fileSheets||[]).length===1?"foglio":"fogli"}: dove sono le date, quali righe sono asset, debiti, totali, cambi…</span></div>`;return;}
+  if(S.recipe&&S.recipe.status==="done"&&!S.und){el.innerHTML=`<p class="lead">${esc(S.recipe.r.spiegazione)}</p>${(S.recipe.r.scartati||[]).length?`<p class="caption">Scartato: ${S.recipe.r.scartati.map(esc).join(" · ")}</p>`:""}<div class="row" style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn" id="recipeOff">Usa la lettura automatica</button></div>`;return;}
   if(S.und){renderUnderstand(el);return;}
   const auto=`<label class="toggle"><input type="checkbox" id="aiAuto"${aiAuto()?" checked":""}>Fai partire l'IA quando carico un file</label>`;
   if(!a){el.innerHTML=`<p class="lead">L'IA rilegge il file: corregge colonne dubbie ed errori di battitura, oppure lo ricostruisce tenendo solo gli asset, con i loro prezzi e il loro andamento. Tu confermi con un clic.</p><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button type="button" class="btn primary" id="aiUnderstand" data-mag>Ricostruisci il file con l'IA</button><button type="button" class="btn" id="aiRun">Correggi solo gli errori</button>${auto}</div>`;return;}
@@ -671,7 +733,9 @@ function renderAI(){
     ${n?`<ul class="props">${items}</ul><div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn primary" id="aiApply" data-mag>Applica tutte (${n})</button><button type="button" class="btn" id="aiDismiss">Ignora</button></div>`:""}`;
 }
 document.addEventListener("click",e=>{
-  const t=e.target.closest("#aiRun,#aiApply,#aiDismiss,#aiUndo,#aiUnderstand,#undApply,#undRebuild,#undDismiss");if(!t)return;
+  const t=e.target.closest("#aiRun,#aiApply,#aiDismiss,#aiUndo,#aiUnderstand,#undApply,#undRebuild,#undDismiss,#recipeOff,#recipeRun");if(!t)return;
+  if(t.id==="recipeOff")return recipeOff();
+  if(t.id==="recipeRun")return requestRecipe();
   if(t.id==="aiUnderstand")requestUnderstand();
   else if(t.id==="undApply")applyUnderstandSeries();
   else if(t.id==="undRebuild")rebuildFromPrices();
@@ -804,7 +868,7 @@ function guessSymbol(label,type,cur){
   if(/etf/i.test(type||""))return t+(cur==="EUR"?".DEX":".LON");
   return t.replace(".","-");
 }
-function wideSnapshot(W){
+function wideSnapshot(W,sym){sym=sym||new Map();
   const D=W.detail||[],N=(W.months||[]).length,fmtM=m=>{const [y,mo]=m.split("-").map(Number);return fmtDate(new Date(Date.UTC(y,mo-1,1)),12);};
   const listed=d=>/^(Azioni ed ETF|Previdenza)$/.test(d.cls)&&guessSymbol(d.label,d.type,d.cur);
   /* un mese conta se non è nel futuro e se è compilato davvero (almeno il 30% delle voci del mese più pieno) */
@@ -818,9 +882,9 @@ function wideSnapshot(W){
   const held=D.filter(d=>d.eur&&d.eur[li]>0),pos=held.filter(listed),tot=held.reduce((s,d)=>s+d.eur[li],0),ptot=pos.reduce((s,d)=>s+d.eur[li],0);
   const by=new Map();held.filter(d=>!listed(d)).forEach(d=>by.set(d.cls,(by.get(d.cls)||0)+d.eur[li]));
   const why={"Crypto":"wallet ed exchange, non un singolo strumento quotato","Immobili":"non quotati","Private equity":"non quotato","Liquidità":"conti e saldi","Altro":"beni e investimenti non quotati","Prestiti e obbligazioni":"piattaforme senza prezzo di mercato","Previdenza":"fondo senza simbolo di borsa","Azioni ed ETF":"senza simbolo di borsa riconoscibile"};
-  return {status:"ready",tipo:"riepilogo_portafoglio",local:true,foglio:W.sheets[0].name,
-    spiegazione:`Letto senza IA dal tuo tracker. ${li<last?`A ${fmtM(W.months[last])} i titoli quotati sono il ${fmtPct(lowNow,0)} del patrimonio: uso ${fmtM(W.months[li])}, l'ultimo mese in cui pesavano almeno il 10%.`:`Posizioni di ${fmtM(W.months[li])}.`} ${pos.length} titoli quotati per ${fmtN(Math.round(ptot))} € (${fmtPct(ptot/tot,0)} del patrimonio lordo). Ricostruendo il file con i loro prezzi storici i rendimenti diventano quelli del mercato, senza i soldi che hai aggiunto o tolto.`,
-    posizioni:pos.map(d=>({nome:d.label+(d.sec?` · ${d.sec}`:""),ticker:d.label,simbolo:guessSymbol(d.label,d.type,d.cur),valore:Math.round(d.eur[li]*100)/100,pesoAttuale:d.eur[li]/ptot,pesoTarget:null})),
+  return {status:"ready",tipo:"riepilogo_portafoglio",foglio:W.sheets[0].name,
+    local:!sym.size,spiegazione:`${sym.size?"Letto dall'IA":"Letto senza IA"} dal tuo tracker. ${li<last?`A ${fmtM(W.months[last])} i titoli quotati sono il ${fmtPct(lowNow,0)} del patrimonio: uso ${fmtM(W.months[li])}, l'ultimo mese in cui pesavano almeno il 10%.`:`Posizioni di ${fmtM(W.months[li])}.`} ${pos.length} titoli quotati per ${fmtN(Math.round(ptot))} € (${fmtPct(ptot/tot,0)} del patrimonio lordo). Ricostruendo il file con i loro prezzi storici i rendimenti diventano quelli del mercato, senza i soldi che hai aggiunto o tolto.`,
+    posizioni:pos.map(d=>({nome:d.label+(d.sec?` · ${d.sec}`:""),ticker:d.label,simbolo:sym.get(d.label.toLowerCase())||guessSymbol(d.label,d.type,d.cur),valore:Math.round(d.eur[li]*100)/100,pesoAttuale:d.eur[li]/ptot,pesoTarget:null})),
     scartati:[...by].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${fmtN(Math.round(v))} €: ${why[k]||"non quotato"}`)};
 }
 
@@ -2391,3 +2455,8 @@ quantaScene("home");
 requestAnimationFrame(movePill);
 if(!HAS_G)heroIntro();
 renderPager("home");
+/* per i test automatici: caricare fogli come se fossero un file e leggere cosa ha capito il sito */
+window.__pos={loadSheets:(sheets,name)=>load(sheets,{name:name||"prova.xlsx",size:0,kind:"file"},true),
+  state:()=>({recipe:S.recipe?{status:S.recipe.status,tipo:S.recipe.r&&S.recipe.r.tipoFile,errors:S.recipe.errors||[],msg:S.recipe.msg||null}:null,sheet:an()&&an().name,
+    assets:S.ds&&S.ds.ok?S.ds.assets.map(a=>`${a.name}:${a.role}`):[],obs:S.ds&&S.ds.ok?S.ds.nObs:0,
+    und:S.und&&S.und.posizioni?S.und.posizioni.map(p=>`${p.ticker}→${p.simbolo}`):null,sheets:S.sheets.map(s=>s.name)})};
