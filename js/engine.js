@@ -557,9 +557,14 @@ function buildDataset(an,roles,opts){
             break;}
         }
       }
+      /* prezzi quasi sempre uguali: non è uno storico di mercato (per esempio il prezzo di oggi copiato su tutte le date) */
+      const nv=vals.filter(v=>v!=null),cnt=new Map();nv.forEach(v=>cnt.set(v,(cnt.get(v)||0)+1));const top=Math.max(0,...cnt.values());
+      if(nv.length>=8&&top/nv.length>=.8)anomalies.push({id:`flat:${c.idx}`,type:"flat",block:true,col:c.idx,asset:c.name,text:`«${c.name}»: lo stesso prezzo (${fmtN([...cnt].find(x=>x[1]===top)[0])}) nel ${Math.round(top/nv.length*100)}% delle date. Non è uno storico di mercato: rendimenti e rischi verrebbero quasi zero.`});
+      else{
       /* prezzi fermi per molti periodi: valori inseriti a mano o strumento non quotato */
       let run=1,maxRun=1,at=0;for(let k=1;k<vals.length;k++){if(vals[k]!=null&&vals[k]===vals[k-1]){run++;if(run>maxRun){maxRun=run;at=k;}}else run=1;}
       if(maxRun>=(freq.f>=52?15:6))anomalies.push({id:`stale:${c.idx}`,type:"stale",block:false,col:c.idx,asset:c.name,text:`«${c.name}»: lo stesso valore per ${maxRun} periodi di fila (fino a ${fmtDate(dates[at],freq.f)}). Valori inseriti a mano o strumento senza quotazione: la volatilità risulterà più bassa del vero.`});
+      }
     }
     ((opts.exclude||{})[c.idx]||[]).forEach(k=>{if(k<ret.length)ret[k]=NaN;});
     if(missing)Q.warnings.push(`«${c.name}»: ${missing} ${missing===1?"valore mancante":"valori mancanti"} (${missDates.slice(0,3).map(d=>fmtDate(d,freq.f)).join(", ")}${missing>3?"…":""}). Esclusi dai calcoli, non stimati.`);

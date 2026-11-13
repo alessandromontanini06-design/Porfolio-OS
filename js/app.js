@@ -409,8 +409,10 @@ function load(sheets,source,fromUser,opts={}){
   if(fromUser){S.scanPlayed=false;go("scan",{force:true});}
   if(source.kind!=="rebuilt"){S.portfolio=null;S.tx=detectTx(sheets);}
   const sym=new Map(((opts.recipe&&opts.recipe.simboli)||[]).map(x=>[String(x.titolo).trim().toLowerCase(),avSymbol(x.simbolo)]));
-  const tx=opts.tx||localTx,pos=(opts.recipe&&opts.recipe.posizioni)||localPos||[];
-  const u=tx&&tx.positions.length?txSnapshot(tx,sym):S.wide?wideSnapshot(S.wide,sym):pos.length?{status:"ready",tipo:"riepilogo_portafoglio",local:!opts.recipe,foglio:"",spiegazione:opts.recipe?opts.recipe.spiegazione:`Riepilogo di ${pos.length} posizioni senza storico: con i prezzi di mercato le analisi usano anni di dati.`,posizioni:pos.slice(0,20).map(p=>({...p,simbolo:opts.recipe?avSymbol(p.simbolo):/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.simbolo)||(p.isin&&!/:/.test(p.simbolo))?"":guessSymbol(p.simbolo,"ETF",null)||""})),scartati:(opts.recipe?opts.recipe.scartati:(S.local&&S.local.recipe.scartati))||[]}:null;
+  let tx=opts.tx||localTx,pos=(opts.recipe&&opts.recipe.posizioni)||localPos||[];
+  /* le posizioni (ticker, ISIN) servono sempre per i prezzi di mercato: se la ricetta non le ha, le cercano i riconoscitori locali */
+  if(isFile&&opts.recipe&&!(tx&&tx.positions.length)&&!pos.length){const L2=P.localRecipe(sheets);if(L2){if(L2.recipe.movimenti){const T2=P.applyRecipe(sheets,{movimenti:L2.recipe.movimenti}).tx;if(T2&&T2.positions.length)tx=T2;}if(!(tx&&tx.positions.length)&&L2.recipe.posizioni.length)pos=L2.recipe.posizioni;}}
+  const u=tx&&tx.positions.length?txSnapshot(tx,sym):S.wide?wideSnapshot(S.wide,sym):pos.length?{status:"ready",tipo:"riepilogo_portafoglio",local:!opts.recipe,foglio:"",spiegazione:opts.recipe?opts.recipe.spiegazione:`Riepilogo di ${pos.length} posizioni senza storico: con i prezzi di mercato le analisi usano anni di dati.`,posizioni:pos.slice(0,20).map(p=>({...p,simbolo:normSym(p)})),scartati:(opts.recipe?opts.recipe.scartati:(S.local&&S.local.recipe.scartati))||[]}:null;
   if(u){S.und=u;renderAI();}
   if(opts.memory){S.recipe={status:"memory",r:opts.recipe,errors:[]};S.tplUsed=true;}
   /* ogni file nuovo: l'IA legge la struttura di tutti i fogli; un modello già confermato non la richiede */
@@ -813,7 +815,7 @@ async function requestUnderstand(){
 function renderUnderstand(el){
   const u=S.und;
   if(u.status==="loading"){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>L'IA sta leggendo ${Math.min(12,S.raw.length)} ${S.raw.length===1?"foglio":"fogli"} per capire che file è…</span></div>`;return;}
-  if(u.status==="rebuilding"){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Scarico lo storico di ${u.posizioni.length} strumenti da Alpha Vantage e ricostruisco il file…</span></div>`;return;}
+  if(u.status==="rebuilding"){el.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>${esc(u.progress||`Scarico lo storico di mercato di ${u.posizioni.length} strumenti e ricostruisco il file…`)}</span></div><p class="caption">Le analisi useranno i prezzi di mercato di ogni strumento, non i valori del tuo Excel.</p>`;return;}
   if(u.status==="error"){el.innerHTML=`<p style="color:var(--muted)">${esc(u.msg)}</p><div class="row" style="display:flex;gap:10px"><button type="button" class="btn" id="aiUnderstand">Riprova</button><button type="button" class="btn" id="undDismiss">Chiudi</button></div>`;return;}
   const tipo=`<span class="chip hist"><i></i>${esc(TIPO_L[u.tipo]||u.tipo)}</span>`;
   const scart=(u.scartati||[]).length?`<p class="caption">Scartato: ${u.scartati.map(esc).join(" · ")}</p>`:"";
@@ -864,22 +866,28 @@ async function resolveIsins(pos){
 async function rebuildFromPrices(){
   const u=S.und;
   let pos=u.posizioni.map((p,i)=>({...p,simbolo:String(((document.getElementById("und-sym-"+i)||{}).value)||p.simbolo||"").trim().toUpperCase()}));
-  S.und={...u,posizioni:pos,status:"rebuilding",err:null};renderAI();
+  S.lastUnd={...u,posizioni:pos.map(p=>({...p}))};
+  S.und={...u,posizioni:pos,status:"rebuilding",err:null,progress:""};renderAI();
+  const prog=t=>{if(S.und&&S.und.status==="rebuilding"){S.und.progress=t;renderAI();}};
   try{
+    prog("Cerco i simboli di borsa degli ISIN…");
     const isinLog=await resolveIsins(pos);
     const noSym=pos.filter(p=>!p.simbolo);pos=pos.filter(p=>p.simbolo);
     if(!pos.length)throw new Error("Nessuno strumento ha un simbolo di borsa: scrivilo nella colonna «Simbolo per i prezzi».");
     // Un ETF per richiesta: la rete di Vercel conserva ogni serie 24 ore e la condivide tra tutti i visitatori.
     // Se un simbolo non scarica, si provano le altre quotazioni dello stesso ISIN.
     const series=[];
-    for(const p of pos){
+    /* limite al minuto del piano gratuito di Alpha Vantage: si aspetta e si riprova, fino a 4 volte per simbolo */
+    const fetchSym=async sym=>{for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=2`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
+      if(j.error&&/limite/i.test(j.error)&&k<4){for(let w=20;w>0;w--){prog(`Limite al minuto di Alpha Vantage: riprovo ${sym} tra ${w} s…`);await new Promise(res=>setTimeout(res,1000));}continue;}return {r,j};}};
+    for(const [n,p] of pos.entries()){
       let got=null,tried=[];
       for(const sym of [p.simbolo,...(p.alt||[]).filter(x=>x!==p.simbolo)].slice(0,4)){
-        tried.push(sym);
-        const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=2`,{signal:AbortSignal.timeout(30000)});
-        const j=await r.json().catch(()=>({}));
+        tried.push(sym);prog(`Scarico lo storico di ${p.ticker||p.nome} (${sym}) · ${n+1} di ${pos.length}…`);
+        const {r,j}=await fetchSym(sym);
         if(r.ok&&!j.error&&j.points&&j.points.length){got=j;if(sym!==p.simbolo){p.simboloOrig=p.simbolo;p.simbolo=sym;}break;}
         got={symbol:sym,error:j.error||`Errore ${r.status} per ${sym}.`};
+        if(/limite giornaliero/i.test(got.error))break;
       }
       if(got.error&&tried.length>1)got.error+=` (provati: ${tried.join(", ")})`;
       series.push(got);
@@ -901,7 +909,7 @@ async function rebuildFromPrices(){
     if(months.length<13)throw new Error("Lo storico comune degli strumenti è troppo corto (meno di un anno). Prova a cambiare i simboli.");
     const aoa=[["Data",...ok.map(o=>o.p.ticker||o.p.nome)]];
     months.forEach(m=>{const d=maps[0].get(m).d;aoa.push([`${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}`,...maps.map(mp=>mp.get(m).v)]);});
-    const orig=S.source.name,scartati=u.scartati||[];
+    const orig=S.source.name.replace(/ · ricostruito$/,""),scartati=u.scartati||[];
     const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},true);
     S.portfolio=pf;
@@ -909,7 +917,7 @@ async function rebuildFromPrices(){
       `Valute di quotazione: ${ok.map(o=>`${o.p.ticker||o.p.nome} ${o.s.currency||"sconosciuta"}`).join(", ")}.`,
       ...(unknown.length?[`Valuta non determinata per ${unknown.join(", ")}: lasciata com'è, verifica il simbolo.`]:[]),
       ...pf.missing.map(m=>`Non scaricato: ${m.nome}${m.simbolo?` (${m.simbolo})`:""}. ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
-    renderQuality(S.ds);
+    renderImport(false);
   }catch(e){
     S.und={...S.und,status:"ready",err:e instanceof TypeError?"Lo storico dei prezzi si scarica nella versione del sito pubblicata su Vercel.":String(e.message||e)};renderAI();
   }
@@ -930,7 +938,7 @@ function colSource(A,c){
 }
 function sheetCcy(A,c){const v=A.ccyArr&&A.ccyArr[c.idx];return (S.ccyDone[A.name]&&S.ccyDone[A.name][c.idx])?"EUR":v||c.ccy||null;}
 function computeChecks(A,ds){
-  const out=[],R=S.res;
+  const out=[],R=S.res,canRebuild=!!(S.und&&S.und.posizioni&&S.und.posizioni.some(p=>p.simbolo||p.isin||ISIN_RX.test(p.ticker||"")));
   /* 1) due letture diverse dello stesso file: l'utente sceglie */
   if(S.conflict)out.push({id:"conflict",block:true,title:"L'IA e la lettura automatica non sono d'accordo",text:S.conflict.text,acts:[["ai","Usa la lettura dell'IA"],["auto","Usa la lettura automatica"]]});
   /* 2) lettura fatta solo dall'IA, senza conferme da altre fonti: va guardata una volta */
@@ -940,14 +948,19 @@ function computeChecks(A,ds){
   if(unsure.length)out.push({id:"unsure",block:true,title:`${unsure.length} ${unsure.length===1?"colonna da verificare":"colonne da verificare"}`,text:unsure.map(c=>`«${c.name}» → ${(ROLES.find(r=>r.v===S.roles[c.idx])||{}).l}: ${c.reason}`).join(" · "),acts:[["ok","Le ho controllate, confermo"],["show","Mostramele"]],cols:unsure.map(c=>c.idx)});
   /* 4) valori di patrimonio invece di prezzi */
   const flowy=(A.virtual&&S.wide&&S.wide.sheets.some(s=>s.name===A.name))||A.cols.some(c=>c.flowValue&&ASSETR.includes(S.roles[c.idx]));
-  const canRebuild=S.und&&S.und.posizioni&&S.und.posizioni.some(p=>p.simbolo||p.isin||ISIN_RX.test(p.ticker||""));
   if(flowy)out.push({id:"flows",block:true,title:"Sono valori di patrimonio, non prezzi",text:"Contengono i soldi che hai aggiunto o tolto: un versamento sembra un guadagno, una vendita o uno spostamento di liquidità sembra un crollo, e la volatilità esce falsata (anche oltre il 100%). Volatilità, correlazioni e frontiera vanno calcolate sui prezzi di mercato di ogni strumento."+(canRebuild?"":" In questo file non ci sono ticker o ISIN: scrivili nel riquadro qui sopra oppure analizza i valori sapendo che i rischi saranno falsati."),acts:canRebuild?[["rebuild","Usa i prezzi di mercato (consigliato)"],["ok","Analizza comunque i valori del file"]]:[["ok","Analizza comunque i valori del file"]]});
   /* 5) valute diverse dall'euro */
   if(ds&&ds.ok){const cc=A.cols.filter(c=>ASSETR.includes(S.roles[c.idx])).map(c=>[c,sheetCcy(A,c)]).filter(([,v])=>v&&v!=="EUR");
     if(cc.length)out.push({id:"ccy",block:true,title:"Serie in valute diverse dall'euro",text:cc.map(([c,v])=>`«${c.name}» in ${v}`).join(" · ")+". Mescolare valute falsa correlazioni e rischio: conviene convertire con il cambio ufficiale BCE di fine mese.",acts:[["convert","Converti in euro"],["keep","Lascia nella valuta originale"]],cc:cc.map(([c,v])=>[c.idx,v])});}
+  /* portafoglio ricostruito a cui mancano strumenti: niente risultati parziali in silenzio */
+  if(S.portfolio&&S.portfolio.missing&&S.portfolio.missing.length&&S.source&&S.source.kind==="rebuilt"){
+    const M=S.portfolio.missing,tot=(S.lastUnd&&S.lastUnd.posizioni||[]).reduce((q,p)=>q+(p.valore||0),0),mv=M.reduce((q,m)=>q+(((S.lastUnd&&S.lastUnd.posizioni)||[]).find(p=>p.nome===m.nome)||{}).valore||0,0);
+    out.push({id:"partial",block:true,title:`Mancano ${M.length} ${M.length===1?"strumento":"strumenti"}${tot&&mv?` (${fmtPct(mv/tot,0)} del valore)`:""}`,text:M.map(m=>`${m.nome}${m.simbolo?` (${m.simbolo})`:""}: ${m.err}`).join(" · ")+" Senza di loro pesi, rischio e frontiera descrivono solo una parte del portafoglio.",acts:[["retry","Riprova a scaricarli"],["ok","Procedi senza (pesi ricalcolati sul resto)"]]});
+  }
   /* 6) anomalie dei dati */
   (ds&&ds.anomalies||[]).forEach(a=>{
     if(a.type==="future")out.push({id:"future",block:true,title:"Date nel futuro",text:a.text,acts:[["drop","Escludile"]]});
+    else if(a.type==="flat")out.push({id:a.id,block:true,title:"Prezzi costanti",text:a.text,acts:canRebuild?[["rebuild","Usa i prezzi di mercato (consigliato)"],["drop","Escludi questa serie"]]:[["drop","Escludi questa serie"]],a});
     else if(a.type==="split"||a.type==="unit")out.push({id:a.id,block:true,title:a.type==="unit"?"Possibile cambio di unità":"Possibile frazionamento",text:a.text,acts:[["fix",a.type==="unit"?"Correggi la scala":"Correggi i prezzi precedenti"],["exclude","Escludi questo periodo"],["keep","È un movimento vero"]],a});
   });
   const stale=(ds&&ds.anomalies||[]).filter(a=>a.type==="stale");
@@ -987,7 +1000,9 @@ document.addEventListener("click",async e=>{
     delete S.res[id];delete S.doneChecks[id];hideLab();renderImport(false);return;
   }
   if(act==="show"){const sel=document.querySelector(`#role-${c.cols[0]}`);if(sel){const row=sel.closest("tr");row.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"center"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");}return;}
-  if(id==="flows"&&act==="rebuild"){S.autoRebuilt=S.source;rebuildFromPrices();return;}
+  if(act==="rebuild"){S.autoRebuilt=S.source;rebuildFromPrices();return;}
+  if(id==="partial"&&act==="retry"&&S.lastUnd){S.und={...S.lastUnd,status:"ready",posizioni:S.lastUnd.posizioni.map(p=>({...p}))};S.lastSource=S.source;go("map");rebuildFromPrices();return;}
+  if(c.a&&c.a.type==="flat"&&act==="drop"){S.roles[c.a.col]="ignore";S.touched[c.a.col]=true;S.res[id]=act;S.doneChecks[id]={...c};hideLab();renderImport(false);return;}
   if(id==="conflict"){S.res.conflict=act;const keep=S.conflict;S.conflict=null;if(act==="auto"){S.recipeChoice="auto";load(S.fileSheets,S.source,false,{forceAuto:true});S.res.conflict="auto";}else{S.agree=false;renderImport(false);}void keep;return;}
   if(c.a&&act==="fix"){const a=c.a;(S.fix.adjust[a.col]=S.fix.adjust[a.col]||[]).push({k:a.k,factor:a.factor});}
   if(c.a&&act==="exclude"){const a=c.a;(S.fix.exclude[a.col]=S.fix.exclude[a.col]||[]).push(a.k);}
@@ -1038,6 +1053,8 @@ function tplApply(t){
 
 /* ---------- Tracker a matrice: le posizioni quotate dell'ultimo mese diventano un riepilogo da ricostruire con i prezzi veri ---------- */
 /* simboli nel formato di Alpha Vantage: i suffissi di Yahoo (.L, .DE, .PA, .AS, .MI) vengono tradotti */
+/* un solo modo di normalizzare i simboli, da qualunque fonte: «AMS:IWDA» → IWDA.AMS, suffissi Yahoo → Alpha Vantage, ISIN → da cercare */
+function normSym(p){const t=String(p.simbolo||"").trim().toUpperCase();if(!t||/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t))return "";if(/:/.test(t))return guessSymbol(t,"ETF",null)||"";if(/\./.test(t))return avSymbol(t);if(p.isin)return "";return guessSymbol(t,"ETF",null)||t;}
 function avSymbol(x){const t=String(x||"").trim().toUpperCase();const m=t.match(/^([A-Z0-9\-]+)\.(L|DE|F|PA|AS|SW)$/);if(!m)return t;return m[1]+"."+({L:"LON",DE:"DEX",F:"DEX",PA:"PAR",AS:"AMS",SW:"SWX"}[m[2]]);}
 function guessSymbol(label,type,cur){
   const t=String(label).trim().toUpperCase();let m;
