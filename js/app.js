@@ -95,7 +95,7 @@ function onEnter(name){
   if(name==="opt")renderOpt();
   if(name==="bench")renderBench();
   if(name==="games")renderGames();
-  if(name==="lab"&&S.lab&&!S.labFx.done){S.labFx.done=true;setTimeout(()=>{countAll();drawChart(true);if(S.corrView==="net")buildNet();},HAS_G?380:0);}
+  if(name==="lab"&&S.lab&&!S.labFx.done){S.labFx.done=true;setTimeout(()=>{if(!S.lab)return;countAll();drawChart(true);if(S.corrView==="net")buildNet();},HAS_G?380:0);}
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!b||b.disabled||b.classList.contains("off"))return;go(b.dataset.go);});
 window.addEventListener("resize",movePill);
@@ -378,29 +378,44 @@ function reveal(){}
 
 /* ---------- Caricamento ---------- */
 function load(sheets,source,fromUser,opts={}){
-  if(source.kind==="file"&&!opts.recipe){S.fileSheets=sheets;S.recipe=null;}
-  /* con la ricetta dell'IA: i suoi fogli ricostruiti; senza: i riconoscitori automatici (tracker a matrice) */
-  S.wide=opts.recipe?(opts.wide||null):source.kind==="file"?P.reshapeWide(sheets):null;
-  const virt=opts.recipe?(opts.virtual||[]):S.wide?S.wide.sheets:[];
+  const isFile=source.kind==="file";
+  if(isFile&&!opts.recipe&&!opts.forceAuto){S.fileSheets=sheets;S.recipe=null;S.conflict=null;S.agree=false;S.fp=P.structureFingerprint(sheets);S.tpl=tplGet(S.fp);}
+  if(!isFile){S.fp=null;S.tpl=null;S.recipe=null;S.conflict=null;S.agree=false;}
+  if(!opts.recipe||!opts.memory)S.tplUsed=false;
+  resetImportState();S.tplCols=null;S.local=null;S.localParts=null;
+  /* stesso modello di file già confermato con una ricetta dell'IA: la si riusa, senza chiamare di nuovo l'IA */
+  if(isFile&&!opts.recipe&&!opts.forceAuto&&S.tpl&&S.tpl.recipe&&!S.tpl.auto){const T=P.applyRecipe(sheets,S.tpl.recipe);if(T.sheets.length||(T.tx&&T.tx.positions.length))opts={...opts,recipe:S.tpl.recipe,virtual:T.sheets,wide:T.wide,tx:T.tx,memory:true};}
+  let virt=[],localTx=null,localPos=null;
+  if(opts.recipe){S.wide=opts.wide||null;virt=opts.virtual||[];}
+  else if(isFile){
+    S.wide=P.reshapeWide(sheets);
+    if(S.wide)virt=S.wide.sheets;
+    else{const L=P.localRecipe(sheets);if(L){const LA=P.applyRecipe(sheets,L.recipe);virt=LA.sheets.map(x=>({...x,name:x.name.replace("★ Serie lette dall'IA","★ Serie riconosciute")}));localTx=LA.tx;localPos=L.recipe.posizioni;S.local=L;S.localParts=L.parts;}}
+  }else S.wide=null;
   const all=[...virt,...sheets];
-  S.source=source;S.raw=all.map(s=>s.aoa);
-  S.sheets=all.map(s=>P.analyzeSheet(s.name,s.aoa));
-  /* ruoli decisi dall'IA per le colonne dei fogli che ha ricostruito */
-  all.forEach((sh,i)=>{if(sh.roles)S.sheets[i].cols.forEach(c=>{const r=sh.roles[c.idx];if(r){c.suggest=r;c.conf="alta";c.reason=r==="date"?"Colonna data indicata dall'IA":"Serie indicata dall'IA dopo aver letto il file";}});});
-  S.sheetIdx=virt.length?0:S.sheets.reduce((b,s,i)=>s.score>S.sheets[b].score?i:b,0);
+  S.source=source;S.raw=all.map(x=>x.aoa);
+  S.sheets=all.map(x=>{const A=P.analyzeSheet(x.name,x.aoa);A.virtual=!!x.virtual;A.fromAI=!!(x.virtual&&opts.recipe&&!opts.memory);A.ccyArr=x.ccy||null;return A;});
+  /* ruoli indicati dalla ricetta (IA, modello salvato o riconoscitori locali) */
+  all.forEach((sh,i)=>{if(sh.roles)S.sheets[i].cols.forEach(c=>{const r=sh.roles[c.idx];if(r){c.suggest=r;c.conf="alta";c.reason=r==="date"?(opts.recipe?"Colonna data indicata dalla ricetta di lettura":"Colonna data riconosciuta"):(opts.recipe&&!opts.memory?"Serie indicata dall'IA dopo aver letto il file":opts.memory?"Serie del modello che hai già confermato":"Serie riconosciuta dalla struttura del file");}});});
+  S.sheetIdx=virt.length?0:S.sheets.reduce((b,x,i)=>x.score>S.sheets[b].score?i:b,0);
   /* nei tracker la liquidità cambia con versamenti e spese, non con il mercato: fuori dalle analisi salvo scelta diversa */
   if(S.wide)S.sheets.slice(0,S.wide.sheets.length).forEach(A=>A.cols.forEach(c=>{if(/^liquidit/i.test(c.name)&&c.suggest){c.suggest="ignore";c.conf="alta";c.reason="Saldi di conti e broker: cambiano con versamenti, spese e trasferimenti, non con il mercato";}}));
-  initRoles();hideLab();$("#fileErr").hidden=true;S.scanPlayed=false;resetAI();
+  initRoles();
+  /* modello già confermato: stesso foglio e stessi ruoli dell'ultima volta */
+  if(isFile&&S.tpl&&(opts.memory||(!opts.recipe&&(S.tpl.auto||!S.tpl.recipe))))S.tplUsed=tplApply(S.tpl);
+  hideLab();$("#fileErr").hidden=true;S.scanPlayed=false;resetAI();
   renderImport(false);
   morphData();
   if(fromUser){S.scanPlayed=false;go("scan",{force:true});}
   if(source.kind!=="rebuilt"){S.portfolio=null;S.tx=detectTx(sheets);}
   const sym=new Map(((opts.recipe&&opts.recipe.simboli)||[]).map(x=>[String(x.titolo).trim().toLowerCase(),avSymbol(x.simbolo)]));
-  const u=opts.tx&&opts.tx.positions.length?txSnapshot(opts.tx,sym):S.wide?wideSnapshot(S.wide,sym):opts.recipe&&(opts.recipe.posizioni||[]).length?{status:"ready",tipo:"riepilogo_portafoglio",foglio:"",spiegazione:opts.recipe.spiegazione,posizioni:opts.recipe.posizioni.slice(0,20).map(p=>({...p,simbolo:avSymbol(p.simbolo)})),scartati:opts.recipe.scartati||[]}:null;
+  const tx=opts.tx||localTx,pos=(opts.recipe&&opts.recipe.posizioni)||localPos||[];
+  const u=tx&&tx.positions.length?txSnapshot(tx,sym):S.wide?wideSnapshot(S.wide,sym):pos.length?{status:"ready",tipo:"riepilogo_portafoglio",local:!opts.recipe,foglio:"",spiegazione:opts.recipe?opts.recipe.spiegazione:`Riepilogo di ${pos.length} posizioni senza storico: con i prezzi di mercato le analisi usano anni di dati.`,posizioni:pos.slice(0,20).map(p=>({...p,simbolo:avSymbol(p.simbolo)})),scartati:(opts.recipe?opts.recipe.scartati:(S.local&&S.local.recipe.scartati))||[]}:null;
   if(u){S.und=u;renderAI();}
-  /* ogni file caricato: l'IA legge la struttura di tutti i fogli e scrive la ricetta; intanto resta la lettura automatica */
-  if(fromUser&&source.kind==="file"&&aiAuto())requestRecipe();
-  renderLog(an(),S.ds,false);
+  if(opts.memory){S.recipe={status:"memory",r:opts.recipe,errors:[]};S.tplUsed=true;}
+  /* ogni file nuovo: l'IA legge la struttura di tutti i fogli; un modello già confermato non la richiede */
+  if(fromUser&&isFile&&aiAuto()&&!S.tplUsed)requestRecipe();
+  renderImport(false);
 }
 /* ---------- Lettura con l'IA: estratto strutturato → ricetta → il motore la esegue su tutto il file ---------- */
 function aiSample(){
@@ -433,22 +448,30 @@ async function requestRecipe(){
     if(!r.ok)throw new Error(j.error||`Il server ha risposto con un errore (${r.status}).`);
     if(S.source!==src)return; // nel frattempo è stato caricato un altro file
     const A=P.applyRecipe(S.fileSheets,j);
-    if(!A.sheets.length&&!(A.tx&&A.tx.positions.length)&&!(j.posizioni||[]).length){S.recipe={status:"empty",r:j,errors:A.errors};renderAI();renderLog(an(),S.ds,false);return;}
-    const prev=S.sheetIdx;load(S.fileSheets,S.source,false,{recipe:j,virtual:A.sheets,wide:A.wide,tx:A.tx});void prev;
-    S.recipe={status:"done",r:j,errors:A.errors};renderAI();renderLog(an(),S.ds,false);
+    if(!A.sheets.length&&!(A.tx&&A.tx.positions.length)&&!(j.posizioni||[]).length){S.recipe={status:"empty",r:j,errors:A.errors};renderAI();renderImport(false);return;}
+    /* la lettura automatica di prima, per confrontarla con quella dell'IA */
+    const autoSig=S.ds&&S.ds.ok&&an().virtual?{n:S.ds.assets.length,obs:S.ds.nObs,names:S.ds.assets.map(a=>a.name)}:null,autoUnd=S.und&&S.und.posizioni?S.und.posizioni.length:0;
+    load(S.fileSheets,S.source,false,{recipe:j,virtual:A.sheets,wide:A.wide,tx:A.tx});
+    S.recipe={status:"done",r:j,errors:A.errors};
+    const aiSig=S.ds&&S.ds.ok?{n:S.ds.assets.length,obs:S.ds.nObs,names:S.ds.assets.map(a=>a.name)}:null;
+    if(autoSig&&aiSig){
+      if(autoSig.n===aiSig.n&&Math.abs(autoSig.obs-aiSig.obs)<=2)S.agree=true;
+      else S.conflict={text:`Lettura automatica: ${autoSig.n} serie (${autoSig.names.slice(0,5).join(", ")}${autoSig.n>5?"…":""}), ${autoSig.obs} date. Lettura dell'IA: ${aiSig.n} serie (${aiSig.names.slice(0,5).join(", ")}${aiSig.n>5?"…":""}), ${aiSig.obs} date. Ora vedi quella dell'IA.`};
+    }else if(autoUnd&&S.und&&S.und.posizioni&&S.und.posizioni.length===autoUnd)S.agree=true;
+    renderAI();renderImport(false);
   }catch(e){
     if(S.source!==src)return;
     S.recipe={status:"error",msg:e.name==="TimeoutError"||e.name==="AbortError"?"L'IA non ha risposto in tempo":e instanceof TypeError?"La lettura con l'IA funziona nel sito pubblicato":String(e.message||e)};
     renderAI();renderLog(an(),S.ds,false);
   }
 }
-function recipeOff(){S.recipe=null;load(S.fileSheets,S.source,false);S.recipe={status:"off"};renderAI();renderLog(an(),S.ds,false);}
+function recipeOff(){load(S.fileSheets,S.source,false,{forceAuto:true});S.recipe={status:"off"};renderAI();renderImport(false);}
 /* movimenti: le posizioni aperte (quantità nette × ultimo prezzo) diventano un riepilogo da ricostruire con i prezzi storici */
 function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
     spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
-    posizioni:T.positions.map(p=>({nome:p.titolo,ticker:p.titolo,simbolo:sym.get(p.titolo.toLowerCase())||guessSymbol(p.titolo,"",T.valuta)||p.titolo,valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
+    posizioni:T.positions.map(p=>({nome:p.titolo,ticker:p.titolo,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -462,12 +485,12 @@ async function handleFile(file){
       const buf=await file.arrayBuffer();let text=new TextDecoder("utf-8").decode(buf);
       if(text.includes(String.fromCharCode(0xFFFD)))text=new TextDecoder("windows-1252").decode(buf);
       sheets=[{name:file.name.replace(/\.[^.]+$/,""),aoa:P.parseCSV(text)}];
-    }else if(["xlsx","xls","xlsm"].includes(ext)){
+    }else if(["xlsx","xls","xlsm","ods"].includes(ext)){
       if(!window.XLSX)throw new Error("noxlsx");
       const buf=await file.arrayBuffer();
       const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
       sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
-    }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls o .csv.`);return;}
+    }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
     if(!sheets.some(s=>s.aoa.length)){showError("Il file è vuoto.");return;}
     load(sheets,{name:file.name,size:file.size,kind:"file"},true);
   }catch(e){showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
@@ -485,10 +508,11 @@ $("#sampleBtn").addEventListener("click",()=>load(P.sampleSheets(),{name:"esempi
 const an=()=>S.sheets[S.sheetIdx];
 const needCount=()=>an().cols.filter(c=>S.roles[c.idx]==null).length;
 function renderImport(animate){
-  const A=an();S.ds=P.buildDataset(A,S.roles);
+  if(!S.res)resetImportState();
+  const A=an();S.ds=P.buildDataset(A,S.roles,fixOpts());
   $("#dsName").textContent=S.source.name;
   $("#dsChip").innerHTML=S.source.kind==="sample"?`<span class="chip sample"><i></i>Esempio · dati sintetici</span>`:"";
-  renderScan(A,animate);renderLog(A,S.ds,animate);renderSummary(A,S.ds);renderSheets();renderMapping(A);renderQuality(S.ds);renderCaps(S.ds);renderConfirm(S.ds);renderTicker();renderAI();
+  renderScan(A,animate);renderLog(A,S.ds,animate);renderSummary(A,S.ds);renderSheets();renderMapping(A);renderQuality(S.ds);renderCaps(S.ds);renderChecks(A,S.ds);renderConfirm(S.ds);renderTicker();renderAI();
 }
 function playScan(){
   S.scanPlayed=true;
@@ -526,6 +550,10 @@ function renderLog(A,ds,animate){
   const t0=performance.now(),L=[];
   L.push(["ok",`Letto «${S.source.name}» · ${S.sheets.length} ${S.sheets.length===1?"foglio":"fogli"}${S.source.size?" · "+fmtSize(S.source.size):""}`]);
   const RC=S.recipe;
+  if(S.tplUsed&&S.tpl)L.push(["ok",`Modello già visto: «${S.tpl.file}», confermato il ${new Date(S.tpl.saved).toLocaleDateString("it-IT")}. Stessa lettura, nessuna chiamata all'IA`]);
+  (S.localParts||[]).forEach(x=>L.push(["ok","Riconosciuto senza IA: "+x.d]));
+  if(S.agree)L.push(["ok","L'IA e la lettura automatica concordano"]);
+  if(S.conflict)L.push(["warn","L'IA e la lettura automatica danno risultati diversi: scegli tu nella mappa"]);
   if(RC&&RC.status==="loading")L.push(["warn",`L'IA sta leggendo la struttura di ${(S.fileSheets||[]).length} ${(S.fileSheets||[]).length===1?"foglio":"fogli"}: intanto vedi la lettura automatica`]);
   else if(RC&&RC.status==="done"){L.push(["ok",`Struttura letta dall'IA: ${RC.r.spiegazione}`]);(RC.errors||[]).slice(0,4).forEach(e=>L.push(["warn","Controllo della ricetta: "+e]));}
   else if(RC&&RC.status==="empty")L.push(["warn","L'IA non ha trovato dati da analizzare: resta la lettura automatica"]);
@@ -566,7 +594,7 @@ function renderSheets(){
   const el=$("#sheets");
   el.innerHTML=S.sheets.length<2?"":S.sheets.map((s,i)=>`<button type="button" data-sheet="${i}" aria-pressed="${i===S.sheetIdx}">${esc(s.name)}${s.score===0?" · senza serie":""}</button>`).join("");
 }
-document.addEventListener("click",e=>{const b=e.target.closest("[data-sheet]");if(!b)return;undoAI(true);S.sheetIdx=+b.dataset.sheet;resetAI();initRoles();hideLab();renderImport(true);morphData();});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-sheet]");if(!b)return;undoAI(true);S.sheetIdx=+b.dataset.sheet;resetAI();resetImportState();S.tplCols=null;initRoles();hideLab();renderImport(true);morphData();});
 function spark(c){
   if(c.kind!=="num")return `<span class="cl">—</span>`;
   const v=c.nums.filter(x=>x!==null);if(v.length<2)return `<span class="cl">—</span>`;
@@ -586,7 +614,7 @@ function renderMapping(A){
       <td class="mono samp">${c.sample.map(esc).join("<br>")}</td>
       <td>${spark(c)}</td>
       <td><select id="role-${c.idx}" data-col="${c.idx}" class="${need?"need":""}" aria-label="Interpretazione di ${esc(c.name)}">${need?`<option value="" selected disabled>Scegli…</option>`:""}${ROLES.map(r=>`<option value="${r.v}"${role===r.v?" selected":""}>${r.l}</option>`).join("")}</select></td>
-      <td><span class="conf ${conf}">${CONF_L[conf]}</span></td>
+      <td><span class="conf ${conf}">${CONF_L[conf]}</span><small class="src">${{auto:"automatica",IA:"dall'IA",modello:"modello salvato",utente:"scelta da te"}[colSource(A,c)]}</small></td>
       <td class="why">${esc(S.aiRoles[c.idx]?"Proposta dall'IA, applicata da te: "+S.aiRoles[c.idx]:S.touched[c.idx]?"Interpretazione scelta da te":c.reason)}</td>
     </tr>`;
   }).join("");
@@ -611,8 +639,10 @@ function renderCaps(ds){
 }
 function renderConfirm(ds){
   const need=needCount(),btn=$("#confirmBtn"),t=$("#confirmText");
-  btn.disabled=!!need||!ds.ok;
-  if(need)t.innerHTML=`<b>${need} ${need===1?"colonna":"colonne"} da confermare</b> prima del laboratorio. <button type="button" class="btn sm" id="gotoNeed" style="margin-left:6px">Mostrami ${need===1?"quale":"quali"}</button>`;
+  const open=(S.checks||[]).filter(c=>c.block&&!c.done).length;
+  btn.disabled=!!need||!ds.ok||!!open;
+  if(!need&&ds.ok&&open)t.innerHTML=`<b>${open} ${open===1?"verifica":"verifiche"} prima del laboratorio</b>: le trovi qui sopra, in «Prima di costruire il laboratorio».`;
+  else if(need)t.innerHTML=`<b>${need} ${need===1?"colonna":"colonne"} da confermare</b> prima del laboratorio. <button type="button" class="btn sm" id="gotoNeed" style="margin-left:6px">Mostrami ${need===1?"quale":"quali"}</button>`;
   else if(!ds.ok)t.innerHTML=`<b>Mappatura incompleta.</b> ${esc(ds.Q.errors[0])}`;
   else t.innerHTML=`Pronto: <b>${ds.assets.length} serie</b> · ${ds.nObs} date · ${ds.Q.warnings.length} ${ds.Q.warnings.length===1?"avviso":"avvisi"}`;
 }
@@ -623,6 +653,7 @@ document.addEventListener("click",e=>{
   setTimeout(()=>{row.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"center"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");sel.focus({preventScroll:true});},380);
 });
 $("#confirmBtn").addEventListener("click",e=>{
+  tplSave();
   if(!HAS_G){showLab(false);return;}
   const ds=S.ds,b=e.currentTarget.getBoundingClientRect(),cx=b.left+b.width/2,cy=b.top+b.height/2;
   const R=Math.hypot(Math.max(cx,innerWidth-cx),Math.max(cy,innerHeight-cy))+20,k=ds.assets.length;
@@ -733,8 +764,9 @@ function renderAI(){
     ${n?`<ul class="props">${items}</ul><div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn primary" id="aiApply" data-mag>Applica tutte (${n})</button><button type="button" class="btn" id="aiDismiss">Ignora</button></div>`:""}`;
 }
 document.addEventListener("click",e=>{
-  const t=e.target.closest("#aiRun,#aiApply,#aiDismiss,#aiUndo,#aiUnderstand,#undApply,#undRebuild,#undDismiss,#recipeOff,#recipeRun");if(!t)return;
+  const t=e.target.closest("#aiRun,#aiApply,#aiDismiss,#aiUndo,#aiUnderstand,#undApply,#undRebuild,#undDismiss,#recipeOff,#recipeRun,#tplForget");if(!t)return;
   if(t.id==="recipeOff")return recipeOff();
+  if(t.id==="tplForget"){tplForget(S.fp);S.tpl=null;S.tplUsed=false;load(S.fileSheets,S.source,false,{forceAuto:true});if(aiAuto())requestRecipe();return;}
   if(t.id==="recipeRun")return requestRecipe();
   if(t.id==="aiUnderstand")requestUnderstand();
   else if(t.id==="undApply")applyUnderstandSeries();
@@ -853,6 +885,125 @@ async function rebuildFromPrices(){
   }catch(e){
     S.und={...S.und,status:"ready",err:e instanceof TypeError?"Lo storico dei prezzi si scarica nella versione del sito pubblicata su Vercel.":String(e.message||e)};renderAI();
   }
+}
+
+/* ---------- Importazione: confidenza, conferme obbligatorie, anomalie, valute, memoria dei modelli ----------
+   Principio: meglio due conferme in più che un'analisi costruita su dati sbagliati.
+   S.res = decisioni dell'utente sulle verifiche; S.fix = correzioni dei prezzi (frazionamenti, unità, date future);
+   S.cconf = colonne incerte confermate; S.ccyDone = conversioni di valuta già fatte. */
+function resetImportState(){S.doneChecks={};S.res={};S.fix={adjust:{},exclude:{},dropFuture:false};S.cconf=new Set();S.ccyDone={};}
+function fixOpts(){const A=an();return {adjust:S.fix.adjust,exclude:S.fix.exclude,dropFuture:S.fix.dropFuture,values:!!(A&&A.virtual&&S.wide&&S.wide.sheets.some(x=>x.name===A.name))};}
+const ASSETR=["price","ret","retpct"];
+function colSource(A,c){
+  if(S.touched[c.idx])return "utente";
+  if(S.tplCols&&S.tplCols.has(c.idx))return "modello";
+  if(A.virtual&&A.fromAI)return "IA";
+  return "auto";
+}
+function sheetCcy(A,c){const v=A.ccyArr&&A.ccyArr[c.idx];return (S.ccyDone[A.name]&&S.ccyDone[A.name][c.idx])?"EUR":v||c.ccy||null;}
+function computeChecks(A,ds){
+  const out=[],R=S.res;
+  /* 1) due letture diverse dello stesso file: l'utente sceglie */
+  if(S.conflict)out.push({id:"conflict",block:true,title:"L'IA e la lettura automatica non sono d'accordo",text:S.conflict.text,acts:[["ai","Usa la lettura dell'IA"],["auto","Usa la lettura automatica"]]});
+  /* 2) lettura fatta solo dall'IA, senza conferme da altre fonti: va guardata una volta */
+  if(A.virtual&&A.fromAI&&!S.agree&&!S.tplUsed)out.push({id:"aiRead",block:true,title:"Lettura dell'IA da verificare",text:`Le serie del foglio «${A.name}» le ha individuate l'IA. Controlla nella mappa qui sotto che nomi e colonne siano giusti.`,acts:[["ok","Ho controllato, è giusta"]]});
+  /* 3) colonne con interpretazione incerta */
+  const unsure=A.cols.filter(c=>{const r=S.roles[c.idx];return r!=null&&r!=="ignore"&&(c.conf==="media"||c.conf==="bassa")&&!S.touched[c.idx]&&!S.cconf.has(c.idx)&&colSource(A,c)!=="modello";});
+  if(unsure.length)out.push({id:"unsure",block:true,title:`${unsure.length} ${unsure.length===1?"colonna da verificare":"colonne da verificare"}`,text:unsure.map(c=>`«${c.name}» → ${(ROLES.find(r=>r.v===S.roles[c.idx])||{}).l}: ${c.reason}`).join(" · "),acts:[["ok","Le ho controllate, confermo"],["show","Mostramele"]],cols:unsure.map(c=>c.idx)});
+  /* 4) valori di patrimonio invece di prezzi */
+  const flowy=(A.virtual&&S.wide&&S.wide.sheets.some(s=>s.name===A.name))||A.cols.some(c=>c.flowValue&&ASSETR.includes(S.roles[c.idx]));
+  if(flowy)out.push({id:"flows",block:true,title:"Sono valori di patrimonio, non prezzi",text:"Contengono i soldi che hai aggiunto o tolto: un versamento sembra un guadagno, una vendita sembra un crollo. Per rendimenti di mercato veri conviene ricostruire con i prezzi storici (riquadro dell'IA qui sopra).",acts:[["ok","Ho capito, analizza i valori"]]});
+  /* 5) valute diverse dall'euro */
+  if(ds&&ds.ok){const cc=A.cols.filter(c=>ASSETR.includes(S.roles[c.idx])).map(c=>[c,sheetCcy(A,c)]).filter(([,v])=>v&&v!=="EUR");
+    if(cc.length)out.push({id:"ccy",block:true,title:"Serie in valute diverse dall'euro",text:cc.map(([c,v])=>`«${c.name}» in ${v}`).join(" · ")+". Mescolare valute falsa correlazioni e rischio: conviene convertire con il cambio ufficiale BCE di fine mese.",acts:[["convert","Converti in euro"],["keep","Lascia nella valuta originale"]],cc:cc.map(([c,v])=>[c.idx,v])});}
+  /* 6) anomalie dei dati */
+  (ds&&ds.anomalies||[]).forEach(a=>{
+    if(a.type==="future")out.push({id:"future",block:true,title:"Date nel futuro",text:a.text,acts:[["drop","Escludile"]]});
+    else if(a.type==="split"||a.type==="unit")out.push({id:a.id,block:true,title:a.type==="unit"?"Possibile cambio di unità":"Possibile frazionamento",text:a.text,acts:[["fix",a.type==="unit"?"Correggi la scala":"Correggi i prezzi precedenti"],["exclude","Escludi questo periodo"],["keep","È un movimento vero"]],a});
+  });
+  const stale=(ds&&ds.anomalies||[]).filter(a=>a.type==="stale");
+  if(stale.length)out.push({id:"stale",block:false,title:stale.length===1?"Valori fermi":`Valori fermi in ${stale.length} serie`,text:stale.length===1?stale[0].text:`${stale.map(a=>a.asset).join(", ")}: lo stesso valore per molti periodi di fila. Valori inseriti a mano o senza quotazione: la volatilità risulterà più bassa del vero.`,acts:[]});
+  (S.recipe&&S.recipe.status==="done"&&S.recipe.errors||[]).slice(0,4).forEach((e,i)=>out.push({id:"rerr"+i,block:false,title:"Controllo della ricetta",text:e,acts:[]}));
+  /* le correzioni già fatte fanno sparire l'anomalia dai dati: restano in elenco, annullabili */
+  Object.values(S.doneChecks||{}).forEach(c=>{if(!out.some(x=>x.id===c.id))out.push(c);});
+  return out.map(c=>({...c,done:R[c.id]!=null}));
+}
+function importConfidence(checks,A){
+  const open=checks.filter(c=>c.block&&!c.done).length,src=S.tplUsed?"modello":S.agree?"concorde":A.virtual&&A.fromAI?"IA":"auto";
+  if(open)return {lv:"bassa",l:`${open} ${open===1?"conferma richiesta":"conferme richieste"}`};
+  if(src==="modello")return {lv:"alta",l:"Alta · modello già confermato da te"};
+  if(src==="concorde")return {lv:"alta",l:"Alta · IA e lettura automatica concordano"};
+  return {lv:checks.some(c=>c.done)?"alta":"media",l:checks.some(c=>c.done)?"Alta · verificata da te":"Media · lettura non verificata da una seconda fonte"};
+}
+function renderChecks(A,ds){
+  const el=$("#checks");if(!el)return;
+  const ch=computeChecks(A,ds);S.checks=ch;const conf=importConfidence(ch,A);
+  const prev=ds&&ds.ok?previewHTML(ds):"";
+  el.innerHTML=`<div class="chk-head"><h3>Prima di costruire il laboratorio</h3><span class="conf ${conf.lv==="alta"?"alta":conf.lv==="media"?"media":"bassa"}">Affidabilità: ${esc(conf.l)}</span>${S.tplUsed?`<button type="button" class="btn sm" id="tplForget">Dimentica questo modello</button>`:""}</div>
+    ${ch.length?`<ul class="chk">${ch.map(c=>`<li class="${c.block?"blk":"info"} ${c.done?"done":""}"><b>${esc(c.title)}</b><span>${esc(c.text)}</span>${c.done?`<em>✓ ${esc((c.acts.find(a=>a[0]===S.res[c.id])||[,"fatto"])[1])}</em> <button type="button" class="btn sm" data-chk="${esc(c.id)}" data-act="undo">Annulla</button>`:c.acts.map(a=>`<button type="button" class="btn sm${a[0]==="ok"||a[0]==="fix"||a[0]==="convert"||a[0]==="ai"||a[0]==="drop"?" primary":""}" data-chk="${esc(c.id)}" data-act="${a[0]}">${esc(a[1])}</button>`).join("")}</li>`).join("")}</ul>`:`<p class="caption">Nessuna verifica richiesta: lettura confermata e dati senza anomalie.</p>`}
+    ${prev}`;
+}
+function previewHTML(ds){
+  const k=Math.min(ds.assets.length,5),n=ds.dates.length,idx=[...new Set([1,2,3,n-3,n-2,n-1].filter(i=>i>0&&i<n))];
+  return `<details class="prev"><summary>Anteprima: cosa entra nel laboratorio (${ds.assets.length} serie, ${ds.nObs} date, frequenza ${ds.freq.label})</summary><div class="tablewrap"><table class="mt"><thead><tr><th>Data</th>${ds.assets.slice(0,k).map(a=>`<th>${esc(a.name)}</th>`).join("")}</tr></thead><tbody>${idx.map(i=>`<tr><td class="mono">${fmtDate(ds.dates[i],ds.freq.f)}</td>${ds.assets.slice(0,k).map(a=>`<td class="mono">${Number.isFinite(a.ret[i])?fmtPct(a.ret[i],2,true):"—"}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="caption">Rendimenti per periodo calcolati dal motore dopo le tue scelte${ds.assets.length>k?` · prime ${k} serie`:""}.</p></details>`;
+}
+function blockingOpen(){return (S.checks||[]).some(c=>c.block&&!c.done);}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-chk]");if(!b)return;
+  const id=b.dataset.chk,act=b.dataset.act,c=(S.checks||[]).find(x=>x.id===id);if(!c)return;
+  if(act==="undo"){
+    if(c.a){const a=c.a,arr=(S.fix.adjust[a.col]||[]).filter(x=>x.k!==a.k);S.fix.adjust[a.col]=arr;S.fix.exclude[a.col]=(S.fix.exclude[a.col]||[]).filter(k=>k!==a.k);}
+    if(id==="future")S.fix.dropFuture=false;
+    if(id==="unsure")(c.cols||[]).forEach(i=>S.cconf.delete(i));
+    delete S.res[id];delete S.doneChecks[id];hideLab();renderImport(false);return;
+  }
+  if(act==="show"){const sel=document.querySelector(`#role-${c.cols[0]}`);if(sel){const row=sel.closest("tr");row.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"center"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");}return;}
+  if(id==="conflict"){S.res.conflict=act;const keep=S.conflict;S.conflict=null;if(act==="auto"){S.recipeChoice="auto";load(S.fileSheets,S.source,false,{forceAuto:true});S.res.conflict="auto";}else{S.agree=false;renderImport(false);}void keep;return;}
+  if(c.a&&act==="fix"){const a=c.a;(S.fix.adjust[a.col]=S.fix.adjust[a.col]||[]).push({k:a.k,factor:a.factor});}
+  if(c.a&&act==="exclude"){const a=c.a;(S.fix.exclude[a.col]=S.fix.exclude[a.col]||[]).push(a.k);}
+  if(id==="future"&&act==="drop")S.fix.dropFuture=true;
+  if(id==="unsure"&&act==="ok")(c.cols||[]).forEach(i=>S.cconf.add(i));
+  if(id==="ccy"&&act==="convert"){b.disabled=true;b.textContent="Scarico i cambi BCE…";const ok=await convertCurrency(c.cc);if(!ok){b.disabled=false;b.textContent="Riprova la conversione";return;}}
+  S.res[id]=act;if(c.a||id==="future"||id==="ccy")S.doneChecks[id]={...c};hideLab();renderImport(false);
+});
+/* conversione in euro con il cambio BCE di fine mese (unità di valuta per 1 euro); GBX = pence */
+async function convertCurrency(list){
+  const A=an(),si=S.sheetIdx,need=[...new Set(list.map(x=>x[1]==="GBX"?"GBP":x[1]))],fx={};
+  for(const c of need){const j=await getJSON(`/api/fx?ccy=${c}`);if(j.error||!j.points){toastImport(`Cambio ${c} non disponibile: ${j.error||"riprova"}`);return false;}fx[c]=new Map(j.points.map(p=>[p.p,p.v]));}
+  const aoa=S.raw[si].map(r=>Array.isArray(r)?[...r]:r),di=A.cols.find(c=>S.roles[c.idx]==="date");if(!di)return false;
+  let miss=0;
+  list.forEach(([ci,cur])=>{const role=S.roles[ci],m=fx[cur==="GBX"?"GBP":cur],div=cur==="GBX"?100:1;let prevRate=null;
+    A.body.forEach(b=>{const r=b.r,d=P.parseDate(aoa[r][di.idx],di.hintDate);if(!d)return;const rate=m.get(d.toISOString().slice(0,7));const p=P.parseNum(aoa[r][ci]);
+      if(!p){prevRate=rate||prevRate;return;}if(!(rate>0)){aoa[r][ci]=null;miss++;return;}
+      if(role==="price")aoa[r][ci]=p.n/div/rate;
+      else{const x=role==="retpct"?p.n/100:p.n,eur=prevRate?(1+x)*prevRate/rate-1:null;aoa[r][ci]=eur==null?null:role==="retpct"?eur*100:eur;}
+      prevRate=rate;});});
+  const roles={...S.roles},touched={...S.touched},nm=A.name;
+  S.raw[si]=aoa;const B=P.analyzeSheet(nm,aoa);B.virtual=A.virtual;B.fromAI=A.fromAI;B.ccyArr=A.ccyArr;S.sheets[si]=B;S.roles=roles;S.touched=touched;
+  S.ccyDone[nm]=Object.fromEntries(list.map(([ci])=>[ci,true]));
+  S.aiLog=[...(S.aiLog||[]),`Convertite in euro con il cambio BCE di fine mese: ${list.map(([ci,c])=>`${(A.cols.find(x=>x.idx===ci)||{}).name} (${c})`).join(", ")}${miss?` · ${miss} valori senza cambio esclusi`:""}.`];
+  return true;
+}
+function toastImport(msg){const t=$("#confirmText");if(t)t.innerHTML=`<b>${esc(msg)}</b>`;}
+
+/* ---------- Memoria dei modelli: la struttura confermata di un file viene ricordata (solo in questo browser) ---------- */
+const TPL_KEY="pos-templates-v1";
+function tplAll(){try{return JSON.parse(localStorage.getItem(TPL_KEY)||"[]")||[];}catch{return [];}}
+function tplGet(fp){return tplAll().find(t=>t.fp===fp)||null;}
+function tplSave(){
+  if(!S.source||S.source.kind!=="file"||!S.fp)return;
+  const A=an(),roles={};A.cols.forEach(c=>{if(S.roles[c.idx]!=null)roles[c.name]=S.roles[c.idx];});
+  const t={fp:S.fp,file:S.source.name,saved:new Date().toISOString(),recipe:S.recipe&&S.recipe.status==="done"?S.recipe.r:S.recipe&&S.recipe.status==="memory"?S.recipe.r:null,auto:S.res.conflict==="auto",sheet:A.name,roles,ccy:S.res.ccy||null,flows:S.res.flows||null};
+  const all=tplAll().filter(x=>x.fp!==t.fp);all.unshift(t);try{localStorage.setItem(TPL_KEY,JSON.stringify(all.slice(0,25)));}catch{}
+}
+function tplForget(fp){try{localStorage.setItem(TPL_KEY,JSON.stringify(tplAll().filter(x=>x.fp!==fp)));}catch{}}
+/* dopo il caricamento: foglio e ruoli come l'ultima volta (per nome di colonna) */
+function tplApply(t){
+  const si=S.sheets.findIndex(s=>s.name===t.sheet);if(si<0)return false;
+  S.sheetIdx=si;S.roles={};S.touched={};S.tplCols=new Set();
+  S.sheets[si].cols.forEach(c=>{const r=t.roles[c.name];if(r!==undefined){S.roles[c.idx]=r;S.tplCols.add(c.idx);}else S.roles[c.idx]=c.suggest;});
+  if(t.flows)S.res.flows=t.flows;
+  return true;
 }
 
 /* ---------- Tracker a matrice: le posizioni quotate dell'ultimo mese diventano un riepilogo da ricostruire con i prezzi veri ---------- */
@@ -1054,6 +1205,7 @@ function niceTicks(min,max,count){
   const lo=Math.floor(min/step)*step,hi=Math.ceil(max/step)*step,t=[];for(let v=lo;v<=hi+step*1e-9;v+=step)t.push(+v.toFixed(10));return t;
 }
 function drawChart(animate){
+  if(!S.lab)return;
   const ds=S.ds,W=S.lab.W,n=ds.dates.length,f=ds.freq.f;
   const VW=900,VH=340,ml=50,mr=14,mt=12,mb=30,iw=VW-ml-mr,ih=VH-mt-mb;
   let mn=Infinity,mx=-Infinity;W.forEach(s=>s.forEach(v=>{if(Number.isFinite(v)){if(v<mn)mn=v;if(v>mx)mx=v;}}));
@@ -2461,4 +2613,6 @@ renderPager("home");
 window.__pos={loadSheets:(sheets,name)=>load(sheets,{name:name||"prova.xlsx",size:0,kind:"file"},true),
   state:()=>({recipe:S.recipe?{status:S.recipe.status,tipo:S.recipe.r&&S.recipe.r.tipoFile,raw:S.recipe.r&&{c:S.recipe.r.serieInColonna,m:S.recipe.r.matriciRendimenti,provider:S.recipe.r.provider},errors:S.recipe.errors||[],msg:S.recipe.msg||null}:null,sheet:an()&&an().name,
     assets:S.ds&&S.ds.ok?S.ds.assets.map(a=>`${a.name}:${a.role}`):[],obs:S.ds&&S.ds.ok?S.ds.nObs:0,
-    und:S.und&&S.und.posizioni?S.und.posizioni.map(p=>`${p.ticker}→${p.simbolo}`):null,sheets:S.sheets.map(s=>s.name)})};
+    und:S.und&&S.und.posizioni?S.und.posizioni.map(p=>`${p.ticker}→${p.simbolo}`):null,sheets:S.sheets.map(s=>s.name),
+    checks:(S.checks||[]).map(c=>({id:c.id,block:c.block,done:c.done})),tpl:!!S.tplUsed,confirmDisabled:$("#confirmBtn").disabled}),
+  forgetTemplates:()=>{try{localStorage.removeItem(TPL_KEY);}catch{}}};

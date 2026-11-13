@@ -68,7 +68,7 @@
             <div class="src">In uso: <b id="dsName">—</b><span id="dsChip"></span></div>
             <p class="err" id="fileErr" hidden></p>
           </div>
-          <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv,.txt" hidden>
+          <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" hidden>
         </div>
         <div class="tile s4">
           <span class="eyebrow">Come funziona</span>
@@ -123,7 +123,7 @@
         <div class="card ai s12" id="aiCard">
           <div class="head"><h3>Correzione con IA</h3><span class="chip"><i></i>Claude · proposte da confermare</span></div>
           <div id="aiBody"></div>
-          <p class="caption">A Claude arrivano solo le intestazioni, le prime righe e le righe sospette del foglio. I calcoli restano nel tuo browser.</p>
+          <p class="caption">All'IA arriva solo un estratto della struttura (intestazioni, titoli di sezione, prime e ultime righe), mai il file intero. I calcoli restano nel tuo browser e un modello già confermato non viene più inviato.</p>
         </div>
         <div class="card s12">
           <div class="tablewrap">
@@ -135,6 +135,7 @@
         </div>
         <div class="card s6"><div class="head"><h3>Controllo qualità</h3><span class="eyebrow" id="qCount"></span></div><ul class="qlist" id="quality"></ul></div>
         <div class="card s6"><div class="head"><h3>Cosa posso costruire</h3><span class="eyebrow">con questi dati</span></div><ul class="caps" id="caps"></ul></div>
+        <div class="card s12 checks-card" id="checks" aria-live="polite"></div>
         <div class="s12 confirm">
           <p id="confirmText"></p>
           <button type="button" class="btn primary" id="confirmBtn">Costruisci il laboratorio</button>

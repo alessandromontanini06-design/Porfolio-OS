@@ -840,3 +840,19 @@ kbd{font-family:var(--f-mono);font-size:.72em;border:1px solid var(--line);borde
 /* il contenuto sfuma sotto la barra in alto e sopra il dock, invece di finirci sotto netto */
 .scene{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 76px,#000 calc(100% - 96px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 76px,#000 calc(100% - 96px),transparent 100%)}
 @media (max-width:760px){.scene{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 64px,#000 calc(100% - 84px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 64px,#000 calc(100% - 84px),transparent 100%)}}
+
+/* ---------- Importazione: verifiche prima del laboratorio ---------- */
+.checks-card .chk-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.checks-card .chk-head h3{margin:0;margin-right:auto}
+.chk{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.chk li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.chk li>b{flex-basis:100%;font-size:.95rem}
+.chk li>span{flex-basis:100%;color:var(--muted);font-size:.86rem;line-height:1.45}
+.chk li.blk{border-color:color-mix(in oklab,var(--warn) 55%,transparent);background:color-mix(in oklab,var(--warn) 7%,transparent)}
+.chk li.blk>b::before{content:"● ";color:var(--warn)}
+.chk li.done{border-color:color-mix(in oklab,var(--good) 45%,transparent);background:color-mix(in oklab,var(--good) 6%,transparent)}
+.chk li.done>b::before{content:"✓ ";color:var(--good)}
+.chk li em{font-style:normal;color:var(--good);font-size:.84rem}
+.chk li.info>b::before{content:"i  ";color:var(--muted)}
+.map small.src{display:block;margin-top:4px;font-size:.66rem;color:var(--muted);font-family:var(--f-mono)}
+.prev{margin-top:12px}.prev summary{cursor:pointer;color:var(--muted);font-size:.86rem}

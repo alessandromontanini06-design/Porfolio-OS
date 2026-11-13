@@ -82,7 +82,7 @@ Compila le parti che servono (lascia vuoti gli array e null il resto):
 
 5) "posizioni": solo se il file è una fotografia di posizioni SENZA storico (un riepilogo con valori e pesi). Solo strumenti quotati.
 
-6) "simboli": per ogni titolo quotato che compare (nelle posizioni, nei movimenti, nelle voci dei tracker) il simbolo per Alpha Vantage nel formato TICKER.BORSA: .LON Londra, .DEX Xetra, .PAR Parigi, .AMS Amsterdam, nessun suffisso per gli Stati Uniti. Borsa Italiana non è coperta: per gli ETF comprati a Milano usa Londra o Xetra (gli iShares "CS…" di Milano a Londra perdono la S: CSSPX → CSPX.LON). Codici come "EPA:MC" → "MC.PAR". Massimo 40.
+6) "simboli": per ogni titolo quotato che compare (nelle posizioni, nei movimenti, nelle voci dei tracker) il simbolo per Alpha Vantage nel formato TICKER.BORSA: .LON Londra, .DEX Xetra, .PAR Parigi, .AMS Amsterdam, nessun suffisso per gli Stati Uniti. Borsa Italiana non è coperta: per gli ETF comprati a Milano usa Londra o Xetra (gli iShares "CS…" di Milano a Londra perdono la S: CSSPX → CSPX.LON). Codici come "EPA:MC" → "MC.PAR". Come "titolo" usa ESATTAMENTE il testo che compare nella colonna del titolo o nella colonna dei nomi (anche se è un ISIN). Se non sei sicuro del simbolo, non inserirlo. Massimo 40.
 
 Regole:
 - Valuta: per ogni serie indica la valuta se si capisce (ISO a tre lettere), altrimenti null.

@@ -25,6 +25,7 @@ function parseNum(v){
   if(!s||/^(n\/?a|na|nan|null|-|—|–|#n\/d|#n\/a|#div\/0!|#value!|#valore!)$/i.test(s))return null;
   let pct=false;
   if(/%$/.test(s)){pct=true;s=s.slice(0,-1).trim();}
+  s=s.replace(/^(eur|usd|gbp|gbx|chf|jpy)\s*/i,"").replace(/\s*(eur|usd|gbp|gbx|chf|jpy)$/i,"").replace(/(\d)['’](?=\d{3})/g,"$1");
   s=s.replace(/[€$£\s ]/g,"").replace(/[−–]/g,"-");
   if(/^\(.*\)$/.test(s))s="-"+s.slice(1,-1);
   if(/^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s))s=s.replace(/\./g,"").replace(",",".");
@@ -54,6 +55,7 @@ function parseDate(v,hint){
   if((m=s.match(/^(\d{1,2})[\/.\-](\d{4})$/)))return mkDate(+m[2],+m[1]-1,1);
   if((m=s.match(/^([a-z]{3})[a-z]*\.?[\s\-\/']*(\d{4}|\d{2})$/))&&(m[1] in MONTHS))return mkDate(+m[2],MONTHS[m[1]],1);
   if((m=s.match(/^(\d{1,2})[\s\-]([a-z]{3})[a-z]*\.?[\s\-](\d{4}|\d{2})$/))&&(m[2] in MONTHS))return mkDate(+m[3],MONTHS[m[2]],+m[1]);
+  if((m=s.match(/^(?:q|t)([1-4])[\s\-\/]*(\d{4})$/))||(m=s.match(/^(\d{4})[\s\-\/]*(?:q|t)([1-4])$/))){const a=+m[1],b=+m[2],q=a<=4?a:b,y=a<=4?b:a;return new Date(Date.UTC(y,q*3,0));}
   if(hint&&(m=s.match(/^(\d{4})$/)))return mkDate(+m[1],11,31);
   return null;
 }
@@ -148,6 +150,9 @@ function analyzeSheet(name,aoa){
   const width=aoa.reduce((w,r)=>Math.max(w,r.length),0);
   const headers=[];
   for(let c=0;c<width;c++){const v=h>=0?aoa[h][c]:null;headers.push(isBlank(v)?`Colonna ${colLetter(c)}`:String(v).trim());}
+  /* intestazione su due righe (gruppi sopra, nomi sotto, celle unite): «Gruppo · Nome» se la riga sopra ha almeno due gruppi */
+  if(h>0){const up=aoa[h-1]||[],grp=up.map(v=>typeof v==="string"&&v.trim()&&!parseNum(v)&&!parseDate(v,false)?v.trim():null);
+    if(grp.filter(Boolean).length>=2&&!up.some(v=>typeof v==="number")){let cur=null;for(let c=0;c<width;c++){if(grp[c])cur=grp[c];if(cur&&!isBlank(aoa[h][c]))headers[c]=`${cur} · ${headers[c]}`;}}}
   const body=[];
   for(let r=h+1;r<aoa.length;r++){const row=aoa[r];if(row.every(isBlank))continue;body.push({r,row});}
   const cols=[];
@@ -155,6 +160,14 @@ function analyzeSheet(name,aoa){
   if(cols.some(c=>c.flow&&/versat|\bvers\b|investit|contribut|deposit/i.test(c.name)))cols.forEach(c=>{
     if(c.suggest==="price"&&VALUE_HINT.test(c.name)&&!/prezz|price|close|chiusura|\bnav\b/i.test(c.name)){c.suggest=null;c.conf="bassa";c.flowValue=true;
       c.reason="Valore del portafoglio che include i versamenti: i rendimenti sarebbero gonfiati dai soldi aggiunti. Servono i prezzi degli strumenti";}});
+  /* sinonimi: in un export di quotazioni contano la chiusura rettificata (o la chiusura), non aperture, massimi, minimi e volumi */
+  const tagOf=c=>headerTag(String((h>=0?aoa[h][c.idx]:"")??"")),hasAdj=cols.some(c=>tagOf(c)==="adjclose"),ohlc=cols.filter(c=>["open","high","low"].includes(tagOf(c))).length>=2;
+  cols.forEach(c=>{const t=tagOf(c);c.tag=t;c.ccy=ccyOf(c.name)||(c.sample||[]).map(ccyOf).find(Boolean)||null;if(c.kind!=="num")return;
+    if(["open","high","low","volume"].includes(t)&&(ohlc||hasAdj)){c.suggest="ignore";c.conf="alta";c.reason=t==="volume"?"Volumi scambiati: non sono prezzi":"Apertura, massimo o minimo del giorno: per l'analisi serve la chiusura";}
+    else if(t==="close"&&hasAdj){c.suggest="ignore";c.conf="alta";c.reason="C'è anche la chiusura rettificata per dividendi e frazionamenti: uso quella";}
+    else if(t==="adjclose"&&c.suggest==="price"){c.conf="alta";c.reason="Chiusura rettificata per dividendi e frazionamenti: la serie giusta per i rendimenti";}
+    else if(["qty","amount","fee","weight","target"].includes(t)&&c.suggest!=="ignore"){c.suggest="ignore";c.conf="alta";c.reason={qty:"Quantità possedute",amount:"Importi delle operazioni",fee:"Commissioni e tasse",weight:"Pesi del portafoglio",target:"Pesi obiettivo"}[t]+": non sono una serie di prezzi";}
+  });
   const dc=cols.filter(c=>c.suggest==="date").sort((a,b)=>(b.dateFrac+(b.hintDate?.1:0))-(a.dateFrac+(a.hintDate?.1:0)));
   dc.forEach((c,i)=>{
     if(i===0){c.conf=c.dateFrac>=0.95?"alta":"media";c.reason=`Il ${Math.round(c.dateFrac*100)}% dei valori è una data valida`;}
@@ -302,7 +315,7 @@ function columnBlocks(sheets,blocks,extra){
       const pts=rowsS.map(x=>{const v=(aoa[x.r]||[])[c],p=v instanceof Date?null:parseNum(v);return [x.d,p?(role==="retpct"&&p.pct?p.n*100:p.n):null];});
       const nn=pts.filter(p=>p[1]!=null).length;
       if(nn<3){errors.push(`«${s.nome}» (colonna ${s.colonna} di «${b.foglio}»): solo ${nn} numeri, esclusa.`);continue;}
-      series.push({name:String(s.nome||s.colonna).trim(),role,pts,md,foglio:b.foglio});
+      series.push({name:String(s.nome||s.colonna).trim(),role,pts,md,foglio:b.foglio,ccy:s.valuta?String(s.valuta).toUpperCase():ccyOf(s.nome)||ccyOf(((aoa[h]||[])[c]))});
     }
   }
   if(!series.length)return {sheet:null,errors};
@@ -313,7 +326,7 @@ function columnBlocks(sheets,blocks,extra){
   const keys=[...new Set(series.flatMap(s=>s.pts.map(p=>key(p[0]))))].sort(),ki=new Map(keys.map((k,i)=>[k,i]));
   const aoa=[["Data",...series.map(s=>s.name)]];keys.forEach(k=>{const [y,m,d]=k.split("-").map(Number);aoa.push([monthly?new Date(y,m,0):new Date(y,m-1,d),...series.map(()=>null)]);});
   series.forEach((s,j)=>s.pts.forEach(([d,v])=>{if(v!=null)aoa[1+ki.get(key(d))][1+j]=v;}));
-  return {sheet:{name:"★ Serie lette dall'IA",aoa,virtual:true,roles:["date",...series.map(s=>s.role)]},errors};
+  return {sheet:{name:"★ Serie lette dall'IA",aoa,virtual:true,roles:["date",...series.map(s=>s.role)],ccy:[null,...series.map(s=>s.ccy||null)]},errors};
 }
 /* movimenti (acquisti e vendite): quantità nette e ultimo prezzo pagato per titolo */
 function txPositions(sheets,m){
@@ -365,13 +378,110 @@ function applyRecipe(sheets,R){
   return out;
 }
 
+/* ---------- Smart column mapping: sinonimi delle intestazioni (italiano, inglese, tedesco, francese, spagnolo) ---------- */
+const SYN=[
+  ["adjclose",/^adj\.?\s*close|adjusted\s*close|chiusura\s*rettificata|close\s*adj|adj\.?\s*cl\b/i],
+  ["close",/^(close|chiusura|ultimo|last|last price|prezzo di chiusura|prezzo chiusura|schlusskurs|schluss|cl[oô]ture|cierre|price)$/i],
+  ["open",/^(open|apertura|er[oö]ffnung|ouverture|apertura prezzo)$/i],
+  ["high",/^(high|max|massimo|hoch|haut|m[aá]ximo)$/i],
+  ["low",/^(low|min|minimo|tief|bas|m[ií]nimo)$/i],
+  ["volume",/^(volume|vol\.?|volumi|umsatz|volumen)$/i],
+  ["nav",/\bnav\b|valore quota|net asset value/i],
+  ["isin",/^(isin|codice isin|isin code)$/i],
+  ["ticker",/^(ticker|simbolo|symbol|codice|code|tkr)$/i],
+  ["name",/^(titolo|strumento|nome|descrizione|prodotto|asset|security|instrument|name|description|wertpapier|titre)$/i],
+  ["qty",/quantit|^qty$|^q\.?t[aà]\.?$|^shares$|^units$|^pezzi$|^quote$|^st[uü]ck|^n\.?\s*azioni|^nominale$/i],
+  ["price",/^(prezzo|price|kurs|cours|precio|prezzo unitario|prezzo medio|unit price|pmc)$/i],
+  ["amount",/importo|controvalore|^amount$|ammontare|totale operazione|betrag|montant|^valore operazione$|net amount|^totale$/i],
+  ["fee",/commission|^fees?$|spese|^costi$|tasse|^tax(es)?$|bollo/i],
+  ["side",/^(tipo|operazione|segno|side|type|buy\/sell|acquisto\/vendita|movimento|tipo operazione|transaction type|action)$/i],
+  ["ccy",/^(valuta|currency|ccy|divisa|w[aä]hrung|devise|moneda)$/i],
+  ["value",/^(valore|value|controvalore attuale|valore di mercato|market value|valore €|valore eur|marktwert)/i],
+  ["weight",/^(peso|weight|allocazione|allocation|% portafoglio|% del portafoglio|peso attuale|peso %)/i],
+  ["target",/target|obiettivo|desiderat|peso ideale|ziel/i]
+];
+function headerTag(h){const t=String(h??"").replace(/\s+/g," ").trim();if(!t)return null;for(const [k,rx] of SYN)if(rx.test(t))return k;return null;}
+/* valuta indicata nell'intestazione o nelle celle */
+function ccyOf(text){const t=String(text??"");if(/\bGBX\b|\bGBp\b|pence/.test(t))return "GBX";if(/\bUSD\b|US\$|\$/.test(t))return "USD";if(/\bGBP\b|£/.test(t))return "GBP";if(/\bCHF\b/.test(t))return "CHF";if(/\bJPY\b|¥/.test(t))return "JPY";if(/\bEUR\b|€/.test(t))return "EUR";return null;}
+const MONTH_TOK=/^(gen(naio)?|jan(uary)?|feb(braio|ruary)?|mar(zo|ch)?|apr(ile|il)?|mag(gio)?|may|giu(gno)?|jun(e)?|lug(lio)?|jul(y)?|ago(sto)?|aug(ust)?|set(tembre)?|sep(t(ember)?)?|ott(obre)?|oct(ober)?|nov(embre|ember)?|dic(embre)?|dec(ember)?)\.?$/i;
+const GENERIC_SHEET=/^(sheet|foglio|tabelle|feuil|hoja|blatt)\s*\d*$/i;
+
+/* ---------- Riconoscitori locali (senza IA): producono una ricetta nello stesso formato di quella dell'IA ---------- */
+function localRecipe(sheets){
+  const R={serieInColonna:[],serieInRiga:[],matriciRendimenti:[],movimenti:null,posizioni:[],simboli:[],scartati:[]},parts=[];
+  for(const sh of sheets||[]){
+    const aoa=(sh.aoa||[]).map(r=>Array.isArray(r)?r:[]);if(!aoa.length)continue;
+    /* 1) tabella di rendimenti mensili: una riga con almeno 10 mesi consecutivi, anni nella colonna a sinistra */
+    let mx=null;
+    for(let r=0;r<Math.min(aoa.length,30)&&!mx;r++){const row=aoa[r];for(let c=0;c<row.length;c++){let k=0;while(c+k<row.length&&MONTH_TOK.test(String(row[c+k]??"").trim()))k++;if(k>=10){mx={r,c};break;}}}
+    if(mx){
+      let yc=-1,ys=0;for(let c=mx.c-1;c>=0;c--){let n=0;for(let r=mx.r+1;r<aoa.length;r++){const p=parseNum(aoa[r][c]);if(p&&Number.isInteger(p.n)&&p.n>1900&&p.n<2100)n++;}if(n>ys){ys=n;yc=c;}}
+      if(yc>=0&&ys>=1){
+        let pct=false,big=false;for(let r=mx.r+1;r<aoa.length;r++)for(let m=0;m<12;m++){const v=aoa[r][mx.c+m];if(typeof v==="string"&&/%/.test(v))pct=true;const p=parseNum(v);if(p&&Math.abs(p.n)>1.5)big=true;}
+        let title=null;for(let r=mx.r-1;r>=0&&!title;r--)title=(aoa[r]||[]).find(v=>typeof v==="string"&&v.trim().length>3&&!parseNum(v))||null;
+        R.matriciRendimenti.push({foglio:sh.name,nome:String(title||sh.name).replace(/\s*[–-]\s*rendimenti.*$/i,"").trim(),colonnaAnno:colLetter(yc),colonnaGennaio:colLetter(mx.c),primaRiga:mx.r+2,ultimaRiga:null,ruolo:pct||big?"rendimento_percentuale":"rendimento_decimale"});
+        parts.push({kind:"matrice",foglio:sh.name,conf:"alta",d:`«${sh.name}»: tabella di rendimenti mensili (anni in riga, mesi in colonna)`});
+        continue;
+      }
+    }
+    const an=analyzeSheet(sh.name,aoa),h=an.headerRow;if(h<0)continue;
+    const hdr=aoa[h].map(v=>String(v??"").trim()),tags=hdr.map(headerTag),find=k=>tags.indexOf(k);
+    const dateCols=an.cols.filter(c=>c.kind==="date"&&c.dateFrac>=.8).map(c=>c.idx).sort((a,b)=>a-b);
+    /* 2) export di quotazioni (Yahoo, Investing, broker): Open/High/Low/Close/Adj Close/Volume */
+    const iAdj=find("adjclose"),iClose=find("close"),ohlc=[find("open"),find("high"),find("low")].filter(i=>i>=0).length>=2;
+    if(dateCols.length===1&&(iAdj>=0||(iClose>=0&&ohlc))){
+      const pc=iAdj>=0?iAdj:iClose,nm=GENERIC_SHEET.test(sh.name)?(hdr[pc]||sh.name):sh.name;
+      R.serieInColonna.push({foglio:sh.name,rigaIntestazione:h+1,colonnaData:colLetter(dateCols[0]),primaRiga:null,ultimaRiga:null,serie:[{colonna:colLetter(pc),nome:nm,ruolo:"prezzo",valuta:ccyOf(hdr[pc])}]});
+      parts.push({kind:"quotazioni",foglio:sh.name,conf:"alta",d:`«${sh.name}»: export di quotazioni, uso ${iAdj>=0?"la chiusura rettificata":"la chiusura"} e ignoro aperture, massimi, minimi e volumi`});
+      continue;
+    }
+    /* 3) due o più tabelle affiancate: ogni gruppo di colonne usa la colonna di date alla sua sinistra */
+    if(dateCols.length>=2){
+      const blocks=dateCols.map((dc,i)=>{const end=i+1<dateCols.length?dateCols[i+1]:Infinity,ser=an.cols.filter(c=>c.idx>dc&&c.idx<end&&ASSET_ROLES.includes(c.suggest));return ser.length?{foglio:sh.name,rigaIntestazione:h+1,colonnaData:colLetter(dc),primaRiga:null,ultimaRiga:null,serie:ser.map(c=>({colonna:c.letter,nome:c.name,ruolo:{price:"prezzo",ret:"rendimento_decimale",retpct:"rendimento_percentuale"}[c.suggest],valuta:ccyOf(c.name)}))}:null;}).filter(Boolean);
+      if(blocks.length>=2){R.serieInColonna.push(...blocks);parts.push({kind:"affiancate",foglio:sh.name,conf:"media",d:`«${sh.name}»: ${blocks.length} tabelle affiancate con date diverse, unite per data`});continue;}
+    }
+    /* 4) movimenti: data + titolo/ISIN + (quantità e prezzo, oppure importo) */
+    const cT=[find("name"),find("ticker"),find("isin")].find(i=>i>=0),cQ=find("qty"),cP=find("price")>=0?find("price"):find("close"),cA=find("amount"),cS=find("side");
+    if(dateCols.length>=1&&cT!=null&&cT>=0&&((cQ>=0&&cP>=0)||(cA>=0&&cQ>=0))&&!R.movimenti){
+      R.movimenti={foglio:sh.name,rigaIntestazione:h+1,colonnaData:colLetter(dateCols[0]),colonnaTitolo:colLetter(cT),colonnaQuantita:cQ>=0?colLetter(cQ):null,colonnaPrezzo:cP>=0?colLetter(cP):null,colonnaImporto:cA>=0?colLetter(cA):null,colonnaOperazione:cS>=0?colLetter(cS):null,valuta:null};
+      const cc=find("ccy");if(cc>=0){const vals=new Set(aoa.slice(h+1).map(r=>String(r[cc]??"").trim().toUpperCase()).filter(Boolean));if(vals.size===1)R.movimenti.valuta=[...vals][0];}
+      parts.push({kind:"movimenti",foglio:sh.name,conf:"media",d:`«${sh.name}»: elenco di acquisti e vendite`});
+      continue;
+    }
+    /* 5) riepilogo di posizioni senza date: nome/ticker/ISIN + valore o peso */
+    const cV=find("value")>=0?find("value"):cA,cW=tags.findIndex((t,i)=>t==="weight"&&!/target|obiettivo/i.test(hdr[i])),cG=tags.findIndex((t,i)=>t==="target"||(t==="weight"&&/target|obiettivo/i.test(hdr[i]))),cTk=find("ticker"),cIs=find("isin"),cN=find("name");
+    if(!dateCols.length&&(cTk>=0||cIs>=0)&&(cV>=0||cW>=0)){
+      const pos=[],sc=[],w=x=>{const p=parseNum(x);return p?(p.pct?p.n:p.n>1.5?p.n/100:p.n):null;};
+      for(let r=h+1;r<aoa.length;r++){const row=aoa[r],nm=String(row[cN>=0?cN:(cTk>=0?cTk:cIs)]??"").trim(),tk=String(row[cTk>=0?cTk:cIs]??"").trim();
+        if(!nm&&!tk)continue;if(/^(totale|total|somma)\b/i.test(nm)){continue;}
+        if(!tk){const v=cV>=0?parseNum(row[cV]):null;if(nm)sc.push(`${nm}${v?` ${fmtN(v.n,0)} €`:""}: senza ticker né ISIN`);continue;}
+        const v=cV>=0?parseNum(row[cV]):null;pos.push({nome:nm||tk,ticker:tk,simbolo:tk,valore:v?v.n:null,pesoAttuale:cW>=0?w(row[cW]):null,pesoTarget:cG>=0?w(row[cG]):null});}
+      if(pos.length){R.posizioni=pos;R.scartati.push(...sc);parts.push({kind:"posizioni",foglio:sh.name,conf:"media",d:`«${sh.name}»: riepilogo di ${pos.length} posizioni senza storico`});continue;}
+    }
+  }
+  /* più fogli di quotazioni: ognuno diventa una serie, tutte unite per data */
+  return parts.length?{recipe:R,parts}:null;
+}
+
+/* ---------- Impronta della struttura di un file: per riconoscere lo stesso modello la volta dopo (solo struttura, niente valori) ---------- */
+function structureFingerprint(sheets){
+  const norm=v=>String(v??"").toLowerCase().replace(/\d+/g,"#").replace(/\s+/g," ").trim();
+  const sig=(sheets||[]).map(s=>{const rows=(s.aoa||[]).slice(0,12).map(r=>(r||[]).filter(v=>typeof v==="string"&&v.trim()&&!parseNum(v)&&!parseDate(v,false)).map(norm).join("|")).filter(Boolean).join("¶");return norm(s.name)+"§"+rows;});
+  const uniq=[...new Set(sig)].sort().join("\n");
+  let h1=5381,h2=52711;for(let i=0;i<uniq.length;i++){const c=uniq.charCodeAt(i);h1=(h1*33)^c;h2=(h2*33)^c;}
+  return ((h1>>>0).toString(16)+(h2>>>0).toString(16)).padStart(16,"0");
+}
+
 const FREQS=[{max:4,label:"giornaliera",adj:"giornaliere",f:252},{max:10,label:"settimanale",adj:"settimanali",f:52},{max:45,label:"mensile",adj:"mensili",f:12},{max:120,label:"trimestrale",adj:"trimestrali",f:4},{max:Infinity,label:"annuale",adj:"annuali",f:1}];
 const OUTLIER={252:0.25,52:0.35,12:0.5,4:0.7,1:1.5};
 const ASSET_ROLES=["price","ret","retpct"];
 
-function buildDataset(an,roles){
-  const Q={errors:[],warnings:[],infos:[]};
-  const fail=()=>({ok:false,Q,assets:[],dates:[]});
+/* opts (decisioni dell'utente sulle anomalie): {adjust:{[col]:[{k,factor}]}, exclude:{[col]:[k]}, dropFuture:bool, today:Date}
+   Restituisce anche "anomalies": frazionamenti, cambi di unità, date future, prezzi fermi. Le prime tre richiedono una decisione. */
+function buildDataset(an,roles,opts){
+  opts=opts||{};
+  const Q={errors:[],warnings:[],infos:[]},anomalies=[];
+  const fail=()=>({ok:false,Q,assets:[],dates:[],anomalies});
   const dateIdx=an.cols.map(c=>c.idx).find(i=>roles[i]==="date");
   const assetCols=an.cols.filter(c=>ASSET_ROLES.includes(roles[c.idx]));
   if(dateIdx===undefined){Q.errors.push("Manca una colonna data: senza date non posso ordinare le osservazioni né calcolare la frequenza.");return fail();}
@@ -388,6 +498,9 @@ function buildDataset(an,roles){
   if(!sorted){rows.sort((a,b)=>a.d-b.d);Q.infos.push("Le date non erano in ordine cronologico: le ho ordinate.");}
   const seen=new Set();let dup=0;
   rows=rows.filter(x=>{const k=x.d.getTime();if(seen.has(k)){dup++;return false;}seen.add(k);return true;});
+  const today=opts.today||new Date(),fut=rows.filter(x=>x.d>today);
+  if(fut.length){if(opts.dropFuture){rows=rows.filter(x=>x.d<=today);Q.infos.push(`${fut.length} ${fut.length===1?"data futura esclusa":"date future escluse"} (righe di previsione o modello da compilare).`);}
+    else anomalies.push({id:"future",type:"future",block:true,n:fut.length,text:`${fut.length} ${fut.length===1?"riga ha una data":"righe hanno date"} nel futuro (dalla ${fmtDate(fut[0].d)}): previsioni, righe da compilare o un errore di data.`});}
   if(dup>rows.length*0.5)Q.warnings.push("Molte date si ripetono: il file potrebbe avere una riga per asset e per data (formato lungo). Questa versione legge un asset per colonna.");
   else if(dup)Q.warnings.push(`${dup} date duplicate: ho tenuto solo la prima occorrenza.`);
   if(rows.length<3){Q.errors.push("Servono almeno 3 date valide per costruire una serie.");return fail();}
@@ -404,6 +517,8 @@ function buildDataset(an,roles){
     let f0=vals.findIndex(x=>x!==null),l=vals.length-1;while(l>=0&&vals[l]===null)l--;
     if(role==="price"){
       for(let k=0;k<vals.length;k++)if(vals[k]!==null&&vals[k]<=0){nonpos++;vals[k]=null;}
+      /* correzioni decise dall'utente: frazionamento o cambio di unità a partire dal periodo k → i prezzi precedenti vengono riportati sulla stessa scala */
+      ((opts.adjust||{})[c.idx]||[]).forEach(a=>{for(let j=0;j<a.k&&j<vals.length;j++)if(vals[j]!==null)vals[j]*=a.factor;});
       f0=vals.findIndex(x=>x!==null);
       for(let k=f0+1;k<=l;k++){
         if(vals[k]===null){missing++;missDates.push(dates[k]);continue;}
@@ -420,6 +535,25 @@ function buildDataset(an,roles){
       if(role==="ret"&&c.maxAbs>1)Q.warnings.push(`«${c.name}»: valori oltre ±1 per dei rendimenti decimali. Forse sono in punti percentuali?`);
     }
     if(nonpos)Q.warnings.push(`«${c.name}»: ${nonpos} prezzi nulli o negativi esclusi.`);
+    if(role==="price"){
+      /* frazionamenti (1:2, 1:10, raggruppamenti) e cambi di unità (×100, per esempio pence e sterline): salti che non sono rendimenti */
+      const done=new Set(((opts.adjust||{})[c.idx]||[]).map(a=>a.k)),excl=new Set((opts.exclude||{})[c.idx]||[]);
+      for(let k=1;k<vals.length;k++){
+        if(opts.values||c.flowValue)break; // valori di patrimonio: un salto è un versamento o una vendita, non un frazionamento
+        if(vals[k]==null||vals[k-1]==null||done.has(k)||excl.has(k))continue;
+        const q=vals[k]/vals[k-1];if(q>.55&&q<1.8)continue;
+        for(const n of [100,.01,2,3,4,5,10,20,.5,1/3,.25,.2,.1,.05]){
+          if(Math.abs(q/n-1)<(Math.abs(Math.log(n))>4?.06:.025)){const unit=n===100||n===.01;
+            anomalies.push({id:`${unit?"unit":"split"}:${c.idx}:${k}`,type:unit?"unit":"split",block:true,col:c.idx,k,factor:n,date:dates[k],asset:c.name,
+              text:`«${c.name}», ${fmtDate(dates[k],freq.f)}: il prezzo passa da ${fmtN(vals[k-1])} a ${fmtN(vals[k])} (×${n>=1?fmtN(n,n%1?2:0):"1/"+fmtN(1/n,0)}). ${unit?"Sembra un cambio di unità (per esempio pence e sterline)":"Sembra un frazionamento o un raggruppamento di azioni"}, non un rendimento del ${fmtPct(q-1,0)}.`});
+            break;}
+        }
+      }
+      /* prezzi fermi per molti periodi: valori inseriti a mano o strumento non quotato */
+      let run=1,maxRun=1,at=0;for(let k=1;k<vals.length;k++){if(vals[k]!=null&&vals[k]===vals[k-1]){run++;if(run>maxRun){maxRun=run;at=k;}}else run=1;}
+      if(maxRun>=(freq.f>=52?15:6))anomalies.push({id:`stale:${c.idx}`,type:"stale",block:false,col:c.idx,asset:c.name,text:`«${c.name}»: lo stesso valore per ${maxRun} periodi di fila (fino a ${fmtDate(dates[at],freq.f)}). Valori inseriti a mano o strumento senza quotazione: la volatilità risulterà più bassa del vero.`});
+    }
+    ((opts.exclude||{})[c.idx]||[]).forEach(k=>{if(k<ret.length)ret[k]=NaN;});
     if(missing)Q.warnings.push(`«${c.name}»: ${missing} ${missing===1?"valore mancante":"valori mancanti"} (${missDates.slice(0,3).map(d=>fmtDate(d,freq.f)).join(", ")}${missing>3?"…":""}). Esclusi dai calcoli, non stimati.`);
     const out=[];ret.forEach((x,k)=>{if(Number.isFinite(x)&&(Math.abs(x)>thr||x<=-1))out.push(k);});
     if(out.length)Q.warnings.push(`«${c.name}»: ${out.length} ${out.length===1?"rendimento anomalo":"rendimenti anomali"} (oltre ±${Math.round(thr*100)}% in un periodo), per esempio ${fmtPct(ret[out[0]])} a ${fmtDate(dates[out[0]],freq.f)}. Verifica che non sia un errore.`);
@@ -428,7 +562,7 @@ function buildDataset(an,roles){
   const minFirst=Math.min(...assets.map(a=>a.first));
   assets.forEach(a=>{if(a.first>minFirst+1)Q.infos.push(`«${a.name}» inizia a ${fmtDate(dates[a.first],freq.f)}, dopo le altre serie.`);});
   const years=(dates[dates.length-1]-dates[0])/(365.25*864e5)+1/freq.f;
-  return {ok:true,Q,dates,freq,medianDays:md,assets,nObs:rows.length,years};
+  return {ok:true,Q,dates,freq,medianDays:md,assets,nObs:rows.length,years,anomalies};
 }
 
 function stats(a,f,dates){
@@ -887,6 +1021,6 @@ function frontierScore(mu,C,w,maxVol,rf){
   const lo=Math.min(...mu),over=me.vol>maxVol+1e-9,eff=best.ret>lo?(me.ret-lo)/(best.ret-lo):1;
   return {w:ww,ret:me.ret,vol:me.vol,best:{w:best.w,ret:best.ret,vol:best.vol},over,score:over?0:Math.round(100*Math.max(0,Math.min(1,eff))),gap:best.ret-me.ret,frontier:O.frontier};
 }
-export const POS={reshapeWide,applyRecipe,colIdx,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
