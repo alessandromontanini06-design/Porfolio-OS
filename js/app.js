@@ -418,9 +418,10 @@ function load(sheets,source,fromUser,opts={}){
   if(u){S.und=u;renderAI();}
   if(opts.memory){S.recipe={status:"memory",r:opts.recipe,errors:[]};S.tplUsed=true;}
   /* ogni file nuovo: l'IA legge la struttura di tutti i fogli; un modello già confermato non la richiede */
-  if(fromUser&&isFile&&aiAuto()&&!S.tplUsed)requestRecipe();
+  /* il file di esempio è noto: niente lettura con l'IA (nessun costo), solo i riconoscitori locali */
+  if(fromUser&&isFile&&aiAuto()&&!S.tplUsed&&!source.example)requestRecipe();
   renderImport(false);
-  if(fromUser&&isFile&&(!aiAuto()||S.tplUsed))maybeAutoRebuild();
+  if(fromUser&&isFile&&(!aiAuto()||S.tplUsed||source.example))maybeAutoRebuild();
 }
 /* ---------- Lettura con l'IA: estratto strutturato → ricetta → il motore la esegue su tutto il file ---------- */
 function aiSample(){
@@ -521,7 +522,23 @@ drop.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0]));
 window.addEventListener("dragover",e=>{if([...(e.dataTransfer?e.dataTransfer.types:[])].includes("Files"))void 0;});
 window.addEventListener("dragleave",e=>{if(!e.relatedTarget)void 0;});
 $("#file").addEventListener("change",e=>{handleFile(e.target.files[0]);e.target.value="";});
-$("#sampleBtn").addEventListener("click",()=>load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},true));
+/* portafoglio di esempio: un vero Excel (movimenti dal 2019, 7 ETF con ISIN) letto come un file caricato dall'utente */
+const EXAMPLE={url:"esempio/Portfolio_OS_esempio.xlsx",name:"Portfolio_OS_esempio.xlsx"};
+const isExample=()=>!!(S.source&&(S.source.example||(S.source.kind==="rebuilt"&&S.rb&&S.rb.origSource&&S.rb.origSource.example)));
+async function loadExample(fromUser){
+  if(fromUser&&isExample()&&S.source.kind==="rebuilt"){go("scan",{force:true});return;}
+  try{
+    for(let k=0;!window.XLSX&&k<50;k++)await new Promise(r=>setTimeout(r,100));
+    if(!window.XLSX)throw new Error("noxlsx");
+    const buf=await (await fetch(EXAMPLE.url)).arrayBuffer();
+    const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
+    const sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
+    if(!fromUser&&S.source&&S.source.kind!=="sample")return; // l'utente ha già caricato un suo file
+    load(sheets,{name:EXAMPLE.name,size:buf.byteLength,kind:"file",example:true},fromUser);
+    if(!fromUser&&S.und&&S.und.posizioni&&S.und.posizioni.length){S.autoRebuilt=S.source;rebuildFromPrices({quiet:true});}
+  }catch(e){if(fromUser)showError("Non riesco a caricare il file di esempio. Ricarica la pagina e riprova.");}
+}
+$("#sampleBtn").addEventListener("click",()=>loadExample(true));
 
 /* ---------- Import ---------- */
 const an=()=>S.sheets[S.sheetIdx];
@@ -530,7 +547,7 @@ function renderImport(animate){
   if(!S.res)resetImportState();
   const A=an();S.ds=P.buildDataset(A,S.roles,fixOpts());
   $("#dsName").textContent=S.source.name;
-  $("#dsChip").innerHTML=S.source.kind==="sample"?`<span class="chip sample"><i></i>Esempio · dati sintetici</span>`:"";
+  $("#dsChip").innerHTML=S.source.kind==="sample"?`<span class="chip sample"><i></i>Esempio · dati sintetici</span>`:isExample()?`<span class="chip sample"><i></i>Esempio · portafoglio dimostrativo</span>`:"";
   renderScan(A,animate);renderLog(A,S.ds,animate);renderSummary(A,S.ds);renderSheets();renderMapping(A);renderQuality(S.ds);renderCaps(S.ds);renderChecks(A,S.ds);renderConfirm(S.ds);renderTicker();renderAI();
 }
 function playScan(){
@@ -929,8 +946,9 @@ async function resolveIsins(pos){
   need.forEach(p=>{const r=found.get(p.isin||p.ticker);if(r){p.simbolo=r.simbolo;p.alt=r.alternative||[];p.isinFrom=r.nome;}});
   return need.map(p=>`${p.nome}: ${p.simbolo?`${p.isin||p.ticker} → ${p.simbolo}`:"ISIN non trovato"}`);
 }
-async function rebuildFromPrices(){
-  const u=S.und;
+async function rebuildFromPrices(o={}){
+  /* o.quiet: ricostruzione in sottofondo (esempio all'apertura), senza cambiare pagina; se nel frattempo arriva un altro file si abbandona */
+  const u=S.und,src0=S.source;
   let pos=u.posizioni.map((p,i)=>({...p,simbolo:String(((document.getElementById("und-sym-"+i)||{}).value)||p.simbolo||"").trim().toUpperCase()}));
   S.lastUnd={...u,posizioni:pos.map(p=>({...p}))};
   S.und={...u,posizioni:pos,status:"rebuilding",err:null,progress:""};renderAI();
@@ -975,9 +993,10 @@ async function rebuildFromPrices(){
     const aoa=rbAoa();
     if(aoa.length<14)throw new Error("Lo storico degli strumenti è troppo corto (meno di un anno). Prova a cambiare i simboli.");
     const months={length:aoa.length-1};
+    if(S.source!==src0)return;
     const orig=S.source.name.replace(/ · ricostruito$/,""),scartati=u.scartati||[];
     const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
-    load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},true);
+    load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},!o.quiet);
     S.portfolio=pf;S.rbLog=null;
     S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
       `Valute di quotazione: ${ok.map(o=>`${o.p.ticker||o.p.nome} ${o.s.currency||"sconosciuta"}`).join(", ")}.`,
@@ -986,6 +1005,7 @@ async function rebuildFromPrices(){
     S.rbLog=[...S.aiLog];
     renderImport(false);
   }catch(e){
+    if(S.source!==src0)return;
     S.und={...S.und,status:"ready",err:e instanceof TypeError?"Lo storico dei prezzi si scarica nella versione del sito pubblicata su Vercel.":String(e.message||e)};renderAI();
   }
 }
@@ -2721,7 +2741,8 @@ window.addEventListener("resize",()=>{if(say.classList.contains("on"))placeSay()
 window.__quanta={roam:()=>{QG.lastInput=0;roam();},say:s=>showSay(s||current)}; // per i test automatici
 
 /* ---------- Avvio ---------- */
-load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);
+load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);/* subito qualcosa da mostrare, poi il portafoglio di esempio vero */
+loadExample(false);
 morphInit();
 renderLabs();loadMarket();
 quantaScene("home");
