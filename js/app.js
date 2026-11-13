@@ -378,16 +378,22 @@ function reveal(){}
 
 /* ---------- Caricamento ---------- */
 function load(sheets,source,fromUser){
-  S.source=source;S.raw=sheets.map(s=>s.aoa);
-  S.sheets=sheets.map(s=>P.analyzeSheet(s.name,s.aoa));
-  S.sheetIdx=S.sheets.reduce((b,s,i)=>s.score>S.sheets[b].score?i:b,0);
+  /* tracker a matrice (una riga per voce, una colonna per mese, un foglio per anno): prima li rimetto in colonna e li unisco */
+  S.wide=source.kind==="file"?P.reshapeWide(sheets):null;
+  const all=S.wide?[...S.wide.sheets,...sheets]:sheets;
+  S.source=source;S.raw=all.map(s=>s.aoa);
+  S.sheets=all.map(s=>P.analyzeSheet(s.name,s.aoa));
+  S.sheetIdx=S.wide?0:S.sheets.reduce((b,s,i)=>s.score>S.sheets[b].score?i:b,0);
+  /* nei tracker la liquidità cambia con versamenti e spese, non con il mercato: fuori dalle analisi salvo scelta diversa */
+  if(S.wide)S.sheets.slice(0,S.wide.sheets.length).forEach(A=>A.cols.forEach(c=>{if(/^liquidit/i.test(c.name)&&c.suggest){c.suggest="ignore";c.conf="alta";c.reason="Saldi di conti e broker: cambiano con versamenti, spese e trasferimenti, non con il mercato";}}));
   initRoles();hideLab();$("#fileErr").hidden=true;S.scanPlayed=false;resetAI();
   renderImport(false);
   morphData();
   if(fromUser){S.scanPlayed=false;go("scan",{force:true});}
   if(source.kind!=="rebuilt"){S.portfolio=null;S.tx=detectTx(sheets);}
+  if(S.wide){const u=wideSnapshot(S.wide);if(u){S.und=u;renderAI();}}
   /* file "tracker" (versamenti, quote, valori) o con molti fogli: prima l'IA capisce che file è, poi eventualmente ricostruisce con i prezzi veri */
-  if(fromUser&&source.kind==="file"&&aiAuto()){const tracker=S.sheets.some(s=>s.tracker);if(S.ds&&S.ds.ok&&!tracker&&S.sheets.length<3)requestFix();else requestUnderstand();}
+  if(fromUser&&source.kind==="file"&&aiAuto()&&!S.wide){const tracker=S.sheets.some(s=>s.tracker);if(S.ds&&S.ds.ok&&!tracker&&S.sheets.length<3)requestFix();else requestUnderstand();}
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -464,7 +470,15 @@ function renderScan(A,animate){
 function renderLog(A,ds,animate){
   const t0=performance.now(),L=[];
   L.push(["ok",`Letto «${S.source.name}» · ${S.sheets.length} ${S.sheets.length===1?"foglio":"fogli"}${S.source.size?" · "+fmtSize(S.source.size):""}`]);
-  if(S.sheets.length>1)L.push(["ok",`Scelto il foglio «${A.name}»: è quello con più serie numeriche`]);
+  const W=S.wide&&S.wide.report;
+  if(W){
+    L.push(["ok",`Formato a matrice riconosciuto: date in orizzontale, una riga per voce, in ${W.sheets.length} fogli (${W.sheets.slice(0,4).join(", ")}${W.sheets.length>4?"…":""})`]);
+    L.push(["ok",`Uniti in una sola storia mensile: ${W.from} → ${W.to} · ${W.holdings} posizioni${W.debts?`, ${W.debts} debiti`:""}${W.totals?`, ${W.totals} righe di patrimonio totale`:""}`]);
+    L.push([W.fx?"ok":"warn",W.fx?`Valute ${W.currencies.join(", ")} convertite in euro con ${W.fx}, mese per mese`:`Valute diverse (${W.currencies.join(", ")}) senza tassi di cambio nel file: le posizioni restano nella loro valuta`]);
+    L.push(["ok",`Classi di attivo ricostruite da ${W.classSrc}: ${W.classes.join(", ")}`]);
+    L.push(["warn","Sono valori di patrimonio, non prezzi: i versamenti e i prelievi entrano nei rendimenti mensili"]);
+    if(!A.virtual&&!/^★/.test(A.name))L.push(["ok",`Stai guardando il foglio originale «${A.name}»`]);
+  }else if(S.sheets.length>1)L.push(["ok",`Scelto il foglio «${A.name}»: è quello con più serie numeriche`]);
   L.push([A.headerRow>=0?"ok":"warn",A.headerRow>=0?`Intestazioni alla riga ${A.headerRow+1}${A.headerRow>0?` (saltate ${A.headerRow} righe di titolo)`:""}`:"Nessuna riga di intestazione: uso le lettere delle colonne"]);
   const need=needCount();
   L.push([need?"warn":"ok",`${A.cols.length} colonne analizzate · ${need?need+" da confermare":"tutte interpretate"}`]);
@@ -713,7 +727,7 @@ function renderUnderstand(el){
       <div class="tablewrap"><table class="mt pos"><thead><tr><th>Strumento</th><th>Simbolo per i prezzi</th><th>Valore</th><th>Peso attuale</th><th>Peso target</th></tr></thead><tbody>
       ${u.posizioni.map((p,i)=>`<tr><td><span class="an">${esc(p.nome)}</span><span class="cl mono">${esc(p.ticker)}</span></td><td><input class="sym" id="und-sym-${i}" value="${esc(p.simbolo)}" aria-label="Simbolo di ${esc(p.nome)}" spellcheck="false"></td><td class="mono">${p.valore==null?"—":fmtN(p.valore)+" €"}</td><td class="mono">${pc(p.pesoAttuale)}</td><td class="mono">${pc(p.pesoTarget)}</td></tr>`).join("")}
       </tbody></table></div>
-      <p class="caption">Il simbolo è proposto dall'IA (formato TICKER.BORSA: .LON Londra, .DEX Xetra). Correggilo se serve: lo storico arriva da Alpha Vantage e viene convertito in euro con il cambio BCE di fine mese.</p>
+      <p class="caption">Il simbolo è proposto ${u.local?"dal ticker scritto nel file":"dall'IA"} (formato TICKER.BORSA: .LON Londra, .DEX Xetra). Correggilo se serve: lo storico arriva da Alpha Vantage e viene convertito in euro con il cambio BCE di fine mese.</p>
       ${scart}${err}<div class="row" style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn primary" id="undRebuild" data-mag>Scarica lo storico e ricostruisci il file</button><button type="button" class="btn" id="undDismiss">Ignora</button></div>`;
     return;
   }
@@ -775,6 +789,39 @@ async function rebuildFromPrices(){
   }catch(e){
     S.und={...S.und,status:"ready",err:e instanceof TypeError?"Lo storico dei prezzi si scarica nella versione del sito pubblicata su Vercel.":String(e.message||e)};renderAI();
   }
+}
+
+/* ---------- Tracker a matrice: le posizioni quotate dell'ultimo mese diventano un riepilogo da ricostruire con i prezzi veri ---------- */
+function guessSymbol(label,type,cur){
+  const t=String(label).trim().toUpperCase();let m;
+  if((m=t.match(/^(EPA|PAR|EURONEXT):([A-Z0-9]+)$/)))return m[2]+".PAR";
+  if((m=t.match(/^(BIT|MIL|BIT MI):([A-Z0-9]+)$/)))return m[2]+".MIL";
+  if((m=t.match(/^(ETR|XETRA|FRA|GER):([A-Z0-9]+)$/)))return m[2]+".DEX";
+  if((m=t.match(/^(LON|LSE):([A-Z0-9]+)$/)))return m[2]+".LON";
+  if((m=t.match(/^(AMS):([A-Z0-9]+)$/)))return m[2]+".AMS";
+  if((m=t.match(/^(NASDAQ|NYSE|NYSEARCA|AMEX):([A-Z0-9.]+)$/)))return m[2].replace(".","-");
+  if(!/^[A-Z][A-Z0-9.\-]{0,6}$/.test(t))return null;
+  if(/etf/i.test(type||""))return t+(cur==="EUR"?".DEX":".LON");
+  return t.replace(".","-");
+}
+function wideSnapshot(W){
+  const D=W.detail||[],N=(W.months||[]).length,fmtM=m=>{const [y,mo]=m.split("-").map(Number);return fmtDate(new Date(Date.UTC(y,mo-1,1)),12);};
+  const listed=d=>/^(Azioni ed ETF|Previdenza)$/.test(d.cls)&&guessSymbol(d.label,d.type,d.cur);
+  /* un mese conta se non è nel futuro e se è compilato davvero (almeno il 30% delle voci del mese più pieno) */
+  const now=new Date().toISOString().slice(0,7),cnt=i=>D.filter(d=>d.eur&&d.eur[i]>0).length,mx=Math.max(0,...W.months.map((_,i)=>cnt(i)));
+  const real=i=>W.months[i]<=now&&cnt(i)>=mx*.3;
+  let last=-1;for(let i=N-1;i>=0&&last<0;i--)if(real(i))last=i;
+  const share=i=>{let a=0,t=0;D.forEach(d=>{const v=d.eur&&d.eur[i];if(v>0){t+=v;if(listed(d))a+=v;}});return t?a/t:0;};
+  let li=-1;for(let i=last;i>=0&&li<0;i--)if(real(i)&&share(i)>=.1)li=i;
+  if(li<0)return null;
+  const lowNow=li<last?share(last):null;
+  const held=D.filter(d=>d.eur&&d.eur[li]>0),pos=held.filter(listed),tot=held.reduce((s,d)=>s+d.eur[li],0),ptot=pos.reduce((s,d)=>s+d.eur[li],0);
+  const by=new Map();held.filter(d=>!listed(d)).forEach(d=>by.set(d.cls,(by.get(d.cls)||0)+d.eur[li]));
+  const why={"Crypto":"wallet ed exchange, non un singolo strumento quotato","Immobili":"non quotati","Private equity":"non quotato","Liquidità":"conti e saldi","Altro":"beni e investimenti non quotati","Prestiti e obbligazioni":"piattaforme senza prezzo di mercato","Previdenza":"fondo senza simbolo di borsa","Azioni ed ETF":"senza simbolo di borsa riconoscibile"};
+  return {status:"ready",tipo:"riepilogo_portafoglio",local:true,foglio:W.sheets[0].name,
+    spiegazione:`Letto senza IA dal tuo tracker. ${li<last?`A ${fmtM(W.months[last])} i titoli quotati sono il ${fmtPct(lowNow,0)} del patrimonio: uso ${fmtM(W.months[li])}, l'ultimo mese in cui pesavano almeno il 10%.`:`Posizioni di ${fmtM(W.months[li])}.`} ${pos.length} titoli quotati per ${fmtN(Math.round(ptot))} € (${fmtPct(ptot/tot,0)} del patrimonio lordo). Ricostruendo il file con i loro prezzi storici i rendimenti diventano quelli del mercato, senza i soldi che hai aggiunto o tolto.`,
+    posizioni:pos.map(d=>({nome:d.label+(d.sec?` · ${d.sec}`:""),ticker:d.label,simbolo:guessSymbol(d.label,d.type,d.cur),valore:Math.round(d.eur[li]*100)/100,pesoAttuale:d.eur[li]/ptot,pesoTarget:null})),
+    scartati:[...by].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${fmtN(Math.round(v))} €: ${why[k]||"non quotato"}`)};
 }
 
 /* ---------- Il tuo portafoglio: pesi dal file, ribilanciamento ---------- */

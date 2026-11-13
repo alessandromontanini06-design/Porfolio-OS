@@ -166,6 +166,100 @@ function analyzeSheet(name,aoa){
   return {name,headerRow:h,body,cols,score,rowCount:aoa.length,tracker:nFlow>=2&&nFlow>=nAsset};
 }
 
+/* ---------- Fogli "a matrice" (tracker di patrimonio): una riga per voce, una colonna per data ----------
+   Riconosce la riga delle date in orizzontale, la colonna dei nomi, valuta e tipo; separa posizioni, debiti, totali,
+   tassi di cambio e blocchi di allocazione; unisce i fogli di anni diversi in una sola serie mensile e converte in euro
+   con i cambi scritti nel file. Restituisce fogli "virtuali" nel formato normale (date in colonna, una serie per colonna). */
+const CUR_CODE={U:"USD",US:"USD",USD:"USD",E:"EUR",EU:"EUR",EUR:"EUR",G:"GBP",GB:"GBP",GBP:"GBP",AE:"AED",AED:"AED",CHF:"CHF",JPY:"JPY",CAD:"CAD",AUD:"AUD",SEK:"SEK",NOK:"NOK",DKK:"DKK",PLN:"PLN",RUB:"RUB",CNY:"CNY",HKD:"HKD"};
+const FXC="USD|EUR|GBP|AED|CHF|JPY|CAD|AUD|SEK|NOK|DKK|PLN|RUB|CNY|HKD|BTC|ETH|XAU|XAG";
+const FXROW_RX=new RegExp(`^(${FXC})(${FXC})\\b`),TOTAL_RX=/^(nw\b|nw\(|net ?worth\b|patrimonio( netto)?\b|totale\b|total\b|grand total)/i;
+const ALLOC_RX=/asset allocation|allocazione|per classe|by class/i,DEBT_RX=/^(debts?|debiti|passivit|liabilit|mutui|prestiti)/i,FXSEC_RX=/^(exchanges?|cambi|tassi di cambio|fx|currenc)/i;
+function wideHeader(aoa){
+  let best=null;
+  for(let r=0;r<Math.min(aoa.length,20);r++){
+    const cols=[];(aoa[r]||[]).forEach((v,c)=>{const d=v instanceof Date||typeof v==="string"?parseDate(v,false):null;if(d)cols.push({c,d});});
+    if(cols.length<3)continue;
+    let inc=0;for(let i=1;i<cols.length;i++)if(cols[i].d>=cols[i-1].d)inc++;
+    if(inc<(cols.length-1)*.8)continue;
+    if(!best||cols.length>best.cols.length)best={r,cols};
+  }
+  return best;
+}
+function parseWideSheet(name,aoa){
+  aoa=(aoa||[]).map(r=>Array.isArray(r)?r:[]);
+  const H=wideHeader(aoa);if(!H)return null;
+  const first=H.cols[0].c,hdr=aoa[H.r],body=aoa.slice(H.r+1),left=[];
+  for(let c=0;c<first;c++){const vals=body.map(r=>r[c]).filter(v=>typeof v==="string"&&v.trim()&&!parseNum(v)).map(v=>v.trim());left.push({c,vals,h:String(hdr[c]??"")});}
+  const isCur=x=>x.vals.length>=3&&x.vals.filter(v=>CUR_CODE[v.toUpperCase()]).length/x.vals.length>=.8&&x.vals.every(v=>v.length<=4);
+  const curC=left.find(x=>/curr|valut|ccy/i.test(x.h)&&x.vals.length)||left.find(isCur)||null;
+  const typeC=left.find(x=>x!==curC&&/^(type|tipo|categ|class)/i.test(x.h.trim()))||null;
+  const labC=left.filter(x=>x!==curC&&x!==typeC).sort((a,b)=>b.vals.length-a.vals.length)[0];
+  if(!labC||labC.vals.length<2)return null;
+  /* le colonne della stessa data o dello stesso mese: vale l'ultima a destra (istantanea di fine mese) */
+  const months=H.cols.map(x=>({c:x.c,k:x.d.toISOString().slice(0,7)}));
+  const out={name,months:months.map(m=>m.k),hold:[],total:[],alloc:[],fx:[],debt:[],skipped:0};
+  let sec="",mode="";
+  for(let r=H.r+1;r<aoa.length;r++){
+    const row=aoa[r],lab=String(row[labC.c]??"").trim();
+    const vals=months.map(m=>{const p=row[m.c] instanceof Date?null:parseNum(row[m.c]);return p?p.n:null;});
+    const nn=vals.filter(v=>v!==null).length;
+    if(!lab){if(nn)out.skipped++;continue;}
+    if(!nn){sec=lab;mode=ALLOC_RX.test(lab)?"alloc":FXSEC_RX.test(lab)?"fx":DEBT_RX.test(lab)?"debt":mode==="alloc"||mode==="fx"?"":mode==="debt"?"":"";continue;}
+    const cc=curC?String(row[curC.c]??"").trim().toUpperCase():"",type=typeC&&typeof row[typeC.c]==="string"?row[typeC.c].trim():"";
+    const item={label:lab,cur:CUR_CODE[cc]||null,type,sec,vals};
+    if(mode==="fx"||(!item.cur&&FXROW_RX.test(lab.toUpperCase())))out.fx.push(item);
+    else if(CUR_CODE[lab.toUpperCase()]&&lab.length>=3){item.cur=CUR_CODE[lab.toUpperCase()];out.total.push(item);}
+    else if(TOTAL_RX.test(lab)||/^total/i.test(type))out.total.push(item);
+    else if(mode==="alloc")out.alloc.push(item);
+    else if(mode==="debt"||vals.every(v=>v===null||v<=0))out.debt.push(item);
+    else out.hold.push(item);
+  }
+  return out.hold.length+out.alloc.length+out.total.length?out:null;
+}
+const CLASS_MAP=[[/etf|stock|azion|equity|shares/i,"Azioni ed ETF"],[/crypto|bitcoin|btc/i,"Crypto"],[/^re$|real ?estate|immob|apparta/i,"Immobili"],[/^pe$|private/i,"Private equity"],[/p2p|lending|bond|obblig|prestit|crowd/i,"Prestiti e obbligazioni"],[/pension|previd/i,"Previdenza"],[/cash|liquid|conto|deposit/i,"Liquidità"]];
+const CLASS_ORDER=["Azioni ed ETF","Previdenza","Crypto","Immobili","Private equity","Prestiti e obbligazioni","Altro","Liquidità"];
+function assetClass(h){for(const [rx,n] of CLASS_MAP)if(rx.test(h.type||""))return n;for(const [rx,n] of CLASS_MAP)if(rx.test(h.sec||""))return n;return "Altro";}
+function reshapeWide(sheets){
+  const parsed=(sheets||[]).map(s=>parseWideSheet(s.name,s.aoa)).filter(Boolean);
+  if(!parsed.length)return null;
+  parsed.sort((a,b)=>a.months[0]<b.months[0]?-1:a.months[0]>b.months[0]?1:0);
+  const months=[...new Set(parsed.flatMap(p=>p.months))].sort(),mi=new Map(months.map((m,i)=>[m,i])),N=months.length;
+  /* ogni mese appartiene a un solo foglio: quello che contiene più mesi di quell'anno (la prima colonna di un foglio annuale
+     spesso ripete la chiusura dell'anno prima, a volte con nomi già cambiati: contarla due volte raddoppierebbe le posizioni) */
+  const owner=kind=>{const O=new Map(),cand=parsed.filter(p=>p[kind].length);months.forEach(m=>{const y=m.slice(0,4);let best=null,bs=-1;cand.forEach(p=>{if(!p.months.includes(m))return;const sc=p.months.filter(x=>x.slice(0,4)===y).length*1e4+p[kind].length;if(sc>=bs){bs=sc;best=p;}});O.set(m,best);});return O;};
+  const merge=(kind,key)=>{const M=new Map(),O=owner(kind);parsed.forEach(p=>p[kind].forEach(it=>{const k=key(it);if(!M.has(k))M.set(k,{...it,vals:new Array(N).fill(null)});const t=M.get(k);t.type=it.type||t.type;t.sec=it.sec||t.sec;it.vals.forEach((v,j)=>{if(v!==null&&O.get(p.months[j])===p)t.vals[mi.get(p.months[j])]=v;});}));return [...M.values()];};
+  const fx=merge("fx",x=>x.label.toUpperCase().replace(/[\s(].*$/,""));
+  fx.forEach(f=>{let last=null;f.vals=f.vals.map(v=>v>0?(last=v):last);});
+  const fxv=code=>{const f=fx.find(x=>x.label.toUpperCase().replace(/[\s(].*$/,"")===code);return f?f.vals:null;};
+  const usdeur=fxv("USDEUR")||(fxv("EURUSD")?fxv("EURUSD").map(v=>v?1/v:null):null);
+  const rate=(cur,i)=>{if(!cur||cur==="EUR")return 1;if(!usdeur||!usdeur[i])return null;if(cur==="USD")return usdeur[i];const ux=fxv("USD"+cur);return ux&&ux[i]?usdeur[i]/ux[i]:null;};
+  const curs=new Set();
+  const conv=it=>{curs.add(it.cur||"?");const v=it.vals.map((x,i)=>{if(x===null)return null;const k=rate(it.cur,i);return k===null?null:x*k;});return v;};
+  const positive=v=>v.map(x=>x!==null&&x>0?x:null),enough=v=>v.filter(x=>x!==null).length>=3;
+  const canEUR=c=>!c||c==="EUR"||(!!usdeur&&(c==="USD"||!!fxv("USD"+c)));
+  const hold=merge("hold",x=>`${x.label}|${x.cur}|${x.type}|${x.sec}`),alloc=merge("alloc",x=>x.label),total=merge("total",x=>x.label),debt=merge("debt",x=>`${x.label}|${x.cur}`);
+  /* classi di attivo: somma delle posizioni per tipo (copre tutti gli anni); il blocco di allocazione del file solo se copre più mesi */
+  const covered=list=>new Set(list.flatMap(s=>s.v.map((x,i)=>x!=null?i:-1).filter(i=>i>=0))).size;
+  const fromAlloc=alloc.filter(a=>canEUR(a.cur)).map(a=>({name:a.label,v:positive(conv(a))})).filter(s=>enough(s.v));
+  const G=new Map();hold.filter(h=>canEUR(h.cur)).forEach(h=>{const k=assetClass(h),v=conv(h);if(!G.has(k))G.set(k,new Array(N).fill(null));const g=G.get(k);v.forEach((x,i)=>{if(x!==null&&x>0)g[i]=(g[i]||0)+x;});});
+  const fromHold=[...G].map(([name,v])=>({name,v})).filter(s=>enough(s.v)).sort((x,y)=>CLASS_ORDER.indexOf(x.name)-CLASS_ORDER.indexOf(y.name));
+  const useAlloc=fromAlloc.length&&covered(fromAlloc)>covered(fromHold);
+  const classes=useAlloc?fromAlloc:fromHold,classSrc=useAlloc?"il blocco di allocazione del file":"la somma delle posizioni per tipo";
+  const lbl=new Map();hold.forEach(h=>lbl.set(h.label,(lbl.get(h.label)||0)+1));
+  const positions=hold.map(h=>{const eur=canEUR(h.cur);return {name:`${h.label}${lbl.get(h.label)>1?` · ${h.sec||h.type}`:""}${eur?"":` (${h.cur})`}`,v:positive(eur?conv(h):h.vals)};}).filter(s=>enough(s.v));
+  /* patrimonio netto: per ogni mese la riga in euro se c'è, altrimenti una riga in un'altra valuta convertita */
+  const nwv=new Array(N).fill(null);[...total.filter(t=>t.cur==="EUR"),...total.filter(t=>t.cur!=="EUR"&&canEUR(t.cur))].forEach(t=>{const v=t.cur==="EUR"?t.vals:conv(t);v.forEach((x,i)=>{if(nwv[i]==null&&x!=null&&x>0)nwv[i]=x;});});
+  const nw=enough(nwv)?[{name:"Patrimonio netto (EUR)",v:nwv}]:[];
+  const mk=(name,series)=>{const aoa=[["Data",...series.map(s=>s.name)]];months.forEach((m,i)=>{if(series.every(s=>s.v[i]==null))return;const [y,mo]=m.split("-").map(Number);aoa.push([new Date(y,mo,0),...series.map(s=>s.v[i]==null?null:Math.round(s.v[i]*100)/100)]);});return {name,aoa,virtual:true};};
+  const out=[];
+  if(classes.length)out.push(mk("★ Classi di attivo · tutti gli anni",classes));
+  if(nw.length)out.push(mk("★ Patrimonio netto · tutti gli anni",nw));
+  if(positions.length)out.push(mk("★ Posizioni · tutti gli anni",positions));
+  if(!out.length)return null;
+  const detail=hold.map(h=>({label:h.label,type:h.type,sec:h.sec,cls:assetClass(h),cur:h.cur,eur:canEUR(h.cur)?conv(h):null}));
+  return {sheets:out,months,detail,report:{sheets:parsed.map(p=>p.name),months:N,from:months[0],to:months[N-1],classes:classes.map(c=>c.name),classSrc,positions:positions.length,holdings:hold.length,debts:debt.length,totals:total.length,fx:usdeur?"i tassi di cambio scritti nel file":null,currencies:[...curs].filter(c=>c!=="?")}};
+}
+
 const FREQS=[{max:4,label:"giornaliera",adj:"giornaliere",f:252},{max:10,label:"settimanale",adj:"settimanali",f:52},{max:45,label:"mensile",adj:"mensili",f:12},{max:120,label:"trimestrale",adj:"trimestrali",f:4},{max:Infinity,label:"annuale",adj:"annuali",f:1}];
 const OUTLIER={252:0.25,52:0.35,12:0.5,4:0.7,1:1.5};
 const ASSET_ROLES=["price","ret","retpct"];
@@ -688,6 +782,6 @@ function frontierScore(mu,C,w,maxVol,rf){
   const lo=Math.min(...mu),over=me.vol>maxVol+1e-9,eff=best.ret>lo?(me.ret-lo)/(best.ret-lo):1;
   return {w:ww,ret:me.ret,vol:me.vol,best:{w:best.w,ret:best.ret,vol:best.vol},over,score:over?0:Math.round(100*Math.max(0,Math.min(1,eff))),gap:best.ret-me.ret,frontier:O.frontier};
 }
-export const POS={gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={reshapeWide,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
