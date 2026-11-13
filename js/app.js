@@ -162,7 +162,7 @@ if(HAS_G){
     <div><div class="ld-mid"><div class="ld-num">000</div><ul class="ld-log"></ul></div><div class="ld-bar"><i></i></div></div></div>
     <div class="ld-title"><span class="a">PORTFOLIO</span><span class="b">OS</span></div><div class="ld-skip">clic per entrare</div>`;
   document.body.appendChild(ld);
-  const LOG=["Kernel statistico · 166 test superati","Rischio: VaR storico, Cornish-Fisher, Kupiec","Dati: BCE · FRED · Kenneth French","BLACK SWAN: 5 crisi reali, giorno per giorno","Quanta online"];
+  const LOG=["Motore statistico · oltre 200 test","Prezzi di mercato · ISIN verificati su OpenFIGI","Cambi e tassi ufficiali BCE","Composizione dei fondi · justETF","Quanta online"];
   const cv=ld.querySelector(".ld-cv"),cx=cv.getContext("2d"),dpr=Math.min(2,window.devicePixelRatio||1),num=ld.querySelector(".ld-num"),bar=ld.querySelector(".ld-bar i"),log=ld.querySelector(".ld-log");
   let W=0,H=0;const size=()=>{W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0);};size();window.addEventListener("resize",size);
   // percorso: passeggiata casuale con un crollo e un rimbalzo, normalizzata 0..1
