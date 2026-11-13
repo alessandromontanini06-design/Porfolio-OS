@@ -100,7 +100,7 @@ export default async function handler(req, res) {
   const payload = JSON.stringify(data);
   if (payload.length > 120_000) { res.status(413).json({ error: "L'estratto del file è troppo grande." }); return; }
   try {
-    const out = await json({ name: "recipe", system: SYSTEM, user: `FILE:\n${payload}`, schema: Recipe, maxTokens: 8000 });
+    const out = await json({ name: "recipe", system: SYSTEM, user: `FILE:\n${payload}`, schema: Recipe, maxTokens: 8000, plainJson: true });
     res.status(200).json({ ...out.data, model: out.model, provider: out.provider, cached: !!out.cached });
   } catch (e) {
     res.status(503).json({ error: e.message || "Le IA non sono raggiungibili. Riprova tra poco." });

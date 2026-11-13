@@ -148,7 +148,20 @@ export async function json(task) {
     const ms = Math.min(p === "claude" ? 40_000 : 25_000, left);
     try {
       let raw, model;
-      if (p === "claude") {
+      if (p === "claude" && task.plainJson) {
+        // schemi grandi: niente grammatica vincolata (ha un limite di dimensione), JSON chiesto nel testo e validato con zod
+        const r = await claude.messages.create({
+          model: CLAUDE_MODEL, max_tokens: task.maxTokens || 4000,
+          system: `${task.system}
+
+Rispondi SOLO con un oggetto JSON valido (niente testo prima o dopo, niente blocchi di codice) che rispetta questo schema:
+${schemaText}`,
+          messages: [{ role: "user", content: task.user }]
+        }, { timeout: ms });
+        const txt = (r.content || []).filter(b => b.type === "text").map(b => b.text).join("").trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+        const i = txt.indexOf("{"), j = txt.lastIndexOf("}");
+        raw = JSON.parse(i >= 0 && j > i ? txt.slice(i, j + 1) : "null"); model = CLAUDE_MODEL;
+      } else if (p === "claude") {
         const r = await claude.messages.parse({
           model: CLAUDE_MODEL, max_tokens: task.maxTokens || 4000, system: task.system,
           output_config: { effort: "low", format: zodOutputFormat(task.schema) },
