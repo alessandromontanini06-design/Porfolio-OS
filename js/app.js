@@ -395,8 +395,8 @@ function load(sheets,source,fromUser,opts={}){
   morphData();
   if(fromUser){S.scanPlayed=false;go("scan",{force:true});}
   if(source.kind!=="rebuilt"){S.portfolio=null;S.tx=detectTx(sheets);}
-  const sym=new Map(((opts.recipe&&opts.recipe.simboli)||[]).map(x=>[String(x.titolo).trim().toLowerCase(),String(x.simbolo).trim().toUpperCase()]));
-  const u=opts.tx&&opts.tx.positions.length?txSnapshot(opts.tx,sym):S.wide?wideSnapshot(S.wide,sym):opts.recipe&&(opts.recipe.posizioni||[]).length?{status:"ready",tipo:"riepilogo_portafoglio",foglio:"",spiegazione:opts.recipe.spiegazione,posizioni:opts.recipe.posizioni.slice(0,20),scartati:opts.recipe.scartati||[]}:null;
+  const sym=new Map(((opts.recipe&&opts.recipe.simboli)||[]).map(x=>[String(x.titolo).trim().toLowerCase(),avSymbol(x.simbolo)]));
+  const u=opts.tx&&opts.tx.positions.length?txSnapshot(opts.tx,sym):S.wide?wideSnapshot(S.wide,sym):opts.recipe&&(opts.recipe.posizioni||[]).length?{status:"ready",tipo:"riepilogo_portafoglio",foglio:"",spiegazione:opts.recipe.spiegazione,posizioni:opts.recipe.posizioni.slice(0,20).map(p=>({...p,simbolo:avSymbol(p.simbolo)})),scartati:opts.recipe.scartati||[]}:null;
   if(u){S.und=u;renderAI();}
   /* ogni file caricato: l'IA legge la struttura di tutti i fogli e scrive la ricetta; intanto resta la lettura automatica */
   if(fromUser&&source.kind==="file"&&aiAuto())requestRecipe();
@@ -856,6 +856,8 @@ async function rebuildFromPrices(){
 }
 
 /* ---------- Tracker a matrice: le posizioni quotate dell'ultimo mese diventano un riepilogo da ricostruire con i prezzi veri ---------- */
+/* simboli nel formato di Alpha Vantage: i suffissi di Yahoo (.L, .DE, .PA, .AS, .MI) vengono tradotti */
+function avSymbol(x){const t=String(x||"").trim().toUpperCase();const m=t.match(/^([A-Z0-9\-]+)\.(L|DE|F|PA|AS|SW)$/);if(!m)return t;return m[1]+"."+({L:"LON",DE:"DEX",F:"DEX",PA:"PAR",AS:"AMS",SW:"SWX"}[m[2]]);}
 function guessSymbol(label,type,cur){
   const t=String(label).trim().toUpperCase();let m;
   if((m=t.match(/^(EPA|PAR|EURONEXT):([A-Z0-9]+)$/)))return m[2]+".PAR";

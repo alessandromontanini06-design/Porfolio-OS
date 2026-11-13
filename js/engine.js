@@ -293,7 +293,10 @@ function columnBlocks(sheets,blocks,extra){
     for(const s of b.serie||[]){
       const role=COLROLE[s.ruolo];if(!role)continue;
       const c=colIdx(s.colonna);if(c<0){errors.push(`«${s.nome}»: colonna «${s.colonna}» non valida.`);continue;}
-      const pts=rows.map(x=>{const v=(aoa[x.r]||[])[c],p=v instanceof Date?null:parseNum(v);return [x.d,p?(role==="retpct"&&p.pct?p.n*100:p.n):null];});
+      /* controllo: se tra la colonna data indicata e la serie c'è un'altra colonna di date (tabelle affiancate), vale quella più vicina */
+      let rowsS=rows;
+      for(let k=c-1;k>dc;k--){const rr=[];for(let r=r0;r<=r1;r++){const d=parseDate((aoa[r]||[])[k],true);if(d)rr.push({r,d});}if(rr.length>=3){rowsS=rr;errors.push(`«${s.nome}»: uso le date della colonna ${colLetter(k)}, la più vicina alla serie.`);break;}}
+      const pts=rowsS.map(x=>{const v=(aoa[x.r]||[])[c],p=v instanceof Date?null:parseNum(v);return [x.d,p?(role==="retpct"&&p.pct?p.n*100:p.n):null];});
       const nn=pts.filter(p=>p[1]!=null).length;
       if(nn<3){errors.push(`«${s.nome}» (colonna ${s.colonna} di «${b.foglio}»): solo ${nn} numeri, esclusa.`);continue;}
       series.push({name:String(s.nome||s.colonna).trim(),role,pts,md,foglio:b.foglio});
