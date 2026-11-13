@@ -410,12 +410,13 @@ function load(sheets,source,fromUser,opts={}){
   if(source.kind!=="rebuilt"){S.portfolio=null;S.tx=detectTx(sheets);}
   const sym=new Map(((opts.recipe&&opts.recipe.simboli)||[]).map(x=>[String(x.titolo).trim().toLowerCase(),avSymbol(x.simbolo)]));
   const tx=opts.tx||localTx,pos=(opts.recipe&&opts.recipe.posizioni)||localPos||[];
-  const u=tx&&tx.positions.length?txSnapshot(tx,sym):S.wide?wideSnapshot(S.wide,sym):pos.length?{status:"ready",tipo:"riepilogo_portafoglio",local:!opts.recipe,foglio:"",spiegazione:opts.recipe?opts.recipe.spiegazione:`Riepilogo di ${pos.length} posizioni senza storico: con i prezzi di mercato le analisi usano anni di dati.`,posizioni:pos.slice(0,20).map(p=>({...p,simbolo:avSymbol(p.simbolo)})),scartati:(opts.recipe?opts.recipe.scartati:(S.local&&S.local.recipe.scartati))||[]}:null;
+  const u=tx&&tx.positions.length?txSnapshot(tx,sym):S.wide?wideSnapshot(S.wide,sym):pos.length?{status:"ready",tipo:"riepilogo_portafoglio",local:!opts.recipe,foglio:"",spiegazione:opts.recipe?opts.recipe.spiegazione:`Riepilogo di ${pos.length} posizioni senza storico: con i prezzi di mercato le analisi usano anni di dati.`,posizioni:pos.slice(0,20).map(p=>({...p,simbolo:opts.recipe?avSymbol(p.simbolo):/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.simbolo)||(p.isin&&!/:/.test(p.simbolo))?"":guessSymbol(p.simbolo,"ETF",null)||""})),scartati:(opts.recipe?opts.recipe.scartati:(S.local&&S.local.recipe.scartati))||[]}:null;
   if(u){S.und=u;renderAI();}
   if(opts.memory){S.recipe={status:"memory",r:opts.recipe,errors:[]};S.tplUsed=true;}
   /* ogni file nuovo: l'IA legge la struttura di tutti i fogli; un modello già confermato non la richiede */
   if(fromUser&&isFile&&aiAuto()&&!S.tplUsed)requestRecipe();
   renderImport(false);
+  if(fromUser&&isFile&&(!aiAuto()||S.tplUsed))maybeAutoRebuild();
 }
 /* ---------- Lettura con l'IA: estratto strutturato → ricetta → il motore la esegue su tutto il file ---------- */
 function aiSample(){
@@ -448,7 +449,7 @@ async function requestRecipe(){
     if(!r.ok)throw new Error(j.error||`Il server ha risposto con un errore (${r.status}).`);
     if(S.source!==src)return; // nel frattempo è stato caricato un altro file
     const A=P.applyRecipe(S.fileSheets,j);
-    if(!A.sheets.length&&!(A.tx&&A.tx.positions.length)&&!(j.posizioni||[]).length){S.recipe={status:"empty",r:j,errors:A.errors};renderAI();renderImport(false);return;}
+    if(!A.sheets.length&&!(A.tx&&A.tx.positions.length)&&!(j.posizioni||[]).length){S.recipe={status:"empty",r:j,errors:A.errors};renderAI();renderImport(false);maybeAutoRebuild();return;}
     /* la lettura automatica di prima, per confrontarla con quella dell'IA */
     const autoSig=S.ds&&S.ds.ok&&an().virtual?{n:S.ds.assets.length,obs:S.ds.nObs,names:S.ds.assets.map(a=>a.name)}:null,autoUnd=S.und&&S.und.posizioni?S.und.posizioni.length:0;
     load(S.fileSheets,S.source,false,{recipe:j,virtual:A.sheets,wide:A.wide,tx:A.tx});
@@ -458,12 +459,18 @@ async function requestRecipe(){
       if(autoSig.n===aiSig.n&&Math.abs(autoSig.obs-aiSig.obs)<=2)S.agree=true;
       else S.conflict={text:`Lettura automatica: ${autoSig.n} serie (${autoSig.names.slice(0,5).join(", ")}${autoSig.n>5?"…":""}), ${autoSig.obs} date. Lettura dell'IA: ${aiSig.n} serie (${aiSig.names.slice(0,5).join(", ")}${aiSig.n>5?"…":""}), ${aiSig.obs} date. Ora vedi quella dell'IA.`};
     }else if(autoUnd&&S.und&&S.und.posizioni&&S.und.posizioni.length===autoUnd)S.agree=true;
-    renderAI();renderImport(false);
+    renderAI();renderImport(false);maybeAutoRebuild();
   }catch(e){
     if(S.source!==src)return;
     S.recipe={status:"error",msg:e.name==="TimeoutError"||e.name==="AbortError"?"L'IA non ha risposto in tempo":e instanceof TypeError?"La lettura con l'IA funziona nel sito pubblicato":String(e.message||e)};
-    renderAI();renderLog(an(),S.ds,false);
+    renderAI();renderLog(an(),S.ds,false);maybeAutoRebuild();
   }
+}
+/* i rendimenti di mercato devono venire dai prezzi degli strumenti, non dai valori del file: appena ci sono posizioni con un ticker o un ISIN, si ricostruisce */
+function maybeAutoRebuild(){
+  const u=S.und;if(!u||!u.posizioni||!u.posizioni.length||u.status!=="ready"||!S.source||S.source.kind!=="file"||S.autoRebuilt===S.source)return;
+  if(!u.posizioni.some(p=>p.simbolo||p.isin||ISIN_RX.test(p.ticker||"")))return;
+  S.autoRebuilt=S.source;rebuildFromPrices();
 }
 function recipeOff(){load(S.fileSheets,S.source,false,{forceAuto:true});S.recipe={status:"off"};renderAI();renderImport(false);}
 /* movimenti: le posizioni aperte (quantità nette × ultimo prezzo) diventano un riepilogo da ricostruire con i prezzi storici */
@@ -471,7 +478,7 @@ function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
     spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
-    posizioni:T.positions.map(p=>({nome:p.titolo,ticker:p.titolo,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
+    posizioni:T.positions.map(p=>({nome:p.titolo,ticker:p.titolo,isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -845,18 +852,39 @@ function applyUnderstandSeries(){
   S.aiLog=[`Ricostruzione IA: tenuti ${keep.size} asset${dIdx>=0?" e la colonna data":""}, scartato tutto il resto.`,...(u.scartati||[]).map(x=>"Scartato: "+x)];
   S.und=null;hideLab();renderImport(false);morphData();
 }
+const ISIN_RX=/^[A-Z]{2}[A-Z0-9]{9}\d$/;
+/* da ISIN a simbolo di borsa (OpenFIGI, lato server): per le posizioni che nel file non hanno un ticker utilizzabile */
+async function resolveIsins(pos){
+  const need=pos.filter(p=>!p.simbolo&&(p.isin||ISIN_RX.test(p.ticker||"")));if(!need.length)return [];
+  const isins=[...new Set(need.map(p=>p.isin||p.ticker))],found=new Map();
+  for(let i=0;i<isins.length;i+=10){const j=await getJSON(`/api/isin?isin=${isins.slice(i,i+10).join(",")}`);(j.results||[]).forEach(r=>{if(r&&r.simbolo)found.set(r.isin,r);});}
+  need.forEach(p=>{const r=found.get(p.isin||p.ticker);if(r){p.simbolo=r.simbolo;p.alt=r.alternative||[];p.isinFrom=r.nome;}});
+  return need.map(p=>`${p.nome}: ${p.simbolo?`${p.isin||p.ticker} → ${p.simbolo}`:"ISIN non trovato"}`);
+}
 async function rebuildFromPrices(){
   const u=S.und;
-  const pos=u.posizioni.map((p,i)=>({...p,simbolo:String(((document.getElementById("und-sym-"+i)||{}).value)||p.simbolo).trim().toUpperCase()})).filter(p=>p.simbolo);
+  let pos=u.posizioni.map((p,i)=>({...p,simbolo:String(((document.getElementById("und-sym-"+i)||{}).value)||p.simbolo||"").trim().toUpperCase()}));
   S.und={...u,posizioni:pos,status:"rebuilding",err:null};renderAI();
   try{
+    const isinLog=await resolveIsins(pos);
+    const noSym=pos.filter(p=>!p.simbolo);pos=pos.filter(p=>p.simbolo);
+    if(!pos.length)throw new Error("Nessuno strumento ha un simbolo di borsa: scrivilo nella colonna «Simbolo per i prezzi».");
     // Un ETF per richiesta: la rete di Vercel conserva ogni serie 24 ore e la condivide tra tutti i visitatori.
+    // Se un simbolo non scarica, si provano le altre quotazioni dello stesso ISIN.
     const series=[];
     for(const p of pos){
-      const r=await fetch(`/api/prices?symbol=${encodeURIComponent(p.simbolo)}&v=2`,{signal:AbortSignal.timeout(30000)});
-      const j=await r.json().catch(()=>({}));
-      series.push(r.ok&&!j.error?j:{symbol:p.simbolo,error:j.error||`Errore ${r.status} per ${p.simbolo}.`});
+      let got=null,tried=[];
+      for(const sym of [p.simbolo,...(p.alt||[]).filter(x=>x!==p.simbolo)].slice(0,4)){
+        tried.push(sym);
+        const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=2`,{signal:AbortSignal.timeout(30000)});
+        const j=await r.json().catch(()=>({}));
+        if(r.ok&&!j.error&&j.points&&j.points.length){got=j;if(sym!==p.simbolo){p.simboloOrig=p.simbolo;p.simbolo=sym;}break;}
+        got={symbol:sym,error:j.error||`Errore ${r.status} per ${sym}.`};
+      }
+      if(got.error&&tried.length>1)got.error+=` (provati: ${tried.join(", ")})`;
+      series.push(got);
     }
+    S.isinLog=isinLog;S.noSym=noSym;
     const ok=[],bad=[];
     series.forEach((s,i)=>{(s.error?bad:ok).push({p:pos[i],s});});
     if(!ok.length)throw new Error(bad.map(b=>b.s.error).join(" ")||"Nessun prezzo scaricato.");
@@ -874,13 +902,13 @@ async function rebuildFromPrices(){
     const aoa=[["Data",...ok.map(o=>o.p.ticker||o.p.nome)]];
     months.forEach(m=>{const d=maps[0].get(m).d;aoa.push([`${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}`,...maps.map(mp=>mp.get(m).v)]);});
     const orig=S.source.name,scartati=u.scartati||[];
-    const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null})),missing:bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),base:"EUR"};
+    const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},true);
     S.portfolio=pf;
-    S.aiLog=[`File ricostruito: ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi da Alpha Vantage (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
+    S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi da Alpha Vantage (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
       `Valute di quotazione: ${ok.map(o=>`${o.p.ticker||o.p.nome} ${o.s.currency||"sconosciuta"}`).join(", ")}.`,
       ...(unknown.length?[`Valuta non determinata per ${unknown.join(", ")}: lasciata com'è, verifica il simbolo.`]:[]),
-      ...pf.missing.map(m=>`Non scaricato: ${m.nome} (${m.simbolo}). ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
+      ...pf.missing.map(m=>`Non scaricato: ${m.nome}${m.simbolo?` (${m.simbolo})`:""}. ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
     renderQuality(S.ds);
   }catch(e){
     S.und={...S.und,status:"ready",err:e instanceof TypeError?"Lo storico dei prezzi si scarica nella versione del sito pubblicata su Vercel.":String(e.message||e)};renderAI();
@@ -912,7 +940,8 @@ function computeChecks(A,ds){
   if(unsure.length)out.push({id:"unsure",block:true,title:`${unsure.length} ${unsure.length===1?"colonna da verificare":"colonne da verificare"}`,text:unsure.map(c=>`«${c.name}» → ${(ROLES.find(r=>r.v===S.roles[c.idx])||{}).l}: ${c.reason}`).join(" · "),acts:[["ok","Le ho controllate, confermo"],["show","Mostramele"]],cols:unsure.map(c=>c.idx)});
   /* 4) valori di patrimonio invece di prezzi */
   const flowy=(A.virtual&&S.wide&&S.wide.sheets.some(s=>s.name===A.name))||A.cols.some(c=>c.flowValue&&ASSETR.includes(S.roles[c.idx]));
-  if(flowy)out.push({id:"flows",block:true,title:"Sono valori di patrimonio, non prezzi",text:"Contengono i soldi che hai aggiunto o tolto: un versamento sembra un guadagno, una vendita sembra un crollo. Per rendimenti di mercato veri conviene ricostruire con i prezzi storici (riquadro dell'IA qui sopra).",acts:[["ok","Ho capito, analizza i valori"]]});
+  const canRebuild=S.und&&S.und.posizioni&&S.und.posizioni.some(p=>p.simbolo||p.isin||ISIN_RX.test(p.ticker||""));
+  if(flowy)out.push({id:"flows",block:true,title:"Sono valori di patrimonio, non prezzi",text:"Contengono i soldi che hai aggiunto o tolto: un versamento sembra un guadagno, una vendita o uno spostamento di liquidità sembra un crollo, e la volatilità esce falsata (anche oltre il 100%). Volatilità, correlazioni e frontiera vanno calcolate sui prezzi di mercato di ogni strumento."+(canRebuild?"":" In questo file non ci sono ticker o ISIN: scrivili nel riquadro qui sopra oppure analizza i valori sapendo che i rischi saranno falsati."),acts:canRebuild?[["rebuild","Usa i prezzi di mercato (consigliato)"],["ok","Analizza comunque i valori del file"]]:[["ok","Analizza comunque i valori del file"]]});
   /* 5) valute diverse dall'euro */
   if(ds&&ds.ok){const cc=A.cols.filter(c=>ASSETR.includes(S.roles[c.idx])).map(c=>[c,sheetCcy(A,c)]).filter(([,v])=>v&&v!=="EUR");
     if(cc.length)out.push({id:"ccy",block:true,title:"Serie in valute diverse dall'euro",text:cc.map(([c,v])=>`«${c.name}» in ${v}`).join(" · ")+". Mescolare valute falsa correlazioni e rischio: conviene convertire con il cambio ufficiale BCE di fine mese.",acts:[["convert","Converti in euro"],["keep","Lascia nella valuta originale"]],cc:cc.map(([c,v])=>[c.idx,v])});}
@@ -940,7 +969,7 @@ function renderChecks(A,ds){
   const ch=computeChecks(A,ds);S.checks=ch;const conf=importConfidence(ch,A);
   const prev=ds&&ds.ok?previewHTML(ds):"";
   el.innerHTML=`<div class="chk-head"><h3>Prima di costruire il laboratorio</h3><span class="conf ${conf.lv==="alta"?"alta":conf.lv==="media"?"media":"bassa"}">Affidabilità: ${esc(conf.l)}</span>${S.tplUsed?`<button type="button" class="btn sm" id="tplForget">Dimentica questo modello</button>`:""}</div>
-    ${ch.length?`<ul class="chk">${ch.map(c=>`<li class="${c.block?"blk":"info"} ${c.done?"done":""}"><b>${esc(c.title)}</b><span>${esc(c.text)}</span>${c.done?`<em>✓ ${esc((c.acts.find(a=>a[0]===S.res[c.id])||[,"fatto"])[1])}</em> <button type="button" class="btn sm" data-chk="${esc(c.id)}" data-act="undo">Annulla</button>`:c.acts.map(a=>`<button type="button" class="btn sm${a[0]==="ok"||a[0]==="fix"||a[0]==="convert"||a[0]==="ai"||a[0]==="drop"?" primary":""}" data-chk="${esc(c.id)}" data-act="${a[0]}">${esc(a[1])}</button>`).join("")}</li>`).join("")}</ul>`:`<p class="caption">Nessuna verifica richiesta: lettura confermata e dati senza anomalie.</p>`}
+    ${ch.length?`<ul class="chk">${ch.map(c=>`<li class="${c.block?"blk":"info"} ${c.done?"done":""}"><b>${esc(c.title)}</b><span>${esc(c.text)}</span>${c.done?`<em>✓ ${esc((c.acts.find(a=>a[0]===S.res[c.id])||[,"fatto"])[1])}</em> <button type="button" class="btn sm" data-chk="${esc(c.id)}" data-act="undo">Annulla</button>`:c.acts.map(a=>`<button type="button" class="btn sm${a[0]==="fix"||a[0]==="convert"||a[0]==="ai"||a[0]==="drop"||a[0]==="rebuild"||(a[0]==="ok"&&!c.acts.some(x=>x[0]==="rebuild"))?" primary":""}" data-chk="${esc(c.id)}" data-act="${a[0]}">${esc(a[1])}</button>`).join("")}</li>`).join("")}</ul>`:`<p class="caption">Nessuna verifica richiesta: lettura confermata e dati senza anomalie.</p>`}
     ${prev}`;
 }
 function previewHTML(ds){
@@ -958,6 +987,7 @@ document.addEventListener("click",async e=>{
     delete S.res[id];delete S.doneChecks[id];hideLab();renderImport(false);return;
   }
   if(act==="show"){const sel=document.querySelector(`#role-${c.cols[0]}`);if(sel){const row=sel.closest("tr");row.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"center"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");}return;}
+  if(id==="flows"&&act==="rebuild"){S.autoRebuilt=S.source;rebuildFromPrices();return;}
   if(id==="conflict"){S.res.conflict=act;const keep=S.conflict;S.conflict=null;if(act==="auto"){S.recipeChoice="auto";load(S.fileSheets,S.source,false,{forceAuto:true});S.res.conflict="auto";}else{S.agree=false;renderImport(false);}void keep;return;}
   if(c.a&&act==="fix"){const a=c.a;(S.fix.adjust[a.col]=S.fix.adjust[a.col]||[]).push({k:a.k,factor:a.factor});}
   if(c.a&&act==="exclude"){const a=c.a;(S.fix.exclude[a.col]=S.fix.exclude[a.col]||[]).push(a.k);}
@@ -2614,5 +2644,5 @@ window.__pos={loadSheets:(sheets,name)=>load(sheets,{name:name||"prova.xlsx",siz
   state:()=>({recipe:S.recipe?{status:S.recipe.status,tipo:S.recipe.r&&S.recipe.r.tipoFile,raw:S.recipe.r&&{c:S.recipe.r.serieInColonna,m:S.recipe.r.matriciRendimenti,provider:S.recipe.r.provider},errors:S.recipe.errors||[],msg:S.recipe.msg||null}:null,sheet:an()&&an().name,
     assets:S.ds&&S.ds.ok?S.ds.assets.map(a=>`${a.name}:${a.role}`):[],obs:S.ds&&S.ds.ok?S.ds.nObs:0,
     und:S.und&&S.und.posizioni?S.und.posizioni.map(p=>`${p.ticker}→${p.simbolo}`):null,sheets:S.sheets.map(s=>s.name),
-    checks:(S.checks||[]).map(c=>({id:c.id,block:c.block,done:c.done})),tpl:!!S.tplUsed,confirmDisabled:$("#confirmBtn").disabled}),
+    checks:(S.checks||[]).map(c=>({id:c.id,block:c.block,done:c.done})),tpl:!!S.tplUsed,rebuilt:S.source&&S.source.kind==="rebuilt",portfolio:S.portfolio?S.portfolio.positions.map(p=>`${p.ticker||p.nome}→${p.simbolo}`):null,confirmDisabled:$("#confirmBtn").disabled}),
   forgetTemplates:()=>{try{localStorage.removeItem(TPL_KEY);}catch{}}};

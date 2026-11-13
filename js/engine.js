@@ -331,7 +331,7 @@ function columnBlocks(sheets,blocks,extra){
 /* movimenti (acquisti e vendite): quantità nette e ultimo prezzo pagato per titolo */
 function txPositions(sheets,m){
   const aoa=(sheets.find(s=>s.name===m.foglio)||{}).aoa;if(!aoa)return {errors:[`Il foglio «${m.foglio}» non esiste.`],positions:[],n:0};
-  const h=(m.rigaIntestazione||1)-1,cD=colIdx(m.colonnaData),cT=colIdx(m.colonnaTitolo),cQ=colIdx(m.colonnaQuantita),cP=colIdx(m.colonnaPrezzo),cA=colIdx(m.colonnaImporto),cO=colIdx(m.colonnaOperazione);
+  const h=(m.rigaIntestazione||1)-1,cD=colIdx(m.colonnaData),cT=colIdx(m.colonnaTitolo),cI=colIdx(m.colonnaIsin),cQ=colIdx(m.colonnaQuantita),cP=colIdx(m.colonnaPrezzo),cA=colIdx(m.colonnaImporto),cO=colIdx(m.colonnaOperazione);
   if(cT<0)return {errors:["Manca la colonna del titolo."],positions:[],n:0};
   const P=new Map();let n=0;const num=(row,c)=>{if(c<0)return null;const p=parseNum(row[c]);return p?p.n:null;};
   for(let r=h+1;r<aoa.length;r++){
@@ -340,11 +340,11 @@ function txPositions(sheets,m){
     if(q==null&&amt!=null&&px)q=Math.abs(amt)/px;if(q==null)continue;
     const op=cO>=0?lc(row[cO]):"",sell=/vend|sell|sale|cession|uscit|rimbors|short/.test(op),buy=/acq|buy|purch|sottoscr|entrat|compr/.test(op);
     const qty=sell?-Math.abs(q):buy?Math.abs(q):q;
-    const it=P.get(t)||{titolo:t,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
+    const isin=cI>=0?String(row[cI]??"").trim().toUpperCase():"",it=P.get(t)||{titolo:t,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
     if(px>0&&(!it.lastD||!d||d>=it.lastD)){it.last=px;it.lastD=d;}
     it.inv+=amt!=null?(qty<0?-1:1)*Math.abs(amt):px?qty*px:0;P.set(t,it);n++;
   }
-  const positions=[...P.values()].filter(x=>x.q>1e-9).map(x=>({titolo:x.titolo,quantita:x.q,prezzo:x.last,valore:x.last?x.q*x.last:null,investito:x.inv,operazioni:x.n,data:x.lastD}));
+  const positions=[...P.values()].filter(x=>x.q>1e-9).map(x=>({titolo:x.titolo,isin:x.isin,quantita:x.q,prezzo:x.last,valore:x.last?x.q*x.last:null,investito:x.inv,operazioni:x.n,data:x.lastD}));
   return {errors:n?[]:["Nessun movimento leggibile."],positions,n,chiuse:[...P.values()].filter(x=>x.q<=1e-9).length};
 }
 /* tabella di rendimenti mensili: un anno per riga, dodici colonne di mesi (gen → dic) */
@@ -443,19 +443,27 @@ function localRecipe(sheets){
     /* 4) movimenti: data + titolo/ISIN + (quantità e prezzo, oppure importo) */
     const cT=[find("name"),find("ticker"),find("isin")].find(i=>i>=0),cQ=find("qty"),cP=find("price")>=0?find("price"):find("close"),cA=find("amount"),cS=find("side");
     if(dateCols.length>=1&&cT!=null&&cT>=0&&((cQ>=0&&cP>=0)||(cA>=0&&cQ>=0))&&!R.movimenti){
-      R.movimenti={foglio:sh.name,rigaIntestazione:h+1,colonnaData:colLetter(dateCols[0]),colonnaTitolo:colLetter(cT),colonnaQuantita:cQ>=0?colLetter(cQ):null,colonnaPrezzo:cP>=0?colLetter(cP):null,colonnaImporto:cA>=0?colLetter(cA):null,colonnaOperazione:cS>=0?colLetter(cS):null,valuta:null};
+      R.movimenti={foglio:sh.name,rigaIntestazione:h+1,colonnaData:colLetter(dateCols[0]),colonnaTitolo:colLetter(cT),colonnaIsin:find("isin")>=0?colLetter(find("isin")):null,colonnaQuantita:cQ>=0?colLetter(cQ):null,colonnaPrezzo:cP>=0?colLetter(cP):null,colonnaImporto:cA>=0?colLetter(cA):null,colonnaOperazione:cS>=0?colLetter(cS):null,valuta:null};
       const cc=find("ccy");if(cc>=0){const vals=new Set(aoa.slice(h+1).map(r=>String(r[cc]??"").trim().toUpperCase()).filter(Boolean));if(vals.size===1)R.movimenti.valuta=[...vals][0];}
       parts.push({kind:"movimenti",foglio:sh.name,conf:"media",d:`«${sh.name}»: elenco di acquisti e vendite`});
       continue;
     }
     /* 5) riepilogo di posizioni senza date: nome/ticker/ISIN + valore o peso */
     const cV=find("value")>=0?find("value"):cA,cW=tags.findIndex((t,i)=>t==="weight"&&!/target|obiettivo/i.test(hdr[i])),cG=tags.findIndex((t,i)=>t==="target"||(t==="weight"&&/target|obiettivo/i.test(hdr[i]))),cTk=find("ticker"),cIs=find("isin"),cN=find("name");
-    if(!dateCols.length&&(cTk>=0||cIs>=0)&&(cV>=0||cW>=0)){
+    /* colonne riconosciute dal contenuto: codici brevi (SWDA, CSNDX) e codici con la borsa (AMS:IWDA, ETR:XXSC, come in Google Finanza) */
+    let tEnd=h+1;while(tEnd<aoa.length&&(aoa[tEnd]||[]).some(v=>!isBlank(v)))tEnd++; // la tabella finisce alla prima riga vuota
+    const colFrac=(c,rx)=>{const v=aoa.slice(h+1,tEnd).map(r=>r[c]).filter(x=>typeof x==="string"&&x.trim()&&!/^(totale|total)\b/i.test(x.trim()));return v.length>=2?v.filter(x=>rx.test(x.trim())).length/v.length:0;};
+    const width=Math.max(0,...aoa.slice(h,h+30).map(r=>r.length));
+    let cEx=-1,cCode=-1;for(let c=0;c<width;c++){if(cEx<0&&colFrac(c,/^[A-Z]{2,8}:[A-Z0-9.\-]{1,12}$/)>=.8)cEx=c;if(cCode<0&&c!==cIs&&colFrac(c,/^[A-Z][A-Z0-9]{1,5}$/)>=.8)cCode=c;}
+    const cTick=cTk>=0&&cTk!==cEx?cTk:cCode>=0?cCode:cTk;
+    if(!dateCols.length&&(cTick>=0||cIs>=0||cEx>=0)&&(cV>=0||cW>=0)){
       const pos=[],sc=[],w=x=>{const p=parseNum(x);return p?(p.pct?p.n:p.n>1.5?p.n/100:p.n):null;};
-      for(let r=h+1;r<aoa.length;r++){const row=aoa[r],nm=String(row[cN>=0?cN:(cTk>=0?cTk:cIs)]??"").trim(),tk=String(row[cTk>=0?cTk:cIs]??"").trim();
-        if(!nm&&!tk)continue;if(/^(totale|total|somma)\b/i.test(nm)){continue;}
-        if(!tk){const v=cV>=0?parseNum(row[cV]):null;if(nm)sc.push(`${nm}${v?` ${fmtN(v.n,0)} €`:""}: senza ticker né ISIN`);continue;}
-        const v=cV>=0?parseNum(row[cV]):null;pos.push({nome:nm||tk,ticker:tk,simbolo:tk,valore:v?v.n:null,pesoAttuale:cW>=0?w(row[cW]):null,pesoTarget:cG>=0?w(row[cG]):null});}
+      for(let r=h+1;r<tEnd;r++){const row=aoa[r],cell=c=>c>=0?String(row[c]??"").trim():"";
+        const code=cell(cTick)||(cell(cEx).split(":")[1]||""),isin=cell(cIs),ex=cell(cEx),nm=cell(cN)||code||isin;
+        if(!nm&&!code&&!isin)continue;if(/^(totale|total|somma)\b/i.test(nm)||/^(totale|total|somma)\b/i.test(code))continue;
+        if(!code&&!isin&&!ex){const v=cV>=0?parseNum(row[cV]):null;if(nm)sc.push(`${nm}${v?` ${fmtN(v.n,0)} €`:""}: senza ticker né ISIN`);continue;}
+        const v=cV>=0?parseNum(row[cV]):null;
+        pos.push({nome:nm,ticker:code||isin,isin:isin||null,simbolo:ex||code||"",valore:v?v.n:null,pesoAttuale:cW>=0?w(row[cW]):null,pesoTarget:cG>=0?w(row[cG]):null});}
       if(pos.length){R.posizioni=pos;R.scartati.push(...sc);parts.push({kind:"posizioni",foglio:sh.name,conf:"media",d:`«${sh.name}»: riepilogo di ${pos.length} posizioni senza storico`});continue;}
     }
   }

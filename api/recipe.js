@@ -41,6 +41,7 @@ const Recipe = z.object({
     rigaIntestazione: z.number().int(),
     colonnaData: L,
     colonnaTitolo: z.string(),
+    colonnaIsin: L,
     colonnaQuantita: L,
     colonnaPrezzo: L,
     colonnaImporto: L,
