@@ -478,11 +478,19 @@ function maybeAutoRebuild(){
 }
 function recipeOff(){load(S.fileSheets,S.source,false,{forceAuto:true});S.recipe={status:"off"};renderAI();renderImport(false);}
 /* movimenti: le posizioni aperte (quantità nette × ultimo prezzo) diventano un riepilogo da ricostruire con i prezzi storici */
+/* etichetta da mostrare: il ticker se c'è, altrimenti il nome; mai l'ISIN quando esiste altro */
+function txLabel(p){
+  const ok=t=>t&&!ISIN_RX.test(t);
+  if(ok(p.tk))return p.tk;
+  if(ok(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12)return p.titolo;
+  const n=ok(p.nome)?p.nome:ok(p.titolo)?p.titolo:null;
+  return n?(n.length>28?n.slice(0,27)+"…":n):p.titolo;
+}
 function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
     spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
-    posizioni:T.positions.map(p=>({nome:p.titolo,ticker:p.titolo,isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
+    posizioni:T.positions.map(p=>({nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -1330,7 +1338,7 @@ function renderLook(){
   body.innerHTML=`<div class="look-kpi k4"><div><span class="eyebrow">Costo annuo medio (TER)</span><b>${Number.isFinite(T.ter)?fmtPct(T.ter,2):"—"}</b><small>${Number.isFinite(T.ter)?`≈ ${T.ter*tot<10?fmtN(T.ter*tot,2)+" €":fmtEur(T.ter*tot)} l'anno${T.coverage<.999?` · noto per il ${fmtPct(T.coverage,0)}`:""}`:"TER non disponibile"}</small></div>
       <div><span class="eyebrow">Fuori dall'euro</span><b>${Number.isFinite(nonEur)?neTxt:"—"}</b><small>esposto ad altre valute${nonEurMax-nonEurMin>.005?" · intervallo per le quote non dettagliate":""}</small></div>
       <div><span class="eyebrow">Mercati emergenti</span><b>${Number.isFinite(emg)?fmtPct(emg,0):"—"}</b><small>del portafoglio</small></div>
-      <div><span class="eyebrow">Copertura dei dati</span><b>${fmtPct(C.coverage,0)}</b><small>con composizione nota${pf.etfLoading?" · in caricamento":""}</small></div></div>
+      <div><span class="eyebrow">Copertura dei dati</span><b>${fmtPct(X?X.coverage:C.coverage,0)}</b><small>con scheda del fondo letta${pf.etfLoading?" · in caricamento":""}</small></div></div>
     <div class="seg look-tabs" role="tablist" aria-label="Vista della composizione">${LOOK_TABS.map(([k,l])=>`<button type="button" role="tab" data-look="${k}" aria-pressed="${tab===k}" aria-selected="${tab===k}">${l}</button>`).join("")}</div>
     <div class="look-main">${main}</div>
     <h4 class="look-h">Strumenti</h4>
@@ -1343,7 +1351,7 @@ const hedgedTxt=e=>{const c=String(e.copertura||"").replace(/^Con copertura valu
 function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;
   const starts=ds.assets.map(a=>({n:a.name,k:Math.max(0,a.first-1)})),late=starts.filter(s=>s.k>Math.min(...starts.map(x=>x.k))+1),gc=$("#growthNote");
-  if(gc)gc.textContent=late.length?`Le linee partono quando inizia lo storico di ciascuno strumento: ${starts.map(s=>`${s.n} dal ${fmtDate(ds.dates[s.k],f)}`).join(", ")}. Per confrontarle sullo stesso periodo usa le sezioni Rischio e Frontiera, che lavorano sui mesi comuni.`:"";
+  if(gc)gc.textContent=late.length?`Le linee partono quando inizia lo storico di ciascuno strumento: ${starts.map(s=>`${s.n} da ${fmtDate(ds.dates[s.k],f)}`).join(", ")}. Per confrontarle sullo stesso periodo usa le sezioni Rischio e Frontiera, che lavorano sui mesi comuni.`:"";
   $("#labSource").textContent=`${S.source.name} · foglio «${an().name}» · ${ds.assets.length} asset dal ${fmtDate(ds.dates[0],f)} al ${fmtDate(ds.dates[ds.dates.length-1],f)}.`;
   $("#kpis").innerHTML=[
     ["Asset",ds.assets.length,true],["Osservazioni",ds.nObs,true],
@@ -2290,6 +2298,8 @@ function detectTx(sheets){
     const dI=an.cols.find(c=>c.suggest==="date"||c.kind==="date"),cD=dI?dI.idx:find(/^data\b|date/i);
     const cT=find(/^(etf|ticker|strumento|titolo|simbolo|asset|prodotto|isin)\b|\bticker\b|\betf\b/i),cA=find(/importo|controvalore|ammontare|amount|valore operazione|^investit/i);
     const cU=find(/^quote$|^quote\b|quantit|shares|units|pezzi/i),cP=find(/^prezzo|price/i),cY=find(/^tipo|operazione|^type|movimento|segno/i);
+    /* altre colonne che identificano lo stesso strumento: servono ad abbinare i movimenti agli asset anche se nei dati hanno un altro nome */
+    const alias=[find(/^isin\b|\bisin\b/i),find(/^(ticker|simbolo|symbol)\b/i),find(/^(strumento|nome|descrizione|titolo|prodotto|name)\b/i)].filter(c=>c>=0&&c!==cT);
     if(cD<0||cT<0||(cA<0&&(cU<0||cP<0)))return;
     const rows=[];
     for(let r=h+1;r<s.aoa.length;r++){const row=s.aoa[r]||[],d=P.parseDate(row[cD],true),tk=String(row[cT]==null?"":row[cT]).trim(),ty=cY>=0?String(row[cY]==null?"":row[cY]).trim():"";
@@ -2297,8 +2307,8 @@ function detectTx(sheets){
       let amt=cA>=0?P.parseNum(row[cA]):null;amt=amt?amt.n:NaN;
       if(!Number.isFinite(amt)&&cU>=0&&cP>=0){const u=P.parseNum(row[cU]),p=P.parseNum(row[cP]);if(u&&p)amt=u.n*p.n;}
       if(!Number.isFinite(amt)||amt===0)continue;
-      const sell=/vend|sell|riscatt|prelie|rimbors/i.test(ty);
-      rows.push({d,ticker:tk,type:ty,amount:sell?-Math.abs(amt):Math.abs(amt)});}
+      const sell=/vend|sell|riscatt|prelie|rimbors|divid|cedol|coupon/i.test(ty);/* dividendi e cedole incassati escono dal portafoglio come un prelievo */
+      rows.push({d,ticker:tk,alias:alias.map(c=>String(row[c]==null?"":row[c]).trim()).filter(Boolean),type:ty,amount:sell?-Math.abs(amt):Math.abs(amt)});}
     if(rows.length>=2&&(!best||rows.length>best.rows.length))best={sheet:s.name,rows,cols:{data:hd[cD],strumento:hd[cT],importo:cA>=0?hd[cA]:`${hd[cU]} × ${hd[cP]}`,tipo:cY>=0?hd[cY]:null}};
   });
   return best;
@@ -2309,7 +2319,12 @@ function txMatch(tk,names){
 }
 function realCalc(){
   if(!S.tx||!S.ds||!S.ds.ok)return null;
-  const ds=S.ds,names=ds.assets.map(a=>a.name),tx=S.tx.rows.map(x=>({...x,i:txMatch(x.ticker,names)}));
+  const ds=S.ds,names=ds.assets.map(a=>a.name);
+  /* ogni asset è riconoscibile da più nomi: quello mostrato, il nome lungo, il simbolo e l'ISIN della posizione da cui è stato ricostruito */
+  const pos=(S.portfolio&&S.portfolio.positions)||[],key=v=>String(v||"").trim().toLowerCase();
+  const akas=ds.assets.map(a=>{const c=S.rb&&S.rb.cols.find(x=>x.name===a.name),q=pos.find(x=>(x.ticker||x.nome)===a.name);return new Set([a.name,c&&c.nome,c&&c.sym,q&&q.isin,q&&q.nome,q&&q.ticker].filter(Boolean).map(key));});
+  const match=x=>{for(const v of [x.ticker,...(x.alias||[])]){const i=akas.findIndex(s=>s.has(key(v)));if(i>=0)return i;}return txMatch(x.ticker,names);};
+  const tx=S.tx.rows.map(x=>({...x,i:match(x)}));
   const pp=P.personalPerformance(ds.dates,ds.assets,tx);if(pp.error)return {error:pp.error,tx};
   return {pp,tx};
 }

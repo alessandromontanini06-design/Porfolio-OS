@@ -334,17 +334,23 @@ function txPositions(sheets,m){
   const h=(m.rigaIntestazione||1)-1,cD=colIdx(m.colonnaData),cT=colIdx(m.colonnaTitolo),cI=colIdx(m.colonnaIsin),cQ=colIdx(m.colonnaQuantita),cP=colIdx(m.colonnaPrezzo),cA=colIdx(m.colonnaImporto),cO=colIdx(m.colonnaOperazione);
   if(cT<0)return {errors:["Manca la colonna del titolo."],positions:[],n:0};
   const P=new Map();let n=0;const num=(row,c)=>{if(c<0)return null;const p=parseNum(row[c]);return p?p.n:null;};
+  /* colonne di contorno lette dall'intestazione: nome leggibile e ticker, per mostrare «EUNL» e non l'ISIN */
+  const hd=(aoa[h]||[]).map(v=>lc(v)),fc=re=>hd.findIndex((x,i)=>i!==cT&&re.test(x));
+  const cN=fc(/^(strumento|nome|descrizione|titolo|prodotto|name|security|etf)\b/),cK=fc(/^(ticker|simbolo|symbol|codice di borsa)\b/),cI2=cI>=0?cI:fc(/^isin\b/);
   for(let r=h+1;r<aoa.length;r++){
     const row=aoa[r]||[],t=String(row[cT]??"").trim();if(!t)continue;
     const d=cD>=0?parseDate(row[cD],true):null,px=num(row,cP),amt=num(row,cA);let q=num(row,cQ);
     if(q==null&&amt!=null&&px)q=Math.abs(amt)/px;if(q==null)continue;
-    const op=cO>=0?lc(row[cO]):"",sell=/vend|sell|sale|cession|uscit|rimbors|short/.test(op),buy=/acq|buy|purch|sottoscr|entrat|compr/.test(op);
+    const op=cO>=0?lc(row[cO]):"";
+    /* dividendi, cedole, commissioni e imposte non cambiano le quote possedute */
+    if(/divid|cedol|coupon|commission|bollo|impost|tass[ae]|fee|tax/.test(op))continue;
+    const sell=/vend|sell|sale|cession|uscit|rimbors|short/.test(op),buy=/acq|buy|purch|sottoscr|entrat|compr/.test(op);
     const qty=sell?-Math.abs(q):buy?Math.abs(q):q;
-    const isin=cI>=0?String(row[cI]??"").trim().toUpperCase():"",it=P.get(t)||{titolo:t,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
+    const isin=cI2>=0?String(row[cI2]??"").trim().toUpperCase():"",it=P.get(t)||{titolo:t,nome:cN>=0?String(row[cN]??"").trim()||null:null,tk:cK>=0?String(row[cK]??"").trim().toUpperCase()||null:null,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
     if(px>0&&(!it.lastD||!d||d>=it.lastD)){it.last=px;it.lastD=d;}
     it.inv+=amt!=null?(qty<0?-1:1)*Math.abs(amt):px?qty*px:0;P.set(t,it);n++;
   }
-  const positions=[...P.values()].filter(x=>x.q>1e-9).map(x=>({titolo:x.titolo,isin:x.isin,quantita:x.q,prezzo:x.last,valore:x.last?x.q*x.last:null,investito:x.inv,operazioni:x.n,data:x.lastD}));
+  const positions=[...P.values()].filter(x=>x.q>1e-9).map(x=>({titolo:x.titolo,nome:x.nome||null,tk:x.tk||null,isin:x.isin,quantita:x.q,prezzo:x.last,valore:x.last?x.q*x.last:null,investito:x.inv,operazioni:x.n,data:x.lastD}));
   return {errors:n?[]:["Nessun movimento leggibile."],positions,n,chiuse:[...P.values()].filter(x=>x.q<=1e-9).length};
 }
 /* tabella di rendimenti mensili: un anno per riga, dodici colonne di mesi (gen → dic) */
