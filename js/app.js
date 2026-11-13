@@ -1184,7 +1184,7 @@ function showLab(instant,stay){
   S.labFx={};
   $("#lab").hidden=false;$("#labEmpty").hidden=true;$("#navLab").classList.remove("off");$("#navRisk").classList.remove("off");$("#navSim").classList.remove("off");$("#navStress").classList.remove("off");$("#navOpt").classList.remove("off");$("#navBench").classList.remove("off");renderPager(current);S.mc=null;S.mcIn=null;S.stress=null;S.st=null;S.opt=null;S.opIn=null;S.optW=null;if(S.riskW==="opt")S.riskW=null;
   if(!S.macro||S.macro.status!=="ready"||S.macro.key!==ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]))S.macro=null;
-  renderLab();reveal($("#lab"));
+  renderLab();reveal($("#lab"));renderLook();loadEtfInfo();
   if(!S.macro)fetchMacro().then(()=>{if(S.macro)S.macro.key=ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]);});
   if(!HAS_G){countAll();drawChart(false);if(S.corrView==="net")buildNet();S.labFx.done=true;}
   if(!stay)go("lab",{force:true});
@@ -1247,6 +1247,33 @@ function renderMetrics(){
       <td>${cell("vol-"+i,fmtPct(s.vol))}${(()=>{const v=mktVol(a.name);return v?`<span class="cl mono" title="Volatilità dei rendimenti giornalieri di mercato, annualizzata (√252), come justETF">1a ${v.y1!=null?fmtPct(v.y1,1):"—"} · 3a ${v.y3!=null?fmtPct(v.y3,1):"—"} · 5a ${v.y5!=null?fmtPct(v.y5,1):"—"}</span>`:"";})()}</td><td>${cell("sharpe-"+i,fmtN(sh))}</td>
       <td>${cell("mdd-"+i,fmtPct(s.mdd),"neg")}</td><td>${cell("worst-"+i,`${fmtPct(s.worst)} <span style="color:var(--faint)">${fmtDate(ds.dates[s.worstK],f)}</span>`)}</td><td class="mono">${s.n}</td></tr>`;}).join("")}</tbody>`;
   const cap=$("#metricsCap");if(cap)cap.textContent=mm?`Sharpe con tasso privo di rischio medio ${fmtPct(mm.rf,2)} (${mm.rfName}). Rendimento reale al netto dell'inflazione media ${fmtPct(mm.infl,2)}.`:"Sharpe con tasso privo di rischio 0%.";
+}
+/* ---------- Dove sei investito: paesi, settori e costi dei fondi dalle schede di justETF (per ISIN) ---------- */
+async function loadEtfInfo(){
+  const pf=S.portfolio;if(!pf||pf.etfLoading||pf.etfDone)return;
+  const list=pf.positions.filter(p=>p.isin&&/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.isin));if(!list.length){pf.etfDone=true;return;}
+  pf.etfLoading=true;renderLook();
+  for(const p of list){const j=await getJSON(`/api/etfinfo?isin=${p.isin}`);p.etf=j&&!j.error?j:{error:(j&&j.error)||"non disponibile"};renderLook();}
+  pf.etfLoading=false;pf.etfDone=true;renderLook();
+}
+function renderLook(){
+  const card=$("#lookCard"),body=$("#lookBody");if(!card||!body)return;
+  const pf=S.portfolio,ds=S.ds;if(!pf||!S.lab||!ds||!ds.ok){card.hidden=true;return;}
+  card.hidden=false;
+  const tot=pf.positions.reduce((q,p)=>q+(p.valore||0),0);
+  const items=pf.positions.map(p=>({nome:p.ticker||p.nome,w:tot?(p.valore||0)/tot:1/pf.positions.length,etf:p.etf,isin:p.isin}));
+  if(!pf.positions.some(p=>p.isin)){body.innerHTML=`<p style="color:var(--muted)">Per sapere in quali paesi e settori sei investito servono gli ISIN dei fondi: nel file non ci sono. Aggiungili nel file (una colonna «ISIN») e ricaricalo.</p>`;return;}
+  if(pf.etfLoading&&!items.some(x=>x.etf)){body.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Leggo le schede dei fondi su justETF…</span></div>`;return;}
+  const L=k=>P.lookThrough(items.map(x=>({w:x.w,parti:x.etf&&!x.etf.error?x.etf[k]:null}))),C=L("paesi"),Se=L("settori");
+  const T=P.weightedTer(items.map(x=>({w:x.w,ter:x.etf&&!x.etf.error?x.etf.ter:NaN})));
+  const bars=(R,col)=>`<ul class="look">${[...R.rows.filter(r=>!/^Altri|^Non classificato/.test(r.nome)).slice(0,10),...R.rows.filter(r=>/^Altri|^Non classificato/.test(r.nome))].map(r=>`<li class="${/^Altri|^Non classificato/.test(r.nome)?"oth":""}"><span>${esc(r.nome)}</span><i><em style="width:${Math.min(100,r.peso*100/Math.max(...R.rows.map(x=>x.peso)))}%;background:${col}"></em></i><b>${fmtPct(r.peso,1)}</b></li>`).join("")}</ul>`;
+  const per=items.map(x=>{const e=x.etf;return `<tr><td><span class="an">${esc(x.nome)}</span>${e&&!e.error?`<span class="cl">${esc(e.nome||"")}</span>`:""}</td><td class="mono">${fmtPct(x.w,1)}</td><td class="mono">${e&&!e.error&&Number.isFinite(e.ter)?fmtPct(e.ter,2):"—"}</td><td>${e&&!e.error?esc([e.focus,e.indice].filter(Boolean).join(" · ")):`<span class="cl">${x.isin?esc(e?e.error:"in caricamento…"):"senza ISIN: non classificato"}</span>`}</td><td class="mono">${e&&!e.error?esc([e.valuta,e.copertura&&!/^no$/i.test(e.copertura.replace(/^Con copertura valutaria\s*/i,""))?"coperto":null,(e.distribuzione||"").toLowerCase()].filter(Boolean).join(" · ")):""}</td></tr>`;}).join("");
+  const read=items.map(x=>x.etf&&!x.etf.error&&x.etf.letto).filter(Boolean).sort()[0];
+  body.innerHTML=`<div class="look-grid"><div><h4>Paesi</h4>${bars(C,"var(--c1)")}</div><div><h4>Settori</h4>${bars(Se,"var(--c3)")}</div></div>
+    <div class="look-kpi"><div><span class="eyebrow">Costo annuo medio (TER)</span><b>${Number.isFinite(T.ter)?fmtPct(T.ter,2):"—"}</b><small>${Number.isFinite(T.ter)?`≈ ${fmtN(T.ter*tot,0)} € l'anno su ${fmtN(tot,0)} €${T.coverage<.999?` · TER noto per il ${fmtPct(T.coverage,0)} del portafoglio`:""}`:"TER non disponibile"}</small></div>
+      <div><span class="eyebrow">Copertura dei dati</span><b>${fmtPct(C.coverage,0)}</b><small>quota del portafoglio con composizione nota${pf.etfLoading?" · ancora in caricamento":""}</small></div></div>
+    <div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>Peso</th><th>TER</th><th>Esposizione</th><th>Valuta · tipo</th></tr></thead><tbody>${per}</tbody></table></div>
+    <p class="caption">Composizione look-through: peso del paese = Σ peso del fondo × quota del paese nel fondo. Ogni scheda justETF pubblica i primi 4 paesi e settori più «Altri»: quella parte resta in «Altri, non dettagliati», senza ridistribuirla. I fondi senza ISIN o senza scheda restano «Non classificato». Il TER è il costo dichiarato dall'emittente; non comprende commissioni di acquisto, spread e imposte. Fonte: justETF, schede lette il ${read?read.split("-").reverse().join("/"):"—"}.</p>`;
 }
 function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;

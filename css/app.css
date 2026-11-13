@@ -856,3 +856,13 @@ kbd{font-family:var(--f-mono);font-size:.72em;border:1px solid var(--line);borde
 .chk li.info>b::before{content:"i  ";color:var(--muted)}
 .map small.src{display:block;margin-top:4px;font-size:.66rem;color:var(--muted);font-family:var(--f-mono)}
 .prev{margin-top:12px}.prev summary{cursor:pointer;color:var(--muted);font-size:.86rem}
+
+/* Dove sei investito */
+.look-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}.look-grid h4{margin:0 0 10px;font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.look{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.look li{display:grid;grid-template-columns:minmax(0,1.3fr) 1fr 56px;gap:10px;align-items:center;font-size:.88rem}
+.look li i{height:8px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}.look li em{display:block;height:100%;border-radius:4px}
+.look li b{font-family:var(--f-mono);text-align:right;font-size:.82rem}.look li.oth{color:var(--muted)}.look li.oth em{opacity:.45}
+.look-kpi{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}.look-kpi>div{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.look-kpi b{font-family:var(--f-display);font-size:1.6rem}.look-kpi small{color:var(--muted);font-size:.78rem}
+@media (max-width:760px){.look-grid,.look-kpi{grid-template-columns:1fr}}

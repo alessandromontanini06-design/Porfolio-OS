@@ -872,6 +872,28 @@ function bayesStein(assets,f){
   const phi=Math.min(1,Math.max(0,(N+2)/((N+2)+T*q)));
   return out(phi,mu0,null);
 }
+/* Composizione "look-through": il peso di ogni paese (o settore) nel portafoglio = Σ peso dello strumento × quota del paese nello strumento.
+   items: [{nome, w (peso nel portafoglio, anche non normalizzato), parti: [{nome, peso}] | null}]
+   Le parti «Altri» di ogni fondo restano una voce a sé ("Altri, non dettagliati"), gli strumenti senza dati vanno in "Non classificato":
+   niente viene ridistribuito o inventato. Restituisce anche la copertura (quota del portafoglio con dati). */
+function lookThrough(items){
+  const tot=items.reduce((s,x)=>s+(x.w>0?x.w:0),0);if(!(tot>0))return {rows:[],coverage:0,total:0};
+  const M=new Map(),add=(k,v)=>M.set(k,(M.get(k)||0)+v);let cov=0;
+  items.forEach(x=>{const w=(x.w>0?x.w:0)/tot;if(!w)return;
+    if(!x.parti||!x.parti.length){add("Non classificato",w);return;}
+    cov+=w;const sum=x.parti.reduce((s,p)=>s+(p.peso||0),0);
+    x.parti.forEach(p=>add(/^altr[io]$/i.test(p.nome.trim())?"Altri, non dettagliati":p.nome.trim(),w*(p.peso||0)));
+    if(sum<.999)add("Altri, non dettagliati",w*(1-sum)); // la scheda può non arrivare al 100%
+  });
+  const rows=[...M].map(([nome,peso])=>({nome,peso})).sort((a,b)=>{const sp=n=>/^Altri|^Non classificato/.test(n);return sp(a.nome)-sp(b.nome)||b.peso-a.peso;});
+  return {rows,coverage:cov,total:rows.reduce((s,r)=>s+r.peso,0)};
+}
+/* costo annuo ponderato: Σ wᵢ · TERᵢ sugli strumenti con TER noto; la parte senza TER resta dichiarata */
+function weightedTer(items){
+  const tot=items.reduce((s,x)=>s+(x.w>0?x.w:0),0);if(!(tot>0))return {ter:NaN,coverage:0};
+  let c=0,cov=0;items.forEach(x=>{const w=(x.w>0?x.w:0)/tot;if(Number.isFinite(x.ter)){c+=w*x.ter;cov+=w;}});
+  return {ter:cov>0?c/cov:NaN,known:c,coverage:cov};
+}
 function projBox(v,lo,hi){
   let a=Math.min(...v.map((x,i)=>x-hi[i]))-1,b=Math.max(...v.map((x,i)=>x-lo[i]))+1;
   const s=t=>v.reduce((acc,x,i)=>acc+Math.min(hi[i],Math.max(lo[i],x-t)),0);
@@ -1058,6 +1080,6 @@ function frontierScore(mu,C,w,maxVol,rf){
   const lo=Math.min(...mu),over=me.vol>maxVol+1e-9,eff=best.ret>lo?(me.ret-lo)/(best.ret-lo):1;
   return {w:ww,ret:me.ret,vol:me.vol,best:{w:best.w,ret:best.ret,vol:best.vol},over,score:over?0:Math.round(100*Math.max(0,Math.min(1,eff))),gap:best.ret-me.ret,frontier:O.frontier};
 }
-export const POS={bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={lookThrough,weightedTer,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
