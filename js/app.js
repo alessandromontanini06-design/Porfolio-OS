@@ -1875,6 +1875,9 @@ function opEval(w,inp,rf){
 function opSolve(a){
   /* a = {mode,target(decimale),min,max} → {O,chosen,note} ; usato dalla sezione e da Quanta */
   const ds=S.ds,f=ds.freq.f,mm=macroFor(S.rfSrc),rf=mm?mm.rf:0,inp=P.annualInputs(ds.assets,f),k=ds.assets.length;
+  /* rendimenti attesi prudenti (Bayes-Stein) salvo scelta diversa: le medie storiche da sole premiano chi è andato meglio per caso */
+  const prudent=a.prudent!==undefined?a.prudent:!(S.opIn&&S.opIn.prudent===false);
+  inp.rawMu=inp.mu.slice();inp.bs=P.bayesStein(ds.assets,f);if(prudent)inp.mu=inp.bs.mu;inp.prudent=prudent;
   if(inp.common<12)return {error:`Servono almeno 12 periodi in cui tutti gli asset hanno un valore: qui ce ne sono ${inp.common}.`};
   const O=P.optimize({mu:inp.mu,C:inp.C,rf,min:a.min,max:a.max});if(O.error)return {error:O.error};
   let ch,note="";
@@ -1891,7 +1894,7 @@ function renderOpt(){
   if(!S.lab||!S.ds||!S.ds.ok||S.ds.assets.length<2){box.hidden=true;empty.hidden=false;if(S.lab&&S.ds&&S.ds.assets.length<2)empty.querySelector("p").textContent="Con un solo asset non c'è niente da combinare: la frontiera serve almeno due asset.";return;}
   box.hidden=false;empty.hidden=true;
   const ds=S.ds,f=ds.freq.f;
-  if(!S.opIn){S.opIn={mode:"sharpe",target:null,min:0,max:100,short:false};$("#opMin").value=0;$("#opMax").value=100;$("#opShort").checked=false;}
+  if(!S.opIn){S.opIn={mode:"sharpe",target:null,min:0,max:100,short:false,prudent:true};$("#opMin").value=0;$("#opMax").value=100;$("#opShort").checked=false;$("#opPrudent").checked=true;}
   const I=S.opIn,base=opBase();
   document.querySelectorAll("#opMode [data-opm]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.opm===I.mode)));
   const tgt=I.mode==="tvol"||I.mode==="tret";$("#opTargetL").style.visibility=tgt?"visible":"hidden";
@@ -1902,7 +1905,7 @@ function renderOpt(){
   const A=opEval(base.w,R.inp,R.rf),B=opEval(R.chosen,R.inp,R.rf);
   S.opt={...R,A,B,base,modeLabel:OP_L[I.mode],lo:R.O.lo,hi:R.O.hi};
   const yrs=R.inp.common/f,ci=Number.isFinite(B.vol)?1.96*B.vol/Math.sqrt(Math.max(yrs,1e-9)):NaN;S.opCI={yrs,ci};
-  $("#opSub").textContent=`${ds.assets.length} asset, ${R.inp.common} periodi comuni${yrs<5?` (solo ${fmtN(yrs,1)} anni: stime molto incerte)`:""}. Obiettivo: ${OP_L[I.mode]}${tgt?` ${fmtPct(I.target/100,1)}`:""}, pesi tra ${fmtPct(R.O.lo[0],0)} e ${fmtPct(R.O.hi[0],0)}${R.rf?`, tasso privo di rischio ${fmtPct(R.rf,2)}`:""}.`;
+  $("#opSub").textContent=`${ds.assets.length} asset, ${R.inp.common} periodi comuni${yrs<5?` (solo ${fmtN(yrs,1)} anni: stime molto incerte)`:""}. Rendimenti attesi ${R.inp.prudent?`prudenti (Bayes-Stein, avvicinati del ${fmtPct(R.inp.bs.phi,0)} alla media ${fmtPct(R.inp.bs.mu0,1)})`:"storici"}. Obiettivo: ${OP_L[I.mode]}${tgt?` ${fmtPct(I.target/100,1)}`:""}, pesi tra ${fmtPct(R.O.lo[0],0)} e ${fmtPct(R.O.hi[0],0)}${R.rf?`, tasso privo di rischio ${fmtPct(R.rf,2)}`:""}.`;
   const d=(x,y,inv,pp)=>{const v=y-x;if(!Number.isFinite(v)||Math.abs(v)<(pp?.0005:.005))return "uguale a prima";const good=inv?v<0:v>0;return `<span class="${good?"up":"dn"}">${v>0?"+":"−"}${pp?fmtN(Math.abs(v)*100,1)+" punti":fmtN(Math.abs(v))}</span> rispetto a prima`;};
   const btn=(k,v)=>`<button type="button" class="v" data-rc="op-${k}-o">${v}</button>`;
   $("#opKpis").innerHTML=[["Rendimento atteso",btn("ret",fmtPct(B.ret,1)),d(A.ret,B.ret,false,true)+(S.opCI&&Number.isFinite(S.opCI.ci)?`<br><span class="${S.opCI.ci>.15?"dn":""}">incertezza ±${fmtN(S.opCI.ci*100,0)} punti al 95% (${fmtN(S.opCI.yrs,1)} anni di dati)</span>`:"")],["Volatilità",btn("vol",fmtPct(B.vol,1)),d(A.vol,B.vol,true,true)],["Sharpe",btn("sharpe",fmtN(B.sharpe)),d(A.sharpe,B.sharpe,false,false)],["Max drawdown storico",btn("mdd",fmtPct(B.mdd,1)),d(A.mdd,B.mdd,false,true)]]
@@ -1954,7 +1957,7 @@ function renderOpWeights(){
 function renderOpNotes(){
   const O=S.opt,ds=S.ds,f=ds.freq.f;
   $("#opNotes").innerHTML=[
-    `<b>Rendimenti attesi = medie storiche</b>: μ è la media dei rendimenti ${ds.freq.adj} sui ${O.inp.common} periodi comuni × ${f}. È la parte più incerta: piccoli cambi nelle medie spostano molto i pesi ottimali. Per questo l'ottimizzatore tende a concentrarsi sugli asset andati meglio in passato.`,
+    O.inp.prudent?`<b>Rendimenti attesi prudenti (Bayes-Stein, Jorion 1986)</b>: ogni media storica dei ${O.inp.common} periodi comuni viene avvicinata del ${fmtPct(O.inp.bs.phi,0)} alla media del portafoglio a minima varianza (${fmtPct(O.inp.bs.mu0,1)} l'anno). Quanto avvicinarla lo decidono i dati: pochi anni o differenze piccole rispetto al rumore → più prudenza. Così l'ottimizzatore non si concentra su chi è andato meglio per caso. Puoi tornare alle medie storiche con l'interruttore.`:`<b>Rendimenti attesi = medie storiche</b>: μ è la media dei rendimenti ${ds.freq.adj} sui ${O.inp.common} periodi comuni × ${f}. È la parte più incerta: piccoli cambi nelle medie spostano molto i pesi ottimali. Per questo l'ottimizzatore tende a concentrarsi sugli asset andati meglio in passato.`,
     `<b>Rischio</b>: covarianza campionaria sugli stessi periodi, annualizzata (Σ × ${f}).`,
     `<b>Problema risolto</b>: min wᵀΣw − λ·μᵀw con Σw = 1 e limiti di peso, per 57 valori di λ (gradiente proiettato accelerato). Massimo Sharpe: ricerca a sezione aurea lungo la frontiera. Target: bisezione su λ.`,
     `<b>Minima volatilità e minima varianza</b> coincidono: minimizzare σ o σ² dà gli stessi pesi.`,
@@ -1970,12 +1973,13 @@ function opReceipt(m,who){
   const val={ret:fmtPct(P0.ret,2),vol:fmtPct(P0.vol,2),sharpe:fmtN(P0.sharpe),cagr:fmtPct(P0.cagr,2,true),mdd:fmtPct(P0.mdd,2),var95:fmtPct(-P0.var95,2)}[m];
   const name={ret:"Rendimento atteso",vol:"Volatilità",sharpe:"Sharpe",cagr:"CAGR storico",mdd:"Max drawdown storico",var95:"VaR 95%"}[m];
   return {title:`${name} · ${lab}`,value:val,formula:fx+(who==="o"?`\nw = soluzione "${O.modeLabel}" con ${fmtPct(O.lo[0],0)} ≤ wᵢ ≤ ${fmtPct(O.hi[0],0)}`:""),
-    kv:[...ds.assets.map((a,i)=>[`${a.name}`,`peso ${fmtPct(P0.w[i],1)} · μ ${fmtPct(O.inp.mu[i],1)} · σ ${fmtPct(Math.sqrt(O.inp.C[i][i]),1)}`]),["Periodi comuni",O.inp.common],["Tasso privo di rischio",O.mm?`${fmtPct(O.rf,2)} · ${O.mm.rfName}`:"0%"]]};
+    kv:[...(m==="ret"&&O.inp.prudent?[["Metodo dei rendimenti attesi","Bayes-Stein (Jorion, 1986): μ̂ = (1 − φ)·μ + φ·μ₀"],["φ (quanto si avvicina alla media)",fmtPct(O.inp.bs.phi,1)],["μ₀ (portafoglio a minima varianza)",fmtPct(O.inp.bs.mu0,2)]]:[]),...ds.assets.map((a,i)=>[`${a.name}`,`peso ${fmtPct(P0.w[i],1)} · μ ${fmtPct(O.inp.mu[i],1)}${O.inp.prudent?` (storica ${fmtPct(O.inp.rawMu[i],1)})`:""} · σ ${fmtPct(Math.sqrt(O.inp.C[i][i]),1)}`]),["Periodi comuni",O.inp.common],["Tasso privo di rischio",O.mm?`${fmtPct(O.rf,2)} · ${O.mm.rfName}`:"0%"]]};
 }
 let opT=0;
-$("#opForm").addEventListener("input",e=>{if(e.target.id==="opShort")return;clearTimeout(opT);opT=setTimeout(()=>{const I=S.opIn;if(!I)return;const v=id=>parseFloat($(id).value);
+$("#opForm").addEventListener("input",e=>{if(e.target.id==="opShort"||e.target.id==="opPrudent")return;clearTimeout(opT);opT=setTimeout(()=>{const I=S.opIn;if(!I)return;const v=id=>parseFloat($(id).value);
   if(Number.isFinite(v("#opTarget")))I.target=v("#opTarget");if(Number.isFinite(v("#opMin")))I.min=Math.max(-100,Math.min(100,v("#opMin")));if(Number.isFinite(v("#opMax")))I.max=Math.max(0,Math.min(300,v("#opMax")));renderOpt();},300);});
 $("#opForm").addEventListener("submit",e=>e.preventDefault());
+$("#opPrudent").addEventListener("change",e=>{const I=S.opIn;if(!I)return;I.prudent=e.target.checked;renderOpt();});
 $("#opShort").addEventListener("change",e=>{const I=S.opIn;if(!I)return;I.short=e.target.checked;if(I.short&&I.min>=0){I.min=-30;I.max=Math.max(I.max,130);}if(!I.short){I.min=Math.max(0,I.min);I.max=Math.min(100,I.max);}$("#opMin").value=I.min;$("#opMax").value=I.max;renderOpt();});
 document.addEventListener("click",e=>{
   const m=e.target.closest("[data-opm]");if(m&&S.opIn){if(S.opIn.mode!==m.dataset.opm){S.opIn.mode=m.dataset.opm;if(m.dataset.opm==="tvol"||m.dataset.opm==="tret")S.opIn.target=null;}renderOpt();return;}

@@ -848,6 +848,30 @@ function annualInputs(assets,f){
   const C=covMatrix(assets).C.map(r=>r.map(x=>x*f));
   return {mu:mu.map(x=>x*f),C,common:m};
 }
+/* inversa di una matrice simmetrica (Gauss-Jordan con pivot parziale e una minima regolarizzazione) */
+function invSym(A){
+  const n=A.length,tr=A.reduce((s,r,i)=>s+r[i],0)||1,M=A.map((r,i)=>[...r.map((x,j)=>x+(i===j?1e-10*tr/n:0)),...r.map((_,j)=>i===j?1:0)]);
+  for(let c=0;c<n;c++){let p=c;for(let r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;[M[c],M[p]]=[M[p],M[c]];const d=M[c][c];if(!d)return null;
+    for(let j=0;j<2*n;j++)M[c][j]/=d;for(let r=0;r<n;r++)if(r!==c){const k=M[r][c];if(k)for(let j=0;j<2*n;j++)M[r][j]-=k*M[c][j];}}
+  return M.map(r=>r.slice(n));
+}
+/* Rendimenti attesi prudenti: stimatore di Bayes-Stein (Jorion, 1986).
+   Ogni media storica viene avvicinata alla media del portafoglio a minima varianza μ₀:
+   μ̂ = (1 − φ)·μ + φ·μ₀,   φ = (N + 2) / ( (N + 2) + T · (μ − μ₀)ᵀ Σ̃⁻¹ (μ − μ₀) ),   Σ̃ = Σ · (T − 1)/(T − N − 2)
+   Pochi periodi o medie poco distinguibili dal rumore → φ vicino a 1 (molta prudenza); molti anni e differenze nette → φ piccolo. */
+function bayesStein(assets,f){
+  const T0=assets[0].ret.length,common=[];for(let t=0;t<T0;t++)if(assets.every(a=>Number.isFinite(a.ret[t])))common.push(t);
+  const T=common.length,N=assets.length,mu=assets.map(a=>common.reduce((s,t)=>s+a.ret[t],0)/(T||1));
+  const S=assets.map((a,i)=>assets.map((b,j)=>T>1?common.reduce((s,t)=>s+(a.ret[t]-mu[i])*(b.ret[t]-mu[j]),0)/(T-1):NaN));
+  const out=(phi,mu0,note)=>({mu:mu.map(m=>((1-phi)*m+phi*mu0)*f),raw:mu.map(m=>m*f),phi,mu0:mu0*f,T,N,note});
+  if(N<2||T<3)return out(0,mu[0]||0,"troppo pochi dati per stimare");
+  const Si=invSym(S);if(!Si)return out(0,mu.reduce((a,b)=>a+b,0)/N,"covarianza non invertibile");
+  const one=Si.map(r=>r.reduce((a,b)=>a+b,0)),den=one.reduce((a,b)=>a+b,0),w0=one.map(x=>x/den),mu0=w0.reduce((s,w,i)=>s+w*mu[i],0);
+  if(T-N-2<=0)return out(1,mu0,"più asset che periodi: rendimenti attesi tutti uguali alla media prudente");
+  const d=mu.map(m=>m-mu0),k=(T-N-2)/(T-1),q=d.reduce((s,di,i)=>s+di*Si[i].reduce((t,x,j)=>t+x*d[j],0),0)*k;
+  const phi=Math.min(1,Math.max(0,(N+2)/((N+2)+T*q)));
+  return out(phi,mu0,null);
+}
 function projBox(v,lo,hi){
   let a=Math.min(...v.map((x,i)=>x-hi[i]))-1,b=Math.max(...v.map((x,i)=>x-lo[i]))+1;
   const s=t=>v.reduce((acc,x,i)=>acc+Math.min(hi[i],Math.max(lo[i],x-t)),0);
@@ -1034,6 +1058,6 @@ function frontierScore(mu,C,w,maxVol,rf){
   const lo=Math.min(...mu),over=me.vol>maxVol+1e-9,eff=best.ret>lo?(me.ret-lo)/(best.ret-lo):1;
   return {w:ww,ret:me.ret,vol:me.vol,best:{w:best.w,ret:best.ret,vol:best.vol},over,score:over?0:Math.round(100*Math.max(0,Math.min(1,eff))),gap:best.ret-me.ret,frontier:O.frontier};
 }
-export const POS={reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,gameWindow,survival,frontierScore,CRISIS_NEWS,fearGreed,survivalAwards,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
