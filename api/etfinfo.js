@@ -27,6 +27,22 @@ function table(html, kind) {
   }).filter(Boolean);
   return rows.length ? rows : null;
 }
+/* prime 10 partecipazioni: nome, ISIN dell'azienda (dal link alla sua scheda), peso; più peso totale delle prime 10 e numero di titoli */
+function topHoldings(html) {
+  const i = html.indexOf("etf-holdings_top-holdings_container");
+  if (i < 0) return null;
+  const end = html.indexOf("</table>", i), seg = html.slice(i, end > i ? end : i + 20000);
+  const rows = [...seg.matchAll(/data-testid="etf-holdings_top-holdings_row"[\s\S]*?<\/tr>/g)].map(m => {
+    const href = (m[0].match(/href="[^"]*\/([A-Z]{2}[A-Z0-9]{9}\d)"/) || [])[1] || null;
+    const nome = text((m[0].match(/title="([^"]*)"/) || [])[1] || (m[0].match(/<span>([\s\S]*?)<\/span>/) || [])[1]);
+    const peso = pctNum(text((m[0].match(/top-holdings_value_percentage"[^>]*>([\s\S]*?)<\/span>/) || [])[1]));
+    return nome && peso != null ? { nome, isin: href, peso } : null;
+  }).filter(Boolean);
+  if (!rows.length) return null;
+  const tot = pctNum(text((seg.match(/top-holdings_weight"[^>]*>([\s\S]*?)<\/span>/) || [])[1]));
+  const cnt = (text((seg.match(/top-holdings_count"[^>]*>([\s\S]*?)<\/div>/) || [])[1]).match(/[\d.]+/) || [])[0];
+  return { righe: rows, pesoTop: tot, numero: cnt ? Number(cnt.replace(/\./g, "")) : null };
+}
 function basics(html) {
   const out = {};
   for (const m of html.matchAll(/data-testid="etf-basics_row_([a-z-]+)"[\s\S]*?<\/tr>/g)) {
@@ -54,7 +70,7 @@ export default async function handler(req, res) {
     if (r.status === 404) { res.status(404).json({ isin, error: "Non è un ETF presente su justETF." }); return; }
     if (!r.ok) throw new Error(`justETF ${r.status}`);
     const html = await r.text();
-    const b = basics(html), countries = table(html, "countries"), sectors = table(html, "sectors");
+    const b = basics(html), countries = table(html, "countries"), sectors = table(html, "sectors"), top = topHoldings(html);
     const name = text((html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/) || [])[1]);
     if (!b.ter && !countries && !sectors) { res.setHeader("Cache-Control", "no-store"); res.status(404).json({ isin, error: "Scheda justETF non trovata per questo ISIN (forse non è un ETF)." }); return; }
     const v = {
@@ -63,8 +79,8 @@ export default async function handler(req, res) {
       valuta: (b["fund-currency"] || "").replace(/^Valuta dell'ETF\s*/i, "") || null, copertura: b["currency-hedge"] || null, replica: (b.replication || "").replace(/^Replicazione\s*/i, "") || null,
       distribuzione: (b["distribution-policy"] || "").replace(/^Politica di distribuzione\s*/i, "") || null, emittente: (b["fund-provider"] || "").replace(/^Emittente\s*/i, "") || null,
       lancio: (b["launch-date"] || "").replace(/^Data di lancio\/? ?quotazione\s*/i, "") || null, dimensione: (b["fund-size"] || "").replace(/^Dimensione del fondo\s*/i, "") || null,
-      paesi: countries, settori: sectors,
-      nota: "Paesi e settori: le prime posizioni pubblicate da justETF più «Altri»; i dati dipendono dalle composizioni dichiarate dall'emittente."
+      paesi: countries, settori: sectors, partecipazioni: top,
+      nota: "Paesi e settori: le prime posizioni pubblicate da justETF più «Altri»; partecipazioni: le prime 10. I dati dipendono dalle composizioni dichiarate dall'emittente."
     };
     cache.set(isin, { t: Date.now(), v });
     res.setHeader("Cache-Control", "public, s-maxage=604800, stale-while-revalidate=86400");

@@ -758,3 +758,8 @@ body[data-scene="bench"]{--pill:#5BF0A5;--pill-rgb:91,240,165}
 
 .at-t .an i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle}
 .at-t .cl{display:block}
+
+.look-kpi.k3{grid-template-columns:repeat(3,minmax(0,1fr))}.look-kpi.k3 b{font-size:1.3rem}
+.look.co li,.look.ov li{grid-template-columns:minmax(0,1.5fr) 1fr 92px}.look.co li span small,.look.ov li span small{display:block;color:var(--faint);font-size:.72rem;margin-top:1px}
+.look.co li i{position:relative}.look.co li em.rng{position:absolute;top:0;height:100%;background:var(--c1);opacity:.3;border-radius:0 4px 4px 0}
+@media (max-width:760px){.look-kpi.k3{grid-template-columns:1fr}}

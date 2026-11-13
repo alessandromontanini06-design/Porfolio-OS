@@ -949,6 +949,29 @@ function exposures(items){
   const rel=M=>rows(M).map(r=>({...r,peso:eq>0?r.peso/eq:0}));
   return {cls:rows(cls),reg:rows(reg),dev:rows(dev),ccy:rows(ccy),size:rel(size),style:rel(style),esg:rel(esg),equity:eq,coverage:cov};
 }
+/* Concentrazione per azienda dalle prime 10 partecipazioni di ogni ETF azionario.
+   items: [{nome, w, eq (fondo azionario), top: {righe:[{nome,isin,peso}], pesoTop, numero} | null}]
+   Per ogni azienda: minimo = Σ wf · peso nel fondo (dove è tra le prime 10);
+   massimo = minimo + Σ wf · (peso della 10ª partecipazione) sugli altri fondi azionari, perché fuori dalla top 10 non può pesare di più.
+   Se un fondo azionario non ha i dati, il massimo non si può dire (null). Sovrapposizione tra due fondi: Σ min(aᶜ, bᶜ) sulle aziende
+   comuni alle due top 10 = limite minimo. Classi di azioni della stessa società (Alphabet A e C) sono unite. */
+const CO_STOP=new Set(["inc","corp","corporation","co","company","ltd","limited","plc","sa","ag","nv","se","the","class","cl","reg","registered","shs","com","holding","holdings","group","a","b","c","adr","n"]);
+const coKey=n=>String(n||"").toLowerCase().replace(/[^a-z0-9à-ü ]+/g," ").split(/\s+/).filter(w=>w&&!CO_STOP.has(w)).join(" ");
+function companyExposure(items){
+  const tot=items.reduce((s,x)=>s+(x.w>0?x.w:0),0);if(!(tot>0))return null;
+  const F=items.map(x=>({...x,w:(x.w>0?x.w:0)/tot,rows:x.top&&x.top.righe&&x.top.righe.length?x.top.righe:null})).filter(x=>x.eq&&x.w>0);
+  if(!F.length)return {rows:[],pairs:[],funds:0,missing:[]};
+  F.forEach(f=>{if(f.rows){f.min10=Math.min(...f.rows.map(r=>r.peso));const M=new Map();f.rows.forEach(r=>{const k=coKey(r.nome)||r.isin;M.set(k,(M.get(k)||0)+r.peso);});f.map=M;}});
+  const missing=F.filter(f=>!f.rows),C=new Map();
+  F.filter(f=>f.rows).forEach(f=>f.rows.forEach(r=>{const k=coKey(r.nome)||r.isin;const o=C.get(k)||{nome:r.nome.replace(/,?\s+(Inc\.?\s+)?(Class\s+)?[AC]$/i,"").replace(/,$/,""),isin:new Set(),lo:0,in:[]};
+    o.isin.add(r.isin);if(!o.in.some(x=>x.f===f.nome)){o.in.push({f:f.nome,peso:f.map.get(k)});o.lo+=f.w*f.map.get(k);}C.set(k,o);}));
+  const eqW=F.reduce((s,f)=>s+f.w,0);
+  const rows=[...C.entries()].map(([k,o])=>{const hi=missing.length?null:Math.min(eqW,o.lo+F.filter(f=>f.rows&&!f.map.has(k)).reduce((s,f)=>s+f.w*f.min10,0));return {key:k,nome:o.nome,isin:[...o.isin].filter(Boolean),lo:o.lo,hi,in:o.in};}).sort((a,b)=>b.lo-a.lo);
+  const pairs=[];for(let i=0;i<F.length;i++)for(let j=i+1;j<F.length;j++){const a=F[i],b=F[j];if(!a.rows||!b.rows)continue;let ov=0,n=0;a.map.forEach((v,k)=>{if(b.map.has(k)){ov+=Math.min(v,b.map.get(k));n++;}});pairs.push({a:a.nome,b:b.nome,lo:ov,n,topA:a.top.pesoTop,topB:b.top.pesoTop});}
+  pairs.sort((x,y)=>y.lo-x.lo);
+  const top10=rows.slice(0,10).reduce((s,r)=>s+r.lo,0),distinct=Math.max(0,...F.map(f=>f.top&&f.top.numero||0));
+  return {rows,pairs,top10,distinct,funds:F.length,missing:missing.map(f=>f.nome),eqW};
+}
 /* quanto costa il TER nel tempo: differenza tra crescere al rendimento lordo r e a r − TER, su un capitale V */
 function terDrag(V,ter,r,years){return V*(Math.pow(1+r,years)-Math.pow(1+r-ter,years));}
 /* Divide un versamento C tra gli strumenti per avvicinarsi ai pesi target senza vendere.
@@ -1107,6 +1130,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
