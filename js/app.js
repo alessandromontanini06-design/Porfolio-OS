@@ -415,6 +415,7 @@ function load(sheets,source,fromUser,opts={}){
   /* le posizioni (ticker, ISIN) servono sempre per i prezzi di mercato: se la ricetta non le ha, le cercano i riconoscitori locali */
   if(isFile&&opts.recipe&&!(tx&&tx.positions.length)&&!pos.length){const L2=P.localRecipe(sheets);if(L2){if(L2.recipe.movimenti){const T2=P.applyRecipe(sheets,{movimenti:L2.recipe.movimenti}).tx;if(T2&&T2.positions.length)tx=T2;}if(!(tx&&tx.positions.length)&&L2.recipe.posizioni.length)pos=L2.recipe.posizioni;}}
   const u=tx&&tx.positions.length?txSnapshot(tx,sym):S.wide?wideSnapshot(S.wide,sym):pos.length?{status:"ready",tipo:"riepilogo_portafoglio",local:!opts.recipe,foglio:"",spiegazione:opts.recipe?opts.recipe.spiegazione:`Riepilogo di ${pos.length} posizioni senza storico: con i prezzi di mercato le analisi usano anni di dati.`,posizioni:pos.slice(0,20).map(p=>({...p,simbolo:normSym(p)})),scartati:(opts.recipe?opts.recipe.scartati:(S.local&&S.local.recipe.scartati))||[]}:null;
+  if(u&&u.posizioni)fillTargets(u.posizioni,sheets);
   if(u){S.und=u;renderAI();}
   if(opts.memory){S.recipe={status:"memory",r:opts.recipe,errors:[]};S.tplUsed=true;}
   /* ogni file nuovo: l'IA legge la struttura di tutti i fogli; un modello già confermato non la richiede */
@@ -487,6 +488,20 @@ function txLabel(p){
   const n=ok(p.nome)?p.nome:ok(p.titolo)?p.titolo:null;
   return n?(n.length>28?n.slice(0,27)+"…":n):p.titolo;
 }
+/* pesi target da un foglio di riepilogo (colonna «Peso target», «Target», «Obiettivo»), abbinati per ISIN, ticker o nome */
+function fillTargets(pos,sheets){
+  if(!pos.length||pos.some(p=>p.pesoTarget!=null&&p.pesoTarget>0))return;
+  const key=v=>String(v==null?"":v).trim().toLowerCase();
+  for(const sh of sheets){const A=sh.aoa||[];
+    for(let h=0;h<Math.min(A.length,15);h++){const hd=(A[h]||[]).map(key),cT=hd.findIndex(x=>/^(peso )?target|obiettivo|peso obiettivo|allocazione target/.test(x));if(cT<0)continue;
+      const ids=hd.map((x,i)=>/^(isin|ticker|simbolo|strumento|nome|titolo|etf)\b/.test(x)?i:-1).filter(i=>i>=0);if(!ids.length)continue;
+      const M=new Map();for(let r=h+1;r<A.length;r++){const row=A[r]||[],p=P.parseNum(row[cT]);if(!p)continue;const w=p.pct?p.n:(p.n>1?p.n/100:p.n);ids.forEach(i=>{const k=key(row[i]);if(k)M.set(k,w);});}
+      let hit=0;pos.forEach(p=>{const w=[p.isin,p.ticker,p.nome].map(key).map(k=>M.get(k)).find(x=>x!=null);if(w!=null){p.pesoTarget=w;hit++;}});
+      if(hit){pos.forEach(p=>{if(p.pesoTarget==null)p.pesoTarget=0;});return;}}}
+}
+/* versamento medio mensile degli ultimi 12 mesi dai movimenti (per proporre il versamento del mese) */
+function avgMonthly(){const T=S.tx;if(!T||!T.rows.length)return null;const last=Math.max(...T.rows.map(r=>+r.d)),from=last-365*864e5;
+  const s=T.rows.filter(r=>+r.d>from&&r.amount>0&&!/divid|cedol/i.test(r.type||"")).reduce((a,r)=>a+r.amount,0);return s>0?Math.round(s/12/50)*50||50:null;}
 function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
@@ -995,7 +1010,7 @@ async function rebuildFromPrices(o={}){
     const months={length:aoa.length-1};
     if(S.source!==src0)return;
     const orig=S.source.name.replace(/ · ricostruito$/,""),scartati=u.scartati||[];
-    const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
+    const pf={monthly:avgMonthly(),from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},!o.quiet);
     S.portfolio=pf;S.rbLog=null;
     S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
@@ -1195,6 +1210,40 @@ function pfAsset(w,label){
   for(let k=0;k<n;k++){let r=0,ws=0;ds.assets.forEach((a,i)=>{if(w[i]>0&&Number.isFinite(a.ret[k])){r+=w[i]*a.ret[k];ws+=w[i];}});if(ws>.999){ret[k]=r;if(k<first)first=k;}}
   return {name:label,ret,first,missing:0,role:"price",col:"—"};
 }
+/* ---------- Ribilanciamento: pesi target modificabili, versamento del mese, banda di tolleranza ----------
+   Tutto a prezzi fermi e senza costi né tasse: dice quanto comprare, non prevede i mercati. */
+function rebalanceHTML(pf){
+  const P0=pf.positions.filter(p=>p.valore!=null&&p.valore>0),tot=P0.reduce((s,p)=>s+p.valore,0);if(!P0.length||!(tot>0))return "";
+  if(!S.rbal)S.rbal={C:pf.monthly||500,band:.03};
+  const has=P0.some(p=>p.pesoTarget>0),tsum=P0.reduce((s,p)=>s+(p.pesoTarget>0?p.pesoTarget:0),0);
+  const head=`<h3 style="font-size:1.1rem;margin-top:6px">Ribilanciamento</h3>`;
+  if(!has)return `${head}<p style="color:var(--muted)">Nel file non ci sono pesi target. Scrivili qui sotto, oppure parti dai pesi attuali e modificali.</p>
+    <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><button type="button" class="btn sm" id="tgtFromNow">Usa i pesi attuali come target</button><button type="button" class="btn sm" id="tgtEqual">Pesi uguali</button></div>`;
+  const v=P0.map(p=>p.valore),t=P0.map(p=>(p.pesoTarget>0?p.pesoTarget:0)/tsum),C=S.rbal.C,band=S.rbal.band;
+  const b=P.contributionSplit(v,t,C),after=v.map((x,i)=>x+b[i]),T1=tot+C,T2=Math.max(...P0.map((p,i)=>t[i]>0?v[i]/t[i]:0));
+  const months=P.monthsToTarget(v,t,C,band),out=P0.filter((p,i)=>Math.abs(v[i]/tot-t[i])>band).length;
+  const e=x=>fmtEur(x),pt=x=>`${x>=0?"+":"−"}${fmtN(Math.abs(x)*100,1)} pt`;
+  const rows=P0.map((p,i)=>{const dev=v[i]/tot-t[i],full=t[i]*tot-v[i],only=t[i]*T2-v[i];
+    return `<tr><td><span class="an">${esc(p.ticker||p.nome)}</span></td><td class="mono">${e(v[i])}</td><td class="mono">${fmtPct(v[i]/tot,1)}</td>
+      <td><input class="tgt" type="number" min="0" max="100" step="0.5" inputmode="decimal" data-tgt="${esc(p.ticker||p.nome)}" value="${+(p.pesoTarget*100/ (tsum>0?tsum:1)).toFixed(2)}" aria-label="Peso target di ${esc(p.ticker||p.nome)} in percentuale"></td>
+      <td class="mono ${Math.abs(dev)>band?(dev>0?"neg":"dn"):""}">${pt(dev)}</td>
+      <td class="mono">${b[i]>.005?"<b>+"+e(b[i])+"</b>":"—"}</td><td class="mono">${fmtPct(after[i]/T1,1)}</td>
+      <td class="mono ${full<0?"neg":""}">${full>=0?"+":"−"}${e(Math.abs(full))}</td><td class="mono">${only>.5?"+"+e(only):"—"}</td></tr>`;}).join("");
+  const norm=Math.abs(tsum-1)>.001?`<p class="caption" style="color:var(--warn)">I pesi target sommano a ${fmtPct(tsum,1)}: li uso riproporzionati a 100%.</p>`:"";
+  return `${head}
+    <div class="rb-form"><label><span class="eyebrow">Versamento di questo mese (€)</span><input type="number" min="0" step="50" inputmode="decimal" id="rbC" value="${C}"></label>
+      <label><span class="eyebrow">Banda di tolleranza (± punti)</span><input type="number" min="0.5" max="20" step="0.5" inputmode="decimal" id="rbBand" value="${+(band*100).toFixed(1)}"></label>
+      <div class="rb-sum"><b>${out?`${out} ${out===1?"strumento fuori":"strumenti fuori"} dalla banda`:"Tutto dentro la banda"}</b><span>${months===0?"non serve ribilanciare":months?`con ${e(C)} al mese rientri in <b>${months} ${months===1?"mese":"mesi"}</b> senza vendere`:"con questo versamento non rientri in 50 anni: serve vendere o versare di più"}</span></div></div>
+    <div class="tablewrap"><table class="mt rb-t"><thead><tr><th>Strumento</th><th>Valore</th><th>Peso attuale</th><th>Target %</th><th>Scostamento</th><th>Questo mese</th><th>Peso dopo</th><th>Compra / vendi</th><th>Solo acquisti</th></tr></thead><tbody>${rows}
+      <tr class="pf"><td><b>Totale</b></td><td class="mono"><b>${e(tot)}</b></td><td class="mono">100%</td><td class="mono">${fmtN(tsum*100,1)}%</td><td></td><td class="mono"><b>+${e(C)}</b></td><td class="mono">100%</td><td class="mono">0 €</td><td class="mono"><b>+${e(Math.max(0,T2-tot))}</b></td></tr></tbody></table></div>${norm}
+    <p class="caption"><b>Questo mese</b>: il versamento va agli strumenti più sottopesati, portandoli insieme verso il target (acquisti bᵢ = max(0, tᵢ·K − vᵢ), con K tale che Σ bᵢ = versamento). <b>Compra / vendi</b>: riporta oggi ai target senza aggiungere soldi. <b>Solo acquisti</b>: quanto versare per arrivarci senza vendere. I mesi necessari sono calcolati a prezzi fermi, senza commissioni né tasse: vendere può generare plusvalenze tassate al 26% (12,5% sui titoli di Stato).</p>`;
+}
+document.addEventListener("click",e=>{const id=e.target&&e.target.id;if(id!=="tgtFromNow"&&id!=="tgtEqual")return;const pf=S.portfolio;if(!pf)return;
+  const P0=pf.positions.filter(p=>p.valore>0),tot=P0.reduce((s,p)=>s+p.valore,0);P0.forEach(p=>{p.pesoTarget=id==="tgtEqual"?1/P0.length:+(p.valore/tot).toFixed(4);});renderPortfolio();});
+document.addEventListener("change",e=>{const el=e.target;if(!el||!S.portfolio)return;
+  if(el.matches&&el.matches("input.tgt")){const p=S.portfolio.positions.find(x=>(x.ticker||x.nome)===el.dataset.tgt),v=parseFloat(String(el.value).replace(",","."));if(p&&Number.isFinite(v)&&v>=0){p.pesoTarget=v/100;S.portfolio.positions.forEach(x=>{if(x!==p&&x.pesoTarget==null)x.pesoTarget=0;});renderPortfolio();if(current==="risk")renderRisk();}return;}
+  if(el.id==="rbC"||el.id==="rbBand"){const v=parseFloat(String(el.value).replace(",","."));if(!Number.isFinite(v)||v<0)return;if(!S.rbal)S.rbal={C:500,band:.03};if(el.id==="rbC")S.rbal.C=v;else S.rbal.band=Math.max(.001,v/100);renderPortfolio();}
+});
 function renderPortfolio(){
   const card=$("#pfCard");if(!card)return;
   const pf=S.portfolio,ds=S.ds,f=ds&&ds.freq?ds.freq.f:12;
@@ -1206,20 +1255,10 @@ function renderPortfolio(){
   const rows=S.lab.pf.map((r,i)=>{const s=r.st;if(s.n<2)return "";const sh=s.vol>0?(s.mean*f-rf)/s.vol:NaN,real=mm?(1+s.cagr)/(1+mm.infl)-1:NaN;
     return `<tr><td><span class="an">${esc(r.label)}</span><span class="cl mono">${r.w.map((x,j)=>x>0?`${esc(ds.assets[j].name)} ${fmtPct(x,0)}`:"").filter(Boolean).join(" · ")}</span></td>
       <td>${cell("pf-cagr-"+i,fmtPct(s.cagr,1,true),s.cagr<0?"neg":"")}</td><td>${mm?cell("pf-real-"+i,fmtPct(real,1,true),real<0?"neg":""):"—"}</td><td>${cell("pf-vol-"+i,fmtPct(s.vol))}</td><td>${cell("pf-sharpe-"+i,fmtN(sh))}</td><td>${cell("pf-mdd-"+i,fmtPct(s.mdd),"neg")}</td></tr>`;}).join("");
-  const P0=pf.positions.filter(p=>p.valore!=null),tot=P0.reduce((s,p)=>s+p.valore,0),tsum=P0.reduce((s,p)=>s+(p.pesoTarget||0),0);
-  let reb="";
-  if(P0.length&&tot>0&&tsum>0){
-    const tw=p=>(p.pesoTarget||0)/tsum,T2=Math.max(...P0.filter(p=>tw(p)>0).map(p=>p.valore/tw(p)));
-    reb=`<h3 style="font-size:1.1rem;margin-top:6px">Ribilanciamento verso i pesi target</h3>
-    <div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>Valore</th><th>Peso attuale</th><th>Peso target</th><th>Compra / vendi</th><th>Solo acquisti</th></tr></thead><tbody>
-    ${P0.map(p=>{const d=tw(p)*tot-p.valore,b=tw(p)*T2-p.valore;return `<tr><td><span class="an">${esc(p.ticker||p.nome)}</span></td><td class="mono">${fmtN(p.valore)} €</td><td class="mono">${fmtPct(p.valore/tot,1)}</td><td class="mono">${fmtPct(tw(p),1)}</td><td class="mono ${d<0?"neg":""}">${d>=0?"+":""}${fmtN(d)} €</td><td class="mono">${b>0.005?"+"+fmtN(b)+" €":"—"}</td></tr>`;}).join("")}
-    <tr><td><b>Totale</b></td><td class="mono"><b>${fmtN(tot)} €</b></td><td></td><td></td><td class="mono">0,00 €</td><td class="mono"><b>+${fmtN(T2-tot)} €</b></td></tr>
-    </tbody></table></div>
-    <p class="caption">"Compra / vendi" riporta il portafoglio di oggi ai pesi target senza aggiungere soldi. "Solo acquisti" indica quanto versare, e in cosa, per arrivarci senza vendere nulla.</p>`;
-  }
+  const reb=rebalanceHTML(pf);
   card.innerHTML=`<div class="head"><h3>Il tuo portafoglio</h3><span class="chip hist"><i></i>pesi dal file «${esc(pf.from)}»</span></div>
     <div class="tablewrap"><table class="mt"><thead><tr><th>Portafoglio</th><th>Rend. annuo</th><th>Rend. reale</th><th>Volatilità</th><th>Sharpe</th><th>Max drawdown</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="caption">Ipotesi: portafoglio ribilanciato ogni mese ai pesi indicati, sullo storico di ${ds.nObs} mesi. Prezzi nella valuta di quotazione di ciascun ETF, non convertiti in euro.${pf.missing.length?` Esclusi perché senza prezzi: ${pf.missing.map(m=>esc(m.nome)).join(", ")}.`:""}</p>${reb}`;
+    <p class="caption">Ipotesi: portafoglio ribilanciato ogni mese ai pesi indicati, sullo storico di ${ds.nObs} mesi. ${S.rb?"Prezzi di mercato convertiti in euro con il cambio BCE di fine mese.":"Valori come nel file."}${pf.missing.length?` Esclusi perché senza prezzi: ${pf.missing.map(m=>esc(m.nome)).join(", ")}.`:""}</p>${reb}`;
 }
 
 /* ---------- Laboratorio ---------- */
@@ -1561,7 +1600,7 @@ function renderRisk(){
     ["Sortino",btn("rk-sortino-p",fmtN(PR.sortino)),`rendimento per unità di rischio al ribasso`],
     ["Drawdown più lungo",btn("rk-ddlen-p",unitN(PR.longest,f)),PR.ongoing?"non ancora recuperato":`sotto il massimo, poi recuperato`]
   ].map(k=>`<div class="kpi"><span class="eyebrow">${k[0]}</span>${k[1]}<span class="sub">${k[2]}</span></div>`).join("");
-  drawHist(PR,f);drawContrib();drawUnderwater(PR,f);renderRiskTable();renderRiskPro();
+  drawHist(PR,f);drawContrib();drawUnderwater(PR,f);renderDecomp();renderRiskTable();renderRiskPro();
   if(current==="risk")Morph.shape("risk");
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-rw]");if(!b)return;S.riskW=b.dataset.rw;renderRisk();if(current==="sim")renderSim();if(current==="stress")renderStress();if(current==="bench")renderBench();});
@@ -1607,10 +1646,10 @@ function renderRiskPro(){
     </div>`;
 }
 function drawContrib(){
-  const R=S.risk,ds=S.ds,maxv=Math.max(...R.w,...R.RC.pct.map(x=>Math.max(0,x)),.01);
+  const R=S.risk,ds=S.ds,maxv=Math.max(...R.w,...R.RC.pct.map(x=>Math.abs(x)),.01);
   const rows=ds.assets.map((a,i)=>R.w[i]>0?`<div class="cbar"><span class="nm">${esc(a.name)}</span><div class="bars">
     <div class="b w"><i data-w="${(R.w[i]/maxv*100).toFixed(1)}"></i><button type="button" data-rc="rk-rc-${i}" tabindex="-1">${fmtPct(R.w[i],0)}</button></div>
-    <div class="b r"><i data-w="${(Math.max(0,R.RC.pct[i])/maxv*100).toFixed(1)}"></i><button type="button" data-rc="rk-rc-${i}">${fmtPct(R.RC.pct[i],0)}</button></div></div></div>`:"").join("");
+    <div class="b r${R.RC.pct[i]<0?" neg":""}"><i data-w="${(Math.abs(R.RC.pct[i])/maxv*100).toFixed(1)}"></i><button type="button" data-rc="rk-rc-${i}">${fmtPct(R.RC.pct[i],0)}</button></div></div></div>`:"").join("");
   $("#riskContrib").innerHTML=`<div class="leg2"><span><i style="background:var(--c2)"></i>peso nel portafoglio</span><span><i style="background:var(--lime)"></i>quota del rischio</span></div>${rows}`;
   requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelectorAll("#riskContrib i[data-w]").forEach(el=>{el.style.width=el.dataset.w+"%";})));
   $("#riskConc").innerHTML=`<div class="conc">
@@ -1633,6 +1672,21 @@ function drawUnderwater(PR,f){
   g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--muted)"/>`;
   $("#riskDD").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Drawdown del portafoglio nel tempo">${g}</svg>`;
   $("#ddCap").textContent=PR.troughK!=null?`Calo peggiore: inizio ${fmtDate(ds.dates[PR.peakAtTrough],f)}, punto più basso ${fmtDate(ds.dates[PR.troughK],f)}, ${PR.recK!=null?`recuperato ${fmtDate(ds.dates[PR.recK],f)}.`:"non ancora recuperato."}`:"Nessun calo dal massimo nel periodo.";
+}
+/* scomposizione del rischio: quanto pesa, quanto rischia da solo, quanto aggiunge al portafoglio */
+function renderDecomp(){
+  const R=S.risk,ds=S.ds,RC=R.RC,el=$("#riskDecomp");if(!el)return;
+  const idx=ds.assets.map((a,i)=>i).filter(i=>R.w[i]>0);
+  const c=(k,i,v,cl="")=>`<button type="button" class="cellbtn ${cl}" data-rc="rk-${k}-${i}">${v}</button>`;
+  const ratio=i=>R.w[i]>0?RC.pct[i]/R.w[i]:NaN,sumWS=idx.reduce((s,i)=>s+R.w[i]*RC.sig[i],0),save=sumWS-RC.volP;
+  el.innerHTML=`<thead><tr><th>Asset</th><th>Peso</th><th>Volatilità da solo</th><th>Contributo marginale</th><th>Contributo al rischio</th><th>Quota del rischio</th><th>Rischio / peso</th></tr></thead><tbody>
+    ${idx.map(i=>{const r=ratio(i);return `<tr><td><span class="an"><i style="background:${color(i)}"></i>${esc(ds.assets[i].name)}</span></td><td class="mono">${fmtPct(R.w[i],1)}</td><td>${c("rc",i,fmtPct(RC.sig[i],1))}</td><td>${c("mcr",i,fmtPct(RC.mcr[i],1),RC.mcr[i]<0?"neg":"")}</td><td>${c("ccr",i,fmtN(RC.ccr[i]*100,2)+" pt",RC.ccr[i]<0?"neg":"")}</td><td>${c("rc",i,fmtPct(RC.pct[i],1),RC.pct[i]<0?"neg":"")}</td><td class="mono ${r>1.15?"neg":r<.85?"up":""}">${Number.isFinite(r)?fmtN(r,2)+"×":"—"}</td></tr>`;}).join("")}
+    <tr class="pf"><td><b>Portafoglio</b></td><td class="mono">100%</td><td class="mono">${fmtPct(sumWS,1)}<span class="cl" style="display:block">media ponderata</span></td><td class="mono">—</td><td>${c("volp","p",fmtN(RC.volP*100,2)+" pt")}</td><td class="mono">100%</td><td class="mono">1,00×</td></tr></tbody>`;
+  const hi=idx.filter(i=>ratio(i)>1.15).sort((a,b)=>ratio(b)-ratio(a)),neg=idx.filter(i=>RC.pct[i]<0);
+  $("#riskDecompCap").innerHTML=`La somma dei contributi è la volatilità del portafoglio (${fmtPct(RC.volP,1)}). Se ogni asset si muovesse sempre insieme agli altri sarebbe ${fmtPct(sumWS,1)}: la diversificazione toglie <b>${fmtN(save*100,1)} punti</b> di volatilità.`+
+    (hi.length?` ${hi.map(i=>`<b>${esc(ds.assets[i].name)}</b>`).join(", ")} ${hi.length===1?"porta":"portano"} più rischio di quanto ${hi.length===1?"pesa":"pesano"} (rischio / peso sopra 1).`:"")+
+    (neg.length?` ${neg.map(i=>`<b>${esc(ds.assets[i].name)}</b>`).join(", ")} ${neg.length===1?"riduce":"riducono"} il rischio totale: contributo negativo, perché ${neg.length===1?"tende":"tendono"} a muoversi in senso opposto al resto.`:"")+
+    ` Il contributo marginale è la sensibilità della volatilità al peso dell'asset; nella ricevuta trovi l'effetto di spostare 1 punto su quell'asset togliendolo dagli altri in proporzione.`;
 }
 function renderRiskTable(){
   const R=S.risk,ds=S.ds,f=ds.freq.f,cell=(k,v,c="")=>`<button type="button" class="cellbtn ${c}" data-rc="${k}">${v}</button>`;
@@ -1661,6 +1715,8 @@ function riskReceipt(m,who){
     kurt:{t:"Curtosi in eccesso",v:fmtN(st.kurt),fx:"κ = m₄ / m₂² − 3\npositiva = code più spesse di una distribuzione normale",kv:[]},
     ddlen:{t:"Drawdown più lungo",v:unitN(st.longest,f),fx:"periodi tra un massimo e il ritorno a quel livello",kv:[["Inizio",st.lStart!=null?fmtDate(ds.dates[st.lStart],f):"—"],["Fine",st.ongoing?"non ancora recuperato":st.lEnd!=null?fmtDate(ds.dates[st.lEnd],f):"—"]]},
     rc:{t:"Contributo al rischio",v:fmtPct(R.RC.pct[i],1),fx:"RCᵢ = wᵢ · (Σw)ᵢ / σₚ   (la somma dei contributi è σₚ)\nquota = RCᵢ / σₚ",kv:[["Peso nel portafoglio",fmtPct(R.w[i],1)],["Volatilità dell'asset",fmtPct(R.RC.sig[i],2)],["Volatilità del portafoglio",fmtPct(R.RC.volP,2)],["Periodi comuni usati",R.cov.common]]},
+    mcr:{t:"Contributo marginale al rischio",v:fmtPct(R.RC.mcr[i],2),fx:"MCRᵢ = ∂σₚ / ∂wᵢ = (Σw)ᵢ / σₚ = ρᵢ,ₚ · σᵢ   (annualizzato con √f)\nspostamento di 1 punto dagli altri asset in proporzione: Δσₚ ≈ (MCRᵢ − σₚ) / (1 − wᵢ) × 0,01",kv:[["Peso",fmtPct(R.w[i],1)],["Volatilità dell'asset",fmtPct(R.RC.sig[i],2)],["Volatilità del portafoglio",fmtPct(R.RC.volP,2)],["Correlazione con il portafoglio (MCR / σᵢ)",fmtN(R.RC.sig[i]>0&&R.RC.volP>0?R.RC.mcr[i]/R.RC.sig[i]:NaN,2)],["Spostando +1 punto su questo asset dagli altri in proporzione",R.w[i]<1?`${R.RC.mcr[i]>=R.RC.volP?"+":"−"}${fmtN(Math.abs((R.RC.mcr[i]-R.RC.volP)/(1-R.w[i])),3)} pt di volatilità`:"—"],["Periodi comuni usati",R.cov.common]]},
+    ccr:{t:"Contributo al rischio (punti di volatilità)",v:fmtN(R.RC.ccr[i]*100,2)+" pt",fx:"CCRᵢ = wᵢ · MCRᵢ\nΣ CCRᵢ = σₚ   (scomposizione di Euler: i contributi si sommano esattamente)",kv:[["Peso",fmtPct(R.w[i],1)],["Contributo marginale",fmtPct(R.RC.mcr[i],2)],["Quota del rischio",fmtPct(R.RC.pct[i],1)],["Volatilità del portafoglio",fmtPct(R.RC.volP,2)]]},
     volp:{t:"Volatilità del portafoglio",v:fmtPct(R.RC.volP,2),fx:"σₚ = √( wᵀ Σ w ) · √f\nΣ = matrice di covarianza sui periodi comuni",kv:[["Periodi comuni usati",R.cov.common]]},
     neff:{t:"Asset effettivi",v:fmtN(R.RC.neff,2),fx:"N_eff = 1 / Σ wᵢ²   (inverso dell'indice di Herfindahl)",kv:[["Indice di Herfindahl",fmtN(R.RC.hhi,3)],["Asset nel file",ds.assets.length]]},
     div:{t:"Rapporto di diversificazione",v:fmtN(R.RC.divRatio),fx:"DR = Σ wᵢ σᵢ / σₚ\n1 = nessun beneficio; più è alto, più la diversificazione riduce il rischio",kv:[["Volatilità del portafoglio",fmtPct(R.RC.volP,2)]]},

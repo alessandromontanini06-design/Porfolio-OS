@@ -745,3 +745,13 @@ body[data-scene="bench"]{--pill:#5BF0A5;--pill-rgb:91,240,165}
 .look-tabs{margin:4px 0 16px;flex-wrap:wrap;max-width:100%}
 .look-main{min-height:120px}.look-h{margin:20px 0 8px;font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 @media (max-width:900px){.look-kpi.k4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.cbar .b.r.neg i{background:var(--bad)}
+#riskDecomp .an i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle}
+
+.rb-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:6px 0 14px;align-items:end}
+.rb-form label{display:flex;flex-direction:column;gap:6px}
+.rb-sum{border:1px solid var(--line);border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:2px}.rb-sum span{color:var(--muted);font-size:.86rem}
+.rb-t input.tgt{width:76px;padding:6px 8px;font-family:var(--f-mono)}
+.rb-form input,.rb-t input.tgt{border-radius:10px;border:1px solid var(--line);background:var(--raise);padding:9px 11px;font:inherit;font-family:var(--f-mono);color:var(--fg);font-variant-numeric:tabular-nums}
+.rb-form input{width:100%}.rb-form input:focus,.rb-t input.tgt:focus{outline:2px solid var(--accent);outline-offset:1px}

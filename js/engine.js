@@ -708,7 +708,9 @@ function covMatrix(assets){
 function riskContrib(w,C,f){
   const Cw=C.map(row=>row.reduce((s,x,j)=>s+x*w[j],0)),varP=w.reduce((s,x,i)=>s+x*Cw[i],0),sp=Math.sqrt(Math.max(0,varP));
   const rc=w.map((x,i)=>sp>0?x*Cw[i]/sp:0),sig=C.map((row,i)=>Math.sqrt(Math.max(0,row[i]))),hhi=w.reduce((s,x)=>s+x*x,0);
-  return {volP:sp*Math.sqrt(f),pct:rc.map(x=>sp>0?x/sp:0),sig:sig.map(x=>x*Math.sqrt(f)),
+  /* MCRᵢ = ∂σₚ/∂wᵢ = (Σw)ᵢ / σₚ ; CCRᵢ = wᵢ · MCRᵢ (punti di volatilità, Σ CCR = σₚ) — tutto annualizzato con √f */
+  const mcr=Cw.map(x=>sp>0?x/sp*Math.sqrt(f):NaN),ccr=mcr.map((x,i)=>w[i]*x);
+  return {volP:sp*Math.sqrt(f),pct:rc.map(x=>sp>0?x/sp:0),sig:sig.map(x=>x*Math.sqrt(f)),mcr,ccr,
     divRatio:sp>0?w.reduce((s,x,i)=>s+x*sig[i],0)/sp:NaN,hhi,neff:hhi>0?1/hhi:NaN};
 }
 function countOut(text,d){let n=0,q=false;for(const ch of text){if(ch==='"')q=!q;else if(!q&&ch===d)n++;}return n;}
@@ -949,6 +951,24 @@ function exposures(items){
 }
 /* quanto costa il TER nel tempo: differenza tra crescere al rendimento lordo r e a r − TER, su un capitale V */
 function terDrag(V,ter,r,years){return V*(Math.pow(1+r,years)-Math.pow(1+r-ter,years));}
+/* Divide un versamento C tra gli strumenti per avvicinarsi ai pesi target senza vendere.
+   Acquisti bᵢ = max(0, tᵢ·K − vᵢ) con K scelto (bisezione) perché Σ bᵢ = C: i più sottopesati salgono insieme
+   allo stesso rapporto (vᵢ + bᵢ)/tᵢ = K, il che minimizza il massimo scostamento relativo. Deterministico. */
+function contributionSplit(v,t,C){
+  const n=v.length,ts=t.reduce((s,x)=>s+(x>0?x:0),0);if(!(ts>0)||!(C>0))return v.map(()=>0);
+  const tt=t.map(x=>(x>0?x:0)/ts),buy=K=>tt.map((x,i)=>Math.max(0,x*K-v[i])),sum=K=>buy(K).reduce((s,x)=>s+x,0);
+  let lo=0,hi=(v.reduce((s,x)=>s+x,0)+C)/Math.min(...tt.filter(x=>x>0))+1;
+  for(let k=0;k<200;k++){const m=(lo+hi)/2;if(sum(m)<C)lo=m;else hi=m;}
+  const b=buy(hi),s=b.reduce((a,x)=>a+x,0);return s>0?b.map(x=>x*C/s):b;
+}
+/* Mesi di versamenti costanti C per rientrare nella banda ±band dai target senza vendere, a prezzi fermi. */
+function monthsToTarget(v,t,C,band,max=600){
+  const ts=t.reduce((s,x)=>s+(x>0?x:0),0);if(!(ts>0))return null;const tt=t.map(x=>(x>0?x:0)/ts);
+  let cur=v.slice();const ok=x=>{const T=x.reduce((s,y)=>s+y,0);return T>0&&x.every((y,i)=>Math.abs(y/T-tt[i])<=band+1e-12);};
+  if(ok(cur))return 0;if(!(C>0))return null;
+  for(let m=1;m<=max;m++){const b=contributionSplit(cur,tt,C);cur=cur.map((x,i)=>x+b[i]);if(ok(cur))return m;}
+  return null;
+}
 /* costo annuo ponderato: Σ wᵢ · TERᵢ sugli strumenti con TER noto; la parte senza TER resta dichiarata */
 function weightedTer(items){
   const tot=items.reduce((s,x)=>s+(x.w>0?x.w:0),0);if(!(tot>0))return {ter:NaN,coverage:0};
@@ -1083,6 +1103,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
