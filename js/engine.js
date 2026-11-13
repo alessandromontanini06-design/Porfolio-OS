@@ -1077,7 +1077,9 @@ function xirr(flows){
    Rendimento ponderato nel tempo (TWR): Rₜ = Σ Vᵢ,ₜ₋₁ · rᵢ,ₜ / Σ Vᵢ,ₜ₋₁, poi composto. */
 function personalPerformance(dates,assets,tx){
   const n=dates.length,k=assets.length,flowAt=Array.from({length:n},()=>new Array(k).fill(0)),out={unmatched:[],before:0,after:0,used:0};
+  const per=assets.map(()=>({bought:0,sold:0,income:0,clipped:0,flows:[]}));
   tx.forEach(x=>{if(x.i==null||x.i<0||x.i>=k){out.unmatched.push(x);return;}
+    const q=per[x.i];if(x.amount>0)q.bought+=x.amount;else if(/divid|cedol|coupon|interess/i.test(x.type||""))q.income-=x.amount;else q.sold-=x.amount;q.flows.push({t:x.d,v:-x.amount});
     let p=dates.findIndex(d=>d.getTime()>=x.d.getTime());
     if(p<0){out.after++;p=n-1;}            // dopo l'ultima data: nel periodo finale
     if(p===0&&n>1&&dates[0].getTime()-x.d.getTime()>dates[1].getTime()-dates[0].getTime())out.before++; // più di un periodo prima dei dati
@@ -1087,7 +1089,7 @@ function personalPerformance(dates,assets,tx){
     const prev=V.reduce((s,x)=>s+x,0);let gain=0;
     if(prev>0)assets.forEach((a,i)=>{if(V[i]>0){const r=a.ret[t];if(Number.isFinite(r)){gain+=V[i]*r;V[i]*=1+r;}else miss++;}});
     if(prev>0){twr*=1+gain/prev;if(twr>peak)peak=twr;mdd=Math.min(mdd,twr/peak-1);}
-    const F=flowAt[t].reduce((s,x)=>s+x,0);flowAt[t].forEach((x,i)=>{V[i]=Math.max(0,V[i]+x);});inv+=F;
+    const F=flowAt[t].reduce((s,x)=>s+x,0);flowAt[t].forEach((x,i)=>{const y=V[i]+x;if(y<0)per[i].clipped-=y;V[i]=Math.max(0,y);});inv+=F;
     if(first<0&&F!==0)first=t;
     if(first>=0)series.push({t,value:V.reduce((s,x)=>s+x,0),invested:inv,twr});
   }
@@ -1095,7 +1097,9 @@ function personalPerformance(dates,assets,tx){
   const last=n-1,value=V.reduce((s,x)=>s+x,0),years=(dates[last]-dates[first])/(365.25*864e5);
   const flows=tx.filter(x=>x.i!=null&&x.i>=0&&x.i<k).map(x=>({t:x.d,v:-x.amount}));flows.push({t:dates[last],v:value});
   return {...out,series,first,flowsT:flowAt.map(r=>r.reduce((s,x)=>s+x,0)),value,invested:inv,gain:value-inv,gainPct:inv>0?value/inv-1:NaN,xirr:xirr(flows),twr:twr-1,twrAnn:years>0?Math.pow(twr,1/Math.max(years,1e-9))-1:NaN,years,mdd,miss,
-    byAsset:assets.map((a,i)=>({value:V[i],invested:flowAt.reduce((s,r)=>s+r[i],0)}))};
+    byAsset:assets.map((a,i)=>{const inv_=flowAt.reduce((s,r)=>s+r[i],0),q=per[i],fl=q.flows.concat(V[i]>0?[{t:dates[last],v:V[i]}]:[]);
+      return {value:V[i],invested:inv_,bought:q.bought,sold:q.sold,income:q.income,gain:V[i]-inv_,clipped:q.clipped,ops:q.flows.length,
+        xirr:q.flows.length&&fl.some(f=>f.v>0)&&fl.some(f=>f.v<0)?xirr(fl):NaN};})};
 }
 /* gli stessi versamenti messi in un benchmark (rendimenti di periodo allineati alle date) */
 function sameFlows(dates,bret,flowsByT){

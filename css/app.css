@@ -755,3 +755,6 @@ body[data-scene="bench"]{--pill:#5BF0A5;--pill-rgb:91,240,165}
 .rb-t input.tgt{width:76px;padding:6px 8px;font-family:var(--f-mono)}
 .rb-form input,.rb-t input.tgt{border-radius:10px;border:1px solid var(--line);background:var(--raise);padding:9px 11px;font:inherit;font-family:var(--f-mono);color:var(--fg);font-variant-numeric:tabular-nums}
 .rb-form input{width:100%}.rb-form input:focus,.rb-t input.tgt:focus{outline:2px solid var(--accent);outline-offset:1px}
+
+.at-t .an i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle}
+.at-t .cl{display:block}

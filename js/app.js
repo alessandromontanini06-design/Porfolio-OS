@@ -1351,7 +1351,7 @@ async function loadEtfInfo(){
       pf.isinStatus="done";}catch(e){pf.isinStatus="error";pf.isinErr=e instanceof TypeError?"ricerca ISIN non raggiungibile":String(e.message||e);}}
   const list=pf.positions.filter(p=>p.isin&&ISIN_RX.test(p.isin));if(!list.length){pf.etfLoading=false;pf.etfDone=true;renderLook();return;}
   for(const p of list){const j=await getJSON(`/api/etfinfo?isin=${p.isin}`);p.etf=j&&!j.error?j:{error:(j&&j.error)||"non disponibile"};renderLook();}
-  pf.etfLoading=false;pf.etfDone=true;renderLook();
+  pf.etfLoading=false;pf.etfDone=true;renderLook();renderReal();/* classi di attivo nel guadagno per strumento */
 }
 const LOOK_TABS=[["geo","Aree e paesi"],["ccy","Valute"],["style","Classi e stile"],["sect","Settori"],["ter","Costi (TER)"]];
 document.addEventListener("click",e=>{const b=e.target.closest("[data-look]");if(!b)return;S.lookTab=b.dataset.look;renderLook();});
@@ -2435,7 +2435,26 @@ function renderReal(){
         :`<span class="eyebrow">Confronto con l'indice</span><span style="color:var(--muted)">${esc(src.error||"Scegli un indice nella sezione Benchmark.")}</span>`}
       </div></div>
     <p class="caption" style="margin-top:12px">Il valore segue i rendimenti degli strumenti nei dati e aggiunge ogni versamento a fine ${UNIT[f]?UNIT[f][0]:"periodo"}. ${S.source.kind==="rebuilt"?"I rendimenti sono quelli di mercato convertiti in euro con il cambio BCE di fine mese; il valore può differire un po' da quello del tuo broker (prezzi di fine mese, borsa diversa).":"I rendimenti vengono dai prezzi del file: se sono prezzi medi pagati, il valore è una stima."}${un.length?` Transazioni non collegate (strumento non nei dati): ${esc(un.join(", "))}.`:""}${pp.before?` ${pp.before} transazioni sono prima dell'inizio dei dati e sono contate dal primo periodo.`:""} TIR e rendimento ponderato su meno di un anno o due possono cambiare molto: non sono previsioni.</p>`;
+  el.insertAdjacentHTML("beforeend",attribHTML(R));
   drawReal();
+}
+/* Quanto ha reso ogni strumento, in euro: guadagno = valore oggi − (acquisti − vendite − dividendi incassati).
+   La somma dei guadagni degli strumenti è esattamente il guadagno totale: niente collegamenti tra periodi né approssimazioni. */
+function attribHTML(R){
+  const pp=R.pp,ds=S.ds,B=pp.byAsset,idx=ds.assets.map((a,i)=>i).filter(i=>B[i].ops>0);if(!idx.length)return "";
+  const tg=idx.reduce((s,i)=>s+B[i].gain,0),eur=v=>`${v>=0?"+":"−"}${fmtEur(Math.abs(v))}`,c=(k,i,v,cl="")=>`<button type="button" class="cellbtn ${cl}" data-rc="rl-at${k}-${i}">${v}</button>`;
+  const pos=S.portfolio?S.portfolio.positions:[],cls=i=>{const q=pos.find(p=>(p.ticker||p.nome)===ds.assets[i].name);return q&&q.etf&&!q.etf.error?P.etfClass(q.etf):null;};
+  const rows=idx.slice().sort((a,b)=>B[b].gain-B[a].gain).map(i=>{const b=B[i],sh=tg!==0?b.gain/tg:NaN;
+    return `<tr><td><span class="an"><i style="background:${color(i)}"></i>${esc(ds.assets[i].name)}</span>${cls(i)?`<span class="cl">${esc(cls(i))}</span>`:""}</td><td class="mono">${fmtEur(b.bought)}</td><td class="mono">${b.sold>.5?"−"+fmtEur(b.sold):"—"}</td><td class="mono">${b.income>.005?"+"+fmtEur(b.income):"—"}</td><td>${c("v",i,fmtEur(b.value))}</td><td>${c("g",i,`<span class="${b.gain>=0?"up":"dn"}">${eur(b.gain)}</span>`)}</td><td class="mono">${Number.isFinite(b.xirr)?fmtPct(b.xirr,1,true):"—"}</td><td class="mono">${Number.isFinite(sh)?fmtPct(sh,0):"—"}</td></tr>`;}).join("");
+  /* per classe di attivo, se le schede dei fondi sono state lette */
+  const byC=new Map();idx.forEach(i=>{const k=cls(i);if(!k)return;const o=byC.get(k)||{g:0,v:0,inv:0};o.g+=B[i].gain;o.v+=B[i].value;o.inv+=B[i].invested;byC.set(k,o);});
+  const clsRows=byC.size>1&&idx.every(i=>cls(i))?`<h4 class="look-h">Per classe di attivo</h4><div class="tablewrap"><table class="mt"><thead><tr><th>Classe</th><th>Versato netto</th><th>Valore oggi</th><th>Guadagno</th><th>Quota del guadagno</th></tr></thead><tbody>${[...byC].sort((a,b)=>b[1].g-a[1].g).map(([k,o])=>`<tr><td>${esc(k)}</td><td class="mono">${fmtEur(o.inv)}</td><td class="mono">${fmtEur(o.v)}</td><td class="mono ${o.g>=0?"up":"dn"}">${eur(o.g)}</td><td class="mono">${tg!==0?fmtPct(o.g/tg,0):"—"}</td></tr>`).join("")}</tbody></table></div>`:"";
+  const clip=idx.filter(i=>B[i].clipped>1);
+  const best=idx.reduce((a,i)=>B[i].gain>B[a].gain?i:a,idx[0]),worst=idx.reduce((a,i)=>B[i].gain<B[a].gain?i:a,idx[0]);
+  return `<h4 class="look-h" style="margin-top:22px">Quanto ha reso ogni strumento</h4>
+    <div class="tablewrap"><table class="mt at-t"><thead><tr><th>Strumento</th><th>Acquisti</th><th>Vendite</th><th>Dividendi incassati</th><th>Valore oggi</th><th>Guadagno</th><th>TIR</th><th>Quota del guadagno</th></tr></thead><tbody>${rows}
+      <tr class="pf"><td><b>Totale</b></td><td class="mono">${fmtEur(idx.reduce((s,i)=>s+B[i].bought,0))}</td><td class="mono">${idx.some(i=>B[i].sold>.5)?"−"+fmtEur(idx.reduce((s,i)=>s+B[i].sold,0)):"—"}</td><td class="mono">${idx.some(i=>B[i].income>.005)?"+"+fmtEur(idx.reduce((s,i)=>s+B[i].income,0)):"—"}</td><td class="mono"><b>${fmtEur(pp.value)}</b></td><td class="mono ${tg>=0?"up":"dn"}"><b>${eur(tg)}</b></td><td class="mono">${fmtPct(pp.xirr,1,true)}</td><td class="mono">100%</td></tr></tbody></table></div>${clsRows}
+    <p class="caption">${idx.length>1?`<b>${esc(ds.assets[best].name)}</b> ha portato il guadagno maggiore (${eur(B[best].gain)})${B[worst].gain<0?`, <b>${esc(ds.assets[worst].name)}</b> è in perdita (${eur(B[worst].gain)})`:worst!==best?`, <b>${esc(ds.assets[worst].name)}</b> il minore (${eur(B[worst].gain)})`:""}. `:""}Guadagno = valore oggi − acquisti + vendite + dividendi incassati: la somma per strumento è esattamente il guadagno totale. I prezzi sono rettificati, quindi i dividendi reinvestiti sono già nel valore; quelli incassati (ETF a distribuzione) contano come soldi usciti dal portafoglio, che hai però guadagnato. Commissioni e imposta di bollo non abbinate a uno strumento non sono incluse.${clip.length?` <span style="color:var(--warn)">Per ${clip.map(i=>esc(ds.assets[i].name)).join(", ")} alcune vendite superano il valore stimato di ${fmtEur(clip.reduce((s,i)=>s+B[i].clipped,0))}: quella parte risulta guadagno realizzato, ma può dipendere dai prezzi di fine mese o da una borsa diversa da quella del tuo broker.</span>`:""}</p>`;
 }
 function drawReal(){
   const R=S.real,pp=R.pp,ds=S.ds,f=ds.freq.f,s=pp.series,n=s.length,VW=640,VH=260,ml=56,mr=12,mt=12,mb=28,iw=VW-ml-mr,ih=VH-mt-mb;
@@ -2462,6 +2481,9 @@ function realReceipt(m){
     gain:["Guadagno",fmtEur(pp.gain),"Valore oggi − Versato",[["Sul versato",fmtPct(pp.gainPct,2,true)]]],
     twr:["Rendimento ponderato nel tempo",fmtPct(pp.twr,2,true),"Rₜ = Σ Vᵢ,ₜ₋₁ · rᵢ,ₜ / Σ Vᵢ,ₜ₋₁    TWR = Π (1 + Rₜ) − 1\nnon dipende da quanto e quando hai versato: misura le tue scelte di strumenti",[["Annualizzato",pp.years>=1?fmtPct(pp.twrAnn,2,true):"periodo inferiore a un anno"],["Massimo calo",fmtPct(pp.mdd,2)]]]
   }[m]||[m,"—","",[]];
+  if(/^at[vg]$/.test(m)&&arguments[1]!=null){const i=+arguments[1],b=pp.byAsset[i],a=ds.assets[i];
+    return m==="atg"?{title:`Guadagno · ${a.name}`,value:fmtEur(b.gain),formula:"Guadagnoᵢ = Valoreᵢ oggi − (Acquistiᵢ − Venditeᵢ − Dividendi incassatiᵢ)\nΣ Guadagnoᵢ = Guadagno totale",kv:[["Acquisti",fmtEur(b.bought)],["Vendite",fmtEur(b.sold)],["Dividendi incassati",fmtEur(b.income)],["Versato netto",fmtEur(b.invested)],["Valore oggi",fmtEur(b.value)],["TIR dello strumento",Number.isFinite(b.xirr)?fmtPct(b.xirr,2,true):"—"],["Operazioni",b.ops],...base]}
+      :{title:`Valore oggi · ${a.name}`,value:fmtEur(b.value),formula:"Vₜ = Vₜ₋₁ · (1 + rₜ) + flussoₜ   (flusso: acquisti +, vendite e dividendi incassati −)\nrₜ = rendimento di mercato dello strumento in euro",kv:[["Periodi",ds.nObs],["Operazioni",b.ops],...base]};}
   return {title:M[0],value:M[1],formula:M[2],kv:[...M[3],...base]};
 }
 /* storia corta: la frontiera e il benchmark riguardano gli strumenti, non da quanto li possiedi */
@@ -2651,7 +2673,7 @@ function receipt(key){
   if(kind==="st"&&S.stress)return stReceipt(parts[1],parts[2],parts[3]);
   if(kind==="op"&&S.opt)return opReceipt(parts[1],parts[2]);
   if(kind==="bn"&&S.bnRes)return bnReceipt(parts[1],parts[2]);
-  if(kind==="rl"&&S.real)return realReceipt(parts[1]);
+  if(kind==="rl"&&S.real)return realReceipt(parts[1],parts[2]);
   if(kind==="corr"){
     const i=+parts[1],j=+parts[2],a=ds.assets[i],b=ds.assets[j],c=L.C[i][j];
     return {title:`Correlazione · ${a.name} / ${b.name}`,value:fmtN(c.r),formula:"ρ = Σ (xᵢ − x̄)(yᵢ − ȳ) / √[ Σ (xᵢ − x̄)² · Σ (yᵢ − ȳ)² ]\nx, y = rendimenti di periodo dei due asset",
