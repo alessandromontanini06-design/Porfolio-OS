@@ -379,6 +379,7 @@ function reveal(){}
 /* ---------- Caricamento ---------- */
 function load(sheets,source,fromUser,opts={}){
   const isFile=source.kind==="file";
+  if(isFile){S.rb=null;S.youngRes={};}
   if(isFile&&!opts.recipe&&!opts.forceAuto){S.fileSheets=sheets;S.recipe=null;S.conflict=null;S.agree=false;S.fp=P.structureFingerprint(sheets);S.tpl=tplGet(S.fp);}
   if(!isFile){S.fp=null;S.tpl=null;S.recipe=null;S.conflict=null;S.agree=false;}
   if(!opts.recipe||!opts.memory)S.tplUsed=false;
@@ -855,6 +856,41 @@ function applyUnderstandSeries(){
   S.und=null;hideLab();renderImport(false);morphData();
 }
 const ISIN_RX=/^[A-Z]{2}[A-Z0-9]{9}\d$/;
+/* ---------- Strumenti con poca storia: estensione con lo stesso indice, esclusione o soli mesi comuni ---------- */
+const PROXY=[[/msci world|ftse developed world|developed world/i,"IWDA.AMS","MSCI World"],[/s&p ?500|sp ?500/i,"SXR8.DEX","S&P 500"],[/nasdaq[- ]?100/i,"CNDX.AMS","Nasdaq-100"],[/emerging|msci em\b|\bem imi\b/i,"EMIM.AMS","MSCI Emerging Markets"],[/all[- ]world|acwi/i,"VWRL.AMS","FTSE All-World"],[/stoxx europe 600/i,"EXSA.DEX","STOXX Europe 600"]];
+/* prezzi in euro, mese per mese (GBX = pence) */
+function eurMap(s,fxm){const c=String(s.currency||"").toUpperCase(),cc=c==="GBX"||c==="GBP"?"GBP":c||null,pence=c==="GBX",m=new Map();
+  s.points.forEach(x=>{const k=x.d.slice(0,7);let v=x.v/(pence?100:1);if(cc&&cc!=="EUR"){const r=fxm[cc]&&fxm[cc].get(k);if(!(r>0))return;v/=r;}m.set(k,{d:x.d,v:+v.toFixed(6)});});return m;}
+function findYoung(){
+  const R=S.rb,starts=R.cols.map(c=>[...c.map.keys()].sort()[0]),sorted=[...starts].sort(),med=sorted[Math.floor(sorted.length/2)];
+  const mi=k=>{const [y,m]=k.split("-").map(Number);return y*12+m;};
+  R.cols.forEach((c,i)=>{c.first=starts[i];c.young=R.cols.length>1&&mi(starts[i])-mi(med)>=36&&c.map.size<60;
+    const px=PROXY.find(p=>p[0].test(c.info+" "+c.name));c.proxySym=px&&px[1]!==c.sym?px[1]:null;c.proxyIdx=px?px[2]:null;});
+}
+/* tabella dei prezzi dalle decisioni: esclusi fuori, estesi con l'indice prima del primo prezzo, «mesi comuni» = solo i mesi di tutti */
+function rbAoa(){
+  const R=S.rb,cols=R.cols.filter(c=>S.youngRes[c.name]!=="exclude");
+  const ser=cols.map(c=>{let m=c.map;if(S.youngRes[c.name]==="proxy"&&c.proxy){const f=[...c.map.keys()].sort()[0],a=c.map.get(f),b=c.proxy.get(f);if(a&&b){m=new Map(c.map);const k=a.v/b.v;for(const [mm,x] of c.proxy)if(mm<f)m.set(mm,{d:x.d,v:+(x.v*k).toFixed(6)});}}return {name:c.name,m};});
+  let months=[...new Set(ser.flatMap(x=>[...x.m.keys()]))].sort();
+  if(cols.some(c=>c.young&&S.youngRes[c.name]==="keep"))months=months.filter(k=>ser.every(x=>x.m.has(k)));
+  const aoa=[["Data",...ser.map(x=>x.name)]];
+  months.forEach(k=>{const [y,mo]=k.split("-").map(Number),d=new Date(Date.UTC(y,mo,0));aoa.push([`${String(d.getUTCDate()).padStart(2,"0")}/${String(mo).padStart(2,"0")}/${y}`,...ser.map(x=>x.m.has(k)?x.m.get(k).v:null)]);});
+  return aoa;
+}
+async function youngDecide(c,act){
+  if(act==="proxy"&&!c.proxy){
+    const j=await getJSON(`/api/prices?symbol=${encodeURIComponent(c.proxySym)}&v=3`);if(j.error||!j.points)return `Indice ${c.proxySym} non disponibile: ${j.error||"riprova"}`;
+    const cc=String(j.currency||"").toUpperCase(),need=cc==="GBX"?"GBP":cc;if(need&&need!=="EUR"&&!S.rb.fxm[need]){const f=await getJSON(`/api/fx?ccy=${need}`);if(f.points)S.rb.fxm[need]=new Map(f.points.map(x=>[x.p,x.v]));}
+    c.proxy=eurMap(j,S.rb.fxm);
+  }
+  S.youngRes[c.name]=act;
+  const pf=S.portfolio,log=S.rbLog||[],name=S.source.name;
+  load([{name:"Prezzi mensili",aoa:rbAoa()}],{name,size:0,kind:"rebuilt"},false);
+  S.portfolio=pf;
+  S.aiLog=[...log,...S.rb.cols.filter(x=>S.youngRes[x.name]).map(x=>S.youngRes[x.name]==="proxy"?`${x.name}: prima del ${x.first} usa l'indice ${x.proxyIdx} (${x.proxySym}), riscalato sul primo prezzo vero. È un'approssimazione: le due quotazioni seguono lo stesso indice ma con costi e metodi di replica diversi.`:S.youngRes[x.name]==="exclude"?`${x.name}: escluso dalle analisi per lo storico troppo corto (dal ${x.first}); i pesi sono ricalcolati sugli altri.`:`${x.name}: analisi solo sui mesi in cui esistono tutti gli strumenti.`)];
+  renderImport(false);return null;
+}
+
 /* da ISIN a simbolo di borsa (OpenFIGI, lato server): per le posizioni che nel file non hanno un ticker utilizzabile */
 async function resolveIsins(pos){
   const need=pos.filter(p=>!p.simbolo&&(p.isin||ISIN_RX.test(p.ticker||"")));if(!need.length)return [];
@@ -903,20 +939,21 @@ async function rebuildFromPrices(){
     for(const c of need){const j=await getJSON(`/api/fx?ccy=${c}`);if(j.error||!j.points)fxErr.push(`${c}: ${j.error||"cambio non disponibile"}`);else fxm[c]=new Map(j.points.map(x=>[x.p,x.v]));}
     if(fxErr.length)throw new Error(`Non riesco a convertire in euro (${fxErr.join("; ")}). Riprova tra poco.`);
     const unknown=ok.filter(o=>!ccyOf(o.s)).map(o=>o.p.simbolo);
-    const maps=ok.map(o=>{const c=ccyOf(o.s),pence=String(o.s.currency||"").toUpperCase()==="GBX",m=new Map();
-      o.s.points.forEach(x=>{const k=x.d.slice(0,7);let v=x.v/(pence?100:1);if(c&&c!=="EUR"){const r=fxm[c].get(k);if(!(r>0))return;v/=r;}m.set(k,{d:x.d,v:+v.toFixed(6)});});return m;});
-    const months=[...maps[0].keys()].filter(m=>maps.every(mp=>mp.has(m))).sort();
-    if(months.length<13)throw new Error("Lo storico comune degli strumenti è troppo corto (meno di un anno). Prova a cambiare i simboli.");
-    const aoa=[["Data",...ok.map(o=>o.p.ticker||o.p.nome)]];
-    months.forEach(m=>{const d=maps[0].get(m).d;aoa.push([`${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}`,...maps.map(mp=>mp.get(m).v)]);});
+    const maps=ok.map(o=>eurMap(o.s,fxm));
+    S.rb={cols:ok.map((o,i)=>({name:o.p.ticker||o.p.nome,map:maps[i],info:o.s.info||"",sym:o.p.simbolo})),fxm};S.youngRes={};
+    findYoung();
+    const aoa=rbAoa();
+    if(aoa.length<14)throw new Error("Lo storico degli strumenti è troppo corto (meno di un anno). Prova a cambiare i simboli.");
+    const months={length:aoa.length-1};
     const orig=S.source.name.replace(/ · ricostruito$/,""),scartati=u.scartati||[];
     const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},true);
-    S.portfolio=pf;
+    S.portfolio=pf;S.rbLog=null;
     S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
       `Valute di quotazione: ${ok.map(o=>`${o.p.ticker||o.p.nome} ${o.s.currency||"sconosciuta"}`).join(", ")}.`,
       ...(unknown.length?[`Valuta non determinata per ${unknown.join(", ")}: lasciata com'è, verifica il simbolo.`]:[]),
       ...pf.missing.map(m=>`Non scaricato: ${m.nome}${m.simbolo?` (${m.simbolo})`:""}. ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
+    S.rbLog=[...S.aiLog];
     renderImport(false);
   }catch(e){
     S.und={...S.und,status:"ready",err:e instanceof TypeError?"Lo storico dei prezzi si scarica nella versione del sito pubblicata su Vercel.":String(e.message||e)};renderAI();
@@ -952,6 +989,10 @@ function computeChecks(A,ds){
   /* 5) valute diverse dall'euro */
   if(ds&&ds.ok){const cc=A.cols.filter(c=>ASSETR.includes(S.roles[c.idx])).map(c=>[c,sheetCcy(A,c)]).filter(([,v])=>v&&v!=="EUR");
     if(cc.length)out.push({id:"ccy",block:true,title:"Serie in valute diverse dall'euro",text:cc.map(([c,v])=>`«${c.name}» in ${v}`).join(" · ")+". Mescolare valute falsa correlazioni e rischio: conviene convertire con il cambio ufficiale BCE di fine mese.",acts:[["convert","Converti in euro"],["keep","Lascia nella valuta originale"]],cc:cc.map(([c,v])=>[c.idx,v])});}
+  /* strumenti con poca storia: senza una scelta tagliano a pochi mesi rischio, correlazioni e frontiera di tutto il portafoglio */
+  if(S.rb&&S.source&&S.source.kind==="rebuilt")S.rb.cols.filter(c=>c.young).forEach(c=>{const id="young:"+c.name;if(S.youngRes[c.name])R[id]=S.youngRes[c.name];
+    out.push({id,block:true,title:`${c.name}: storico corto (dal ${c.first}, ${c.map.size} mesi)`,text:`Gli altri strumenti hanno molti anni di prezzi. Con ${c.name} dentro così com'è, rischio, correlazioni e frontiera userebbero solo i mesi in cui esistono tutti: troppo pochi per stime affidabili.${c.proxySym?` ${c.name} replica l'indice ${c.proxyIdx}: per gli anni precedenti si può usare ${c.proxySym}, che segue lo stesso indice.`:""}`,
+      acts:[...(c.proxySym?[["proxy",`Estendi con ${c.proxySym} (stesso indice)`]]:[]),["exclude","Escludi dalle analisi"],["keep","Usa solo i mesi comuni"]],young:c});});
   /* portafoglio ricostruito a cui mancano strumenti: niente risultati parziali in silenzio */
   if(S.portfolio&&S.portfolio.missing&&S.portfolio.missing.length&&S.source&&S.source.kind==="rebuilt"){
     const M=S.portfolio.missing,tot=(S.lastUnd&&S.lastUnd.posizioni||[]).reduce((q,p)=>q+(p.valore||0),0),mv=M.reduce((q,m)=>q+(((S.lastUnd&&S.lastUnd.posizioni)||[]).find(p=>p.nome===m.nome)||{}).valore||0,0);
@@ -993,7 +1034,7 @@ function blockingOpen(){return (S.checks||[]).some(c=>c.block&&!c.done);}
 document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-chk]");if(!b)return;
   const id=b.dataset.chk,act=b.dataset.act,c=(S.checks||[]).find(x=>x.id===id);if(!c)return;
-  if(act==="undo"){
+  if(act==="undo"&&!c.young){
     if(c.a){const a=c.a,arr=(S.fix.adjust[a.col]||[]).filter(x=>x.k!==a.k);S.fix.adjust[a.col]=arr;S.fix.exclude[a.col]=(S.fix.exclude[a.col]||[]).filter(k=>k!==a.k);}
     if(id==="future")S.fix.dropFuture=false;
     if(id==="unsure")(c.cols||[]).forEach(i=>S.cconf.delete(i));
@@ -1001,6 +1042,8 @@ document.addEventListener("click",async e=>{
   }
   if(act==="show"){const sel=document.querySelector(`#role-${c.cols[0]}`);if(sel){const row=sel.closest("tr");row.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"center"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");}return;}
   if(act==="rebuild"){S.autoRebuilt=S.source;rebuildFromPrices();return;}
+  if(c.young&&act!=="undo"){b.disabled=true;b.textContent="Un momento…";const err=await youngDecide(c.young,act);if(err){b.disabled=false;b.textContent=err;}return;}
+  if(c.young&&act==="undo"){delete S.youngRes[c.young.name];const pf=S.portfolio,log=S.rbLog||[];load([{name:"Prezzi mensili",aoa:rbAoa()}],{name:S.source.name,size:0,kind:"rebuilt"},false);S.portfolio=pf;S.aiLog=[...log];renderImport(false);return;}
   if(id==="partial"&&act==="retry"&&S.lastUnd){S.und={...S.lastUnd,status:"ready",posizioni:S.lastUnd.posizioni.map(p=>({...p}))};S.lastSource=S.source;go("map");rebuildFromPrices();return;}
   if(c.a&&c.a.type==="flat"&&act==="drop"){S.roles[c.a.col]="ignore";S.touched[c.a.col]=true;S.res[id]=act;S.doneChecks[id]={...c};hideLab();renderImport(false);return;}
   if(id==="conflict"){S.res.conflict=act;const keep=S.conflict;S.conflict=null;if(act==="auto"){S.recipeChoice="auto";load(S.fileSheets,S.source,false,{forceAuto:true});S.res.conflict="auto";}else{S.agree=false;renderImport(false);}void keep;return;}
@@ -1858,10 +1901,11 @@ function renderOpt(){
   if(R.error){$("#opKpis").innerHTML=`<div class="kpi"><span class="eyebrow">Impossibile ottimizzare</span><span class="v txt">${esc(R.error)}</span>${rebuildHint()}</div>`;["#opChart","#opCmp","#opWeights","#opLegend"].forEach(id=>$(id).innerHTML="");$("#opCap").textContent="";S.opt=null;return;}
   const A=opEval(base.w,R.inp,R.rf),B=opEval(R.chosen,R.inp,R.rf);
   S.opt={...R,A,B,base,modeLabel:OP_L[I.mode],lo:R.O.lo,hi:R.O.hi};
-  $("#opSub").textContent=`${ds.assets.length} asset, ${R.inp.common} periodi comuni. Obiettivo: ${OP_L[I.mode]}${tgt?` ${fmtPct(I.target/100,1)}`:""}, pesi tra ${fmtPct(R.O.lo[0],0)} e ${fmtPct(R.O.hi[0],0)}${R.rf?`, tasso privo di rischio ${fmtPct(R.rf,2)}`:""}.`;
+  const yrs=R.inp.common/f,ci=Number.isFinite(B.vol)?1.96*B.vol/Math.sqrt(Math.max(yrs,1e-9)):NaN;S.opCI={yrs,ci};
+  $("#opSub").textContent=`${ds.assets.length} asset, ${R.inp.common} periodi comuni${yrs<5?` (solo ${fmtN(yrs,1)} anni: stime molto incerte)`:""}. Obiettivo: ${OP_L[I.mode]}${tgt?` ${fmtPct(I.target/100,1)}`:""}, pesi tra ${fmtPct(R.O.lo[0],0)} e ${fmtPct(R.O.hi[0],0)}${R.rf?`, tasso privo di rischio ${fmtPct(R.rf,2)}`:""}.`;
   const d=(x,y,inv,pp)=>{const v=y-x;if(!Number.isFinite(v)||Math.abs(v)<(pp?.0005:.005))return "uguale a prima";const good=inv?v<0:v>0;return `<span class="${good?"up":"dn"}">${v>0?"+":"−"}${pp?fmtN(Math.abs(v)*100,1)+" punti":fmtN(Math.abs(v))}</span> rispetto a prima`;};
   const btn=(k,v)=>`<button type="button" class="v" data-rc="op-${k}-o">${v}</button>`;
-  $("#opKpis").innerHTML=[["Rendimento atteso",btn("ret",fmtPct(B.ret,1)),d(A.ret,B.ret,false,true)],["Volatilità",btn("vol",fmtPct(B.vol,1)),d(A.vol,B.vol,true,true)],["Sharpe",btn("sharpe",fmtN(B.sharpe)),d(A.sharpe,B.sharpe,false,false)],["Max drawdown storico",btn("mdd",fmtPct(B.mdd,1)),d(A.mdd,B.mdd,false,true)]]
+  $("#opKpis").innerHTML=[["Rendimento atteso",btn("ret",fmtPct(B.ret,1)),d(A.ret,B.ret,false,true)+(S.opCI&&Number.isFinite(S.opCI.ci)?`<br><span class="${S.opCI.ci>.15?"dn":""}">incertezza ±${fmtN(S.opCI.ci*100,0)} punti al 95% (${fmtN(S.opCI.yrs,1)} anni di dati)</span>`:"")],["Volatilità",btn("vol",fmtPct(B.vol,1)),d(A.vol,B.vol,true,true)],["Sharpe",btn("sharpe",fmtN(B.sharpe)),d(A.sharpe,B.sharpe,false,false)],["Max drawdown storico",btn("mdd",fmtPct(B.mdd,1)),d(A.mdd,B.mdd,false,true)]]
     .map(k=>`<div class="kpi"><span class="eyebrow">${k[0]}</span>${k[1]}<span class="sub">${k[2]}</span></div>`).join("");
   drawFrontier();renderOpCmp();renderOpWeights();renderOpNotes();
   $("#opUse").textContent=S.optW&&S.riskW==="opt"&&S.optW.w.every((x,i)=>Math.abs(x-B.w[i])<1e-9)?"Pesi in uso nelle altre analisi ✓":"Usa questi pesi nelle altre analisi";
