@@ -888,6 +888,61 @@ function lookThrough(items){
   const rows=[...M].map(([nome,peso])=>({nome,peso})).sort((a,b)=>{const sp=n=>/^Altri|^Non classificato/.test(n);return sp(a.nome)-sp(b.nome)||b.peso-a.peso;});
   return {rows,coverage:cov,total:rows.reduce((s,r)=>s+r.peso,0)};
 }
+/* Paesi (nomi italiani delle schede justETF) → valuta e area. Zona euro in EUR. */
+const EUR_C=["Francia","Germania","Paesi Bassi","Italia","Spagna","Irlanda","Belgio","Finlandia","Austria","Portogallo","Lussemburgo","Grecia","Slovacchia","Slovenia","Estonia","Lettonia","Lituania","Croazia","Cipro","Malta"];
+const COUNTRY={"Stati Uniti":["USD","Nord America"],"Canada":["CAD","Nord America"],"Regno Unito":["GBP","Europa"],"Svizzera":["CHF","Europa"],"Svezia":["SEK","Europa"],"Danimarca":["DKK","Europa"],"Norvegia":["NOK","Europa"],
+  "Giappone":["JPY","Giappone"],"Australia":["AUD","Pacifico"],"Hong Kong":["HKD","Pacifico"],"Singapore":["SGD","Pacifico"],"Nuova Zelanda":["NZD","Pacifico"],"Israele":["ILS","Medio Oriente sviluppato"],
+  "Cina":["CNY","Emergenti"],"Taiwan":["TWD","Emergenti"],"Corea del Sud":["KRW","Emergenti"],"Corea":["KRW","Emergenti"],"India":["INR","Emergenti"],"Brasile":["BRL","Emergenti"],"Sudafrica":["ZAR","Emergenti"],"Arabia Saudita":["SAR","Emergenti"],
+  "Messico":["MXN","Emergenti"],"Indonesia":["IDR","Emergenti"],"Thailandia":["THB","Emergenti"],"Malesia":["MYR","Emergenti"],"Polonia":["PLN","Emergenti"],"Emirati Arabi Uniti":["AED","Emergenti"],"Qatar":["QAR","Emergenti"],
+  "Kuwait":["KWD","Emergenti"],"Cile":["CLP","Emergenti"],"Turchia":["TRY","Emergenti"],"Filippine":["PHP","Emergenti"],"Perù":["PEN","Emergenti"],"Colombia":["COP","Emergenti"],"Ungheria":["HUF","Emergenti"],"Repubblica Ceca":["CZK","Emergenti"]};
+EUR_C.forEach(c=>{COUNTRY[c]=["EUR","Europa"];});
+/* classe di un fondo dal «focus di investimento» di justETF (es. "Azioni, Globale, Bassa capitalizzazione") */
+function etfClass(e){const f=String(e&&e.focus||"").toLowerCase(),t=f+" "+String(e&&e.indice||"").toLowerCase()+" "+String(e&&e.nome||"").toLowerCase();
+  if(/^azion/.test(f))return "Azioni";if(/^obblig/.test(f))return "Obbligazioni";if(/^(metalli|materie|commodit)/.test(f)||/\bgold\b|\boro\b|\betc\b/.test(t))return "Materie prime";
+  if(/^immobil|real estate|reit/.test(t))return "Immobiliare";if(/^mercato monetario|money market/.test(t))return "Monetario";if(/^cripto|crypto/.test(t))return "Cripto";return f?"Altro":"Non classificato";}
+const hedged=e=>{const c=String(e&&e.copertura||"").replace(/^Con copertura valutaria\s*/i,"").trim();return !!c&&!/^(no|nessuna?|—|-)$/i.test(c);};
+/* Esposizioni del portafoglio dalle schede dei fondi. items: [{w, etf}] (etf = scheda /api/etfinfo o null).
+   Regole dichiarate: nulla viene inventato; le quote «Altri» dei fondi diventano voci a sé, attribuite a un'area solo quando il focus del fondo la dice (es. mercati emergenti). */
+function exposures(items){
+  const tot=items.reduce((s,x)=>s+(x.w>0?x.w:0),0),acc=()=>new Map(),add=(M,k,v)=>{if(v>0)M.set(k,(M.get(k)||0)+v);};
+  const cls=acc(),reg=acc(),dev=acc(),ccy=acc(),size=acc(),style=acc(),esg=acc();let cov=0,eq=0;
+  if(!(tot>0))return null;
+  items.forEach(x=>{const w=(x.w>0?x.w:0)/tot;if(!w)return;const e=x.etf&&!x.etf.error?x.etf:null;
+    if(!e){["cls","reg","ccy"].forEach(k=>add({cls,reg,ccy}[k],"Non classificato",w));add(dev,"Non classificato",w);return;}
+    cov+=w;const c=etfClass(e),f=String(e.focus||""),t=`${f} ${e.indice||""} ${e.nome||""}`,em=/emergent|emerging/i.test(t),world=/\bworld\b|globale/i.test(t)&&!/all[- ]?world|acwi|all country|emerging|emergent/i.test(t);
+    /* dove vanno le quote «Altri» del fondo: nell'area che il fondo dichiara, se ne dichiara una sola */
+    const area=em?"Emergenti":/europ/i.test(t)?"Europa":/stati uniti|\busa?\b|s&p 500|nasdaq|nord america|north america/i.test(t)?"Nord America":/giappone|japan/i.test(t)?"Giappone":world?"Altri paesi sviluppati":null;
+    const oReg=area||"Altri, non dettagliati",oDev=area==="Emergenti"?"Emergenti":area?"Sviluppati":"Non dettagliato",oCcy=area==="Emergenti"?"Valute emergenti, altre":area==="Europa"?"Valute europee, altre (anche EUR)":"Altre valute, non dettagliate";
+    add(cls,c,w);
+    const P=(e.paesi||[]).filter(p=>p&&p.peso>0),sum=P.reduce((s,p)=>s+p.peso,0);
+    /* aree e sviluppati/emergenti */
+    if(c==="Materie prime"){add(reg,"Senza area (materie prime)",w);add(dev,"Senza area (materie prime)",w);}
+    else if(!P.length){add(reg,"Non classificato",w);add(dev,"Non classificato",w);}
+    else{P.forEach(p=>{const nm=p.nome.trim(),k=COUNTRY[nm];const q=w*p.peso;
+        if(/^altr[io]$/i.test(nm)){add(reg,oReg,q);add(dev,oDev,q);}
+        else if(k){add(reg,k[1],q);add(dev,k[1]==="Emergenti"?"Emergenti":"Sviluppati",q);}
+        else{add(reg,"Altri, non dettagliati",q);add(dev,"Non dettagliato",q);}});
+      if(sum<.999){add(reg,oReg,w*(1-sum));add(dev,oDev,w*(1-sum));}}
+    /* valute: fondo coperto → euro; obbligazioni → valuta delle emissioni scritta nel focus; materie prime → dollaro; azioni → valuta dei paesi */
+    const fc=(f.match(/\b(EUR|USD|GBP|CHF|JPY|CAD|AUD|SEK|NOK|DKK|CNY)\b/)||[])[1];
+    if(hedged(e))add(ccy,"EUR",w);
+    else if(c==="Obbligazioni"&&fc)add(ccy,fc,w);
+    else if(c==="Materie prime")add(ccy,"USD",w);
+    else if(c==="Monetario")add(ccy,fc||e.valuta||"EUR",w);
+    else if(!P.length)add(ccy,"Non classificato",w);
+    else{P.forEach(p=>{const nm=p.nome.trim(),k=COUNTRY[nm];add(ccy,k?k[0]:oCcy,w*p.peso);});if(sum<.999)add(ccy,oCcy,w*(1-sum));}
+    /* stile e fattori: solo la parte azionaria, dal nome dell'indice e dal focus */
+    if(c==="Azioni"){eq+=w;
+      add(size,/bassa capitalizzazione|small ?cap/i.test(t)?"Small cap":/media capitalizzazione|mid ?cap/i.test(t)?"Mid cap":/\bIMI\b|investable market|all cap|total market|tutte le capitalizzazioni/i.test(t)?"Tutte le capitalizzazioni":"Large e mid cap",w);
+      const st=/value|valore/i.test(t)?"Value":/growth|crescita/i.test(t)?"Growth":/momentum/i.test(t)?"Momentum":/quality|qualità/i.test(t)?"Quality":/min(imum)? ?vol|bassa volatilit|low vol/i.test(t)?"Bassa volatilità":/dividend/i.test(t)?"Dividendi":/equal weight|equally weighted|equiponderat/i.test(t)?"Pesi uguali":/multi.?factor|multifattor/i.test(t)?"Multifattoriale":"Mercato (nessuno stile)";
+      add(style,st,w);add(esg,/\besg\b|\bsri\b|sostenib|socially|paris|climate|clima/i.test(t)?"Con criteri ESG":"Senza criteri ESG",w);}
+  });
+  const rows=M=>[...M].map(([nome,peso])=>({nome,peso})).sort((a,b)=>{const sp=n=>/^Altr|^Non |^Senza area|, altre/.test(n);return sp(a.nome)-sp(b.nome)||b.peso-a.peso;});
+  const rel=M=>rows(M).map(r=>({...r,peso:eq>0?r.peso/eq:0}));
+  return {cls:rows(cls),reg:rows(reg),dev:rows(dev),ccy:rows(ccy),size:rel(size),style:rel(style),esg:rel(esg),equity:eq,coverage:cov};
+}
+/* quanto costa il TER nel tempo: differenza tra crescere al rendimento lordo r e a r − TER, su un capitale V */
+function terDrag(V,ter,r,years){return V*(Math.pow(1+r,years)-Math.pow(1+r-ter,years));}
 /* costo annuo ponderato: Σ wᵢ · TERᵢ sugli strumenti con TER noto; la parte senza TER resta dichiarata */
 function weightedTer(items){
   const tot=items.reduce((s,x)=>s+(x.w>0?x.w:0),0);if(!(tot>0))return {ter:NaN,coverage:0};
@@ -1022,6 +1077,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={lookThrough,weightedTer,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

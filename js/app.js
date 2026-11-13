@@ -1274,30 +1274,72 @@ function renderMetrics(){
 /* ---------- Dove sei investito: paesi, settori e costi dei fondi dalle schede di justETF (per ISIN) ---------- */
 async function loadEtfInfo(){
   const pf=S.portfolio;if(!pf||pf.etfLoading||pf.etfDone)return;
-  const list=pf.positions.filter(p=>p.isin&&/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.isin));if(!list.length){pf.etfDone=true;return;}
   pf.etfLoading=true;renderLook();
+  /* strumenti senza ISIN nel file: l'IA lo propone dal ticker e dal nome, il server lo verifica su OpenFIGI; si usano solo quelli verificati */
+  const noIsin=pf.positions.filter(p=>!(p.isin&&ISIN_RX.test(p.isin)));
+  if(noIsin.length&&!pf.isinSearched){pf.isinSearched=true;pf.isinStatus="loading";renderLook();
+    try{const r=await fetch("/api/findisin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({strumenti:noIsin.map(p=>({nome:p.nome||"",ticker:p.ticker||"",simbolo:p.simbolo||""}))}),signal:AbortSignal.timeout(60000)});
+      const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||`Errore ${r.status}`);
+      (j.risultati||[]).forEach(x=>{const p=noIsin[x.indice];if(!p)return;if(x.verificato&&x.isin){p.isin=x.isin;p.isinFound={via:x.via,motivo:x.motivo};}else p.isinMiss=x.isin?`${x.isin} proposto ma scartato: ${x.motivo}`:x.motivo;});
+      pf.isinStatus="done";}catch(e){pf.isinStatus="error";pf.isinErr=e instanceof TypeError?"ricerca ISIN non raggiungibile":String(e.message||e);}}
+  const list=pf.positions.filter(p=>p.isin&&ISIN_RX.test(p.isin));if(!list.length){pf.etfLoading=false;pf.etfDone=true;renderLook();return;}
   for(const p of list){const j=await getJSON(`/api/etfinfo?isin=${p.isin}`);p.etf=j&&!j.error?j:{error:(j&&j.error)||"non disponibile"};renderLook();}
   pf.etfLoading=false;pf.etfDone=true;renderLook();
 }
+const LOOK_TABS=[["geo","Aree e paesi"],["ccy","Valute"],["style","Classi e stile"],["sect","Settori"],["ter","Costi (TER)"]];
+document.addEventListener("click",e=>{const b=e.target.closest("[data-look]");if(!b)return;S.lookTab=b.dataset.look;renderLook();});
 function renderLook(){
   const card=$("#lookCard"),body=$("#lookBody");if(!card||!body)return;
   const pf=S.portfolio,ds=S.ds;if(!pf||!S.lab||!ds||!ds.ok){card.hidden=true;return;}
   card.hidden=false;
   const tot=pf.positions.reduce((q,p)=>q+(p.valore||0),0);
-  const items=pf.positions.map(p=>({nome:p.ticker||p.nome,w:tot?(p.valore||0)/tot:1/pf.positions.length,etf:p.etf,isin:p.isin}));
-  if(!pf.positions.some(p=>p.isin)){body.innerHTML=`<p style="color:var(--muted)">Per sapere in quali paesi e settori sei investito servono gli ISIN dei fondi: nel file non ci sono. Aggiungili nel file (una colonna «ISIN») e ricaricalo.</p>`;return;}
+  const items=pf.positions.map(p=>({nome:p.ticker||p.nome,w:tot?(p.valore||0)/tot:1/pf.positions.length,etf:p.etf,isin:p.isin,p}));
+  if(pf.isinStatus==="loading"){body.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Nel file mancano alcuni ISIN: li cerco dal ticker e dal nome, e verifico ognuno su OpenFIGI…</span></div>`;return;}
   if(pf.etfLoading&&!items.some(x=>x.etf)){body.innerHTML=`<div class="thinking"><i></i><i></i><i></i><span>Leggo le schede dei fondi su justETF…</span></div>`;return;}
-  const L=k=>P.lookThrough(items.map(x=>({w:x.w,parti:x.etf&&!x.etf.error?x.etf[k]:null}))),C=L("paesi"),Se=L("settori");
-  const T=P.weightedTer(items.map(x=>({w:x.w,ter:x.etf&&!x.etf.error?x.etf.ter:NaN})));
-  const bars=(R,col)=>`<ul class="look">${[...R.rows.filter(r=>!/^Altri|^Non classificato/.test(r.nome)).slice(0,10),...R.rows.filter(r=>/^Altri|^Non classificato/.test(r.nome))].map(r=>`<li class="${/^Altri|^Non classificato/.test(r.nome)?"oth":""}"><span>${esc(r.nome)}</span><i><em style="width:${Math.min(100,r.peso*100/Math.max(...R.rows.map(x=>x.peso)))}%;background:${col}"></em></i><b>${fmtPct(r.peso,1)}</b></li>`).join("")}</ul>`;
-  const per=items.map(x=>{const e=x.etf;return `<tr><td><span class="an">${esc(x.nome)}</span>${e&&!e.error?`<span class="cl">${esc(e.nome||"")}</span>`:""}</td><td class="mono">${fmtPct(x.w,1)}</td><td class="mono">${e&&!e.error&&Number.isFinite(e.ter)?fmtPct(e.ter,2):"—"}</td><td>${e&&!e.error?esc([e.focus,e.indice].filter(Boolean).join(" · ")):`<span class="cl">${x.isin?esc(e?e.error:"in caricamento…"):"senza ISIN: non classificato"}</span>`}</td><td class="mono">${e&&!e.error?esc([e.valuta,e.copertura&&!/^no$/i.test(e.copertura.replace(/^Con copertura valutaria\s*/i,""))?"coperto":null,(e.distribuzione||"").toLowerCase()].filter(Boolean).join(" · ")):""}</td></tr>`;}).join("");
-  const read=items.map(x=>x.etf&&!x.etf.error&&x.etf.letto).filter(Boolean).sort()[0];
-  body.innerHTML=`<div class="look-grid"><div><h4>Paesi</h4>${bars(C,"var(--c1)")}</div><div><h4>Settori</h4>${bars(Se,"var(--c3)")}</div></div>
-    <div class="look-kpi"><div><span class="eyebrow">Costo annuo medio (TER)</span><b>${Number.isFinite(T.ter)?fmtPct(T.ter,2):"—"}</b><small>${Number.isFinite(T.ter)?`≈ ${fmtN(T.ter*tot,0)} € l'anno su ${fmtN(tot,0)} €${T.coverage<.999?` · TER noto per il ${fmtPct(T.coverage,0)} del portafoglio`:""}`:"TER non disponibile"}</small></div>
-      <div><span class="eyebrow">Copertura dei dati</span><b>${fmtPct(C.coverage,0)}</b><small>quota del portafoglio con composizione nota${pf.etfLoading?" · ancora in caricamento":""}</small></div></div>
-    <div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>Peso</th><th>TER</th><th>Esposizione</th><th>Valuta · tipo</th></tr></thead><tbody>${per}</tbody></table></div>
-    <p class="caption">Composizione look-through: peso del paese = Σ peso del fondo × quota del paese nel fondo. Ogni scheda justETF pubblica i primi 4 paesi e settori più «Altri»: quella parte resta in «Altri, non dettagliati», senza ridistribuirla. I fondi senza ISIN o senza scheda restano «Non classificato». Il TER è il costo dichiarato dall'emittente; non comprende commissioni di acquisto, spread e imposte. Fonte: justETF, schede lette il ${read?read.split("-").reverse().join("/"):"—"}.</p>`;
+  if(!items.some(x=>x.isin)){body.innerHTML=`<p style="color:var(--muted)">Per sapere dove sei investito servono gli ISIN dei fondi. Nel file non ci sono e non sono riuscito a trovarli con certezza${pf.isinErr?` (${esc(pf.isinErr)})`:""}: aggiungi una colonna «ISIN» nel file e ricaricalo.</p>`;return;}
+  const ok=x=>x.etf&&!x.etf.error;
+  const L=k=>P.lookThrough(items.map(x=>({w:x.w,parti:ok(x)?x.etf[k]:null}))),C=L("paesi"),Se=L("settori");
+  const X=P.exposures(items.map(x=>({w:x.w,etf:ok(x)?x.etf:null})));
+  const T=P.weightedTer(items.map(x=>({w:x.w,ter:ok(x)?x.etf.ter:NaN})));
+  const sp=n=>/^Altr|^Non |^Senza area|, altre|Non dettagliato/.test(n);
+  const bars=(rows,col,lim=10)=>{const mx=Math.max(...rows.map(x=>x.peso),1e-9);return `<ul class="look">${[...rows.filter(r=>!sp(r.nome)).slice(0,lim),...rows.filter(r=>sp(r.nome))].map(r=>`<li class="${sp(r.nome)?"oth":""}"><span>${esc(r.nome)}</span><i><em style="width:${Math.min(100,r.peso*100/mx)}%;background:${col}"></em></i><b>${fmtPct(r.peso,1)}</b></li>`).join("")}</ul>`;};
+  const get=(rows,n)=>(rows.find(r=>r.nome===n)||{peso:0}).peso;
+  /* fuori dall'euro: valute note + quote «altre» (le emergenti sono comunque non euro, le europee possono contenere euro) → intervallo */
+  const isOth=n=>/, altre|non dettagliate/.test(n);
+  const nonEur=X?X.ccy.filter(r=>r.nome!=="EUR"&&r.nome!=="Non classificato"&&!isOth(r.nome)).reduce((s,r)=>s+r.peso,0):NaN,emOth=X?get(X.ccy,"Valute emergenti, altre"):0,unk=X?X.ccy.filter(r=>isOth(r.nome)).reduce((s,r)=>s+r.peso,0):0,emg=X?get(X.dev,"Emergenti"):NaN;
+  const nonEurMin=nonEur+emOth,nonEurMax=nonEur+unk,neTxt=Math.round(nonEurMax*100)>Math.round(nonEurMin*100)?`${fmtN(nonEurMin*100,0)}–${fmtPct(nonEurMax,0)}`:fmtPct(nonEurMin,0);
+  const tab=S.lookTab||"geo";
+  let main="";
+  if(tab==="geo")main=`<div class="look-grid"><div><h4>Aree</h4>${bars(X.reg,"var(--c1)")}<h4 style="margin-top:18px">Sviluppati ed emergenti</h4>${bars(X.dev,"var(--c2)")}</div><div><h4>Paesi</h4>${bars(C.rows,"var(--c1)")}</div></div>
+    <p class="caption">Le quote «Altri» di ogni fondo vengono assegnate a un'area solo quando il fondo la dichiara: «Altri» di un ETF sui mercati emergenti vanno negli Emergenti, quelli di un ETF MSCI World tra gli altri paesi sviluppati. Il resto rimane «non dettagliato».</p>`;
+  else if(tab==="ccy"){const usd=get(X.ccy,"USD");main=`<div class="look-grid"><div><h4>Valute a cui sei esposto</h4>${bars(X.ccy,"var(--c2)")}</div><div><h4>Cosa significa</h4>
+    <p style="color:var(--muted);margin:0 0 10px">${nonEurMax-nonEurMin>.005?`Tra ${artIl(nonEurMin)}<b style="color:var(--fg)">${fmtPct(nonEurMin,0)}</b> e ${artIl(nonEurMax)}<b style="color:var(--fg)">${fmtPct(nonEurMax,0)}</b>`:`${artIl(nonEurMin).replace(/^./,c=>c.toUpperCase())}<b style="color:var(--fg)">${fmtPct(nonEurMin,0)}</b>`} del portafoglio dipende da valute diverse dall'euro, anche se gli ETF sono quotati in euro: conta la valuta delle aziende e dei titoli dentro il fondo, non quella del listino.</p>
+    ${usd>0?`<p style="color:var(--muted);margin:0 0 10px">Se il dollaro perdesse il 10% sull'euro, a parità di tutto il resto il portafoglio perderebbe circa <b style="color:var(--fg)">${fmtPct(usd*.1,1)}</b>${tot?` (≈ ${fmtEur(usd*.1*tot)})`:""}.</p>`:""}
+    <p class="caption" style="margin:0">Regole: fondo con copertura valutaria → euro; obbligazioni → valuta delle emissioni indicata nel focus del fondo; oro e materie prime → dollaro; azioni → valuta di ogni paese (zona euro = EUR).</p></div></div>`;}
+  else if(tab==="style"){main=`<div class="look-grid"><div><h4>Classi di attivo</h4>${bars(X.cls,"var(--c3)")}</div><div>${X.equity>0?`<h4>Dimensione · parte azionaria</h4>${bars(X.size,"var(--c1)")}<h4 style="margin-top:18px">Stile e fattori · parte azionaria</h4>${bars(X.style,"var(--c2)")}<h4 style="margin-top:18px">Criteri ESG · parte azionaria</h4>${bars(X.esg,"var(--c3)")}`:`<p style="color:var(--muted)">Nessun fondo azionario: dimensione e stile non si applicano.</p>`}</div></div>
+    <p class="caption">Classi, dimensione e stile sono letti dal focus e dal nome dell'indice di ogni fondo (per esempio «Bassa capitalizzazione», «Value», «Minimum Volatility»). Un ETF a capitalizzazione di mercato senza stile è «Mercato»: è l'esposizione neutra ai fattori.</p>`;}
+  else if(tab==="sect")main=`<div class="look-grid"><div><h4>Settori</h4>${bars(Se.rows,"var(--c3)")}</div><div><h4>Come leggerlo</h4><p style="color:var(--muted);margin:0">Ogni scheda justETF pubblica i primi 4 settori di ogni fondo più «Altri»: quella parte resta «Altri, non dettagliati» e non viene ridistribuita. Per le obbligazioni i settori sono quelli degli emittenti.</p></div></div>`;
+  else{const r=.05,rowsT=items.map(x=>{const v=tot*x.w,t=ok(x)&&Number.isFinite(x.etf.ter)?x.etf.ter:NaN;return {x,v,t,y:v*t,d10:Number.isFinite(t)?P.terDrag(v,t,r,10):NaN,d20:Number.isFinite(t)?P.terDrag(v,t,r,20):NaN};});
+    const sum=k=>rowsT.reduce((s,q)=>s+(Number.isFinite(q[k])?q[k]:0),0),eur=v=>!Number.isFinite(v)?"—":Math.abs(v)<10?fmtN(v,2)+" €":fmtEur(v);
+    main=`<div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>Valore</th><th>TER</th><th>Costo l'anno</th><th>In 10 anni</th><th>In 20 anni</th></tr></thead><tbody>${rowsT.sort((a,b)=>(b.t||0)-(a.t||0)).map(q=>`<tr><td><span class="an">${esc(q.x.nome)}</span></td><td class="mono">${eur(q.v)}</td><td class="mono">${Number.isFinite(q.t)?fmtPct(q.t,2):"—"}</td><td class="mono">${eur(q.y)}</td><td class="mono">${eur(q.d10)}</td><td class="mono">${eur(q.d20)}</td></tr>`).join("")}
+      <tr class="pf"><td><b>Totale</b></td><td class="mono">${eur(tot)}</td><td class="mono">${Number.isFinite(T.ter)?fmtPct(T.ter,2):"—"}</td><td class="mono">${eur(sum("y"))}</td><td class="mono">${eur(sum("d10"))}</td><td class="mono">${eur(sum("d20"))}</td></tr></tbody></table></div>
+      <p class="caption">«In 10/20 anni» è quanto capitale in meno avresti per colpa del TER, senza nuovi versamenti, se il fondo rendesse il 5% l'anno lordo: V · [(1 + 5%)ⁿ − (1 + 5% − TER)ⁿ]. Include l'effetto composto (i costi pagati non rendono più). Non comprende commissioni di acquisto, spread, bollo e imposte. Il TER è dichiarato dall'emittente ed è già tolto dai prezzi: le analisi del sito lo includono già.</p>`;}
+  const per=items.map(x=>{const e=x.etf,src=x.p.isinFound?`<span class="cl">trovato dall'IA, verificato con ${x.p.isinFound.via==="ticker"?"il ticker":"il nome"} su OpenFIGI</span>`:x.isin?"":`<span class="cl">${esc(x.p.isinMiss||"non presente nel file")}</span>`;
+    return `<tr><td><span class="an">${esc(x.nome)}</span>${ok(x)?`<span class="cl">${esc(e.nome||"")}</span>`:""}</td><td class="mono">${x.isin?esc(x.isin):"—"}${src}</td><td class="mono">${fmtPct(x.w,1)}</td><td>${ok(x)?esc([e.focus,e.indice].filter(Boolean).join(" · ")):`<span class="cl">${x.isin?esc(e?e.error:"in caricamento…"):"non classificato"}</span>`}</td><td class="mono">${ok(x)?esc([e.valuta,hedgedTxt(e),(e.distribuzione||"").toLowerCase()].filter(Boolean).join(" · ")):""}</td></tr>`;}).join("");
+  const read=items.map(x=>ok(x)&&x.etf.letto).filter(Boolean).sort()[0],found=items.filter(x=>x.p.isinFound).length;
+  body.innerHTML=`<div class="look-kpi k4"><div><span class="eyebrow">Costo annuo medio (TER)</span><b>${Number.isFinite(T.ter)?fmtPct(T.ter,2):"—"}</b><small>${Number.isFinite(T.ter)?`≈ ${T.ter*tot<10?fmtN(T.ter*tot,2)+" €":fmtEur(T.ter*tot)} l'anno${T.coverage<.999?` · noto per il ${fmtPct(T.coverage,0)}`:""}`:"TER non disponibile"}</small></div>
+      <div><span class="eyebrow">Fuori dall'euro</span><b>${Number.isFinite(nonEur)?neTxt:"—"}</b><small>esposto ad altre valute${nonEurMax-nonEurMin>.005?" · intervallo per le quote non dettagliate":""}</small></div>
+      <div><span class="eyebrow">Mercati emergenti</span><b>${Number.isFinite(emg)?fmtPct(emg,0):"—"}</b><small>del portafoglio</small></div>
+      <div><span class="eyebrow">Copertura dei dati</span><b>${fmtPct(C.coverage,0)}</b><small>con composizione nota${pf.etfLoading?" · in caricamento":""}</small></div></div>
+    <div class="seg look-tabs" role="tablist" aria-label="Vista della composizione">${LOOK_TABS.map(([k,l])=>`<button type="button" role="tab" data-look="${k}" aria-pressed="${tab===k}" aria-selected="${tab===k}">${l}</button>`).join("")}</div>
+    <div class="look-main">${main}</div>
+    <h4 class="look-h">Strumenti</h4>
+    <div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>ISIN</th><th>Peso</th><th>Esposizione</th><th>Valuta · tipo</th></tr></thead><tbody>${per}</tbody></table></div>
+    <p class="caption">Composizione look-through: peso del paese = Σ peso del fondo × quota del paese nel fondo.${found?` ${found} ISIN mancanti nel file sono stati trovati dall'IA e usati solo dopo la verifica su OpenFIGI.`:""} Fonte: justETF, schede lette il ${read?read.split("-").reverse().join("/"):"—"}.</p>`;
 }
+/* articolo davanti a una percentuale: «l'8%», «l'11%», «l'84%», altrimenti «il» */
+const artIl=v=>/^(8|11(?!\d))/.test(String(Math.round(v*100)))?"l'":"il ";
+const hedgedTxt=e=>{const c=String(e.copertura||"").replace(/^Con copertura valutaria\s*/i,"").trim();return c&&!/^(no|nessuna?)$/i.test(c)?"coperto":null;};
 function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;
   const starts=ds.assets.map(a=>({n:a.name,k:Math.max(0,a.first-1)})),late=starts.filter(s=>s.k>Math.min(...starts.map(x=>x.k))+1),gc=$("#growthNote");
@@ -2672,7 +2714,7 @@ requestAnimationFrame(movePill);
 if(!HAS_G)heroIntro();
 renderPager("home");
 /* per i test automatici: caricare fogli come se fossero un file e leggere cosa ha capito il sito */
-window.__pos={loadSheets:(sheets,name)=>load(sheets,{name:name||"prova.xlsx",size:0,kind:"file"},true),
+window.__pos={pf:()=>S.portfolio,loadEtfInfo:()=>loadEtfInfo(),loadSheets:(sheets,name)=>load(sheets,{name:name||"prova.xlsx",size:0,kind:"file"},true),
   state:()=>({recipe:S.recipe?{status:S.recipe.status,tipo:S.recipe.r&&S.recipe.r.tipoFile,raw:S.recipe.r&&{c:S.recipe.r.serieInColonna,m:S.recipe.r.matriciRendimenti,provider:S.recipe.r.provider},errors:S.recipe.errors||[],msg:S.recipe.msg||null}:null,sheet:an()&&an().name,
     assets:S.ds&&S.ds.ok?S.ds.assets.map(a=>`${a.name}:${a.role}`):[],obs:S.ds&&S.ds.ok?S.ds.nObs:0,
     und:S.und&&S.und.posizioni?S.und.posizioni.map(p=>`${p.ticker}→${p.simbolo}`):null,sheets:S.sheets.map(s=>s.name),
