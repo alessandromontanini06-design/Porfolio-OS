@@ -969,8 +969,12 @@ async function rebuildFromPrices(o={}){
   S.und={...u,posizioni:pos,status:"rebuilding",err:null,progress:""};renderAI();
   const prog=t=>{if(S.und&&S.und.status==="rebuilding"){S.und.progress=t;renderAI();}};
   try{
+    /* con l'ISIN nel file comanda l'ISIN (identificativo ufficiale): il simbolo suggerito (dall'IA o indovinato) diventa una riserva.
+       Un simbolo cambiato a mano dall'utente nella tabella resta il primo. */
+    pos.forEach((p,i)=>{const sug=String((u.posizioni[i]||{}).simbolo||"").trim().toUpperCase();if(p.isin&&ISIN_RX.test(p.isin)&&p.simbolo&&p.simbolo===sug){p.simboloHint=p.simbolo;p.simbolo="";}});
     prog("Cerco i simboli di borsa degli ISIN…");
     const isinLog=await resolveIsins(pos);
+    pos.forEach(p=>{if(!p.simboloHint)return;if(!p.simbolo)p.simbolo=p.simboloHint;else if(p.simboloHint!==p.simbolo)p.alt=[...(p.alt||[]).filter(x=>x!==p.simboloHint),p.simboloHint];});
     const noSym=pos.filter(p=>!p.simbolo);pos=pos.filter(p=>p.simbolo);
     if(!pos.length)throw new Error("Nessuno strumento ha un simbolo di borsa: scrivilo nella colonna «Simbolo per i prezzi».");
     // Un ETF per richiesta: la rete di Vercel conserva ogni serie 24 ore e la condivide tra tutti i visitatori.
