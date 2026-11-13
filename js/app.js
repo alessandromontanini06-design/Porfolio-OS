@@ -20,10 +20,10 @@ const fmtSize=b=>b<1024?b+" B":b<1048576?fmtN(b/1024,0)+" KB":fmtN(b/1048576,1)+
 const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,corrView:"net",scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null,macro:null,rfSrc:"ecb"};
 
 /* ---------- Scene e dock ---------- */
-const SCENES=["home","scan","map","lab","risk","sim","stress","opt","bench","games"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",stress:"Stress test",opt:"Frontiera",bench:"Benchmark",games:"Giochi"};
+const SCENES=["home","scan","map","lab","risk","sim","stress","opt","bench"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
 let current="home";
 /* colore d'accento di ogni sezione (lo stesso del CSS) */
-const ACC={home:"212,255,58",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165",games:"122,162,255"};
+const ACC={home:"212,255,58",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165"};
 /* la pillola del dock insegue il pulsante attivo con una molla, anche mentre l'etichetta si allarga */
 const pillS={x:0,w:0,on:false,until:0};
 function movePill(){pillS.until=performance.now()+900;if(pillS.on)return;pillS.on=true;
@@ -94,7 +94,6 @@ function onEnter(name){
   if(name==="stress")renderStress();
   if(name==="opt")renderOpt();
   if(name==="bench")renderBench();
-  if(name==="games")renderGames();
   if(name==="lab"&&S.lab&&!S.labFx.done){S.labFx.done=true;setTimeout(()=>{if(!S.lab)return;countAll();drawChart(true);if(S.corrView==="net")buildNet();},HAS_G?380:0);}
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!b||b.disabled||b.classList.contains("off"))return;go(b.dataset.go);});
@@ -218,7 +217,7 @@ if(HAS_G){
 const Morph={on:false,shape(){},cur:{x:0,y:0,s:1,a:1},goal:{x:0,y:0,s:1,a:1},mx:0,my:0,vis:true};
 function morphPlace(name){
   const narrow=window.innerWidth<820;
-  const P={home:narrow?{x:0,y:.6,s:.85,a:.45}:{x:1.5,y:.05,s:1.4,a:.62},scan:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.4,y:1.4,s:.72,a:.34},map:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.6,y:-1.1,s:.7,a:.3},lab:{x:0,y:0,s:1.3,a:.16},risk:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.3,y:-1.3,s:.72,a:.32},sim:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},stress:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.3,s:.75,a:.3},opt:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},bench:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},games:narrow?{x:0,y:2.2,s:.65,a:.3}:{x:3,y:-1,s:.85,a:.45}};
+  const P={home:narrow?{x:0,y:.6,s:.85,a:.45}:{x:1.5,y:.05,s:1.4,a:.62},scan:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.4,y:1.4,s:.72,a:.34},map:narrow?{x:0,y:2.6,s:.6,a:.22}:{x:3.6,y:-1.1,s:.7,a:.3},lab:{x:0,y:0,s:1.3,a:.16},risk:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.3,y:-1.3,s:.72,a:.32},sim:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},stress:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.3,s:.75,a:.3},opt:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3},bench:narrow?{x:0,y:2.4,s:.6,a:.22}:{x:3.2,y:-1.2,s:.75,a:.3}};
   return P[name]||P.home;
 }
 function morphShape(name){
@@ -323,7 +322,7 @@ function morphInit(){
   Object.assign(Morph,{on:true,renderer,scene,cam,group,geo,pos,tgt,spd,N,mat,U,halo});
   Morph.shape=name=>{Morph.tgt.set(morphShape(name));Morph.goal=morphPlace(name);};
   /* ogni sezione tinge le particelle del suo colore (casa e laboratorio restano viola e lime) */
-  const TINT={risk:[1,.48,.24],sim:[.28,.9,1],stress:[1,.76,.29],opt:[1,.48,.85],bench:[.36,.94,.65],games:[.48,.64,1]};
+  const TINT={risk:[1,.48,.24],sim:[.28,.9,1],stress:[1,.76,.29],opt:[1,.48,.85],bench:[.36,.94,.65]};
   Morph.tint=name=>{const t=TINT[name],v=U.uTint.value;if(!HAS_G){if(t)v.set(...t);U.uTintK.value=t?1:0;return;}if(t)G.to(v,{x:t[0],y:t[1],z:t[2],duration:1.2,ease:"power2.out"});G.to(U.uTintK,{value:t?1:0,duration:1.2,ease:"power2.out"});};
   /* esplosione: le particelle schizzano verso l'esterno e si ricompongono nella forma della nuova sezione */
   Morph.burst=(power=1)=>{
@@ -2515,18 +2514,13 @@ $("#closeDrawer").addEventListener("click",closeReceipt);
 $("#scrim").addEventListener("click",closeReceipt);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeReceipt();});
 
-/* ---------- Home: terminale con dati ufficiali BCE e mappa dei 10 laboratori ---------- */
+/* ---------- Home: terminale con dati ufficiali BCE e mappa dei laboratori ---------- */
 const LABS=[
   {n:"01",t:"Portfolio Intelligence",d:"Metriche, rischio, contributi, benchmark e il tuo rendimento reale.",c:"var(--lime)",go:"lab",g:"M4 20 10 12l4 4 8-11"},
   {n:"02",t:"Simulation Lab",d:"Monte Carlo con versamenti, prelievi, inflazione e probabilità di obiettivo.",c:"var(--c3)",go:"sim",g:"M3 18c5 0 6-12 9-12s4 8 9 8M3 18c5 0 7-6 9-6s5 3 9 3"},
   {n:"03",t:"Crisis Room",d:"Dot-com, 2008, debito euro, COVID, inflazione 2022 e i tuoi shock.",c:"var(--bad)",go:"stress",g:"M3 6l6 8 4-4 8 10"},
   {n:"04",t:"Quant Lab",d:"Frontiera efficiente, ottimizzatori, VaR a tre metodi, test statistici.",c:"var(--c2)",go:"opt",g:"M4 20C6 10 11 5 20 4M8 15h.01M13 10h.01M17 8h.01"},
-  {n:"05",t:"Strategy Arena",d:"Backtest e strategie a confronto nelle stesse condizioni.",c:"var(--warn)",soon:true,g:"M5 19l7-14 7 14M8 13h8"},
-  {n:"06",t:"Macro & Economy",d:"Curva dei tassi, inflazione, obbligazioni, duration.",c:"var(--good)",soon:true,g:"M3 17c4-8 8-10 18-10M3 21h18"},
-  {n:"07",t:"Behavioral Lab",d:"Panico, avversione alle perdite, market timing: provali sulla tua pelle.",c:"var(--c4)",soon:true,g:"M12 21c5-3 8-7 8-11a8 8 0 1 0-16 0c0 4 3 8 8 11z"},
-  {n:"08",t:"AI Research",d:"Quanta: fai domande, lei chiede i numeri al motore e te li spiega.",c:"var(--lime)",chat:true,g:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"},
-  {n:"09",t:"Financial Games",d:"Sopravvivi alle crisi mese per mese, batti la frontiera: sfide sui dati veri.",c:"#7AA2FF",go:"games",free:true,g:"M6 12h4M8 10v4M15 11h.01M18 13h.01M3 9a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"},
-  {n:"10",t:"Academy & Workspace",d:"Formule, glossario, analisi salvate e report.",c:"var(--muted)",soon:true,g:"M4 5h7v14H4zM13 5h7v14h-7z"}
+  {n:"05",t:"AI Research",d:"Quanta: fai domande, lei chiede i numeri al motore e te li spiega.",c:"var(--lime)",chat:true,g:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"}
 ];
 function renderLabs(){
   const el=$("#labsGrid");if(!el)return;
@@ -2558,114 +2552,6 @@ async function loadMarket(){
   $("#mktNote").textContent="Fonte: Banca centrale europea, data-api.ecb.europa.eu. Ultimo dato mensile disponibile.";
 }
 
-/* ---------- Financial Games ---------- */
-const GAMES=[
-  {id:"blackswan",n:"01",t:"BLACK SWAN · The Last Portfolio",d:"Gestisci 1.000.000 € dentro una crisi vera, giorno per giorno: eventi, decisioni, War Room e un'autopsia finale di ogni tua scelta.",tag:"dati storici giornalieri reali"},
-  {id:"frontier",n:"02",t:"Batti la frontiera",d:"Costruisci a mano il portafoglio più efficiente con i tuoi asset entro un limite di rischio. Il motore ti dà il voto.",tag:"i tuoi dati"},
-  {id:"timing",n:"03",t:"Market Timing Challenge",d:"Indovina i mesi migliori per entrare e uscire.",soon:true},
-  {id:"bubble",n:"04",t:"Bubble Detective",d:"Riconosci una bolla prima che scoppi.",soon:true},
-  {id:"div",n:"05",t:"Diversification Challenge",d:"Riduci il rischio senza sacrificare il rendimento.",soon:true}];
-const GM={game:null};
-function renderGames(){
-  if(GM.game){$("#gmHub").hidden=true;$("#gmPlay").hidden=false;return;}
-  $("#gmPlay").hidden=true;$("#gmHub").hidden=false;
-  $("#gmHub").innerHTML=GAMES.map(g=>`<button type="button" class="gm-card${g.soon?" soon":""}" ${g.soon?"disabled":`data-game="${g.id}"`}>
-    <span class="gm-n">${g.n}</span><b>${g.t}</b><span class="gm-d">${g.d}</span>
-    <span class="gm-tag">${g.soon?"in arrivo":g.id==="frontier"&&!S.lab?"serve un file nel laboratorio":g.tag}</span>${g.soon?"":`<span class="gm-play-b">Gioca →</span>`}</button>`).join("");
-}
-document.addEventListener("click",e=>{
-  const g=e.target.closest("[data-game]");if(g){if(g.dataset.game==="blackswan"){import("./games/blackswan-ui.js").then(m=>m.open({P,go,SFX})).catch(err=>alert("Non riesco a caricare il gioco: "+err.message));return;}GM.game=g.dataset.game;fxStart();renderGames();return;}
-  if(e.target.closest("[data-gm-back]")){GM.game=null;GM.sv=null;renderGames();}
-});
-/* --- Suoni sintetizzati (nessun file esterno), disattivabili --- */
-const SFX={ctx:null,on:(()=>{try{return localStorage.getItem("pos-sfx")!=="0";}catch{return true;}})(),
-  ac(){if(!this.on)return null;if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;this.ctx=new A();}if(this.ctx.state==="suspended")this.ctx.resume();return this.ctx;},
-  tone(f,d,type,vol,to,delay){const a=this.ac();if(!a)return;const t=a.currentTime+(delay||0),o=a.createOscillator(),g=a.createGain();o.type=type||"sine";o.frequency.setValueAtTime(f,t);if(to)o.frequency.exponentialRampToValueAtTime(to,t+d);
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol||.08,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(a.destination);o.start(t);o.stop(t+d+.02);},
-  noise(d,vol,cut){const a=this.ac();if(!a)return;const n=a.sampleRate*d,b=a.createBuffer(1,n,a.sampleRate),c=b.getChannelData(0);for(let i=0;i<n;i++)c[i]=(Math.random()*2-1)*(1-i/n);
-    const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();f.type="lowpass";f.frequency.value=cut||900;g.gain.value=vol||.2;s.buffer=b;s.connect(f).connect(g).connect(a.destination);s.start();},
-  tick(){this.tone(1200,.035,"square",.018);},
-  crash(){this.noise(.6,.28,700);this.tone(160,.55,"sawtooth",.07,45);},
-  gain(){[660,880,1320].forEach((f,i)=>this.tone(f,.12,"triangle",.06,null,i*.06));},
-  alarm(){[0,.18,.36].forEach(d=>{this.tone(880,.12,"square",.035,null,d);this.tone(660,.12,"square",.035,null,d+.09);});},
-  beep(h){this.tone(h?1320:660,.14,"sine",.09);},
-  win(){[523,659,784,1046,1318].forEach((f,i)=>this.tone(f,.22,"triangle",.07,null,i*.09));},
-  lose(){[392,330,262,196].forEach((f,i)=>this.tone(f,.28,"sawtooth",.04,null,i*.13));},
-  toggle(){this.on=!this.on;try{localStorage.setItem("pos-sfx",this.on?"1":"0");}catch{}return this.on;}
-};
-const svBest=()=>{try{return JSON.parse(localStorage.getItem("pos-sv-best")||"{}");}catch{return {};}};
-const svSaveBest=(id,s)=>{try{const b=svBest();if(!(b[id]>=s)){b[id]=s;localStorage.setItem("pos-sv-best",JSON.stringify(b));return true;}}catch{}return false;};
-
-window.__SFX=SFX; // condiviso con il modulo di BLACK SWAN
-/* --- Gioco 2: Batti la frontiera, 3 round a tempo; il file si carica dal gioco --- */
-const FX_ROUND_S=45;
-async function fxLoadFile(file){
-  const msg=$("#fxMsg");if(msg)msg.textContent="Leggo il file…";
-  try{
-    const ext=(file.name.split(".").pop()||"").toLowerCase();let sheets;
-    if(ext==="csv"||ext==="txt"){const buf=await file.arrayBuffer();let text=new TextDecoder("utf-8").decode(buf);if(text.includes(String.fromCharCode(0xFFFD)))text=new TextDecoder("windows-1252").decode(buf);sheets=[{name:file.name.replace(/\.[^.]+$/,""),aoa:P.parseCSV(text)}];}
-    else if(["xlsx","xls","xlsm"].includes(ext)){if(!window.XLSX)throw new Error("Il lettore Excel non si è caricato: ricarica la pagina.");const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));}
-    else throw new Error(`Formato .${ext} non supportato: usa .xlsx, .xls o .csv.`);
-    fxUse(sheets,{name:file.name,size:file.size,kind:"file"});
-  }catch(e){if(msg)msg.textContent=String(e.message||e);}
-}
-/* carica i dati senza lasciare il gioco: le colonne dubbie vengono escluse, poi il laboratorio si costruisce in silenzio */
-function fxUse(sheets,source){
-  load(sheets,source,false);
-  an().cols.forEach(c=>{if(S.roles[c.idx]==null)S.roles[c.idx]="ignore";});renderImport(false);
-  const msg=$("#fxMsg");
-  if(!S.ds||!S.ds.ok||S.ds.assets.length<2){if(msg)msg.textContent=S.ds&&S.ds.ok?"Il file ha un solo asset: servono almeno due serie di prezzi o rendimenti.":`Non riesco a usare il file così com'è${S.ds&&S.ds.Q.errors[0]?": "+S.ds.Q.errors[0]:""}. Sistemalo nella Mappa o prova l'esempio.`;return;}
-  showLab(true,true);fxStart();
-}
-function fxStart(){
-  const el=$("#gmPlay");el.hidden=false;
-  if(!S.lab||!S.ds||S.ds.assets.length<2){
-    el.innerHTML=`<div class="card gm-panel"><div class="head"><div><span class="eyebrow">Gioco 02</span><h3 style="margin-top:4px">Batti la frontiera</h3></div><button type="button" class="btn sm" data-gm-back>← Tutti i giochi</button></div>
-      <p class="gm-lead">3 round a tempo: costruisci il portafoglio con il massimo rendimento sotto un limite di rischio, ogni volta più alto. Servono almeno due asset: carica il tuo file qui, senza uscire dal gioco.</p>
-      <div class="fx-load"><label class="btn lime" for="fxFile">Carica il tuo file</label><input type="file" id="fxFile" accept=".xlsx,.xls,.xlsm,.csv,.txt" hidden><button type="button" class="btn" data-fxsample>Usa il file d'esempio</button></div>
-      <p class="caption" id="fxMsg">Il file resta nel tuo browser. Le colonne che non sono prezzi o rendimenti vengono escluse.</p></div>`;
-    return;
-  }
-  const inp=P.annualInputs(S.ds.assets,S.ds.freq.f);if(inp.common<12){el.innerHTML=`<div class="card gm-panel"><p>Servono almeno 12 periodi comuni a tutti gli asset.</p><button type="button" class="btn sm" data-gm-back>← Indietro</button></div>`;return;}
-  const O=P.optimize({mu:inp.mu,C:inp.C}),v0=O.minVar.vol,v1=O.frontier[O.frontier.length-1].vol,lim=[.25,.55,.85].map(q=>Math.round((v0+(v1-v0)*q)*1000)/1000);
-  GM.fx={inp,lims:lim,round:0,maxVol:lim[0],w:S.ds.assets.map(()=>Math.round(100/S.ds.assets.length)),done:false,scores:[],left:FX_ROUND_S,timer:0};fxRender();fxTimer();
-}
-function fxTimer(){const F=GM.fx;clearInterval(F.timer);F.timer=setInterval(()=>{if(GM.fx!==F||current!=="games"||!$("#fxClock")){clearInterval(F.timer);return;}if(F.done)return;F.left--;const c=$("#fxClock");if(c){c.textContent=F.left+" s";c.classList.toggle("hot",F.left<=10);}if(F.left<=10&&F.left>0)SFX.tick();if(F.left<=0){fxCheck(true);}},1000);}
-function fxCheck(timeout){const F=GM.fx;if(!F||F.done)return;F.done=true;const mm=macroFor(S.rfSrc),R=P.frontierScore(F.inp.mu,F.inp.C,F.w,F.maxVol,mm?mm.rf:0),bonus=timeout||R.over?0:Math.ceil(F.left/3);F.scores[F.round]={score:R.score,bonus,over:R.over,timeout:!!timeout};
-  fxRender();(R.score>=90&&!R.over?SFX.win:R.over?SFX.lose:SFX.gain).call(SFX);if(Morph.burst)Morph.burst(R.score>=90?.8:.4);}
-function fxRender(){
-  const F=GM.fx,ds=S.ds,mm=macroFor(S.rfSrc),rf=mm?mm.rf:0,R=P.frontierScore(F.inp.mu,F.inp.C,F.w,F.maxVol,rf),sc=F.scores[F.round];
-  const VW=640,VH=300,ml=50,mr=14,mt=14,mb=34,iw=VW-ml-mr,ih=VH-mt-mb,pts=[...R.frontier,{vol:R.vol,ret:R.ret},...F.inp.mu.map((m,i)=>({vol:Math.sqrt(F.inp.C[i][i]),ret:m}))];
-  const x1=Math.max(...pts.map(p=>p.vol))*1.1,y0=Math.min(0,...pts.map(p=>p.ret)),y1=Math.max(...pts.map(p=>p.ret))*1.12,X=v=>ml+v/x1*iw,Y=v=>mt+ih-(v-y0)/(y1-y0)*ih;
-  let g=`<rect x="${ml}" y="${mt}" width="${X(F.maxVol)-ml}" height="${ih}" fill="var(--lime)" opacity=".07"/><line x1="${X(F.maxVol)}" x2="${X(F.maxVol)}" y1="${mt}" y2="${mt+ih}" stroke="var(--lime)" stroke-dasharray="5 4"/><text x="${X(F.maxVol)+6}" y="${mt+14}" style="fill:var(--lime)">limite ${fmtPct(F.maxVol,1)}</text>`;
-  niceTicks(0,x1,5).filter(v=>v<=x1).forEach(v=>{g+=`<text x="${X(v)}" y="${VH-12}" text-anchor="middle">${fmtPct(v,0)}</text>`;});
-  niceTicks(y0,y1,4).filter(v=>v>=y0&&v<=y1).forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${ml-6}" y="${Y(v)+4}" text-anchor="end">${fmtPct(v,0)}</text>`;});
-  if(F.done)g+=`<path d="${R.frontier.map((p,i)=>(i?"L":"M")+X(p.vol).toFixed(1)+","+Y(p.ret).toFixed(1)).join("")}" fill="none" stroke="var(--muted)" stroke-width="2.5"/><circle cx="${X(R.best.vol)}" cy="${Y(R.best.ret)}" r="9" fill="none" stroke="var(--fg)" stroke-width="2.5"/><text x="${X(R.best.vol)+12}" y="${Y(R.best.ret)-8}" style="fill:var(--fg);font-weight:700">ottimo</text>`;
-  F.inp.mu.forEach((m,i)=>{g+=`<circle cx="${X(Math.sqrt(F.inp.C[i][i]))}" cy="${Y(m)}" r="5" fill="${color(i)}"><title>${esc(ds.assets[i].name)}</title></circle>`;});
-  g+=`<circle cx="${X(R.vol)}" cy="${Y(R.ret)}" r="11" fill="${R.over?"var(--bad)":"var(--lime)"}" stroke="var(--solid)" stroke-width="2" class="fx-me"/><text x="${X(R.vol)-14}" y="${Y(R.ret)-14}" text-anchor="end" style="fill:var(--fg);font-weight:800">tu</text>`;
-  const tot=F.scores.reduce((s,x)=>s+(x?x.score+x.bonus:0),0),last=F.round===2&&F.done;
-  $("#gmPlay").innerHTML=`<div class="card gm-panel"><div class="head"><div><span class="eyebrow">Gioco 02 · ${esc(S.source.name)}</span><h3 style="margin-top:4px">Batti la frontiera · round ${F.round+1} di 3</h3></div><div class="gm-tools"><span class="fx-clock${F.left<=10?" hot":""}" id="fxClock">${F.done?"stop":F.left+" s"}</span><span class="fx-tot">${tot} pt</span><button type="button" class="btn sm" data-gm-back>← Tutti i giochi</button></div></div>
-    <div class="fx-rounds">${F.lims.map((l,i)=>`<span class="${i===F.round?"on":i<F.round?"ok":""}">R${i+1} · rischio ≤ ${fmtPct(l,1)}${F.scores[i]?` · ${F.scores[i].score+F.scores[i].bonus} pt`:""}</span>`).join("")}</div>
-    <p class="gm-lead">Massimo rendimento con volatilità <b>non oltre ${fmtPct(F.maxVol,1)}</b>. Prima confermi, più punti bonus (1 ogni 3 secondi rimasti).</p>
-    <div class="fx-grid"><div class="fx-sl">${ds.assets.map((a,i)=>`<label class="fx-row"><span class="nm"><i style="background:${color(i)}"></i>${esc(a.name)}</span><input type="range" min="0" max="100" step="1" value="${F.w[i]}" data-fxw="${i}" ${F.done?"disabled":""}><b>${fmtPct(R.w[i],0)}</b></label>`).join("")}
-      <div class="gm-hud fx-hud"><div><span>Rendimento atteso</span><b>${fmtPct(R.ret,1)}</b></div><div><span>Volatilità</span><b class="${R.over?"dn":""}">${fmtPct(R.vol,1)}</b><small>${R.over?"oltre il limite!":"entro il limite"}</small></div></div>
-      ${F.done?`<div class="gm-badge"><span>Round ${F.round+1}${sc.timeout?" · tempo scaduto":""}</span><b>${sc.score}${sc.bonus?` + ${sc.bonus}`:""} pt</b><p>${R.over?"Oltre il limite di rischio: 0 punti.":R.score>=95?"Sulla frontiera: da quant!":R.score>=75?"Molto vicino all'ottimo.":"C'era margine."} Ottimo: ${fmtPct(R.best.ret,1)} con ${fmtPct(R.best.vol,1)} (${ds.assets.map((a,i)=>`${esc(a.name)} ${fmtPct(R.best.w[i],0)}`).join(", ")}).</p></div>
-        <div class="gm-go">${last?`<button type="button" class="btn lime" data-fxrestart>Nuova partita</button>`:`<button type="button" class="btn lime" data-fxnext>Round ${F.round+2} →</button>`}</div>
-        ${last?`<div class="gm-badge"><span>Totale</span><b>${tot} / 345 pt</b><p>${tot>=300?"Livello quant: hai letto la frontiera come un ottimizzatore.":tot>=240?"Ottimo istinto di portafoglio.":"La frontiera è più stretta di quanto sembri: riprova."}</p></div>`:""}`
-      :`<div class="gm-go"><button type="button" class="btn lime" data-fxcheck>Conferma</button></div>`}
-      </div><div class="chartbox"><svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Il tuo portafoglio sul piano rischio-rendimento">${g}</svg></div></div>
-    <p class="caption">Rendimenti attesi = medie storiche del file, rischio = covarianza storica, come nella sezione Frontiera. Gara nel campione, non una previsione.</p></div>`;
-}
-document.addEventListener("input",e=>{const i=e.target.dataset&&e.target.dataset.fxw;if(i===undefined||!GM.fx||GM.fx.done)return;GM.fx.w[+i]=+e.target.value;clearTimeout(fxRender.t);fxRender.t=setTimeout(()=>{const a=document.activeElement&&document.activeElement.dataset.fxw;fxRender();if(a!==undefined){const el=document.querySelector(`[data-fxw="${a}"]`);if(el)el.focus();}},60);});
-document.addEventListener("change",e=>{if(e.target.id==="fxFile"&&e.target.files[0])fxLoadFile(e.target.files[0]);});
-document.addEventListener("click",e=>{
-  if(e.target.closest("[data-fxsample]")){fxUse(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"});return;}
-  if(e.target.closest("[data-fxcheck]")&&GM.fx){fxCheck(false);return;}
-  if(e.target.closest("[data-fxnext]")&&GM.fx){const F=GM.fx;F.round++;F.maxVol=F.lims[F.round];F.done=false;F.left=FX_ROUND_S;F.w=S.ds.assets.map(()=>Math.round(100/S.ds.assets.length));fxRender();fxTimer();SFX.beep(true);return;}
-  if(e.target.closest("[data-fxrestart]")){clearInterval(GM.fx&&GM.fx.timer);fxStart();return;}
-  if(e.target.closest("[data-gm-back]")&&GM.fx)clearInterval(GM.fx.timer);
-});
-
 /* ---------- Quanta si presenta: fumetti per sezione e qualche giro per lo schermo ---------- */
 const QTIPS={
   home:{t:"Ciao, sono <b>Quanta</b>! Carica un file e chiedimi qualsiasi cosa sui tuoi investimenti.",q:null},
@@ -2676,8 +2562,7 @@ const QTIPS={
   sim:{t:"Chiedimi: «Con 300 € al mese quanto avrei tra 20 anni?»",q:"Con 300 € al mese quanto avrei tra 20 anni?"},
   stress:{t:"Come avrebbe retto il tuo portafoglio nel 2008? Chiedimelo.",q:"Come ha retto il portafoglio nelle crisi?"},
   opt:{t:"Ti trovo l'allocazione più efficiente con i tuoi vincoli.",q:"Qual è l'allocazione più efficiente con massimo 50% per asset?"},
-  bench:{t:"Hai battuto il mercato? Te lo dico con la statistica.",q:"Ho battuto l'S&P 500? L'alpha è significativo?"},
-  games:{t:"Sai perché chi vende nel panico perde il rimbalzo? Gioca, poi chiedimelo.",q:null}
+  bench:{t:"Hai battuto il mercato? Te lo dico con la statistica.",q:"Ho battuto l'S&P 500? L'alpha è significativo?"}
 };
 const QG={seen:new Set(),roams:0,opened:false,hideT:0,tl:null,pos:{x:0,y:0},lastInput:Date.now()};
 const say=document.createElement("button");say.type="button";say.className="orb-say";say.setAttribute("aria-live","polite");document.body.appendChild(say);
