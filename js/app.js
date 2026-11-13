@@ -874,12 +874,13 @@ function rbAoa(){
   let months=[...new Set(ser.flatMap(x=>[...x.m.keys()]))].sort();
   if(cols.some(c=>c.young&&S.youngRes[c.name]==="keep"))months=months.filter(k=>ser.every(x=>x.m.has(k)));
   const aoa=[["Data",...ser.map(x=>x.name)]];
-  months.forEach(k=>{const [y,mo]=k.split("-").map(Number),d=new Date(Date.UTC(y,mo,0));aoa.push([`${String(d.getUTCDate()).padStart(2,"0")}/${String(mo).padStart(2,"0")}/${y}`,...ser.map(x=>x.m.has(k)?x.m.get(k).v:null)]);});
+  const today=new Date();
+  months.forEach(k=>{const [y,mo]=k.split("-").map(Number),end=new Date(Date.UTC(y,mo,0)),d=end>today?new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate())):end;aoa.push([`${String(d.getUTCDate()).padStart(2,"0")}/${String(mo).padStart(2,"0")}/${y}`,...ser.map(x=>x.m.has(k)?x.m.get(k).v:null)]);});
   return aoa;
 }
 async function youngDecide(c,act){
   if(act==="proxy"&&!c.proxy){
-    const j=await getJSON(`/api/prices?symbol=${encodeURIComponent(c.proxySym)}&v=3`);if(j.error||!j.points)return `Indice ${c.proxySym} non disponibile: ${j.error||"riprova"}`;
+    const j=await getJSON(`/api/prices?symbol=${encodeURIComponent(c.proxySym)}&v=4`);if(j.error||!j.points)return `Indice ${c.proxySym} non disponibile: ${j.error||"riprova"}`;
     const cc=String(j.currency||"").toUpperCase(),need=cc==="GBX"?"GBP":cc;if(need&&need!=="EUR"&&!S.rb.fxm[need]){const f=await getJSON(`/api/fx?ccy=${need}`);if(f.points)S.rb.fxm[need]=new Map(f.points.map(x=>[x.p,x.v]));}
     c.proxy=eurMap(j,S.rb.fxm);
   }
@@ -914,7 +915,7 @@ async function rebuildFromPrices(){
     // Se un simbolo non scarica, si provano le altre quotazioni dello stesso ISIN.
     const series=[];
     /* limite al minuto del piano gratuito di Alpha Vantage: si aspetta e si riprova, fino a 4 volte per simbolo */
-    const fetchSym=async sym=>{for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=3`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
+    const fetchSym=async sym=>{for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
       if(j.error&&/limite/i.test(j.error)&&k<4){for(let w=20;w>0;w--){prog(`Limite al minuto di Alpha Vantage: riprovo ${sym} tra ${w} s…`);await new Promise(res=>setTimeout(res,1000));}continue;}return {r,j};}};
     for(const [n,p] of pos.entries()){
       let got=null,tried=[];
@@ -946,7 +947,7 @@ async function rebuildFromPrices(){
     if(aoa.length<14)throw new Error("Lo storico degli strumenti è troppo corto (meno di un anno). Prova a cambiare i simboli.");
     const months={length:aoa.length-1};
     const orig=S.source.name.replace(/ · ricostruito$/,""),scartati=u.scartati||[];
-    const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
+    const pf={from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},true);
     S.portfolio=pf;S.rbLog=null;
     S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
@@ -1230,6 +1231,8 @@ function renderMacro(){
     ${(M.data.errors||[]).length?`<p class="caption">${esc(M.data.errors.join(" "))}</p>`:""}`;
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-rf]");if(!b)return;S.rfSrc=b.dataset.rf;renderMacro();renderMetrics();renderPortfolio();renderReal();if(current==="risk")renderRisk();});
+/* volatilità di mercato a 1, 3 e 5 anni dai prezzi giornalieri (come i siti di ETF), per gli strumenti scaricati */
+function mktVol(name){const p=S.portfolio&&S.portfolio.positions.find(x=>(x.ticker||x.nome)===name);return p&&p.vol&&(p.vol.y1||p.vol.y3||p.vol.y5)?{...p.vol,cur:p.currency,sym:p.yahoo||p.simbolo}:null;}
 function renderMetrics(){
   const ds=S.ds,L=S.lab,f=ds.freq.f,mm=macroFor(S.rfSrc),rf=mm?mm.rf:0;
   const cell=(key,val,cls="")=>`<button type="button" class="cellbtn ${cls}" data-rc="${key}">${val}</button>`;
@@ -1241,7 +1244,7 @@ function renderMetrics(){
       return `<tr><td><span class="an"><i style="background:${color(i)}"></i>${esc(a.name)}</span><span class="cl mono">${ROLE_SHORT[a.role]} · col. ${a.col}</span></td>
       <td>${cell("cagr-"+i,fmtPct(s.cagr,1,true),s.cagr<0?"neg":"")}</td>
       <td>${mm?cell("real-"+i,fmtPct(real,1,true),real<0?"neg":""):`<span class="cl">${pending?"…":"—"}</span>`}</td>
-      <td>${cell("vol-"+i,fmtPct(s.vol))}</td><td>${cell("sharpe-"+i,fmtN(sh))}</td>
+      <td>${cell("vol-"+i,fmtPct(s.vol))}${(()=>{const v=mktVol(a.name);return v?`<span class="cl mono" title="Volatilità dei rendimenti giornalieri di mercato, annualizzata (√252), come justETF">1a ${v.y1!=null?fmtPct(v.y1,1):"—"} · 3a ${v.y3!=null?fmtPct(v.y3,1):"—"} · 5a ${v.y5!=null?fmtPct(v.y5,1):"—"}</span>`:"";})()}</td><td>${cell("sharpe-"+i,fmtN(sh))}</td>
       <td>${cell("mdd-"+i,fmtPct(s.mdd),"neg")}</td><td>${cell("worst-"+i,`${fmtPct(s.worst)} <span style="color:var(--faint)">${fmtDate(ds.dates[s.worstK],f)}</span>`)}</td><td class="mono">${s.n}</td></tr>`;}).join("")}</tbody>`;
   const cap=$("#metricsCap");if(cap)cap.textContent=mm?`Sharpe con tasso privo di rischio medio ${fmtPct(mm.rf,2)} (${mm.rfName}). Rendimento reale al netto dell'inflazione media ${fmtPct(mm.infl,2)}.`:"Sharpe con tasso privo di rischio 0%.";
 }
@@ -1375,7 +1378,7 @@ function buildNet(){
     const base=.15+.8*Math.abs(r),ln=new T.Line(new T.BufferGeometry().setFromPoints([nodes[i].position.clone(),nodes[j].position.clone()]),new T.LineBasicMaterial({color:r>=0?accC:badC,transparent:true,opacity:base,blending:T.AdditiveBlending}));
     ln.userData={i,j,base};group.add(ln);edges.push(ln);
   }
-  const labels=ds.assets.map((a,i)=>{const d=document.createElement("div");d.className="nl";d.innerHTML=`${esc(a.name.length>18?a.name.slice(0,17)+"…":a.name)}<small>σ ${fmtPct(L.st[i].vol)}</small>`;d.style.borderColor=NET_COLORS[i%6];box.appendChild(d);return d;});
+  const labels=ds.assets.map((a,i)=>{const d=document.createElement("div");d.className="nl";const mv=mktVol(a.name);d.innerHTML=`${esc(a.name.length>18?a.name.slice(0,17)+"…":a.name)}<small>${mv&&mv.y3!=null?`σ 3a ${fmtPct(mv.y3)}`:`σ ${fmtPct(L.st[i].vol)}`}</small>`;d.style.borderColor=NET_COLORS[i%6];box.appendChild(d);return d;});
   const size=()=>{const w=box.clientWidth,h=box.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/Math.max(1,h);camera.updateProjectionMatrix();};
   const ro=new ResizeObserver(size);ro.observe(box);size();
   NET={renderer,scene,camera,group,nodes,edges,labels,ro,raf:0,drag:null,hover:-1,auto:!REDUCE,rx:.2,ry:.5,vy:0,intro:REDUCE?1:0};
@@ -2000,7 +2003,7 @@ async function getJSON(url){
 }
 function bnLoad(sym){
   const cur=S.bnData[sym];if(cur)return cur.loading?cur.pr:Promise.resolve();
-  const pr=Promise.all([getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}&v=3`),S.fx?Promise.resolve(S.fx):getJSON("/api/fx?ccy=USD")]).then(([d,fx])=>{
+  const pr=Promise.all([getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`),S.fx?Promise.resolve(S.fx):getJSON("/api/fx?ccy=USD")]).then(([d,fx])=>{
     S.bnData[sym]=d;if(!fx.error){S.fx=fx;S.fxErr=null;}else if(!S.fx)S.fxErr=fx.error;
     if(current==="bench")renderBench();if(current==="stress"&&S.stress)renderStress();if(current==="lab"&&S.lab)renderReal();
   });
@@ -2462,7 +2465,7 @@ function receipt(key){
   const src=a.role==="price"?"rᵢ = Pᵢ / Pᵢ₋₁ − 1   (dai prezzi)\n":a.role==="retpct"?"rᵢ = valore / 100   (dai punti %)\n":"rᵢ = valore   (rendimenti decimali)\n";
   const M={
     cagr:{t:"Rendimento annuo composto (CAGR)",v:fmtPct(s.cagr,2,true),fx:src+"CAGR = [ Π (1 + rᵢ) ]^(f / n) − 1",kv:[["Rendimento totale",fmtPct(s.total,1,true)],["n",s.n],["f",f]]},
-    vol:{t:"Volatilità annualizzata",v:fmtPct(s.vol,2),fx:src+"σ = √[ Σ (rᵢ − r̄)² / (n − 1) ] · √f",kv:[["Deviazione standard di periodo",fmtPct(s.sd,2)],["Rendimento medio di periodo",fmtPct(s.mean,3)]]},
+    vol:{t:"Volatilità annualizzata",v:fmtPct(s.vol,2),fx:src+"σ = √[ Σ (rᵢ − r̄)² / (n − 1) ] · √f",kv:[["Deviazione standard di periodo",fmtPct(s.sd,2)],["Rendimento medio di periodo",fmtPct(s.mean,3)],...(()=>{const v=mktVol(a.name);return v?[["Volatilità di mercato a 1 anno",v.y1!=null?fmtPct(v.y1,2):"storico più corto"],["Volatilità di mercato a 3 anni",v.y3!=null?fmtPct(v.y3,2):"storico più corto"],["Volatilità di mercato a 5 anni",v.y5!=null?fmtPct(v.y5,2):"storico più corto"],["Come",`rendimenti giornalieri di ${v.sym} (Yahoo Finance), annualizzati con √252, in ${v.cur||"valuta di quotazione"}${v.removed?` · ${v.removed} prezzi anomali di un giorno scartati`:""}`],["Perché diversa da quella sopra","quella sopra usa i rendimenti mensili in euro su tutto il periodo comune, crisi passate comprese"]]:[];})()]},
     sharpe:{t:"Indice di Sharpe",v:fmtN(s.vol>0?(s.mean*f-rf)/s.vol:NaN),fx:src+"Sharpe = (r̄ · f − rf) / σ",kv:[["Rendimento medio annualizzato",fmtPct(s.mean*f,2)],["Volatilità annualizzata",fmtPct(s.vol,2)],["Tasso privo di rischio",mm?`${fmtPct(rf,2)} · ${mm.rfName}`:"0% · nessun dato macro"]]},
     real:{t:"Rendimento reale annuo",v:mm?fmtPct((1+s.cagr)/(1+mm.infl)-1,2,true):"—",fx:src+"Reale = (1 + CAGR) / (1 + π) − 1\nπ = inflazione media annua del periodo",kv:[["CAGR nominale",fmtPct(s.cagr,2,true)],["Inflazione media annua",mm?`${fmtPct(mm.infl,2)} · ${mm.cpiName}`:"—"]]},
     mdd:{t:"Massimo drawdown",v:fmtPct(s.mdd,2),fx:src+"Wₜ = Π (1 + rᵢ)   fino a t\nDD = min ( Wₜ / max(W₀…Wₜ) − 1 )",kv:[["Picco",fmtDate(ds.dates[s.mddPeak],f)],["Minimo",fmtDate(ds.dates[s.mddTrough],f)]]},

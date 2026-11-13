@@ -32,38 +32,70 @@ function toYahoo(symbol) {
   if (!m) return symbol;
   return Y_SUFFIX[m[2]] ? `${m[1]}.${Y_SUFFIX[m[2]]}` : symbol;
 }
-async function yahoo(symbol) {
-  // con range=max Yahoo dirada a punti trimestrali gli storici lunghi: con un intervallo di date esplicito resta mensile
-  const ys = toYahoo(symbol), q = `period1=0&period2=${Math.floor(Date.now() / 1000)}&interval=1mo&includeAdjustedClose=true&events=div%2Csplit`;
-  let j = null, last = "";
+/* errori di un solo punto: il prezzo salta e il punto dopo torna dov'era (tipico dei dati di Yahoo).
+   Si scarta il punto se il salto supera la soglia, il successivo va nel verso opposto e il ritorno annulla quasi tutto il salto. */
+function dropSpikes(pts, thr) {
+  let removed = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    const keep = [pts[0]];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const prev = keep[keep.length - 1].v, a1 = pts[i].v / prev, a2 = pts[i + 1].v / pts[i].v, back = pts[i + 1].v / prev;
+      if (Math.abs(Math.log(a1)) > Math.log(1 + thr) && Math.abs(Math.log(a2)) > Math.log(1 + thr) && Math.sign(a1 - 1) !== Math.sign(a2 - 1) && Math.abs(Math.log(back)) < Math.abs(Math.log(a1)) / 3) { removed++; continue; }
+      keep.push(pts[i]);
+    }
+    if (pts.length > 1) keep.push(pts[pts.length - 1]);
+    pts = keep;
+  }
+  return { pts, removed };
+}
+/* volatilità annualizzata dei rendimenti giornalieri negli ultimi N anni (come i siti di ETF: √252) */
+function volWindow(pts, years) {
+  const d = new Date(); d.setUTCFullYear(d.getUTCFullYear() - years); const from = d.toISOString().slice(0, 10);
+  if (!pts.length || pts[0].d > from) return null; // storico più corto della finestra
+  const r = []; for (let i = 1; i < pts.length; i++) if (pts[i].d > from) r.push(pts[i].v / pts[i - 1].v - 1);
+  if (r.length < 30) return null;
+  const m = r.reduce((s, x) => s + x, 0) / r.length;
+  return +(Math.sqrt(r.reduce((s, x) => s + (x - m) ** 2, 0) / (r.length - 1)) * Math.sqrt(252)).toFixed(6);
+}
+async function yahooRaw(ys, interval) {
+  const q = `period1=0&period2=${Math.floor(Date.now() / 1000)}&interval=${interval}&includeAdjustedClose=true&events=div%2Csplit`;
+  let last = "";
   for (const host of ["query1", "query2"]) {
     try {
-      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ys)}?${q}`, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", Accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ys)}?${q}`, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", Accept: "application/json" }, signal: AbortSignal.timeout(20_000) });
       if (r.status === 404) return { error: "simbolo non trovato" };
       if (!r.ok) { last = `Yahoo ${r.status}`; continue; }
-      j = await r.json(); break;
+      const j = await r.json(), res = j.chart && j.chart.result && j.chart.result[0];
+      if (!res || !res.timestamp) return { error: "simbolo non trovato" };
+      const adj = res.indicators && res.indicators.adjclose && res.indicators.adjclose[0] && res.indicators.adjclose[0].adjclose;
+      const close = res.indicators && res.indicators.quote && res.indicators.quote[0] && res.indicators.quote[0].close;
+      const vals = adj && adj.some(v => v != null) ? adj : close, off = (res.meta && res.meta.gmtoffset) || 0;
+      // l'ora della borsa con l'ora legale può cadere nel giorno (o mese) prima: mezza giornata di margine lo evita
+      const pts = res.timestamp.map((t, i) => ({ d: new Date((t + off + 43200) * 1000).toISOString().slice(0, 10), v: vals && vals[i] })).filter(p => Number.isFinite(p.v) && p.v > 0);
+      return { res, pts, adjusted: vals === adj };
     } catch (e) { last = e.name === "TimeoutError" ? "Yahoo lento" : "Yahoo non raggiungibile"; }
   }
-  if (!j) return { error: last || "Yahoo non disponibile" };
-  const res = j.chart && j.chart.result && j.chart.result[0];
-  if (!res || !res.timestamp) return { error: "simbolo non trovato" };
-  const adj = res.indicators && res.indicators.adjclose && res.indicators.adjclose[0] && res.indicators.adjclose[0].adjclose;
-  const close = res.indicators && res.indicators.quote && res.indicators.quote[0] && res.indicators.quote[0].close;
-  const vals = adj && adj.some(v => v != null) ? adj : close, off = (res.meta && res.meta.gmtoffset) || 0, today = new Date().toISOString().slice(0, 10);
-  const byMonth = new Map();
-  res.timestamp.forEach((t, i) => {
-    const v = vals && vals[i];
-    if (!(Number.isFinite(v) && v > 0)) return;
-    // inizio mese in ora locale della borsa: con l'ora legale cadrebbe nel mese prima, mezza giornata di margine lo evita
-    const dt = new Date((t + off + 43200) * 1000), y = dt.getUTCFullYear(), mo = dt.getUTCMonth();
-    const end = new Date(Date.UTC(y, mo + 1, 0)).toISOString().slice(0, 10);
-    byMonth.set(`${y}-${String(mo + 1).padStart(2, "0")}`, { d: end < today ? end : today, v: +v.toFixed(6) }); // l'ultimo valore del mese vince
+  return { error: last || "Yahoo non disponibile" };
+}
+// Prezzi giornalieri ripuliti dagli errori di un giorno → fine mese = ultimo prezzo valido del mese.
+// Le barre mensili di Yahoo hanno errori propri (salti finti a fine anno): si usano solo se i giornalieri non ci sono.
+async function yahoo(symbol) {
+  const ys = toYahoo(symbol), today = new Date().toISOString().slice(0, 10);
+  let raw = await yahooRaw(ys, "1d"), daily = true;
+  if (raw.error === "simbolo non trovato") return raw;
+  if (raw.error || raw.pts.length < 40) { raw = await yahooRaw(ys, "1mo"); daily = false; if (raw.error) return raw; }
+  const clean = dropSpikes(raw.pts, daily ? 0.08 : 0.2), byMonth = new Map();
+  clean.pts.forEach(p => byMonth.set(p.d.slice(0, 7), p));
+  const points = [...byMonth.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([m, p]) => {
+    const [y, mo] = m.split("-").map(Number), end = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10);
+    return { d: end < today ? end : today, v: +p.v.toFixed(6) };
   });
-  const points = [...byMonth.values()].sort((a, b) => (a.d < b.d ? -1 : 1));
   if (points.length < 2) return { error: "storico vuoto" };
+  const res = raw.res;
   let cur = String((res.meta && res.meta.currency) || "").trim();
   if (cur === "GBp" || cur === "GBX") cur = "GBX"; else cur = cur.toUpperCase();
-  return { data: { points, currency: cur || null, adjusted: vals === adj, yahoo: ys, name: (res.meta && (res.meta.longName || res.meta.shortName)) || null, exchange: (res.meta && res.meta.fullExchangeName) || null } };
+  const vol = daily ? { y1: volWindow(clean.pts, 1), y3: volWindow(clean.pts, 3), y5: volWindow(clean.pts, 5), from: "rendimenti giornalieri", removed: clean.removed } : { removed: clean.removed, from: "rendimenti mensili" };
+  return { data: { points, currency: cur || null, adjusted: raw.adjusted, yahoo: ys, vol, name: (res.meta && (res.meta.longName || res.meta.shortName)) || null, exchange: (res.meta && res.meta.fullExchangeName) || null } };
 }
 
 async function monthly(symbol, key) {
@@ -71,7 +103,7 @@ async function monthly(symbol, key) {
   if (hit && Date.now() - hit.t < TTL) return hit.v;
   const y = await yahoo(symbol);
   if (y.data) {
-    const v = { symbol, adjusted: y.data.adjusted, points: y.data.points, currency: y.data.currency, currencySource: "Yahoo Finance", info: y.data.name ? `${y.data.name}${y.data.exchange ? " · " + y.data.exchange : ""}` : "", source: "Yahoo Finance", yahoo: y.data.yahoo };
+    const v = { symbol, adjusted: y.data.adjusted, points: y.data.points, currency: y.data.currency, currencySource: "Yahoo Finance", info: y.data.name ? `${y.data.name}${y.data.exchange ? " · " + y.data.exchange : ""}` : "", source: "Yahoo Finance", yahoo: y.data.yahoo, vol: y.data.vol };
     if (v.currency) cache.set("m:" + symbol, { t: Date.now(), v });
     return v;
   }
