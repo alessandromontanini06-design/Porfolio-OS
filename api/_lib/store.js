@@ -1,7 +1,18 @@
 // Archivio degli eventi d'uso: Redis di Upstash via REST (variabili create dall'integrazione Vercel ↔ Upstash).
+// Nomi accettati: KV_REST_API_URL/TOKEN, UPSTASH_REDIS_REST_URL/TOKEN, oppure qualsiasi prefisso scelto
+// nell'integrazione (es. STORAGE_REST_API_URL/STORAGE_REST_API_TOKEN).
 // Se le variabili non ci sono, tutto resta spento: il sito funziona uguale e non salva nulla.
-const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
-const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
+function find() {
+  const E = process.env;
+  if (E.KV_REST_API_URL && E.KV_REST_API_TOKEN) return [E.KV_REST_API_URL, E.KV_REST_API_TOKEN];
+  if (E.UPSTASH_REDIS_REST_URL && E.UPSTASH_REDIS_REST_TOKEN) return [E.UPSTASH_REDIS_REST_URL, E.UPSTASH_REDIS_REST_TOKEN];
+  for (const k of Object.keys(E)) {
+    const m = k.match(/^(.*)_REST_API_URL$/);
+    if (m && E[`${m[1]}_REST_API_TOKEN`]) return [E[k], E[`${m[1]}_REST_API_TOKEN`]];
+  }
+  return ["", ""];
+}
+const [URL_, TOKEN] = find();
 export const storeOn = () => !!(URL_ && TOKEN);
 /* più comandi in una sola richiesta: [["INCR","k"],["LPUSH","l","v"],…] */
 export async function redis(cmds) {
