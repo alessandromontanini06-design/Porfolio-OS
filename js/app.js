@@ -2110,15 +2110,21 @@ function simInputs(){
   const I=S.mcIn,num=(id,d)=>{const v=parseFloat($(id).value);return Number.isFinite(v)?v:d;};
   I.init=Math.max(0,num("#mcInit",I.init));I.monthly=num("#mcMonthly",I.monthly);I.years=Math.max(1,Math.min(60,Math.round(num("#mcYears",I.years))));
   I.goal=Math.max(0,num("#mcGoal",I.goal));I.infl=Math.max(-5,Math.min(30,num("#mcInfl",I.infl)));I.costs=Math.max(0,Math.min(20,num("#mcCosts",I.costs)));
+  const rv=parseFloat(String($("#mcRate").value).replace(",","."));I.rate=Number.isFinite(rv)?Math.max(-20,Math.min(30,rv)):null; // null = rendimento storico
 }
 function fillSimForm(){
-  const I=S.mcIn;$("#mcInit").value=I.init;$("#mcMonthly").value=I.monthly;$("#mcYears").value=I.years;$("#mcGoal").value=I.goal;$("#mcInfl").value=I.infl;$("#mcCosts").value=I.costs;$("#mcInflSrc").textContent=I.inflSrc;
+  const I=S.mcIn;$("#mcInit").value=I.init;$("#mcMonthly").value=I.monthly;$("#mcYears").value=I.years;$("#mcGoal").value=I.goal;$("#mcInfl").value=I.infl;$("#mcCosts").value=I.costs;$("#mcInflSrc").textContent=I.inflSrc;$("#mcRate").value=I.rate!=null?I.rate:"";
 }
 function runSim(){
   const ds=S.ds,f=ds.freq.f,I=S.mcIn,{w,label}=riskWeights(),pa=pfAsset(w,"Portafoglio"),steps=I.years*f;
   const n=Math.max(200,Math.min(I.n,Math.floor(8e6/steps)));
-  const R=P.monteCarlo({ret:pa.ret,f,years:I.years,initial:I.init,monthly:I.monthly,goal:I.goal,infl:I.infl/100,costs:I.costs/100,method:I.method,n,block:f,seed:20260101});
-  R.wLabel=label;R.w=w;R.nAsked=I.n;R.histFrom=pa.ret.findIndex(Number.isFinite);
+  /* rendimento usato: quello storico del portafoglio, oppure quello scritto dall'utente.
+     Nel secondo caso ogni rendimento storico è scalato, (1 + r)·k − 1, così la media composta diventa quella scelta e le oscillazioni restano quelle vere. */
+  const fin=pa.ret.filter(Number.isFinite),gH=fin.length?Math.exp(fin.reduce((a,x)=>a+Math.log(1+x),0)/fin.length):1,histAnn=Math.pow(gH,f)-1;
+  let ret=pa.ret;if(I.rate!=null&&fin.length){const k=Math.pow(1+I.rate/100,1/f)/gH;ret=pa.ret.map(x=>Number.isFinite(x)?(1+x)*k-1:x);}
+  $("#mcRateSrc").textContent=I.rate!=null?`storico: ${fmtPct(histAnn,1,true)} l'anno · uso il tuo ${fmtPct(I.rate/100,1,true)}`:`uso lo storico: ${fmtPct(histAnn,1,true)} l'anno (${fin.length} ${ds.freq.adj==="mensili"?"mesi":"periodi"})`;
+  const R=P.monteCarlo({ret,f,years:I.years,initial:I.init,monthly:I.monthly,goal:I.goal,infl:I.infl/100,costs:I.costs/100,method:I.method,n,block:f,seed:20260101});
+  R.wLabel=label;R.w=w;R.nAsked=I.n;R.histAnn=histAnn;R.rate=I.rate;R.nHist=fin.length;R.histFrom=pa.ret.findIndex(Number.isFinite);
   S.mc=R;return R;
 }
 function renderSim(){
@@ -2210,7 +2216,7 @@ function renderMcNotes(R){
 }
 function mcReceipt(m,arg){
   const R=S.mc,ds=S.ds,f=ds.freq.f,real=S.mcIn.real;
-  const base=[["Metodo",MC_M[R.method]+(R.method==="block"?` · blocchi di ${unitN(R.block,f)}`:"")],["Percorsi",R.n],["Orizzonte",`${unitN(R.years,1)} = ${R.steps} passi ${ds.freq.adj}`],["Capitale iniziale",fmtEur(R.initial)],["Flusso per periodo",fmtEur(R.perStep)],["Costi annui",fmtPct(R.costs,2)],["Rendimenti storici usati",R.hist.m],["Seme",R.seed]];
+  const base=[["Metodo",MC_M[R.method]+(R.method==="block"?` · blocchi di ${unitN(R.block,f)}`:"")],["Percorsi",R.n],["Orizzonte",`${unitN(R.years,1)} = ${R.steps} passi ${ds.freq.adj}`],["Capitale iniziale",fmtEur(R.initial)],["Flusso per periodo",fmtEur(R.perStep)],["Costi annui",fmtPct(R.costs,2)],["Rendimenti storici usati",R.hist.m],["Seme",R.seed],["Rendimento annuo usato",R.rate!=null?`${fmtPct(R.rate/100,1,true)} scelto da te (storico ${fmtPct(R.histAnn,1,true)})`:`${fmtPct(R.histAnn,1,true)} · media composta dei ${R.nHist} rendimenti storici del portafoglio`]];
   const fx="Wₜ = Wₜ₋₁ · (1 + r̃ₜ) · (1 − c)^(1/f) + v · 12/f\nr̃ₜ = rendimento estratto dalla storia del portafoglio";
   if(m==="p"){const i=+arg,L=["5°","10°","25°","50°","75°","90°","95°"][i];return {title:`Capitale finale · ${L} percentile`,value:fmtEur(R.pFinal[i]),formula:fx+`\nP${L} = quantile dei ${R.n} capitali finali (interpolazione lineare)`,kv:[["In euro di oggi",fmtEur(R.pFinalReal[i])],["Inflazione",fmtPct(R.infl,2)],...base]};}
   if(m==="med")return mcReceipt("p","3");
@@ -3096,12 +3102,61 @@ function receipt(key){
   }[kind];
   return {title:`${M.t} · ${a.name}`,value:M.v,formula:M.fx,kv:[...M.kv,...base]};
 }
+/* ---------- «In parole semplici»: cosa misura ogni numero e come leggerlo, per chi non è del mestiere ----------
+   Si sceglie dal titolo della ricevuta; l'esempio in euro usa il valore calcolato (mai numeri nuovi). */
+const pctOf=v=>{const m=String(v||"").replace(/−/g,"-").match(/([+-]?\d[\d.]*,?\d*)\s*%/);return m?parseFloat(m[1].replace(/\./g,"").replace(",",".")):null;};
+const eur10=x=>fmtN(Math.abs(x)/100*10000,0)+" €";
+const EXPLAIN=[
+  [/^Rendimento annuo \(TIR\)/,v=>["È quanto sono cresciuti in media ogni anno i soldi che hai versato, tenendo conto di quando li hai versati: un euro messo nel 2019 conta più di uno messo il mese scorso.","È il numero da confrontare con un conto deposito o con un'altra persona che investe: è il tuo rendimento, non quello del fondo."]],
+  [/^Rendimento ponderato nel tempo/,v=>["È il rendimento degli strumenti che hai scelto, come se avessi investito tutto all'inizio: toglie l'effetto di quando e quanto hai versato.","Se è molto diverso dal TIR, i tempi dei versamenti hanno contato: versare prima di un rialzo alza il TIR, versare prima di un calo lo abbassa."]],
+  [/^(Rendimento annuo composto|CAGR|Rendimento annuo$|Rendimento annuo ·)/,v=>{const x=pctOf(v);return ["È la crescita media all'anno, come se il valore fosse salito della stessa percentuale ogni anno.",x!=null?`Con ${x>=0?"+":""}${fmtN(x,1)}% l'anno, 10.000 € diventano circa ${fmtN(10000*Math.pow(1+x/100,10),0)} € in 10 anni, se il futuro fosse come il passato (e non è detto).`:"Non dice nulla degli alti e bassi lungo la strada: per quelli guarda volatilità e drawdown."];}],
+  [/^Rendimento reale/,v=>["È il rendimento dopo aver tolto l'inflazione: dice quanto è aumentato davvero quello che puoi comprare con i tuoi soldi.","Se è vicino a zero, hai solo difeso il potere d'acquisto; se è negativo, i prezzi sono saliti più del portafoglio."]],
+  [/^Volatilità/,v=>{const x=pctOf(v);return ["Misura quanto il valore oscilla, in su e in giù, nel corso di un anno. Più è alta, più il percorso è movimentato.",x!=null?`Con ${fmtN(x,1)}%, in un anno normale è facile vedere scostamenti di circa ${eur10(x)} su 10.000 € rispetto alla media. Per riferimento: azioni mondiali 14–18%, obbligazioni 4–7%.`:"Non distingue tra oscillazioni verso l'alto e verso il basso."];}],
+  [/^Indice di Sharpe|^Sharpe/,v=>["Dice quanto rendimento hai ottenuto per ogni unità di rischio preso, oltre a quello che avresti avuto senza rischi (conto deposito, BOT).","Sotto 0,5 è modesto, tra 0,5 e 1 è buono, sopra 1 è molto buono. Serve a confrontare portafogli con rischi diversi."]],
+  [/^Probabilistic Sharpe/,v=>["È la probabilità che lo Sharpe sia davvero positivo e non frutto del caso, visto quanti dati ci sono.","Sopra il 95% il risultato è solido; sotto il 90% i dati non bastano per esserne sicuri."]],
+  [/^Massimo drawdown|^Perdita massima/,v=>{const x=pctOf(v);return ["È la caduta più grande dal punto più alto al punto più basso, prima di risalire.",x!=null?`Con ${fmtN(x,1)}%: chi aveva 10.000 € al massimo li ha visti scendere a circa ${fmtN(10000*(1+x/100),0)} €. Chiediti se in quel momento avresti venduto.`:"È il numero più utile per capire se reggeresti i momenti brutti."];}],
+  [/^Periodo peggiore/,v=>["È il peggior singolo mese (o periodo) della storia del file.","Dà un'idea del colpo più duro preso in una volta sola."]],
+  [/^VaR/,v=>{const x=pctOf(v);return ["Il VaR (valore a rischio) è la perdita che in un periodo viene superata solo raramente: 1 volta su 20.",x!=null?`Con ${fmtN(Math.abs(x),1)}%: su 10.000 €, in un mese brutto ma non eccezionale puoi perdere circa ${eur10(x)}. Nei casi più estremi la perdita può essere maggiore: per quelli c'è il CVaR.`:"Non dice quanto si perde nei casi peggiori in assoluto."];}],
+  [/^CVaR/,v=>{const x=pctOf(v);return ["Il CVaR è la perdita media nei periodi peggiori, quelli oltre il VaR: misura quanto fa male quando va davvero male.",x!=null?`Con ${fmtN(Math.abs(x),1)}%: su 10.000 €, nei mesi peggiori la perdita media è di circa ${eur10(x)}.`:""];}],
+  [/^Indice di Sortino/,v=>["Come lo Sharpe, ma conta solo le oscillazioni verso il basso: i rialzi improvvisi non vengono considerati un rischio.","Più è alto, meglio è. Sopra 1 è buono; utile quando i rendimenti sono asimmetrici."]],
+  [/^Indice di Calmar/,v=>["Rapporta la crescita annua alla caduta peggiore: quanto hai guadagnato per ogni punto di perdita massima sopportata.","Sopra 0,5 è discreto, sopra 1 è molto buono."]],
+  [/^Periodi positivi/,v=>["La percentuale di mesi chiusi in guadagno.","Anche portafogli ottimi chiudono in perdita 3–4 mesi su 10: è normale."]],
+  [/^Peggiore finestra/,v=>["Il peggior risultato su 12 mesi consecutivi, scegliendo il momento peggiore in cui entrare.","Risponde alla domanda: «se avessi investito nel momento sbagliato, quanto avrei perso dopo un anno?»."]],
+  [/^Asimmetria/,v=>["Dice se le sorprese grandi sono più spesso negative o positive.","Un valore negativo vuol dire che i crolli improvvisi sono più frequenti dei balzi improvvisi."]],
+  [/^Curtosi/,v=>["Dice quanto sono frequenti i mesi estremi rispetto a una situazione «normale».","Positiva vuol dire che gli eventi estremi capitano più spesso di quanto si penserebbe."]],
+  [/^Drawdown più lungo|^Tempo di recupero|^Tempo sott'acqua/,v=>["È il tempo passato sotto il massimo precedente, prima di tornarci.","Conta quanto la profondità: aspettare anni per recuperare mette alla prova la pazienza."]],
+  [/^Tempo per toccare il fondo/,v=>["Quanto è durata la discesa, dal massimo al punto più basso della crisi.","Una discesa veloce spaventa di più; una lenta logora."]],
+  [/^Rendimento nella crisi/,v=>["Il risultato del portafoglio dall'inizio alla fine della crisi.","Confrontalo con l'indice: se hai perso meno, la diversificazione ha funzionato."]],
+  [/^Contributo (al rischio|marginale)/,v=>["Dice quanta parte del rischio totale viene da questo strumento. Non coincide con il peso: uno strumento piccolo ma molto volatile può pesare tanto sul rischio.","Se la quota di rischio è molto più alta del peso, quello strumento è il motore delle oscillazioni."]],
+  [/^Asset effettivi/,v=>["Quanti strumenti «veri» hai, tenendo conto di quanto pesano: 5 strumenti con uno al 90% valgono poco più di 1.","Più si avvicina al numero di strumenti, più i pesi sono equilibrati."]],
+  [/^Rapporto di diversificazione/,v=>["Misura quanto il fatto di avere più strumenti riduce le oscillazioni rispetto alla somma delle singole.","1 vuol dire nessun beneficio; 1,3 o più è una buona diversificazione."]],
+  [/^Backtest del VaR/,v=>["Controlla se il VaR ha funzionato davvero: quante volte la perdita reale ha superato la soglia rispetto alle volte attese.","Se i superamenti sono molti di più di quelli attesi, il VaR sottostima il rischio."]],
+  [/^Ulcer/,v=>["Misura il «dolore» dei cali: conta sia quanto sono profondi sia quanto durano.","Più è basso, più il percorso è stato tranquillo."]],
+  [/^Omega/,v=>["Confronta tutti i guadagni con tutte le perdite.","Sopra 1 i guadagni superano le perdite; più è alto, meglio è."]],
+  [/^Correlazione/,v=>["Dice quanto due strumenti si muovono insieme: 1 sempre insieme, 0 indipendenti, −1 in direzioni opposte.","Strumenti poco correlati si compensano a vicenda: è il cuore della diversificazione."]],
+  [/^Tasso privo di rischio/,v=>["È quanto avresti preso senza rischi, con titoli a brevissimo termine (simile a un conto deposito).","Serve da metro: un investimento rischioso dovrebbe rendere di più."]],
+  [/^Inflazione/,v=>["È di quanto sono saliti in media i prezzi ogni anno nell'area euro.","Un rendimento sotto l'inflazione vuol dire che il potere d'acquisto è sceso."]],
+  [/^Capitale finale/,v=>["Il risultato di migliaia di futuri possibili, costruiti rimescolando i rendimenti passati del portafoglio. Il percentile dice in che posizione si trova questo valore.","Il 50° è lo scenario di mezzo; il 5° è uno scenario sfavorevole (solo 5 futuri su 100 vanno peggio). Non è una previsione."]],
+  [/^Probabilità di raggiungere/,v=>["La quota di futuri simulati in cui arrivi all'obiettivo.","È una stima basata sul passato: cambiando versamenti o anni cambia molto."]],
+  [/^Probabilità di perdita/,v=>["La quota di futuri simulati in cui alla fine hai meno di quanto hai versato.","Più lungo è l'orizzonte, di solito più scende."]],
+  [/^Percorsi che esauriscono/,v=>["La quota di futuri in cui i prelievi consumano tutto il capitale.","Se è sopra il 5–10%, i prelievi sono probabilmente troppo alti."]],
+  [/^Beta/,v=>["Quanto il portafoglio segue i movimenti del mercato: 1 come il mercato, 0,5 la metà, sopra 1 amplifica.","Un beta basso vuol dire cali più contenuti quando il mercato scende, ma anche meno slancio quando sale."]],
+  [/^Alpha/,v=>["Il rendimento in più (o in meno) rispetto a quello che ci si aspetterebbe dato il rischio di mercato preso.","Positivo e stabile nel tempo è raro: spesso è fortuna, per questo c'è il test statistico."]],
+  [/^R²/,v=>["Quanto dei movimenti del portafoglio si spiega con quelli dell'indice.","Vicino a 1 il confronto con quell'indice ha senso; basso vuol dire che il portafoglio è molto diverso."]],
+  [/^Tracking error/,v=>["Quanto il portafoglio si discosta dall'indice ogni anno.","Basso: copia l'indice. Alto: fa una strada sua, nel bene e nel male."]],
+  [/^Information ratio/,v=>["Il rendimento in più rispetto all'indice, diviso per quanto te ne sei discostato.","Sopra 0,5 è buono; negativo vuol dire che discostarsi dall'indice non ha pagato."]],
+  [/^Cattura nei (rialzi|ribassi)/,v=>["Quanta parte dei rialzi (o dei ribassi) dell'indice il portafoglio ha seguito.","L'ideale è prendere molto dei rialzi e poco dei ribassi."]],
+  [/^Rendimento annuo in più/,v=>["La differenza di crescita annua tra il tuo portafoglio e l'indice.","Negativa vuol dire che l'indice, con lo stesso periodo, ha fatto meglio."]],
+  [/^Rendimento atteso/,v=>["La crescita annua stimata dal passato, resa più prudente per non fidarsi troppo dei periodi fortunati.","È una stima incerta: guarda l'intervallo indicato sotto."]],
+  [/^(Guadagno|Valore oggi|Valore stimato|Versato)/,v=>["Somme in euro calcolate dalle tue transazioni e dai prezzi di mercato.","Guadagno = valore di oggi − quanto hai versato + quanto hai già incassato."]]
+];
+function plainOf(R){const t=String(R.title||"");for(const [rx,fn] of EXPLAIN)if(rx.test(t)){try{const [a,b]=fn(R.value);return {what:a,how:b};}catch{return null;}}return null;}
 function openReceipt(key){
   trackOnce("feature","ricevuta",{name:"ricevuta"});
   const R=receipt(key);
   $("#receipt").innerHTML=`<div style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Ricevuta del calcolo</span><h3 style="font-size:1.25rem">${esc(R.title)}</h3></div>
-    <div class="rc-val">${esc(R.value)}</div><div class="formula">${esc(R.formula)}</div>
-    <dl class="kv">${R.kv.map(k=>`<dt>${esc(k[0])}</dt><dd>${esc(k[1])}</dd>`).join("")}</dl>
+    <div class="rc-val">${esc(R.value)}</div>${(()=>{const X=plainOf(R);return X?`<div class="rc-plain"><b>In parole semplici</b><p>${esc(X.what)}</p>${X.how?`<p class="how">${esc(X.how)}</p>`:""}</div>`:"";})()}<details class="rc-math"${plainOf(R)?"":" open"}><summary>Formula e dati usati</summary><div class="formula">${esc(R.formula)}</div>
+    <dl class="kv">${R.kv.map(k=>`<dt>${esc(k[0])}</dt><dd>${esc(k[1])}</dd>`).join("")}</dl></details>
     <div class="stamp"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Calcolo deterministico sui dati del file. Nessun valore generato dall'IA.</div>`;
   $("#drawer").classList.add("open");$("#scrim").classList.add("open");$("#drawer").setAttribute("aria-hidden","false");
   $("#closeDrawer").focus();

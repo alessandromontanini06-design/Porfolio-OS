@@ -419,7 +419,63 @@ const SYN=[
 ];
 /* Export dei broker che non sono tabelle semplici: li si riscrive come un foglio di movimenti ordinario, prima di ogni lettura.
    Interactive Brokers (Activity Statement CSV): righe «Trades,Header,…» e «Trades,Data,Order,…», ISIN nella sezione «Financial Instrument Information». */
+/* Piani di accumulo tenuti a mano: un foglio per strumento (il nome è nel foglio o nel titolo sopra la tabella, non in una colonna),
+   colonne come «Data esecuzione · Quote acquistate · Capitale investito · Prezzo esecuzione · Quote cumulate», spesso una tabella per anno
+   separata da righe vuote, titoli d'anno e intestazioni ripetute. Tutti questi fogli diventano un solo foglio di movimenti ordinario. */
+const PAC_RX={
+  date:/^(data|date|giorno|day)\b|data (di )?(esecuzione|acquisto|operazione|valuta)/,
+  qty:/(quot[ae]|azioni|shares|units|pezzi|quantit[aà]|n\.? ?quote)(?!.*(cumulat|total|progressiv|possedut|detenut|in portafoglio|complessiv))/,
+  amt:/(capitale|importo|investit|versat|controvalore|amount|spesa|esborso)(?!.*(cumulat|total|progressiv|complessiv))/,
+  px:/(prezzo|price|nav|valore (della )?quota|corso|quotazione)(?!.*(medio|carico|pmc|attuale|oggi))/,
+  skip:/cumulat|total|progressiv|possedut|complessiv|rendiment|plus|minus|guadagn|valore attuale|valore (di )?mercato|^pmc|medio/
+};
+const ISIN_RX=/\b([A-Z]{2}[A-Z0-9]{9}\d)\b/;
+function pacSheet(sh){
+  const A=(sh.aoa||[]).map(r=>Array.isArray(r)?r:[]);if(A.length<3)return null;
+  /* intestazione: prima riga (entro 40) con una colonna di date e almeno quote o importo */
+  let h=-1,col=null;
+  for(let r=0;r<Math.min(A.length,40)&&h<0;r++){
+    const hd=A[r].map(lc);if(hd.filter(Boolean).length<3)continue;
+    if(hd.some(x=>/^(titolo|strumento|prodotto|nome|name|security|instrument|isin|ticker|simbolo|symbol)$/.test(x)))return null; // c'è già la colonna del titolo: è un elenco normale
+    const f=(rx,skip)=>hd.findIndex(x=>x&&rx.test(x)&&!(skip&&PAC_RX.skip.test(x)));
+    const c={d:f(PAC_RX.date),q:f(PAC_RX.qty,true),a:f(PAC_RX.amt,true),p:f(PAC_RX.px,true)};
+    if(c.d>=0&&(c.q>=0||c.a>=0)&&(c.p>=0||(c.q>=0&&c.a>=0))&&new Set([c.q,c.a,c.p].filter(i=>i>=0)).size===[c.q,c.a,c.p].filter(i=>i>=0).length){h=r;col=c;}
+  }
+  if(h<0)return null;
+  const hdTxt=A[h].map(v=>String(v??"").trim().toLowerCase()).join("|");
+  const num=(row,c)=>{if(c<0)return null;const x=parseNum(row[c]);return x&&Number.isFinite(x.n)?x.n:null;};
+  const rows=[];
+  for(let r=h+1;r<A.length;r++){
+    const row=A[r];if(!row.some(v=>!isBlank(v)))continue;                                   // righe vuote tra un anno e l'altro
+    if(row.map(v=>String(v??"").trim().toLowerCase()).join("|")===hdTxt)continue;              // intestazione ripetuta
+    const d=parseDate(row[col.d],true);if(!d)continue;                                        // titoli d'anno, totali, note
+    let q=num(row,col.q),am=num(row,col.a),px=num(row,col.p);
+    if(q==null&&am!=null&&px)q=am/px;if(px==null&&am!=null&&q)px=Math.abs(am/q);if(am==null&&q!=null&&px!=null)am=q*px;
+    if(!(q>0))continue;
+    rows.push([d,q,px,am]);
+  }
+  if(rows.length<2)return null;
+  /* nome e ISIN: dal titolo sopra la tabella, altrimenti dal nome del foglio */
+  const above=A.slice(0,h).flat().filter(v=>typeof v==="string"&&v.trim()).map(v=>v.trim());
+  const all=[sh.name,...above].join(" "),isin=(all.toUpperCase().match(ISIN_RX)||[])[1]||null;
+  const clean=t=>t.replace(ISIN_RX,"").replace(/\b(pac|piano di accumulo|piano d'accumulo|accumulo|isin)\b[:\s-]*/gi,"").replace(/[()\[\]·:–-]+\s*$/,"").replace(/^\s*[·:–-]+/,"").replace(/\s{2,}/g," ").trim();
+  const title=above.map(clean).find(t=>t.length>2&&!/^\d{4}$/.test(t)&&!parseNum(t))||null;
+  const nm=clean(String(sh.name||""));
+  const name=(nm&&!/^(sheet|foglio|tabelle)\s*\d*$/i.test(nm)?nm:null)||title||sh.name;
+  const tk=(all.match(/\(([A-Z][A-Z0-9]{2,5})\)/)||[])[1]||null;
+  return {name,isin,tk,rows};
+}
+function pacMerge(sheets){
+  const found=[];(sheets||[]).forEach((sh,i)=>{const p=pacSheet(sh);if(p)found.push({i,...p});});
+  if(!found.length)return sheets;
+  const aoa=[["Data","Operazione","Strumento","Ticker","ISIN","Quantità","Prezzo","Importo"]];
+  found.forEach(f=>f.rows.forEach(([d,q,px,am])=>aoa.push([d,"Acquisto",f.name,f.tk||"",f.isin||"",q,px,am])));
+  const merged={name:found.length>1?`★ Movimenti dei piani di accumulo (${found.length} fogli)`:`★ Movimenti · ${found[0].name}`,aoa,pac:found.map(f=>({foglio:sheets[f.i].name,strumento:f.name,isin:f.isin,righe:f.rows.length}))};
+  const drop=new Set(found.map(f=>f.i));
+  return [merged,...sheets.filter((_,i)=>!drop.has(i))];
+}
 function normalizeExports(sheets){
+  sheets=pacMerge(sheets);
   return (sheets||[]).flatMap(sh=>{
     const A=(sh.aoa||[]).map(r=>Array.isArray(r)?r:[]),c0=A.map(r=>String(r[0]??"").trim());
     if(!(c0.includes("Trades")&&A.some(r=>r[0]==="Trades"&&r[1]==="Header")))return [sh];
