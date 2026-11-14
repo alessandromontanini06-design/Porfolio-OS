@@ -563,10 +563,12 @@ const POPULAR=[["VWCE","Vanguard FTSE All-World (Acc)","IE00BK5BQT80"],["SWDA","
   ["AGGH","iShares Core Global Aggregate Bond EUR Hedged","IE00BDBRDM35"],["IEAG","iShares € Aggregate Bond","IE00B3DKXQ41"],["IBGS","iShares € Govt Bond 1-3yr","IE00B14X4Q57"],
   ["XEON","Xtrackers EUR Overnight Rate Swap (liquidità)","LU0290358497"],["SGLN","iShares Physical Gold","IE00B4ND3602"],["4GLD","Xetra-Gold","DE000A0S9GB0"]];
 const PRESETS=[["Azionario mondo",[["VWCE",100]]],["60/40",[["SWDA",60],["AGGH",40]]],["Core e satelliti",[["SWDA",70],["EIMI",10],["IUSN",10],["CSNDX",10]]],["Prudente",[["SWDA",30],["IEAG",40],["IBGS",15],["SGLN",15]]]];
-const BD={rows:[["SWDA",80],["EIMI",20]]};
+const BD={ports:[[["SWDA",80],["EIMI",20]]],cur:0};
+Object.defineProperty(BD,"rows",{get(){return this.ports[this.cur];},set(v){this.ports[this.cur]=v;}});
 function bdFind(v){const t=String(v||"").trim().toUpperCase(),isin=(t.match(/[A-Z]{2}[A-Z0-9]{9}\d/)||[])[0],tk=t.split(/[\s·]+/)[0];
   return POPULAR.find(p=>p[2]===isin||p[0]===tk)||(isin?[null,null,isin]:tk?[tk,null,null]:null);}
 function bdRender(){
+  $("#bdTabs").innerHTML=BD.ports.map((p,i)=>`<button type="button" class="chipbtn${i===BD.cur?" on":""}" data-bdt="${i}">Portafoglio ${"ABC"[i]}</button>`).join("")+(BD.ports.length<3?`<button type="button" class="chipbtn" data-bdt="new">+ Confronta con ${"ABC"[BD.ports.length]}</button>`:"")+(BD.ports.length>1?`<button type="button" class="chipbtn" data-bdt="del">Togli ${"ABC"[BD.cur]}</button>`:"");
   $("#bdPresets").innerHTML=PRESETS.map((p,i)=>`<button type="button" class="chipbtn" data-bdp="${i}">${esc(p[0])}</button>`).join("");
   $("#bdList").innerHTML=POPULAR.map(p=>`<option value="${p[0]} · ${esc(p[1])}">`).join("");
   $("#bdRows").innerHTML=BD.rows.map((r,i)=>{const f=bdFind(r[0]);return `<div class="bd-row"><div class="bd-in"><input list="bdList" data-bdi="${i}" value="${esc(r[0])}" placeholder="Ticker o ISIN" aria-label="Strumento ${i+1}" spellcheck="false"><small>${f&&f[1]?esc(f[1])+" · "+f[2]:f&&f[2]?"ISIN "+f[2]:r[0]?"ticker da verificare":""}</small></div>
@@ -583,6 +585,7 @@ $("#scrim").addEventListener("click",closeBuilder);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#builder").classList.contains("open"))closeBuilder();});
 $("#builder").addEventListener("click",e=>{const p=e.target.closest("[data-bdp]"),d=e.target.closest("[data-bdd]");
   if(p){BD.rows=PRESETS[+p.dataset.bdp][1].map(x=>[...x]);bdRender();}
+  const tb=e.target.closest("[data-bdt]");if(tb){const v=tb.dataset.bdt;if(v==="new"){BD.ports.push(BD.rows.map(r=>[...r]));BD.cur=BD.ports.length-1;}else if(v==="del"){BD.ports.splice(BD.cur,1);BD.cur=Math.max(0,BD.cur-1);}else BD.cur=+v;bdRender();}
   if(d){BD.rows.splice(+d.dataset.bdd,1);if(!BD.rows.length)BD.rows.push(["",0]);bdRender();}
   if(e.target.id==="bdAdd"){BD.rows.push(["",0]);bdRender();const ins=document.querySelectorAll("#bdRows input[list]");ins[ins.length-1].focus();}
   if(e.target.id==="bdGo")bdGo();});
@@ -590,7 +593,11 @@ $("#builder").addEventListener("change",e=>{const i=e.target.dataset.bdi,w=e.tar
   if(i!=null){const f=bdFind(e.target.value);BD.rows[+i][0]=f&&f[0]?f[0]:String(e.target.value).trim().toUpperCase();bdRender();}
   if(w!=null){BD.rows[+w][1]=Math.max(0,parseFloat(String(e.target.value).replace(",","."))||0);bdRender();}});
 function bdGo(){
-  const rows=BD.rows.filter(r=>String(r[0]).trim()&&+r[1]>0),s=rows.reduce((a,r)=>a+(+r[1]),0);if(!rows.length||!(s>0))return;
+  /* tutti gli strumenti di A, B e C: i prezzi si scaricano una volta; il valore del file è quello di A (gli altri a zero) */
+  const P2=BD.ports.map(rs=>rs.filter(r=>String(r[0]).trim()&&+r[1]>0)),key=r=>{const f=bdFind(r[0])||[r[0]];return f[0]||f[2];};
+  const uni=[];P2.forEach(rs=>rs.forEach(r=>{if(!uni.some(u=>key(u)===key(r)))uni.push([r[0],0]);}));
+  const rows=uni.map(u=>{const a=P2[0].find(r=>key(r)===key(u));return [u[0],a?+a[1]:0];}),s=rows.reduce((a,r)=>a+(+r[1]),0);if(!rows.length||!(s>0))return;
+  S.cmpPending=P2.length>1?P2.map(rs=>{const t=rs.reduce((a,r)=>a+(+r[1]),0),w={};rs.forEach(r=>{const f=bdFind(r[0])||[r[0]];w[f[0]&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(f[0])?f[0]:(f[1]||f[2]||r[0])]=(+r[1])/t;});return {w};}):null;
   const cap=Math.max(100,parseFloat($("#bdCap").value)||10000);
   /* un riepilogo di posizioni come quello di un Excel: lo legge il riconoscitore locale, poi i prezzi di mercato */
   const aoa=[["Strumento","Ticker","ISIN","Valore (€)","Peso"],...rows.map(r=>{const f=bdFind(r[0])||[r[0],null,null],w=(+r[1])/s;return [f[1]||f[0]||f[2],f[0]&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(f[0])?f[0]:"",f[2]||"",Math.round(cap*w*100)/100,w];})];
@@ -1306,6 +1313,71 @@ document.addEventListener("change",e=>{const el=e.target;if(!el||!S.portfolio)re
   if(el.matches&&el.matches("input.tgt")){const p=S.portfolio.positions.find(x=>(x.ticker||x.nome)===el.dataset.tgt),v=parseFloat(String(el.value).replace(",","."));if(p&&Number.isFinite(v)&&v>=0){p.pesoTarget=v/100;S.portfolio.positions.forEach(x=>{if(x!==p&&x.pesoTarget==null)x.pesoTarget=0;});renderPortfolio();if(current==="risk")renderRisk();}return;}
   if(el.id==="rbC"||el.id==="rbBand"){const v=parseFloat(String(el.value).replace(",","."));if(!Number.isFinite(v)||v<0)return;if(!S.rbal)S.rbal={C:500,band:.03};if(el.id==="rbC")S.rbal.C=v;else S.rbal.band=Math.max(.001,v/100);renderPortfolio();}
 });
+/* ---------- Confronta allocazioni: fino a 3 portafogli sugli stessi strumenti, valutati sugli stessi mesi ----------
+   Mesi comuni = quelli in cui hanno un rendimento tutti gli strumenti usati da almeno un portafoglio: così nessuno è avvantaggiato
+   da una storia più lunga. Ribilanciamento mensile ai pesi indicati, senza costi né tasse. */
+const CMP_COL=["var(--lime)","var(--c2)","var(--c3)"];
+function cmpInit(){
+  const ds=S.ds,n=ds.assets.length,eq=ds.assets.map(()=>1/n),names=ds.assets.map(a=>a.name);
+  if(S.cmpPending){const ports=S.cmpPending.map(p=>names.map(nm=>+(p.w[nm]||0)));S.cmpPending=null;if(ports.some(w=>w.some(x=>x>0))){S.cmp={ports:ports.map((w,i)=>({name:"ABC"[i],w}))};return;}}
+  const now=pfWeights("now"),tgt=pfWeights("target");
+  S.cmp={ports:[{name:"A",w:now||eq},{name:"B",w:tgt&&now&&tgt.some((x,i)=>Math.abs(x-now[i])>1e-6)?tgt:eq}]};
+}
+function cmpCalc(){
+  const ds=S.ds,f=ds.freq.f,n=ds.dates.length,mm=macroFor(S.rfSrc),rf=mm?mm.rf:0;
+  const P0=S.cmp.ports.map(p=>{const s=p.w.reduce((a,x)=>a+(x>0?x:0),0);return {...p,wn:s>0?p.w.map(x=>(x>0?x:0)/s):null,sum:s};});
+  const used=ds.assets.map((a,i)=>P0.some(p=>p.wn&&p.wn[i]>0));
+  const mask=ds.dates.map((d,k)=>k>0&&used.some(Boolean)&&ds.assets.every((a,i)=>!used[i]||Number.isFinite(a.ret[k])));
+  const ks=mask.map((m,k)=>m?k:-1).filter(k=>k>=0);
+  const masked=ds.assets.map(a=>({...a,ret:a.ret.map((r,k)=>mask[k]?r:NaN)}));
+  const res=P0.map(p=>{if(!p.wn)return {...p,empty:true};
+    const ret=ds.dates.map((d,k)=>mask[k]?p.wn.reduce((s,w,i)=>s+(w>0?w*ds.assets[i].ret[k]:0),0):NaN),first=ret.findIndex(Number.isFinite);
+    const A={name:p.name,ret,first:first<0?n:first,missing:0,role:"price",col:"—"},st=P.stats(A,f,ds.dates),rk=P.riskStats(ret,f,rf);
+    const W=[1];ks.forEach(k=>W.push(W[W.length-1]*(1+ret[k])));
+    const cr=P.CRISES.map(c=>P.crisisAnalysis(ds.dates,masked,p.wn,f,c)).filter(c=>c.status==="in");
+    return {...p,st,rk,W,cr,sharpe:st.vol>0?(st.mean*f-rf)/st.vol:NaN};});
+  return {res,ks,rf,mm,used};
+}
+function renderCompare(){
+  const card=$("#cmpCard");if(!card)return;const ds=S.ds;
+  if(!S.lab||!ds||!ds.ok||ds.assets.length<1){card.hidden=true;return;}
+  card.hidden=false;if(!S.cmp||S.cmp.n!==ds.assets.length+":"+ds.nObs){cmpInit();S.cmp.n=ds.assets.length+":"+ds.nObs;}
+  const R=cmpCalc(),f=ds.freq.f,K=R.ks,ok=R.res.filter(r=>!r.empty);
+  const inputs=ds.assets.map((a,i)=>`<tr><td><span class="an">${esc(a.name)}</span></td>${S.cmp.ports.map((p,j)=>`<td><input class="cmp-w" type="number" min="0" max="100" step="1" inputmode="decimal" data-cp="${j}" data-ci="${i}" value="${+(p.w[i]*100).toFixed(1)}" aria-label="Peso di ${esc(a.name)} nel portafoglio ${p.name}"></td>`).join("")}</tr>`).join("");
+  const sums=S.cmp.ports.map(p=>{const s=p.w.reduce((a,x)=>a+(x>0?x:0),0);return `<td class="mono ${Math.abs(s-1)<.001?"":"dn"}">${fmtN(s*100,0)}%</td>`;}).join("");
+  const head=S.cmp.ports.map((p,j)=>`<th><span class="cmp-dot" style="background:${CMP_COL[j]}"></span>${p.name}${j>0?` <button type="button" class="cmp-x" data-cpx="${j}" aria-label="Togli il portafoglio ${p.name}">×</button>`:""}</th>`).join("");
+  const best=(key,hi)=>{const v=ok.map(r=>r[key]);const m=hi?Math.max(...v.filter(Number.isFinite)):Math.min(...v.filter(Number.isFinite));return x=>ok.length>1&&Number.isFinite(x)&&Math.abs(x-m)<1e-12;};
+  const rows=[["Rendimento annuo",r=>r.st.cagr,x=>fmtPct(x,1,true),true],["Volatilità",r=>r.st.vol,x=>fmtPct(x,1),false],["Sharpe",r=>r.sharpe,x=>fmtN(x),true],["Perdita massima",r=>r.st.mdd,x=>fmtPct(x,1),true],["Peggiori 12 mesi",r=>r.rk.worst12,x=>fmtPct(x,1),true],["VaR 95% in un mese",r=>-r.rk.var95,x=>fmtPct(x,1),true]];
+  const crIds=[...new Set(ok.flatMap(r=>r.cr.map(c=>c.id)))];
+  const met=rows.map(([l,g,fm,hi])=>{const vals=R.res.map(r=>r.empty?NaN:g(r)),isB=best(null,hi),m=hi?Math.max(...vals.filter(Number.isFinite)):Math.min(...vals.filter(Number.isFinite));
+    return `<tr><td>${l}</td>${vals.map(v=>`<td class="mono${ok.length>1&&Number.isFinite(v)&&Math.abs(v-m)<1e-12?" cmp-best":""}">${Number.isFinite(v)?fm(v):"—"}</td>`).join("")}</tr>`;}).join("")+
+    crIds.map(id=>{const nm=(ok[0].cr.find(c=>c.id===id)||ok.flatMap(r=>r.cr).find(c=>c.id===id)).name,vals=R.res.map(r=>{const c=!r.empty&&r.cr.find(x=>x.id===id);return c?c.mdd:NaN;}),m=Math.max(...vals.filter(Number.isFinite));
+      return `<tr><td>Crisi: ${esc(nm)}</td>${vals.map(v=>`<td class="mono${ok.length>1&&Number.isFinite(v)&&Math.abs(v-m)<1e-12?" cmp-best":""}">${Number.isFinite(v)?fmtPct(v,1):"—"}</td>`).join("")}</tr>`;}).join("");
+  const from=K.length?fmtDate(ds.dates[K[0]-1]||ds.dates[K[0]],f):"—",to=K.length?fmtDate(ds.dates[K[K.length-1]],f):"—";
+  card.innerHTML=`<div class="head"><h3>Confronta allocazioni</h3><span class="eyebrow">stessi mesi · ${K.length} ${UNIT[f]?UNIT[f][1]:"periodi"}</span></div>
+    <div class="cmp-grid"><div><div class="tablewrap"><table class="mt cmp-t"><thead><tr><th>Peso %</th>${head}</tr></thead><tbody>${inputs}<tr class="pf"><td><b>Totale</b></td>${sums}</tr></tbody></table></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${S.cmp.ports.length<3?`<button type="button" class="btn sm" id="cmpAdd">+ Aggiungi ${"ABC"[S.cmp.ports.length]}</button>`:""}<button type="button" class="btn sm" id="cmpEq">B a pesi uguali</button></div>
+      <p class="caption">Se un portafoglio non somma a 100% lo riproporziono. Per confrontare strumenti che non sono nel file usa «Crea il tuo portafoglio» in home.</p></div>
+    <div><div class="chartbox" id="cmpChart"></div><div class="legend">${R.res.map((r,j)=>`<span><i style="background:${CMP_COL[j]}"></i>${r.name}${r.empty?" (vuoto)":""}</span>`).join("")}</div></div></div>
+    ${K.length>=12?`<div class="tablewrap"><table class="mt cmp-r"><thead><tr><th>Misura</th>${R.res.map((r,j)=>`<th><span class="cmp-dot" style="background:${CMP_COL[j]}"></span>${r.name}</th>`).join("")}</tr></thead><tbody>${met}</tbody></table></div>`:`<p style="color:var(--warn)">Servono almeno 12 ${UNIT[f]?UNIT[f][1]:"periodi"} in cui hanno dati tutti gli strumenti usati: qui ce ne sono ${K.length}.</p>`}
+    <p class="caption">Confronto su ${K.length} ${UNIT[f]?UNIT[f][1]:"periodi"} comuni (${from} – ${to}): solo i mesi in cui hanno un prezzo tutti gli strumenti usati da almeno un portafoglio, così nessuno è avvantaggiato da una storia più lunga. Portafogli ribilanciati ogni mese ai pesi indicati, senza costi né tasse; in evidenza il valore migliore di ogni riga. Le crisi compaiono solo se cadono per intero nei mesi comuni. È il passato, non una previsione.</p>`;
+  drawCompare(R);
+}
+function drawCompare(R){
+  const el=$("#cmpChart");if(!el)return;const ds=S.ds,K=R.ks,VW=640,VH=280,ml=46,mr=10,mt=10,mb=26,iw=VW-ml-mr,ih=VH-mt-mb;
+  const L=R.res.filter(r=>!r.empty);if(!K.length||!L.length){el.innerHTML="";return;}
+  const all=L.flatMap(r=>r.W),lo=Math.min(...all)*.95,hi=Math.max(...all)*1.03,n=K.length+1;
+  const X=i=>ml+i/(n-1||1)*iw,Y=v=>mt+ih-(v-lo)/((hi-lo)||1)*ih;let g="";
+  niceTicks(lo*100,hi*100,4).forEach(v=>{if(v<lo*100||v>hi*100)return;g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v/100).toFixed(1)}" y2="${Y(v/100).toFixed(1)}" stroke="var(--line)"/><text x="${ml-6}" y="${(Y(v/100)+4).toFixed(1)}" text-anchor="end">${fmtN(v,0)}</text>`;});
+  [0,n-1].forEach(i=>{const k=i===0?K[0]-1:K[K.length-1];g+=`<text x="${X(i).toFixed(1)}" y="${VH-6}" text-anchor="${i?"end":"start"}">${fmtDate(ds.dates[Math.max(0,k)],ds.freq.f)}</text>`;});
+  R.res.forEach((r,j)=>{if(r.empty)return;let d="";r.W.forEach((v,i)=>{d+=(i?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1);});g+=`<path d="${d}" fill="none" stroke="${CMP_COL[j]}" stroke-width="${j?2:2.6}" stroke-linejoin="round"><title>${r.name}: 100 € diventano ${fmtN(r.W[r.W.length-1]*100,0)} €</title></path>`;});
+  el.innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Crescita di 100 euro per ogni portafoglio sugli stessi mesi">${g}</svg>`;
+}
+document.addEventListener("change",e=>{const el=e.target;if(!el.matches||!el.matches("input.cmp-w")||!S.cmp)return;const v=parseFloat(String(el.value).replace(",","."));if(!Number.isFinite(v)||v<0)return;S.cmp.ports[+el.dataset.cp].w[+el.dataset.ci]=v/100;renderCompare();});
+document.addEventListener("click",e=>{if(!S.cmp)return;const t=e.target;
+  if(t.id==="cmpAdd"&&S.cmp.ports.length<3){const n=S.ds.assets.length;S.cmp.ports.push({name:"ABC"[S.cmp.ports.length],w:S.ds.assets.map(()=>1/n)});renderCompare();}
+  else if(t.id==="cmpEq"&&S.cmp.ports[1]){const n=S.ds.assets.length;S.cmp.ports[1].w=S.ds.assets.map(()=>1/n);renderCompare();}
+  else if(t.dataset&&t.dataset.cpx){S.cmp.ports.splice(+t.dataset.cpx,1);S.cmp.ports.forEach((p,i)=>p.name="ABC"[i]);renderCompare();}});
 function renderPortfolio(){
   const card=$("#pfCard");if(!card)return;
   const pf=S.portfolio,ds=S.ds,f=ds&&ds.freq?ds.freq.f:12;
@@ -1494,6 +1566,7 @@ function renderLab(){
   renderMetrics();
   renderMacro();
   renderPortfolio();
+  renderCompare();
   renderReal();
   renderMatrix();
   const caps=P.capabilities(ds),get=n=>caps.find(c=>c.name.startsWith(n));
