@@ -51,6 +51,7 @@ const xfer=document.createElement("div");xfer.className="xfer";xfer.setAttribute
 xfer.innerHTML=`<div class="xf-p"></div><div class="xf-in"><span class="xf-n"></span><div class="xf-t"><small></small><b></b></div></div>`;document.body.appendChild(xfer);
 function go(name,opts={}){
   if(!SCENES.includes(name)||(name===current&&!opts.force))return;
+  trackOnce("scene",name,{name}); // funzione dichiarata più in basso: sicura anche prima che le statistiche siano pronte
   const from=current,prev=$("#scene-"+current),nxt=$("#scene-"+name);current=name;
   document.querySelectorAll(".dock button[data-go]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.go===name)));
   $("#sceneChip").textContent=SCENE_L[name];movePill();Morph.shape(name);
@@ -528,9 +529,10 @@ async function handleFile(file){
     }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
     if(!sheets.some(s=>s.aoa.length)){showError("Il file è vuoto.");return;}
     if(isSim())spaceSwitch("real",{fresh:true,stay:true});
+    track("start",{how:"file"});TR.t0=Date.now();
     sheets=P.normalizeExports(sheets); // export di broker a più sezioni (es. Interactive Brokers) → foglio di movimenti
     load(sheets,{name:file.name,size:file.size,kind:"file"},true);
-  }catch(e){showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
+  }catch(e){track("import_fail",{kind:"file",why:e.message==="noxlsx"?"lettore excel non caricato":"file illeggibile"});showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
 }
 const drop=$("#drop");
 ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");void 0;}));
@@ -543,6 +545,7 @@ $("#file").addEventListener("change",e=>{handleFile(e.target.files[0]);e.target.
 const EXAMPLE={url:"esempio/Portfolio_OS_esempio.xlsx",name:"Portfolio_OS_esempio.xlsx"};
 const isExample=()=>!!(S.source&&(S.source.example||(S.source.kind==="rebuilt"&&S.rb&&S.rb.origSource&&S.rb.origSource.example)));
 async function loadExample(fromUser){
+  if(fromUser){track("start",{how:"esempio"});TR.t0=Date.now();}
   if(fromUser&&isSim()){spaceSwitch("real",{stay:true});if(isExample()&&S.source&&S.source.kind==="rebuilt"){go("scan",{force:true});return;}}
   if(fromUser&&isExample()&&S.source.kind==="rebuilt"){go("scan",{force:true});return;}
   try{
@@ -587,6 +590,36 @@ function spaceBar(){const el=$("#spaceSw");if(!el)return;const other=SPACES.cur=
 document.addEventListener("click",e=>{const b=e.target.closest("[data-space]");if(!b||b.classList.contains("on"))return;spaceSwitch(b.dataset.space);});
 const isSim=()=>SPACES.cur==="sim";
 
+
+/* ---------- Statistiche d'uso anonime (beta): niente cookie, niente dati dei file ----------
+   Ogni scheda del browser ha un codice casuale di sessione; gli eventi partono a gruppi verso /api/track.
+   Se l'archivio non è collegato su Vercel la funzione risponde «nessun contenuto» e non si salva nulla. */
+const TR={sid:(()=>{try{let s=sessionStorage.getItem("pos-sid");if(!s){s=Math.random().toString(36).slice(2,12);sessionStorage.setItem("pos-sid",s);}return s;}catch{return Math.random().toString(36).slice(2,12);}})(),q:[],seen:new Set(),t0:0,errs:0,h:0};
+function track(e,p={}){try{TR.q.push({e,p});clearTimeout(TR.h);TR.h=setTimeout(trackFlush,1200);}catch{}}
+function trackOnce(e,key,p){try{if(TR.seen.has(e+":"+key))return;TR.seen.add(e+":"+key);track(e,p);}catch{}}
+function trackFlush(){if(!TR.q.length)return;const body=JSON.stringify({s:TR.sid,list:TR.q.splice(0,20)});
+  try{const ok=navigator.sendBeacon&&navigator.sendBeacon("/api/track",new Blob([body],{type:"application/json"}));if(!ok)fetch("/api/track",{method:"POST",headers:{"Content-Type":"application/json"},body,keepalive:true}).catch(()=>{});}catch{}
+  if(TR.q.length)setTimeout(trackFlush,300);}
+addEventListener("pagehide",trackFlush);
+addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")trackFlush();});
+addEventListener("error",e=>{if(TR.errs++<5)track("error",{msg:String(e.message||"errore").slice(0,120),where:current});});
+addEventListener("unhandledrejection",e=>{if(TR.errs++<5)track("error",{msg:String((e.reason&&e.reason.message)||e.reason||"promessa rifiutata").slice(0,120),where:current});});
+(()=>{let from="diretto";try{const h=new URL(document.referrer).hostname;from=/linkedin|lnkd/.test(h)?"linkedin":/google/.test(h)?"google":/whatsapp|wa\.me/.test(h)?"whatsapp":/instagram|facebook|fb\./.test(h)?"social":h&&h!==location.hostname?"altro":"diretto";}catch{}
+  track("visit",{from,device:innerWidth<760?"telefono":innerWidth<1100?"tablet":"computer"});})();
+const importKind=()=>S.source&&(S.source.builder||(S.rb&&S.rb.origSource&&S.rb.origSource.builder))?"crea":isExample()?"esempio":S.rb?"file_prezzi_mercato":"file";
+
+
+/* segnalazione di un file letto male: testo libero e, solo con il consenso, la struttura (nomi di fogli e intestazioni, mai valori né nome del file) */
+function fileStructure(){
+  const sh=(S.fileSheets&&S.fileSheets.length?S.fileSheets:S.sheets.map(x=>({name:x.name,aoa:[]})))||[];
+  return sh.slice(0,8).map(x=>{const A=x.aoa||[],an=P.analyzeSheet(x.name,A),h=an.headerRow,hd=h>=0?(A[h]||[]).filter(v=>typeof v==="string"&&v.trim()&&!/\d{3,}/.test(v)).map(v=>v.trim().slice(0,30)).slice(0,25):[];
+    return `${String(x.name).slice(0,30)} [${A.length} righe] ${h>=0?"intestazione riga "+(h+1)+": "+hd.join(" | "):"intestazione non trovata"}`;});
+}
+document.addEventListener("click",e=>{if(e.target.id!=="fbSend")return;const t=$("#fbText").value.trim(),st=$("#fbStruct").checked;
+  if(!t&&!st){$("#fbMsg").textContent="Scrivi cosa non va oppure spunta la struttura del file.";return;}
+  track("feedback",{text:t,structure:st?fileStructure():null,kind:S.source?importKind():"nessun file"});trackFlush();
+  $("#fbMsg").textContent="Grazie, segnalazione inviata.";$("#fbText").value="";$("#fbStruct").checked=false;});
+
 /* ---------- Crea il tuo portafoglio: strumenti e pesi scelti a mano, poi lo stesso percorso di un Excel (prezzi di mercato → laboratorio) ---------- */
 const POPULAR=[["VWCE","Vanguard FTSE All-World (Acc)","IE00BK5BQT80"],["SWDA","iShares Core MSCI World (Acc)","IE00B4L5Y983"],["CSSPX","iShares Core S&P 500 (Acc)","IE00B5BMR087"],
   ["EIMI","iShares Core MSCI EM IMI (Acc)","IE00BKM4GZ66"],["CSNDX","iShares Nasdaq 100 (Acc)","IE00B53SZB19"],["IUSN","iShares MSCI World Small Cap (Acc)","IE00BF4RFH31"],
@@ -608,11 +641,11 @@ function bdRender(){
   $("#bdSum").innerHTML=`Totale <b class="${Math.abs(s-100)<.01?"up":"dn"}">${fmtN(s,0)}%</b>${Math.abs(s-100)>=.01?" · li riporto a 100%":""}`;
   $("#bdGo").disabled=!ok;
 }
-function openBuilder(){bdRender();$("#builder").classList.add("open");$("#scrim").classList.add("open");$("#builder").setAttribute("aria-hidden","false");setTimeout(()=>{const i=document.querySelector("#bdRows input");if(i)i.focus();},350);}
+function openBuilder(){trackOnce("feature","pannello_crea",{name:"pannello_crea"});bdRender();$("#builder").classList.add("open");$("#scrim").classList.add("open");$("#builder").setAttribute("aria-hidden","false");setTimeout(()=>{const i=document.querySelector("#bdRows input");if(i)i.focus();},350);}
 function closeBuilder(){$("#builder").classList.remove("open");if(!$("#drawer").classList.contains("open"))$("#scrim").classList.remove("open");$("#builder").setAttribute("aria-hidden","true");}
 $("#builderBtn").addEventListener("click",openBuilder);
 /* copia l'allocazione vera come portafoglio A: la modifichi nello spazio di prova senza toccare l'originale */
-document.addEventListener("click",e=>{if(!e.target.closest("#variantBtn")||!S.portfolio)return;const P0=S.portfolio.positions.filter(p=>p.valore>0),tot=P0.reduce((a,p)=>a+p.valore,0);if(!(tot>0))return;
+document.addEventListener("click",e=>{if(!e.target.closest("#variantBtn")||!S.portfolio)return;trackOnce("feature","variante",{name:"variante"});const P0=S.portfolio.positions.filter(p=>p.valore>0),tot=P0.reduce((a,p)=>a+p.valore,0);if(!(tot>0))return;
   BD.ports=[P0.map(p=>{const f=POPULAR.find(x=>x[2]===p.isin);return [f?f[0]:(p.isin||p.ticker||p.nome),Math.round(p.valore/tot*1000)/10];})];BD.cur=0;$("#bdCap").value=Math.round(tot);openBuilder();});
 $("#closeBuilder").addEventListener("click",closeBuilder);
 $("#scrim").addEventListener("click",closeBuilder);
@@ -636,6 +669,7 @@ function bdGo(){
   /* un riepilogo di posizioni come quello di un Excel: lo legge il riconoscitore locale, poi i prezzi di mercato */
   const aoa=[["Strumento","Ticker","ISIN","Valore (€)","Peso"],...rows.map(r=>{const f=bdFind(r[0])||[r[0],null,null],w=(+r[1])/s;return [f[1]||f[0]||f[2],f[0]&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(f[0])?f[0]:"",f[2]||"",Math.round(cap*w*100)/100,w];})];
   closeBuilder();
+  track("start",{how:BD.ports.length>1?"crea_confronto":"crea"});TR.t0=Date.now();
   const pend=S.cmpPending;spaceSwitch("sim",{fresh:true,stay:true});S.cmpPending=pend; // le allocazioni A, B, C scelte passano al nuovo spazio
   load([{name:"Portafoglio di prova",aoa}],{name:"Portafoglio di prova",size:0,kind:"file",builder:true},true);spaceBar();
 }
@@ -790,6 +824,7 @@ document.addEventListener("click",e=>{
   setTimeout(()=>{row.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"center"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");sel.focus({preventScroll:true});},380);
 });
 $("#confirmBtn").addEventListener("click",e=>{
+  track("import_ok",{kind:importKind(),assets:S.ds&&S.ds.ok?S.ds.assets.length:0,fixes:Object.keys(S.touched||{}).length+Object.keys(S.doneChecks||{}).length,checks:(S.checks||[]).map(c=>c.id),secs:TR.t0?Math.round((Date.now()-TR.t0)/1000):null});
   tplSave();
   if(!HAS_G){showLab(false);return;}
   const ds=S.ds,b=e.currentTarget.getBoundingClientRect(),cx=b.left+b.width/2,cy=b.top+b.height/2;
@@ -1122,6 +1157,7 @@ async function rebuildFromPrices(o={}){
     if(S.rb&&S.rb.origSource&&S.rb.origSource.builder&&!o.quiet)setTimeout(()=>{const b=$("#confirmBtn");if(b&&!b.disabled)b.click();},900);
   }catch(e){
     if(S.source!==src0)return;
+    track("import_fail",{kind:importKind(),why:"prezzi: "+String(e.message||e).slice(0,70)});
     S.und={...S.und,status:"ready",err:e instanceof TypeError?"Lo storico dei prezzi si scarica nella versione del sito pubblicata su Vercel.":String(e.message||e)};renderAI();
   }
 }
@@ -1410,7 +1446,7 @@ function drawCompare(R){
   R.res.forEach((r,j)=>{if(r.empty)return;let d="";r.W.forEach((v,i)=>{d+=(i?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1);});g+=`<path d="${d}" fill="none" stroke="${CMP_COL[j]}" stroke-width="${j?2:2.6}" stroke-linejoin="round"><title>${r.name}: 100 € diventano ${fmtN(r.W[r.W.length-1]*100,0)} €</title></path>`;});
   el.innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Crescita di 100 euro per ogni portafoglio sugli stessi mesi">${g}</svg>`;
 }
-document.addEventListener("change",e=>{const el=e.target;if(!el.matches||!el.matches("input.cmp-w")||!S.cmp)return;const v=parseFloat(String(el.value).replace(",","."));if(!Number.isFinite(v)||v<0)return;S.cmp.ports[+el.dataset.cp].w[+el.dataset.ci]=v/100;renderCompare();});
+document.addEventListener("change",e=>{const el=e.target;if(!el.matches||!el.matches("input.cmp-w")||!S.cmp)return;trackOnce("feature","confronto",{name:"confronto"});const v=parseFloat(String(el.value).replace(",","."));if(!Number.isFinite(v)||v<0)return;S.cmp.ports[+el.dataset.cp].w[+el.dataset.ci]=v/100;renderCompare();});
 document.addEventListener("click",e=>{if(!S.cmp)return;const t=e.target;
   if(t.id==="cmpAdd"&&S.cmp.ports.length<3){const n=S.ds.assets.length;S.cmp.ports.push({name:"ABC"[S.cmp.ports.length],w:S.ds.assets.map(()=>1/n)});renderCompare();}
   else if(t.id==="cmpEq"&&S.cmp.ports[1]){const n=S.ds.assets.length;S.cmp.ports[1].w=S.ds.assets.map(()=>1/n);renderCompare();}
@@ -1439,6 +1475,7 @@ function prMix(x){const B=S.PR,pr=P.portfolioReturns(B.ds.assets,B.w),cash=B.rf/
   const n=r.filter(Number.isFinite).length,cagr=n?Math.pow(r.reduce((a,v)=>Number.isFinite(v)?a*(1+v):a,1),B.f/n)-1:NaN;
   return {x,mdd,cr,worst:Math.min(mdd,...cr),cagr};}
 function openProfile(){
+  trackOnce("feature","profilo",{name:"profilo"});
   if(!S.lab||!S.ds||!S.ds.ok)return;S.PR={...prBase(),step:0,ans:{},ch:[]};prRender();
   $("#profile").classList.add("open");$("#scrim").classList.add("open");$("#profile").setAttribute("aria-hidden","false");
 }
@@ -1481,6 +1518,7 @@ function prRender(){
     <p class="caption">Come leggerlo: la soglia nasce da quello che hai scelto rivivendo crisi vere, non da quello che dichiari. Le perdite sono storiche e calcolate sui prezzi di mercato del tuo portafoglio; il futuro può essere peggiore. Strumento educativo, non consulenza finanziaria: non indica prodotti da comprare o vendere.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn" data-prgo="restart">Rifai il test</button><button type="button" class="btn lime" data-prgo="cmp">Prova un'allocazione diversa</button></div>`;
   S.PR.result={tol,thr,worst:all.worst,coh,okMix:okMix&&okMix.x};
+  track("profile_done",{result:coh==null?"senza_crisi":coh?"coerente":"piu_rischioso"});
 }
 $("#profile").addEventListener("click",e=>{const B=S.PR;if(!B)return;const g=e.target.closest("[data-prgo]"),a=e.target.closest("[data-pra]"),c=e.target.closest("[data-prc]");
   if(a){B.ans[a.dataset.pra]=a.dataset.prv;B.step++;prRender();}
@@ -2898,6 +2936,7 @@ const TOOLS_LOCAL={
   portafoglio_utente:()=>S.portfolio?{da_file:S.portfolio.from,posizioni:S.portfolio.positions.map(p=>({nome:p.nome,ticker:p.ticker,valore:p.valore==null?null:`${fmtN(p.valore)} €`,peso_attuale:p.pesoAttuale==null?null:fmtPct(p.pesoAttuale,1),peso_target:p.pesoTarget==null?null:fmtPct(p.pesoTarget,1)}))}:{nota:"Nessun riepilogo di portafoglio caricato: si usano pesi uguali o quelli indicati nella domanda."}
 };
 async function askChat(text){
+  trackOnce("feature","assistente",{name:"assistente"});
   text=String(text||"").trim();
   if(chatBusy||!text)return;
   if(!S.lab){renderChat();return;}
@@ -2970,6 +3009,7 @@ function receipt(key){
   return {title:`${M.t} · ${a.name}`,value:M.v,formula:M.fx,kv:[...M.kv,...base]};
 }
 function openReceipt(key){
+  trackOnce("feature","ricevuta",{name:"ricevuta"});
   const R=receipt(key);
   $("#receipt").innerHTML=`<div style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Ricevuta del calcolo</span><h3 style="font-size:1.25rem">${esc(R.title)}</h3></div>
     <div class="rc-val">${esc(R.value)}</div><div class="formula">${esc(R.formula)}</div>

@@ -806,3 +806,7 @@ body[data-scene="bench"]{--pill:#5BF0A5;--pill-rgb:91,240,165}
 .space-sw button{border:0;background:none;color:var(--muted);font:inherit;font-size:.78rem;padding:6px 12px;border-radius:999px;cursor:pointer}
 .space-sw button.on{background:var(--lime);color:var(--lime-ink);font-weight:700}.space-sw button:disabled{opacity:.4;cursor:default}
 @media (max-width:760px){.space-sw button{padding:5px 9px;font-size:.72rem}}
+
+.fb-card{border:1px dashed var(--line);border-radius:16px;padding:12px 16px;margin-top:6px}.fb-card summary{cursor:pointer;color:var(--muted);font-size:.9rem}
+.fb-body{display:flex;flex-direction:column;gap:12px;margin-top:12px}.fb-body label{display:flex;flex-direction:column;gap:6px}.fb-body label.sw{flex-direction:row;align-items:center;gap:10px}
+.fb-body textarea{width:100%;border-radius:10px;border:1px solid var(--line);background:var(--raise);padding:10px 12px;font:inherit;color:var(--fg);resize:vertical}

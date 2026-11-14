@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Statistiche · Portfolio OS</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600..800&family=Plus+Jakarta+Sans:wght@400..700&family=JetBrains+Mono:wght@400..600&display=swap">
+<style>
+:root{--bg:#0B0616;--panel:#160C2B;--raise:#21143D;--line:rgba(176,140,255,.18);--fg:#F5F1FF;--muted:#AEA2CF;--faint:#7568A0;--lime:#D4FF3A;--ink:#130A24;--bad:#FF6B8B;--c2:#A47BFF;--c3:#47E5FF}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#F4EFFF;--panel:#FFFFFF;--raise:#F0E9FF;--line:rgba(107,43,239,.16);--fg:#170B2E;--muted:#5F5180;--faint:#9B8FBB;--lime:#6B2BEF;--ink:#FFFFFF;--c2:#4F8A00;--c3:#0A8DB0}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font-family:"Plus Jakarta Sans",system-ui,sans-serif;padding:28px 16px 60px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font-family:Unbounded,sans-serif;font-size:1.7rem;margin:0}h2{font-family:Unbounded,sans-serif;font-size:1rem;margin:0 0 12px}
+.ey{font-family:"JetBrains Mono",monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.k{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.k div{background:var(--raise);border-radius:14px;padding:12px 14px}.k b{display:block;font-family:Unbounded,sans-serif;font-size:1.6rem;margin-top:4px}.k small{color:var(--muted)}
+.bars{display:flex;flex-direction:column;gap:7px}.bars li{list-style:none;display:grid;grid-template-columns:minmax(0,1.2fr) 1fr 48px;gap:10px;align-items:center;font-size:.88rem}
+.bars i{height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}.bars em{display:block;height:100%;background:var(--lime);border-radius:4px}.bars b{font-family:"JetBrains Mono",monospace;text-align:right}
+ul{margin:0;padding:0}.log{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto}.log li{list-style:none;border-top:1px solid var(--line);padding-top:10px;font-size:.88rem}
+.log small{color:var(--faint);font-family:"JetBrains Mono",monospace}.log pre{white-space:pre-wrap;font-family:"JetBrains Mono",monospace;font-size:.76rem;color:var(--muted);margin:6px 0 0}
+input,select,button{font:inherit;border-radius:10px;border:1px solid var(--line);background:var(--raise);color:var(--fg);padding:9px 12px}button{background:var(--lime);color:var(--ink);font-weight:700;border:0;cursor:pointer}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.bad{color:var(--bad)}.muted{color:var(--muted)}
+svg text{fill:var(--faint);font:11px "JetBrains Mono",monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row" style="justify-content:space-between"><div><span class="ey">Portfolio OS · beta</span><h1>Statistiche d'uso</h1></div>
+    <div class="row"><select id="days" aria-label="Periodo"><option value="7">Ultimi 7 giorni</option><option value="30" selected>Ultimi 30 giorni</option><option value="90">Ultimi 90 giorni</option></select><button type="button" id="reload">Aggiorna</button></div></div>
+  <div class="card" id="login" hidden><h2>Chiave delle statistiche</h2><p class="muted" style="margin-top:0">È il valore di STATS_KEY impostato su Vercel. Resta salvata solo in questo browser.</p>
+    <div class="row"><input type="password" id="key" autocomplete="current-password" aria-label="Chiave delle statistiche" style="min-width:260px"><button type="button" id="go">Entra</button><span id="err" class="bad"></span></div></div>
+  <div id="out" class="wrap" hidden></div>
+  <p class="muted" style="font-size:.82rem">Dati anonimi: nessun cookie, nessun indirizzo IP salvato, nessun valore dei file. Una «sessione» è una scheda del browser.</p>
+</div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const getKey=()=>{try{return localStorage.getItem("pos-stats-key")||"";}catch{return "";}},setKey=k=>{try{localStorage.setItem("pos-stats-key",k);}catch{}};
+const N={file:"Excel caricato",esempio:"Esempio",crea:"Portafoglio creato",crea_confronto:"Creato con confronto",file_prezzi_mercato:"Excel (prezzi di mercato)",
+  home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",stress:"Stress test",opt:"Frontiera",bench:"Benchmark",
+  ricevuta:"Ricevute dei calcoli",profilo:"Test del profilo",confronto:"Confronto allocazioni (modificato)",variante:"Prova una variante",assistente:"Assistente Quanta",pannello_crea:"Pannello «Crea portafoglio»",
+  coerente:"Coerente",piu_rischioso:"Più rischioso di quanto regge",senza_crisi:"Senza crisi nei dati",linkedin:"LinkedIn",google:"Google",diretto:"Diretto",whatsapp:"WhatsApp",social:"Altri social",altro:"Altri siti",telefono:"Telefono",tablet:"Tablet",computer:"Computer"};
+const nm=k=>N[k]||k;
+async function load(){
+  const key=getKey();if(!key){$("#login").hidden=false;$("#out").hidden=true;return;}
+  const r=await fetch(`/api/stats?days=${$("#days").value}`,{headers:{"x-stats-key":key}});const j=await r.json().catch(()=>({error:"risposta non valida"}));
+  if(!r.ok){$("#login").hidden=false;$("#out").hidden=true;$("#err").textContent=j.error||`Errore ${r.status}`;if(r.status===401)setKey("");return;}
+  $("#login").hidden=true;render(j);
+}
+function sum(o){return Object.values(o||{}).reduce((a,b)=>a+b,0);}
+function group(c,prefix){const out={};Object.entries(c).forEach(([k,v])=>{if(k.startsWith(prefix+":"))out[k.slice(prefix.length+1)]=sum(v);});return Object.entries(out).sort((a,b)=>b[1]-a[1]);}
+function bars(rows,empty="Ancora nessun dato"){if(!rows.length)return `<p class="muted">${empty}</p>`;const mx=Math.max(...rows.map(r=>r[1]),1);return `<ul class="bars">${rows.map(([k,v])=>`<li><span>${esc(nm(k))}</span><i><em style="width:${v/mx*100}%"></em></i><b>${v}</b></li>`).join("")}</ul>`;}
+function daily(days,series){const W=640,H=160,ml=30,mb=20,iw=W-ml-8,ih=H-mb-8,mx=Math.max(1,...series.flatMap(s=>days.map(d=>s.v[d]||0)));let g="";
+  [0,mx].forEach(v=>{const y=8+ih-v/mx*ih;g+=`<text x="${ml-6}" y="${y+4}" text-anchor="end">${v}</text><line x1="${ml}" x2="${W-8}" y1="${y}" y2="${y}" stroke="rgba(176,140,255,.15)"/>`;});
+  const bw=iw/days.length;series.forEach((s,j)=>days.forEach((d,i)=>{const v=s.v[d]||0;if(!v)return;const h=v/mx*ih,w=bw/series.length*.8;g+=`<rect x="${(ml+i*bw+j*w+bw*.1).toFixed(1)}" y="${(8+ih-h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${s.c}" rx="2"><title>${d}: ${v} ${s.l}</title></rect>`;}));
+  [0,days.length-1].forEach(i=>{g+=`<text x="${ml+i*bw+bw/2}" y="${H-4}" text-anchor="${i?"end":"start"}">${days[i].slice(5)}</text>`;});
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sessioni al giorno">${g}</svg><div class="row muted" style="font-size:.82rem">${series.map(s=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${s.c};margin-right:6px"></span>${s.l}</span>`).join("")}</div>`;}
+function render(j){
+  const c=j.count||{},s=j.sessions||{},vis=sum(s.visit),st=sum(s.start),ok=sum(s.import_ok),fail=sum(c.import_fail),pct=(a,b)=>b?Math.round(a/b*100)+"%":"—";
+  const R=j.recent||{};
+  $("#out").hidden=false;$("#out").innerHTML=`
+  <div class="card"><div class="k">
+    <div><span class="ey">Sessioni</span><b>${vis}</b><small>visite (schede aperte)</small></div>
+    <div><span class="ey">Hanno iniziato</span><b>${st}</b><small>${pct(st,vis)} delle sessioni</small></div>
+    <div><span class="ey">Arrivati al laboratorio</span><b>${ok}</b><small>${pct(ok,st)} di chi ha iniziato</small></div>
+    <div><span class="ey">Importazioni fallite</span><b class="${fail?"bad":""}">${fail}</b><small>errori di lettura o prezzi</small></div>
+    <div><span class="ey">Errori del sito</span><b class="${sum(c.error)?"bad":""}">${sum(c.error)}</b><small>errori JavaScript</small></div>
+    <div><span class="ey">Segnalazioni</span><b>${sum(c.feedback)}</b><small>«file non letto bene»</small></div></div></div>
+  <div class="card"><h2>Ogni giorno</h2>${daily(j.days,[{l:"sessioni",c:"var(--c2)",v:s.visit||{}},{l:"hanno iniziato",c:"var(--c3)",v:s.start||{}},{l:"al laboratorio",c:"var(--lime)",v:s.import_ok||{}}])}</div>
+  <div class="grid">
+    <div class="card"><h2>Come iniziano</h2>${bars(group(c,"start"))}</div>
+    <div class="card"><h2>Arrivati al laboratorio, per tipo</h2>${bars(group(c,"import_ok"))}</div>
+    <div class="card"><h2>Fin dove arrivano</h2>${bars(["home","scan","map","lab","risk","sim","stress","opt","bench"].map(k=>[k,sum(c["scene:"+k])]).filter(r=>r[1]))}</div>
+    <div class="card"><h2>Funzioni usate</h2>${bars(group(c,"feature"))}</div>
+    <div class="card"><h2>Test del profilo</h2>${bars(group(c,"profile_done"))}</div>
+    <div class="card"><h2>Da dove arrivano</h2>${bars(group(c,"visit"))}<h2 style="margin-top:16px">Dispositivo</h2>${bars(group(c,"device"))}</div>
+    <div class="card"><h2>Perché falliscono le importazioni</h2>${bars(group(c,"why"),"Nessuna importazione fallita")}</div>
+  </div>
+  <div class="grid">
+    <div class="card"><h2>Segnalazioni</h2>${(R.feedback||[]).length?`<ul class="log">${R.feedback.map(x=>`<li><small>${esc(x.t.slice(0,16).replace("T"," "))} · ${esc(nm(x.kind))}</small><div>${esc(x.text||"(senza testo)")}</div>${x.structure?`<pre>${esc([].concat(x.structure).join("\n"))}</pre>`:""}</li>`).join("")}</ul>`:`<p class="muted">Nessuna segnalazione.</p>`}</div>
+    <div class="card"><h2>Ultime importazioni fallite</h2>${(R.import_fail||[]).length?`<ul class="log">${R.import_fail.map(x=>`<li><small>${esc(x.t.slice(0,16).replace("T"," "))} · ${esc(nm(x.kind))}</small><div>${esc(x.why)}</div></li>`).join("")}</ul>`:`<p class="muted">Nessuna.</p>`}</div>
+    <div class="card"><h2>Ultimi errori del sito</h2>${(R.error||[]).length?`<ul class="log">${R.error.map(x=>`<li><small>${esc(x.t.slice(0,16).replace("T"," "))} · sezione ${esc(nm(x.where))}</small><div>${esc(x.msg)}</div></li>`).join("")}</ul>`:`<p class="muted">Nessun errore.</p>`}</div>
+  </div>`;
+}
+$("#go").addEventListener("click",()=>{setKey($("#key").value.trim());$("#err").textContent="";load();});
+$("#key").addEventListener("keydown",e=>{if(e.key==="Enter")$("#go").click();});
+$("#reload").addEventListener("click",load);$("#days").addEventListener("change",load);
+load();
+</script>
+</body>
+</html>

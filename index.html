@@ -125,7 +125,7 @@
         <div class="card ai s12" id="aiCard">
           <div class="head"><h3>Lettura con IA</h3><span class="chip"><i></i>Claude · proposte da confermare</span></div>
           <div id="aiBody"></div>
-          <p class="caption">All'IA arriva solo un estratto della struttura (intestazioni, titoli di sezione, prime e ultime righe), mai il file intero. I calcoli restano nel tuo browser e un modello già confermato non viene più inviato.</p>
+          <p class="caption">All'IA arriva solo un estratto della struttura (intestazioni, titoli di sezione, prime e ultime righe), mai il file intero. I calcoli restano nel tuo browser e un modello già confermato non viene più inviato. Il sito raccoglie statistiche d'uso anonime (quali sezioni si usano, se l'importazione riesce), senza cookie e senza nessun dato dei tuoi file.</p>
         </div>
         <div class="card s12">
           <div class="tablewrap">
@@ -142,6 +142,11 @@
           <p id="confirmText"></p>
           <button type="button" class="btn primary" id="confirmBtn">Costruisci il laboratorio</button>
         </div>
+        <details class="s12 fb-card" id="fbCard"><summary>Il tuo file non è stato letto bene? Segnalalo</summary>
+          <div class="fb-body"><label><span class="eyebrow">Cosa non va (facoltativo)</span><textarea id="fbText" rows="3" maxlength="1200" placeholder="Es. non trova la colonna delle quantità, oppure le date sono sbagliate"></textarea></label>
+            <label class="sw"><input type="checkbox" id="fbStruct"><span>Invia anche la struttura del file: nomi dei fogli e delle colonne, <b>senza nessun valore</b></span></label>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn sm lime" id="fbSend">Invia la segnalazione</button><span class="caption" id="fbMsg"></span></div>
+            <p class="caption" style="margin:0">Serve a migliorare la lettura dei file. Nessun numero del tuo file viene inviato, né il nome del file.</p></div></details>
       </div>
     </div>
   </section>
