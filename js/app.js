@@ -18,7 +18,7 @@ const COLORS=["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(-
 const NET_COLORS=["#C8FF2E","#A47BFF","#47E5FF","#FF7AD9","#FFC24B","#5BF0A5"];
 const color=i=>COLORS[i%COLORS.length];
 const fmtSize=b=>b<1024?b+" B":b<1048576?fmtN(b/1024,0)+" KB":fmtN(b/1048576,1)+" MB";
-const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,corrView:"net",scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null,macro:null,rfSrc:"ecb"};
+const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,corrView:"mat",scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null,macro:null,rfSrc:"ecb"};
 
 /* ---------- Scene e dock ---------- */
 const SCENES=["home","scan","map","lab","risk","sim","stress","opt","bench"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
@@ -1881,11 +1881,14 @@ function disposeNet(){
   NET.renderer.dispose();NET.renderer.domElement.remove();NET.labels.forEach(l=>l.remove());NET=null;
 }
 function netFallback(msg){setCorrView("mat",false);const old=$("#netmsg");if(old)old.remove();$("#corr").insertAdjacentHTML("beforebegin",`<p class="caption" id="netmsg">${esc(msg)}</p>`);}
+let threeP=null;
+const loadThree=()=>threeP||(threeP=new Promise((ok,ko)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";s.onload=ok;s.onerror=()=>{threeP=null;ko();};document.head.appendChild(s);}));
 function buildNet(){
   disposeNet();const ds=S.ds,L=S.lab;if(!ds||!L)return;
   const k=ds.assets.length,box=$("#net");
   if(k<2){netFallback("La rete richiede almeno due asset.");return;}
-  if(!window.THREE){netFallback("La vista 3D non si è caricata: ti mostro la matrice.");return;}
+  /* three.js si scarica solo qui, la prima volta che si apre la rete 3D (~120 KB risparmiati per chi non la usa) */
+  if(!window.THREE){loadThree().then(()=>{if(S.corrView==="net")buildNet();}).catch(()=>netFallback("La vista 3D non si è caricata: ti mostro la matrice."));return;}
   let renderer;try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch(e){netFallback("Il tuo browser non supporta la grafica 3D: ti mostro la matrice.");return;}
   const T=THREE,scene=new T.Scene(),camera=new T.PerspectiveCamera(42,1,.1,100);
   camera.position.set(0,1.3,8.4);camera.lookAt(0,0,0);renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));box.prepend(renderer.domElement);
@@ -3408,7 +3411,7 @@ window.__quanta={roam:()=>{QG.lastInput=0;roam();},say:s=>showSay(s||current)}; 
 load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);/* subito qualcosa da mostrare, poi il portafoglio di esempio vero */
 loadExample(false);
 if(!CALM)morphInit();
-renderLabs();loadMarket();
+renderLabs();if(!$("#mkt")||!$("#mkt").classList.contains("v2-hidden"))loadMarket();
 quantaScene("home");
 requestAnimationFrame(movePill);
 if(!HAS_G)heroIntro();
