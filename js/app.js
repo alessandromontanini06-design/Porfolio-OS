@@ -1378,6 +1378,84 @@ document.addEventListener("click",e=>{if(!S.cmp)return;const t=e.target;
   if(t.id==="cmpAdd"&&S.cmp.ports.length<3){const n=S.ds.assets.length;S.cmp.ports.push({name:"ABC"[S.cmp.ports.length],w:S.ds.assets.map(()=>1/n)});renderCompare();}
   else if(t.id==="cmpEq"&&S.cmp.ports[1]){const n=S.ds.assets.length;S.cmp.ports[1].w=S.ds.assets.map(()=>1/n);renderCompare();}
   else if(t.dataset&&t.dataset.cpx){S.cmp.ports.splice(+t.dataset.cpx,1);S.cmp.ports.forEach((p,i)=>p.name="ABC"[i]);renderCompare();}});
+/* ---------- Il tuo profilo: la tua allocazione è coerente con te? ----------
+   Non è consulenza: non indica prodotti. Misura la perdita che l'utente regge da come reagisce a crisi vere rivissute
+   con il suo capitale, e la confronta con le perdite storiche del suo portafoglio e di versioni più prudenti
+   (stessa composizione di oggi + liquidità al tasso BCE), sugli stessi dati. */
+const PRQ=[
+  {k:"hor",q:"Fra quanto tempo ti serviranno questi soldi?",o:[["lt3","Meno di 3 anni"],["3-7","Da 3 a 7 anni"],["7-15","Da 7 a 15 anni"],["gt15","Oltre 15 anni"]]},
+  {k:"use",q:"A cosa servono, soprattutto?",o:[["casa","Un acquisto importante (casa, studi…)"],["pens","Pensione o futuro lontano"],["cresc","Far crescere il patrimonio"],["ris","Una riserva per gli imprevisti"]]},
+  {k:"cash",q:"Fuori da questo portafoglio, per quanti mesi di spese hai liquidità da parte?",o:[["0-3","Meno di 3 mesi"],["3-6","Da 3 a 6 mesi"],["6-12","Da 6 a 12 mesi"],["gt12","Più di un anno"]]}];
+const PRC=[["stay","Resto investito"],["half","Vendo metà"],["all","Vendo tutto"],["buy","Compro di più"]];
+function prBase(){
+  const ds=S.ds,f=ds.freq.f,w=pfWeights("now")||ds.assets.map(()=>1/ds.assets.length),pos=S.portfolio?S.portfolio.positions:[];
+  const cap=Math.round(pos.reduce((s,p)=>s+(p.valore||0),0))||10000,mm=macroFor(S.rfSrc),rf=mm?mm.rf:0;
+  const cr=P.CRISES.map(c=>P.crisisAnalysis(ds.dates,ds.assets,w,f,c)).filter(c=>c.status==="in"&&c.troughK!=null&&c.mdd<-.05).sort((a,b)=>a.mdd-b.mdd).slice(0,3);
+  return {ds,f,w,cap,rf,cr};
+}
+/* quanto sarebbe valso restare: dal punto più basso fino al recupero, o al massimo 24 periodi dopo */
+function prAfter(c,f){const pr=P.portfolioReturns(S.ds.assets,S.PR.w),end=Math.min(pr.length-1,c.recK!=null?c.recK:c.troughK+Math.round(2*f));let v=1;for(let k=c.troughK+1;k<=end;k++)if(Number.isFinite(pr[k]))v*=1+pr[k];return {g:v-1,end};}
+/* versione più prudente: x del portafoglio di oggi, il resto in liquidità al tasso privo di rischio, ribilanciata ogni periodo */
+function prMix(x){const B=S.PR,pr=P.portfolioReturns(B.ds.assets,B.w),cash=B.rf/B.f,r=pr.map(v=>Number.isFinite(v)?x*v+(1-x)*cash:NaN);
+  let V=1,pk=1,mdd=0;r.forEach(v=>{if(!Number.isFinite(v))return;V*=1+v;if(V>pk)pk=V;mdd=Math.min(mdd,V/pk-1);});
+  const cr=B.cr.map(c=>{let v=1,p=1,d=0;c.idx.forEach(k=>{if(!Number.isFinite(r[k]))return;v*=1+r[k];if(v>p)p=v;d=Math.min(d,v/p-1);});return d;});
+  const n=r.filter(Number.isFinite).length,cagr=n?Math.pow(r.reduce((a,v)=>Number.isFinite(v)?a*(1+v):a,1),B.f/n)-1:NaN;
+  return {x,mdd,cr,worst:Math.min(mdd,...cr),cagr};}
+function openProfile(){
+  if(!S.lab||!S.ds||!S.ds.ok)return;S.PR={...prBase(),step:0,ans:{},ch:[]};prRender();
+  $("#profile").classList.add("open");$("#scrim").classList.add("open");$("#profile").setAttribute("aria-hidden","false");
+}
+function closeProfile(){$("#profile").classList.remove("open");if(!$("#drawer").classList.contains("open")&&!$("#builder").classList.contains("open"))$("#scrim").classList.remove("open");$("#profile").setAttribute("aria-hidden","true");}
+function prRender(){
+  const B=S.PR,el=$("#prBody"),nq=PRQ.length,nc=B.cr.length,tot=1+nq+nc+1,st=B.step,ds=B.ds,f=B.f;
+  const bar=`<div class="pr-bar"><i style="width:${Math.round(st/(tot-1)*100)}%"></i></div><span class="eyebrow">Passo ${Math.min(st+1,tot)} di ${tot}</span>`;
+  if(st===0){el.innerHTML=`${bar}<h3 class="pr-h">La tua allocazione è coerente con te?</h3>
+    <p>Tre domande su di te, poi rivivi ${nc?`${nc} ${nc===1?"crisi vera":"crisi vere"}`:"le crisi"} con il tuo capitale di oggi (${fmtEur(B.cap)}) e scegli cosa avresti fatto. Alla fine confronto la perdita che reggi con quella che il tuo portafoglio ha avuto davvero.</p>
+    ${nc?"":`<p style="color:var(--warn)">Nei dati del tuo portafoglio non c'è nessuna crisi completa con un calo di almeno il 5%: il test resta alle tre domande e alle perdite storiche.</p>`}
+    <p class="caption">Strumento educativo, non consulenza: non ti dico cosa comprare. Usa solo i prezzi storici del tuo portafoglio.</p>
+    <button type="button" class="btn lime" data-prgo="1">Inizia · 2 minuti</button>`;return;}
+  if(st<=nq){const q=PRQ[st-1];el.innerHTML=`${bar}<h3 class="pr-h">${q.q}</h3><div class="pr-opts">${q.o.map(o=>`<button type="button" class="pr-opt${B.ans[q.k]===o[0]?" on":""}" data-pra="${q.k}" data-prv="${o[0]}">${o[1]}</button>`).join("")}</div>${st>1?`<button type="button" class="btn sm" data-prgo="-1">Indietro</button>`:""}`;return;}
+  if(st<=nq+nc){const i=st-nq-1,c=B.cr[i],v=c.path.find(p=>p.k===c.troughK).v,val=B.cap*(1+c.mdd),done=B.ch[i];
+    const head=`${bar}<span class="eyebrow">${esc(c.name)} · ${fmtDate(ds.dates[c.troughK],f)}</span><h3 class="pr-h">Il tuo portafoglio da ${fmtEur(B.cap)} ora vale <span class="dn">${fmtEur(val)}</span></h3>
+      <p>In ${unitN(c.troughK-c.idx[0]+1,f)} ha perso il <b class="dn">${fmtPct(-c.mdd,0)}</b>. ${esc(c.what||"")} Nessuno sa se il peggio è passato.</p>`;
+    if(!done){el.innerHTML=`${head}<h4 class="pr-q">Cosa fai?</h4><div class="pr-opts">${PRC.map(o=>`<button type="button" class="pr-opt" data-prc="${i}" data-prv="${o[0]}">${o[1]}</button>`).join("")}</div>`;return;}
+    const A=prAfter(c,f),lost=done==="all"?A.g:done==="half"?A.g/2:done==="buy"?-A.g*.25:0,eur=B.cap*(1+c.mdd)*Math.abs(lost);
+    el.innerHTML=`${head}<div class="pr-res"><b>Hai scelto: ${PRC.find(o=>o[0]===done)[1].toLowerCase()}.</b>
+      <p>Restando investito, ${A.end<ds.dates.length-1&&c.recK!=null?`a ${fmtDate(ds.dates[A.end],f)} il portafoglio aveva recuperato tutto`:`nei ${unitN(A.end-c.troughK,f)} successivi il portafoglio ha fatto ${fmtPct(A.g,0,true)}`}.
+      ${done==="stay"?"Restare ti avrebbe fatto recuperare la perdita.":done==="buy"?`Comprare di più (un quarto del valore) ti avrebbe fatto guadagnare circa ${fmtEur(eur)} in più.`:A.g>0?`Vendendo avresti rinunciato a circa <b class="dn">${fmtEur(eur)}</b> di recupero.`:"Questa volta vendere non ti sarebbe costato."}</p></div>
+      <button type="button" class="btn lime" data-prgo="1">${i<nc-1?"Prossima crisi":"Vedi il risultato"}</button>`;return;}
+  /* verdetto */
+  const sold=B.cr.map((c,i)=>({c,ch:B.ch[i]})).filter(x=>x.ch==="all"||x.ch==="half"),tol=sold.length?Math.max(...sold.map(x=>x.c.mdd)):null;
+  /* chi vende a un calo d non regge d: la soglia è appena sopra (d + 2 punti); chi non vende mai regge almeno il calo più profondo rivissuto */
+  const deepest=B.cr.length?Math.min(...B.cr.map(c=>c.mdd)):null,thr=tol!=null?tol+.02:deepest!=null?deepest:null;
+  const all=prMix(1),mixes=[1,.8,.6,.4,.2].map(prMix),fits=m=>thr!=null&&m.worst>=thr-1e-9,okMix=thr!=null?mixes.find(fits):null;
+  const hor=B.ans.hor,cash=B.ans.cash,warn=[];
+  if(hor==="lt3"&&all.worst<-.15)warn.push(`Ti servono i soldi entro 3 anni, ma nel passato il portafoglio ha perso fino al ${fmtPct(-all.worst,0)}: in un periodo così breve una perdita potrebbe non fare in tempo a recuperare.`);
+  if(cash==="0-3")warn.push("Hai meno di 3 mesi di spese da parte: un imprevisto durante un crollo potrebbe costringerti a vendere in perdita. Molti tengono da 3 a 6 mesi di riserva prima di investire.");
+  if(B.ans.use==="ris"&&all.worst<-.1)warn.push("Dici che questi soldi sono una riserva per gli imprevisti, ma il portafoglio può perdere molto proprio quando servono.");
+  const coh=thr==null?null:fits(all);
+  el.innerHTML=`${bar}<h3 class="pr-h">${coh==null?"Il tuo risultato":coh?"La tua allocazione è coerente con come reagisci":`Il tuo portafoglio è più rischioso di quanto reggi`}</h3>
+    <div class="pr-k"><div><span class="eyebrow">La perdita che reggi</span><b>${tol!=null?`meno del ${fmtPct(-tol,0)}`:deepest!=null?`almeno il ${fmtPct(-deepest,0)}`:"—"}</b><small>${tol!=null?`hai venduto quando il portafoglio perdeva il ${fmtPct(-tol,0)}`:deepest!=null?"non hai mai venduto nelle crisi rivissute":"nessuna crisi nei dati"}</small></div>
+      <div><span class="eyebrow">Perdita peggiore del tuo portafoglio</span><b class="dn">${fmtPct(-all.worst,0)}</b><small>nei dati storici, con i pesi di oggi</small></div></div>
+    ${thr!=null?`<h4 class="pr-q">Quanto avresti potuto tenere investito, così com'è, per restare sotto la tua soglia</h4>
+    <div class="tablewrap"><table class="mt pr-t"><thead><tr><th>Investito come oggi</th><th>Liquidità</th><th>Perdita peggiore</th><th>Rendimento annuo</th></tr></thead><tbody>${mixes.map(m=>`<tr class="${okMix&&m.x===okMix.x?"pr-ok":""}"><td class="mono">${fmtPct(m.x,0)}</td><td class="mono">${fmtPct(1-m.x,0)}</td><td class="mono ${fits(m)?"":"dn"}">${fmtPct(-m.worst,0)}</td><td class="mono">${fmtPct(m.cagr,1,true)}</td></tr>`).join("")}</tbody></table></div>
+    <p class="caption">${okMix?`Nel passato, con il ${fmtPct(okMix.x,0)} investito come oggi e il resto in liquidità la perdita peggiore sarebbe rimasta entro la tua soglia.`:"Nessuna combinazione con almeno il 20% investito sarebbe rimasta sotto la tua soglia."} Liquidità remunerata al tasso privo di rischio medio${B.mm?"":" (0%)"}. Puoi provare mix diversi in «Confronta allocazioni».</p>`:""}
+    ${warn.length?`<ul class="pr-warn">${warn.map(x=>`<li>${x}</li>`).join("")}</ul>`:""}
+    <p class="caption">Come leggerlo: la soglia nasce da quello che hai scelto rivivendo crisi vere, non da quello che dichiari. Le perdite sono storiche e calcolate sui prezzi di mercato del tuo portafoglio; il futuro può essere peggiore. Strumento educativo, non consulenza finanziaria: non indica prodotti da comprare o vendere.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="btn" data-prgo="restart">Rifai il test</button><button type="button" class="btn lime" data-prgo="cmp">Prova un'allocazione diversa</button></div>`;
+  S.PR.result={tol,thr,worst:all.worst,coh,okMix:okMix&&okMix.x};
+}
+$("#profile").addEventListener("click",e=>{const B=S.PR;if(!B)return;const g=e.target.closest("[data-prgo]"),a=e.target.closest("[data-pra]"),c=e.target.closest("[data-prc]");
+  if(a){B.ans[a.dataset.pra]=a.dataset.prv;B.step++;prRender();}
+  else if(c){B.ch[+c.dataset.prc]=c.dataset.prv;prRender();}
+  else if(g){const v=g.dataset.prgo;if(v==="restart"){S.PR={...prBase(),step:0,ans:{},ch:[]};}else if(v==="cmp"){closeProfile();const el=$("#cmpCard");if(el){go("lab");setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),400);}return;}else B.step=Math.max(0,B.step+(+v));prRender();}});
+$("#closeProfile").addEventListener("click",closeProfile);
+$("#scrim").addEventListener("click",closeProfile);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#profile").classList.contains("open"))closeProfile();});
+document.addEventListener("click",e=>{if(e.target.closest("#prStart"))openProfile();});
+function renderProfileCard(){const el=$("#profCard");if(!el)return;if(!S.lab||!S.ds||!S.ds.ok){el.hidden=true;return;}el.hidden=false;
+  const r=S.PR&&S.PR.result;
+  el.innerHTML=`<div class="prof-cta"><div><span class="eyebrow">Il tuo profilo</span><h3>La tua allocazione è coerente con te?</h3><p class="caption" style="margin:0">${r&&r.coh!=null?(r.coh?"Ultimo risultato: coerente con come reagisci alle crisi.":"Ultimo risultato: il portafoglio è più rischioso di quanto reggi."):"Rivivi crisi vere con il tuo capitale e scopri la perdita che reggi davvero, misurata da come reagisci e non da un questionario."}</p></div><button type="button" class="btn lime" id="prStart">${r?"Rifai il test":"Fai il test · 2 minuti"}</button></div>`;}
 function renderPortfolio(){
   const card=$("#pfCard");if(!card)return;
   const pf=S.portfolio,ds=S.ds,f=ds&&ds.freq?ds.freq.f:12;
@@ -1565,6 +1643,7 @@ function renderLab(){
   drawChart(false);
   renderMetrics();
   renderMacro();
+  renderProfileCard();
   renderPortfolio();
   renderCompare();
   renderReal();
