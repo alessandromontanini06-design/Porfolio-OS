@@ -801,3 +801,8 @@ body[data-scene="bench"]{--pill:#5BF0A5;--pill-rgb:91,240,165}
 .prof-cta{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}.prof-cta h3{margin:4px 0 6px}
 .pr-t{width:100%;table-layout:fixed}.pr-t th,.pr-t td{padding:8px 6px;font-size:.86rem;white-space:normal;text-align:right}.pr-t th:first-child,.pr-t td:first-child{text-align:left}
 .pr-t{min-width:0!important}
+
+.space-sw{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--solid);margin-right:8px}
+.space-sw button{border:0;background:none;color:var(--muted);font:inherit;font-size:.78rem;padding:6px 12px;border-radius:999px;cursor:pointer}
+.space-sw button.on{background:var(--lime);color:var(--lime-ink);font-weight:700}.space-sw button:disabled{opacity:.4;cursor:default}
+@media (max-width:760px){.space-sw button{padding:5px 9px;font-size:.72rem}}

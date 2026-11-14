@@ -527,6 +527,7 @@ async function handleFile(file){
       sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
     }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
     if(!sheets.some(s=>s.aoa.length)){showError("Il file è vuoto.");return;}
+    if(isSim())spaceSwitch("real",{fresh:true,stay:true});
     sheets=P.normalizeExports(sheets); // export di broker a più sezioni (es. Interactive Brokers) → foglio di movimenti
     load(sheets,{name:file.name,size:file.size,kind:"file"},true);
   }catch(e){showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
@@ -542,6 +543,7 @@ $("#file").addEventListener("change",e=>{handleFile(e.target.files[0]);e.target.
 const EXAMPLE={url:"esempio/Portfolio_OS_esempio.xlsx",name:"Portfolio_OS_esempio.xlsx"};
 const isExample=()=>!!(S.source&&(S.source.example||(S.source.kind==="rebuilt"&&S.rb&&S.rb.origSource&&S.rb.origSource.example)));
 async function loadExample(fromUser){
+  if(fromUser&&isSim()){spaceSwitch("real",{stay:true});if(isExample()&&S.source&&S.source.kind==="rebuilt"){go("scan",{force:true});return;}}
   if(fromUser&&isExample()&&S.source.kind==="rebuilt"){go("scan",{force:true});return;}
   try{
     for(let k=0;!window.XLSX&&k<50;k++)await new Promise(r=>setTimeout(r,100));
@@ -555,6 +557,35 @@ async function loadExample(fromUser){
   }catch(e){if(fromUser)showError("Non riesco a caricare il file di esempio. Ricarica la pagina e riprova.");}
 }
 $("#sampleBtn").addEventListener("click",()=>loadExample(true));
+
+
+/* ---------- Due spazi distinti: «Il mio portafoglio» (dal file) e «Prove e confronti» (portafogli creati a mano) ----------
+   Ognuno ha il suo stato completo; cambiare spazio salva quello attuale e ripristina l'altro, senza sovrascrivere nulla.
+   Restano comuni solo le preferenze (assistente, tasso privo di rischio, viste scelte, benchmark). */
+const SPACE_KEEP=new Set(["chat","chatView","rfSrc","lookTab","corrView","bn","bnData"]);
+const SPACES={cur:"real",store:{real:null,sim:null}};
+const spaceBlank=()=>({source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null,macro:null});
+function spaceSave(){const o={};for(const k of Object.keys(S))if(!SPACE_KEEP.has(k))o[k]=S[k];SPACES.store[SPACES.cur]=o;}
+function spaceSwitch(to,opt={}){
+  if(to===SPACES.cur&&!opt.fresh)return;
+  const hadLab=!!S.lab;spaceSave();if(hadLab)hideLab();
+  for(const k of Object.keys(S))if(!SPACE_KEEP.has(k))delete S[k];
+  Object.assign(S,spaceBlank());SPACES.cur=to;
+  const o=opt.fresh?null:SPACES.store[to];
+  if(o){Object.assign(S,o);const lab=!!o.lab;S.lab=null;
+    renderImport(false);
+    if(lab&&S.ds&&S.ds.ok)showLab(true,true);
+    /* l'esempio si stava ricostruendo in sottofondo quando si è cambiato spazio: si riparte */
+    if(S.und&&S.und.status==="rebuilding"){S.und={...S.und,status:"ready"};S.autoRebuilt=S.source;rebuildFromPrices({quiet:true});}
+  }else if(S.sheets&&S.sheets.length)renderImport(false);
+  spaceBar();
+  if(!opt.stay){if(S.lab)go("lab",{force:true});else if(!opt.fresh)go("home",{force:true});}
+}
+function spaceBar(){const el=$("#spaceSw");if(!el)return;const other=SPACES.cur==="real"?"sim":"real",show=SPACES.cur==="sim"||!!SPACES.store.sim;
+  el.hidden=!show;el.querySelectorAll("[data-space]").forEach(b=>{const on=b.dataset.space===SPACES.cur;b.setAttribute("aria-pressed",String(on));b.classList.toggle("on",on);b.disabled=!on&&b.dataset.space===other&&!SPACES.store[other]&&other==="sim";});
+  document.body.dataset.space=SPACES.cur;}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-space]");if(!b||b.classList.contains("on"))return;spaceSwitch(b.dataset.space);});
+const isSim=()=>SPACES.cur==="sim";
 
 /* ---------- Crea il tuo portafoglio: strumenti e pesi scelti a mano, poi lo stesso percorso di un Excel (prezzi di mercato → laboratorio) ---------- */
 const POPULAR=[["VWCE","Vanguard FTSE All-World (Acc)","IE00BK5BQT80"],["SWDA","iShares Core MSCI World (Acc)","IE00B4L5Y983"],["CSSPX","iShares Core S&P 500 (Acc)","IE00B5BMR087"],
@@ -580,6 +611,9 @@ function bdRender(){
 function openBuilder(){bdRender();$("#builder").classList.add("open");$("#scrim").classList.add("open");$("#builder").setAttribute("aria-hidden","false");setTimeout(()=>{const i=document.querySelector("#bdRows input");if(i)i.focus();},350);}
 function closeBuilder(){$("#builder").classList.remove("open");if(!$("#drawer").classList.contains("open"))$("#scrim").classList.remove("open");$("#builder").setAttribute("aria-hidden","true");}
 $("#builderBtn").addEventListener("click",openBuilder);
+/* copia l'allocazione vera come portafoglio A: la modifichi nello spazio di prova senza toccare l'originale */
+document.addEventListener("click",e=>{if(!e.target.closest("#variantBtn")||!S.portfolio)return;const P0=S.portfolio.positions.filter(p=>p.valore>0),tot=P0.reduce((a,p)=>a+p.valore,0);if(!(tot>0))return;
+  BD.ports=[P0.map(p=>{const f=POPULAR.find(x=>x[2]===p.isin);return [f?f[0]:(p.isin||p.ticker||p.nome),Math.round(p.valore/tot*1000)/10];})];BD.cur=0;$("#bdCap").value=Math.round(tot);openBuilder();});
 $("#closeBuilder").addEventListener("click",closeBuilder);
 $("#scrim").addEventListener("click",closeBuilder);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#builder").classList.contains("open"))closeBuilder();});
@@ -602,7 +636,8 @@ function bdGo(){
   /* un riepilogo di posizioni come quello di un Excel: lo legge il riconoscitore locale, poi i prezzi di mercato */
   const aoa=[["Strumento","Ticker","ISIN","Valore (€)","Peso"],...rows.map(r=>{const f=bdFind(r[0])||[r[0],null,null],w=(+r[1])/s;return [f[1]||f[0]||f[2],f[0]&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(f[0])?f[0]:"",f[2]||"",Math.round(cap*w*100)/100,w];})];
   closeBuilder();
-  load([{name:"Il mio portafoglio",aoa}],{name:"Il mio portafoglio",size:0,kind:"file",builder:true},true);
+  const pend=S.cmpPending;spaceSwitch("sim",{fresh:true,stay:true});S.cmpPending=pend; // le allocazioni A, B, C scelte passano al nuovo spazio
+  load([{name:"Portafoglio di prova",aoa}],{name:"Portafoglio di prova",size:0,kind:"file",builder:true},true);spaceBar();
 }
 
 /* ---------- Import ---------- */
@@ -1340,6 +1375,8 @@ function cmpCalc(){
 }
 function renderCompare(){
   const card=$("#cmpCard");if(!card)return;const ds=S.ds;
+  /* nello spazio «Prove e confronti» il confronto è la scheda principale: in cima al laboratorio */
+  const pc=$("#profCard"),pf=$("#pfCard");if(pc&&pf){if(isSim()){if(card.nextElementSibling!==pc)pc.parentNode.insertBefore(card,pc);}else if(pf.nextElementSibling!==card)pf.parentNode.insertBefore(card,pf.nextSibling);}
   if(!S.lab||!ds||!ds.ok||ds.assets.length<1){card.hidden=true;return;}
   card.hidden=false;if(!S.cmp||S.cmp.n!==ds.assets.length+":"+ds.nObs){cmpInit();S.cmp.n=ds.assets.length+":"+ds.nObs;}
   const R=cmpCalc(),f=ds.freq.f,K=R.ks,ok=R.res.filter(r=>!r.empty);
@@ -1458,6 +1495,7 @@ function renderProfileCard(){const el=$("#profCard");if(!el)return;if(!S.lab||!S
   el.innerHTML=`<div class="prof-cta"><div><span class="eyebrow">Il tuo profilo</span><h3>La tua allocazione è coerente con te?</h3><p class="caption" style="margin:0">${r&&r.coh!=null?(r.coh?"Ultimo risultato: coerente con come reagisci alle crisi.":"Ultimo risultato: il portafoglio è più rischioso di quanto reggi."):"Rivivi crisi vere con il tuo capitale e scopri la perdita che reggi davvero, misurata da come reagisci e non da un questionario."}</p></div><button type="button" class="btn lime" id="prStart">${r?"Rifai il test":"Fai il test · 2 minuti"}</button></div>`;}
 function renderPortfolio(){
   const card=$("#pfCard");if(!card)return;
+  if(isSim()){card.hidden=true;return;} /* portafoglio di prova: pesi e confronto sono nella scheda «Confronta allocazioni» */
   const pf=S.portfolio,ds=S.ds,f=ds&&ds.freq?ds.freq.f:12;
   if(!pf||!S.lab){card.hidden=true;return;}
   card.hidden=false;
@@ -1468,7 +1506,7 @@ function renderPortfolio(){
     return `<tr><td><span class="an">${esc(r.label)}</span><span class="cl mono">${r.w.map((x,j)=>x>0?`${esc(ds.assets[j].name)} ${fmtPct(x,0)}`:"").filter(Boolean).join(" · ")}</span></td>
       <td>${cell("pf-cagr-"+i,fmtPct(s.cagr,1,true),s.cagr<0?"neg":"")}</td><td>${mm?cell("pf-real-"+i,fmtPct(real,1,true),real<0?"neg":""):"—"}</td><td>${cell("pf-vol-"+i,fmtPct(s.vol))}</td><td>${cell("pf-sharpe-"+i,fmtN(sh))}</td><td>${cell("pf-mdd-"+i,fmtPct(s.mdd),"neg")}</td></tr>`;}).join("");
   const reb=rebalanceHTML(pf);
-  card.innerHTML=`<div class="head"><h3>Il tuo portafoglio</h3><span class="chip hist"><i></i>pesi dal file «${esc(pf.from)}»</span></div>
+  card.innerHTML=`<div class="head"><h3>Il tuo portafoglio</h3><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn sm" id="variantBtn">Prova una variante</button><span class="chip hist"><i></i>pesi dal file «${esc(pf.from)}»</span></div></div>
     <div class="tablewrap"><table class="mt"><thead><tr><th>Portafoglio</th><th>Rend. annuo</th><th>Rend. reale</th><th>Volatilità</th><th>Sharpe</th><th>Max drawdown</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="caption">Ipotesi: portafoglio ribilanciato ogni mese ai pesi indicati, sullo storico di ${ds.nObs} mesi. ${S.rb?"Prezzi di mercato convertiti in euro con il cambio BCE di fine mese.":"Valori come nel file."}${pf.missing.length?` Esclusi perché senza prezzi: ${pf.missing.map(m=>esc(m.nome)).join(", ")}.`:""}</p>${reb}`;
 }
