@@ -1768,6 +1768,7 @@ function labIndex(){
 }
 /* indice laterale: evidenzia la scheda che stai guardando */
 document.getElementById("scene-lab")?.addEventListener("scroll",()=>{if(!S.labIdx)return;let k=0;S.labIdx.forEach((v,i)=>{if(v.card.getBoundingClientRect().top<window.innerHeight*.35)k=i;});document.querySelectorAll("#labIdx [data-li]").forEach((b,i)=>b.classList.toggle("on",i===k));},{passive:true});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-gv]");if(!b)return;S.growView=b.dataset.gv;drawChart(false);});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-li]");if(!b||!S.labIdx)return;const v=S.labIdx[+b.dataset.li];if(v)v.card.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"start"});});
 function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;
@@ -1825,6 +1826,11 @@ function niceTicks(min,max,count){
 }
 function drawChart(animate){
   if(!S.lab)return;
+  /* vista alternativa: i tuoi soldi veri (valore e versato) al posto di «crescita di 100 €» */
+  const gv=$("#growView");if(gv){gv.hidden=!(S.real&&S.real.pp);gv.querySelectorAll("[data-gv]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.gv===(S.growView||"100"))));}
+  const gt=$("#growTitle");if(gt)gt.textContent=S.growView==="money"&&S.real&&S.real.pp?"I tuoi soldi nel tempo":"Crescita di 100 €";
+  if(S.growView==="money"&&S.real&&S.real.pp){drawReal("#chartbox","#legend");return;}
+  $("#legend").innerHTML=S.ds.assets.map((a,i)=>`<span><i style="background:${color(i)}"></i>${esc(a.name)}</span>`).join("");
   const ds=S.ds,W=S.lab.W,n=ds.dates.length,f=ds.freq.f;
   const VW=900,VH=340,ml=50,mr=14,mt=12,mb=30,iw=VW-ml-mr,ih=VH-mt-mb;
   let mn=Infinity,mx=-Infinity;W.forEach(s=>s.forEach(v=>{if(Number.isFinite(v)){if(v<mn)mn=v;if(v>mx)mx=v;}}));
@@ -2037,7 +2043,27 @@ function drawUnderwater(PR,f){
   g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--muted)"/>`;
   $("#riskDD").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Drawdown del portafoglio nel tempo">${g}</svg>`;
   $("#ddCap").textContent=PR.troughK!=null?`Calo peggiore: inizio ${fmtDate(ds.dates[PR.peakAtTrough],f)}, punto più basso ${fmtDate(ds.dates[PR.troughK],f)}, ${PR.recK!=null?`recuperato ${fmtDate(ds.dates[PR.recK],f)}.`:"non ancora recuperato."}`:"Nessun calo dal massimo nel periodo.";
+  ddWhyBox(PR,f);
 }
+/* Il calo peggiore raccontato dall'IA: il contesto di mercato di quel periodo, senza numeri inventati
+   e senza attribuire il calo a una sola causa. Il testo resta in memoria per lo stesso periodo. */
+function ddWhyBox(PR,f){
+  const el=$("#ddWhy");if(!el)return;const ds=S.ds;
+  if(PR.troughK==null||PR.mdd>-.03){el.innerHTML="";return;}
+  const from=fmtDate(ds.dates[PR.peakAtTrough],f),to=fmtDate(ds.dates[PR.troughK],f),key=from+"|"+to+"|"+ds.assets.map(a=>a.name).join(",");
+  const c=(S.ddWhy=S.ddWhy||{})[key];
+  el.innerHTML=c&&c.text?`<div class="dd-ai"><span class="eyebrow">Cosa stava succedendo · ${esc(from)} – ${esc(to)}</span>${md(c.text)}<small>Contesto scritto dall'IA di Quanta: non è un calcolo e non dice che il calo sia dovuto a una sola causa. Verifica sempre le fonti.</small></div>`
+    :c&&c.busy?`<div class="dd-ai"><span class="eyebrow">Cosa stava succedendo · ${esc(from)} – ${esc(to)}</span><p class="typing" aria-label="Quanta sta scrivendo"><i></i><i></i><i></i></p></div>`
+    :`<button type="button" class="btn sm" id="ddWhyBtn" data-k="${esc(key)}">Cosa stava succedendo sui mercati? <span class="ai-tag">IA</span></button>${c&&c.err?`<span class="caption" style="margin-left:10px">${esc(c.err)}</span>`:""}`;
+}
+document.addEventListener("click",async e=>{const b=e.target.closest("#ddWhyBtn");if(!b||!S.risk)return;
+  const PR=S.risk.PR,ds=S.ds,f=ds.freq.f,key=b.dataset.k,from=fmtDate(ds.dates[PR.peakAtTrough],f),to=fmtDate(ds.dates[PR.troughK],f);
+  trackOnce("feature","calo_ia",{name:"calo_ia"});S.ddWhy[key]={busy:true};ddWhyBox(PR,f);
+  const q=`Il mio portafoglio (${ds.assets.map(a=>a.name).join(", ")}) ha avuto il calo peggiore da ${from} a ${to}, con una perdita massima di ${fmtPct(PR.mdd,1)}. In 3-5 frasi, senza chiamare strumenti e senza scrivere altri numeri, descrivi il contesto di mercato e macroeconomico di quel periodo (eventi, politiche monetarie, tensioni commerciali o geopolitiche) che può aver influito su questi strumenti. Non attribuire il calo a un solo evento e non dare consigli. Se il periodo è recente e non sei sicuro dei fatti, dillo.`;
+  try{const r=await fetch("/api/assistant",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[{role:"user",text:q}],context:chatContext()}),signal:AbortSignal.timeout(55000)});
+    const j=await r.json().catch(()=>({}));if(!r.ok||!j.text)throw new Error(j.error||"risposta vuota");S.ddWhy[key]={text:j.text};}
+  catch(err){S.ddWhy[key]={err:err instanceof TypeError?"Il commento dell'IA funziona nel sito pubblicato.":"L'IA non ha risposto: riprova tra poco."};}
+  if(S.risk)ddWhyBox(S.risk.PR,S.ds.freq.f);});
 /* scomposizione del rischio: quanto pesa, quanto rischia da solo, quanto aggiunge al portafoglio */
 function renderDecomp(){
   const R=S.risk,ds=S.ds,RC=R.RC,el=$("#riskDecomp");if(!el)return;
@@ -2261,7 +2287,7 @@ function renderStress(){
       <span class="yr">${range}</span><b class="nm">${esc(c.name)}</b>
       ${st!=="out"&&c.used?`<span class="big ${c.mdd>=0?"ok":""}">${fmtPct(c.mdd,1)}</span><small>perdita massima del portafoglio</small>`:`<small>Il file non copre ${fmtDate(c.from,f)} – ${fmtDate(c.to,f)}: nessuna stima inventata${bnCovers(c.id)?`. Clicca per vedere ${esc(S.bnCr.label)}.`:"."}</small>`}
       <span class="st ${st}">${lab}</span>${benchCardLine(c.id)}</button>`;}).join("");
-  renderCrisisDetail();drawCrisisCompare();renderShock(true);renderStNotes();
+  renderCrisisDetail();drawCrisisCompare();renderSwans();renderShock(true);renderStNotes();
   if(current==="stress")Morph.shape("stress");
 }
 function benchCrisisDetail(id){
@@ -2347,6 +2373,42 @@ function drawCrisisCompare(){
   const worst=rows.reduce((a,b)=>b.mdd<a.mdd?b:a);
   $("#stCompareCap").innerHTML=`Barra rossa: perdita massima del portafoglio. Linea lime: rendimento a fine crisi. Pallini: rendimento di ogni asset nella stessa finestra. La crisi peggiore per questo portafoglio è <b>${esc(worst.name)}</b> (${fmtPct(worst.mdd,1)}).`;
 }
+/* Cigni neri: scenari estremi IPOTETICI, scelti apposta più duri della storia del file. Non sono previsioni.
+   Ogni scenario dà uno shock istantaneo per classe di attivo; la classe di ogni asset viene dalla scheda del fondo o dal nome. */
+const SWANS=[
+  {id:"crash",n:"Crollo azionario profondo",d:"Le borse perdono quanto nel 1929–32, ma tutto insieme. I titoli di Stato fanno da rifugio.",sh:{eq:-.60,tech:-.70,bond:.04,gov:.08,gold:.12,cash:0}},
+  {id:"stag",n:"Stagflazione",d:"Inflazione alta e economia ferma, come negli anni '70: scendono sia azioni sia obbligazioni, sale l'oro.",sh:{eq:-.35,tech:-.45,bond:-.20,gov:-.18,gold:.35,cash:0}},
+  {id:"liq",n:"Tutto giù insieme",d:"Panico e corsa alla liquidità: per qualche settimana si vende tutto, anche i rifugi (marzo 2020, ma peggio).",sh:{eq:-.38,tech:-.42,bond:-.12,gov:-.06,gold:-.12,cash:0}},
+  {id:"debt",n:"Crisi del debito pubblico",d:"Gli investitori smettono di fidarsi degli Stati: crollano i titoli di Stato e con loro le banche e le borse.",sh:{eq:-.30,tech:-.30,bond:-.20,gov:-.28,gold:.20,cash:-.02}},
+  {id:"tech",n:"Scoppia la bolla tecnologica",d:"Come nel 2000–2002 ma più concentrato: le grandi aziende tecnologiche USA perdono tre quarti del valore.",sh:{eq:-.40,tech:-.75,bond:.03,gov:.06,gold:.05,cash:0}}
+];
+const SW_L={eq:"Azioni",tech:"Azioni tecnologiche",bond:"Obbligazioni",gov:"Titoli di Stato",gold:"Oro e materie prime",cash:"Liquidità"};
+function swanClass(i){
+  const ds=S.ds,a=ds.assets[i],pos=S.portfolio?S.portfolio.positions:[],q=pos.find(p=>(p.ticker||p.nome)===a.name);
+  const e=q&&q.etf&&!q.etf.error?q.etf:null,c=e?P.etfClass(e):null,t=[a.name,q&&q.nome,e&&e.nome,e&&e.indice,e&&e.focus].filter(Boolean).join(" ").toLowerCase();
+  if(c==="Monetario"||/overnight|money market|monetari|liquidit|xeon|\bcash\b/.test(t))return "cash";
+  if(c==="Materie prime"||/\bgold\b|\boro\b|4gld|sgln|commodit|silver|argento/.test(t))return "gold";
+  if(c==="Obbligazioni"||/bond|obblig|aggregate|treasury|govt|government|ieag|ibgs|aggh|btp|bund/.test(t))return /govt|government|treasury|titoli di stato|btp|bund|sovereign|ibgs/.test(t)&&!/aggregate|corporate/.test(t)?"gov":"bond";
+  if(/nasdaq|technolog|tecnolog|\btech\b|semiconductor|cndx|csndx|eqqq/.test(t))return "tech";
+  return "eq";
+}
+function renderSwans(){
+  const el=$("#stSwan");if(!el||!S.stress)return;
+  const ds=S.ds,R=S.stress,cap=+S.st.cap||0,cls=ds.assets.map((a,i)=>swanClass(i));
+  const rows=SWANS.map(sw=>{const r=cls.map(c=>sw.sh[c]),imp=P.stressImpact(R.w,r);return {sw,r,tot:imp.total};});
+  const worst=rows.reduce((a,b)=>b.tot<a.tot?b:a);
+  el.innerHTML=`<div class="head"><div><span class="eyebrow">Scenari estremi ipotetici</span><h3 style="margin-top:4px">E se arrivasse un cigno nero?</h3></div></div>
+    <p class="sw-intro">Un <b>cigno nero</b>, nel senso di Nassim Taleb, è un evento raro, quasi impossibile da prevedere e con conseguenze enormi: per definizione non è nei dati del passato. Questi cinque scenari sono <b>inventati apposta</b>, più duri delle crisi vere, per chiederti: «se succedesse domani, quanto perderei, e lo reggerei?».</p>
+    <div class="sw-grid">${rows.map(({sw,r,tot})=>`<div class="sw ${sw===worst.sw?"worst":""}"><div class="sw-h"><b>${esc(sw.n)}</b><span class="${tot<0?"dn":"up"}">${fmtPct(tot,1,true)}</span></div>
+      <p>${esc(sw.d)}</p>
+      <div class="sw-eur">${cap>0?`su ${fmtEur(cap)}: <b class="${tot<0?"dn":"up"}">${tot<0?"−":"+"}${fmtEur(Math.abs(cap*tot))}</b>`:""}</div>
+      <ul>${[...new Set(cls)].map(c=>`<li><span>${SW_L[c]}</span><b>${fmtPct(sw.sh[c],0,true)}</b></li>`).join("")}</ul>
+      <button type="button" class="btn sm" data-swan="${sw.id}">Prova nel tuo shock ↓</button></div>`).join("")}</div>
+    <p class="caption">Classe di ogni strumento: ${ds.assets.map((a,i)=>`${esc(a.name)} = ${SW_L[cls[i]].toLowerCase()}`).join(" · ")}. Shock istantanei, senza recupero e senza ribilanciamento: è il colpo del primo momento. Il peggiore per questo portafoglio è <b>${esc(worst.sw.n.toLowerCase())}</b>.</p>`;
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-swan]");if(!b||!S.st)return;const sw=SWANS.find(x=>x.id===b.dataset.swan);if(!sw)return;
+  S.st.shock=S.ds.assets.map((a,i)=>String(Math.round(sw.sh[swanClass(i)]*1000)/10));S.st.prop=false;const pc=$("#stProp");if(pc)pc.checked=false;renderShock(true);
+  $("#stCustom").scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"start"});});
 /* Shock ipotetico */
 function shockValues(){
   const st=S.st,R=S.stress,v=st.shock.map(x=>{const n=parseFloat(String(x).replace(",","."));return Number.isFinite(n)?n/100:NaN;});
@@ -2354,6 +2416,7 @@ function shockValues(){
   return st.prop?P.conditionalShock(R.C,v):{r:v.map(x=>Number.isFinite(x)?x:0),implied:v.map(()=>false)};
 }
 function renderShock(rebuild){
+  if(!rebuild)renderSwans(); // il controvalore in euro dei cigni neri segue il capitale scritto qui
   const ds=S.ds,R=S.stress,st=S.st;
   if(rebuild){
     $("#stShocks").innerHTML=ds.assets.map((a,i)=>R.w[i]>0?`<div class="st-row"><label class="nm" for="sh${i}"><i style="background:${color(i)}"></i>${esc(a.name)}</label><input id="sh${i}" data-sh="${i}" type="text" inputmode="decimal" placeholder="—" value="${esc(st.shock[i])}" aria-label="Shock su ${esc(a.name)} in percentuale"><span class="imp" id="shi${i}"></span></div>`:"").join("");
@@ -2781,6 +2844,22 @@ function realCalc(){
   const pp=P.personalPerformance(ds.dates,ds.assets,tx);if(pp.error)return {error:pp.error,tx};
   return {pp,tx};
 }
+/* Imposte se vendessi tutto oggi (regime amministrato italiano, stima):
+   - 12,5% per gli ETF di titoli di Stato (in realtà vale per la quota di titoli di Stato del fondo: qui solo se il fondo è tutto governativo);
+   - 26% per tutto il resto (azioni, obbligazioni societarie o miste, ETC sull'oro);
+   - si paga solo sui guadagni: le minusvalenze degli ETF non compensano le plusvalenze degli ETF (sono redditi di capitale), quindi niente compensazione tra strumenti. */
+function taxInfo(i){
+  const ds=S.ds,a=ds.assets[i],pos=S.portfolio?S.portfolio.positions:[],q=pos.find(p=>(p.ticker||p.nome)===a.name||p.simbolo===a.sym);
+  const t=[a.name,q&&q.nome,q&&q.titolo,q&&q.etf&&!q.etf.error?[q.etf.nome,q.etf.indice,q.etf.focus].join(" "):""].filter(Boolean).join(" ").toLowerCase();
+  const gov=/govt|government|treasury|treasuries|sovereign|titoli di stato|\bbtp|\bbot\b|\bbund|\boat\b|gilt|staatsanleihen|t-bill/.test(t)&&!/corporate|aggregate|societar|high yield|\bcorp\b/.test(t);
+  return gov?{rate:.125,why:"titoli di Stato: 12,5%"}:{rate:.26,why:"26%"};
+}
+function taxCalc(pp){
+  const ds=S.ds,B=pp.byAsset,rows=B.map((b,i)=>{const ti=taxInfo(i),g=b.value-b.invested;return {i,rate:ti.rate,why:ti.why,gain:g,tax:g>0&&b.value>0?g*ti.rate:0};}).filter(x=>B[x.i].ops>0);
+  const tax=rows.reduce((s,x)=>s+x.tax,0),net=pp.value-tax;
+  const fl=(S.real&&S.real.tx?S.real.tx:[]).filter(x=>x.i>=0).map(x=>({t:x.d,v:-x.amount}));fl.push({t:ds.dates[ds.dates.length-1],v:net});
+  return {tax,net,rows,xirr:fl.length>1?P.xirr(fl):NaN,gainNet:net-pp.invested};
+}
 function renderReal(){
   setTimeout(labIndex,60);
   const el=$("#realCard");if(!el)return;
@@ -2795,7 +2874,7 @@ function renderReal(){
     const sf=P.sameFlows(ds.dates,bret,pp.flowsT),miss=bret.slice(pp.first+1).filter(x=>!Number.isFinite(x)).length;
     const fl=R.tx.filter(x=>x.i>=0).map(x=>({t:x.d,v:-x.amount}));fl.push({t:ds.dates[ds.dates.length-1],v:sf.value});
     bm={label:src.label,value:sf.value,xirr:P.xirr(fl),series:sf.series,miss};}
-  S.real={...R,bm,src};
+  S.real={...R,bm,src};S.real.taxes=taxCalc(pp);const TX=S.real.taxes;
   const pos=pp.gain>=0;
   el.innerHTML=`<div class="head"><div><span class="eyebrow">Dalle tue ${pp.used} transazioni · foglio «${esc(S.tx.sheet)}» · dal ${fmtDate(ds.dates[pp.first],f)}</span><h3 style="margin-top:4px">Il tuo rendimento reale</h3></div><span class="chip hist"><i></i>versamenti veri</span></div>
     <div class="real-k">
@@ -2803,6 +2882,7 @@ function renderReal(){
       <div class="k"><span>Valore stimato oggi</span>${c("value",fmtEur(pp.value))}<small>al ${fmtDate(ds.dates[ds.dates.length-1],f)}</small></div>
       <div class="k"><span>Versato</span>${c("inv",fmtEur(pp.invested))}<small>somma degli acquisti${pp.invested!==R.tx.filter(x=>x.i>=0&&x.amount>0).reduce((s,x)=>s+x.amount,0)?", meno le vendite":""}</small></div>
       <div class="k"><span>Guadagno</span>${c("gain",`<span class="${pos?"up":"dn"}">${pos?"+":"−"}${fmtEur(Math.abs(pp.gain))}</span>`)}<small>${fmtPct(pp.gainPct,1,true)} sul versato</small></div>
+      <div class="k k-net"><span>Al netto delle tasse</span>${c("tax",fmtPct(TX.xirr,1,true))}<small>TIR se vendessi tutto oggi: imposte stimate ${fmtEur(TX.tax)}, ti resterebbero ${fmtEur(TX.net)}</small></div>
       <div class="k"><span>Rendimento ponderato nel tempo</span>${c("twr",fmtPct(pp.twr,1,true))}<small>${pp.years>=1?`${fmtPct(pp.twrAnn,1,true)} l'anno · `:""}come gli strumenti, senza l'effetto dei versamenti</small></div>
     </div>
     <div class="real-two"><div><div class="chartbox" id="realChart"></div><div class="legend" id="realLeg"></div></div>
@@ -2815,6 +2895,7 @@ function renderReal(){
     <p class="caption" style="margin-top:12px">Il valore segue i rendimenti degli strumenti nei dati e aggiunge ogni versamento a fine ${UNIT[f]?UNIT[f][0]:"periodo"}. ${S.source.kind==="rebuilt"?"I rendimenti sono quelli di mercato convertiti in euro con il cambio BCE di fine mese; il valore può differire un po' da quello del tuo broker (prezzi di fine mese, borsa diversa).":"I rendimenti vengono dai prezzi del file: se sono prezzi medi pagati, il valore è una stima."}${un.length?` Transazioni non collegate (strumento non nei dati): ${esc(un.join(", "))}.`:""}${pp.before?` ${pp.before} transazioni sono prima dell'inizio dei dati e sono contate dal primo periodo.`:""} TIR e rendimento ponderato su meno di un anno o due possono cambiare molto: non sono previsioni.</p>`;
   el.insertAdjacentHTML("beforeend",attribHTML(R));
   drawReal();
+  {const gv=$("#growView");if(gv)gv.hidden=false;if(S.growView==="money")drawChart(false);}
 }
 /* Quanto ha reso ogni strumento, in euro: guadagno = valore oggi − (acquisti − vendite − dividendi incassati).
    La somma dei guadagni degli strumenti è esattamente il guadagno totale: niente collegamenti tra periodi né approssimazioni. */
@@ -2834,7 +2915,7 @@ function attribHTML(R){
       <tr class="pf"><td><b>Totale</b></td><td class="mono">${fmtEur(idx.reduce((s,i)=>s+B[i].bought,0))}</td><td class="mono">${idx.some(i=>B[i].sold>.5)?"−"+fmtEur(idx.reduce((s,i)=>s+B[i].sold,0)):"—"}</td><td class="mono">${idx.some(i=>B[i].income>.005)?"+"+fmtEur(idx.reduce((s,i)=>s+B[i].income,0)):"—"}</td><td class="mono"><b>${fmtEur(pp.value)}</b></td><td class="mono ${tg>=0?"up":"dn"}"><b>${eur(tg)}</b></td><td class="mono">${fmtPct(pp.xirr,1,true)}</td><td class="mono">100%</td></tr></tbody></table></div>${clsRows}
     <p class="caption">${idx.length>1?`<b>${esc(ds.assets[best].name)}</b> ha portato il guadagno maggiore (${eur(B[best].gain)})${B[worst].gain<0?`, <b>${esc(ds.assets[worst].name)}</b> è in perdita (${eur(B[worst].gain)})`:worst!==best?`, <b>${esc(ds.assets[worst].name)}</b> il minore (${eur(B[worst].gain)})`:""}. `:""}Guadagno = valore oggi − acquisti + vendite + dividendi incassati: la somma per strumento è esattamente il guadagno totale. I prezzi sono rettificati, quindi i dividendi reinvestiti sono già nel valore; quelli incassati (ETF a distribuzione) contano come soldi usciti dal portafoglio, che hai però guadagnato. Commissioni e imposta di bollo non abbinate a uno strumento non sono incluse.${clip.length?` <span style="color:var(--warn)">Per ${clip.map(i=>esc(ds.assets[i].name)).join(", ")} alcune vendite superano il valore stimato di ${fmtEur(clip.reduce((s,i)=>s+B[i].clipped,0))}: quella parte risulta guadagno realizzato, ma può dipendere dai prezzi di fine mese o da una borsa diversa da quella del tuo broker.</span>`:""}</p>`;
 }
-function drawReal(){
+function drawReal(box="#realChart",leg="#realLeg"){
   const R=S.real,pp=R.pp,ds=S.ds,f=ds.freq.f,s=pp.series,n=s.length,VW=640,VH=260,ml=56,mr=12,mt=12,mb=28,iw=VW-ml-mr,ih=VH-mt-mb;
   const bmS=R.bm?R.bm.series.slice(pp.first):null,all=[...s.map(x=>x.value),...s.map(x=>x.invested),...(bmS||[])].filter(Number.isFinite),hi=Math.max(...all)*1.06||1;
   const X=i=>ml+(n>1?i/(n-1):0)*iw,Y=v=>mt+ih-v/hi*ih;let g="";
@@ -2846,10 +2927,16 @@ function drawReal(){
   g+=path(s.map(x=>x.invested),`stroke="var(--muted)" stroke-width="1.8" stroke-dasharray="5 4"`,1);
   if(bmS)g+=path(bmS,`stroke="var(--c3)" stroke-width="2"`,2);
   g+=path(s.map(x=>x.value),`stroke="var(--lime)" stroke-width="3"`,0);
-  $("#realChart").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Valore del portafoglio con i versamenti veri, confrontato con il versato">${g}</svg>`;
-  $("#realLeg").innerHTML=`<span><i style="background:var(--lime);height:3px"></i>valore del tuo portafoglio</span><span><i style="background:var(--muted)"></i>soldi versati</span>${bmS?`<span><i style="background:var(--c3);height:3px"></i>stessi versamenti in ${esc(R.bm.label)}</span>`:""}`;
+  $(box).innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Valore del portafoglio con i versamenti veri, confrontato con il versato">${g}</svg>`;
+  $(leg).innerHTML=`<span><i style="background:var(--lime);height:3px"></i>valore del tuo portafoglio</span><span><i style="background:var(--muted)"></i>soldi versati</span>${bmS?`<span><i style="background:var(--c3);height:3px"></i>stessi versamenti in ${esc(R.bm.label)}</span>`:""}`;
 }
 function realReceipt(m){
+  if(m==="tax"&&S.real&&S.real.taxes){const T=S.real.taxes,pp=S.real.pp,ds=S.ds;
+    return {title:"Rendimento al netto delle tasse",value:fmtPct(T.xirr,1,true),
+      formula:"Imposta per strumento = max(0, valore oggi − versato netto) × aliquota\naliquota: 26% (12,5% per gli ETF di titoli di Stato)\nTIR netto: stessi flussi, ma il valore finale è il valore oggi meno le imposte",
+      kv:[...T.rows.map(x=>[`${ds.assets[x.i].name} · ${x.why}`,x.tax>0?`${fmtEur(x.tax)} su ${fmtEur(x.gain)} di guadagno`:x.gain<0?`nessuna (in perdita di ${fmtEur(-x.gain)})`:"nessuna"]),
+        ["Imposte totali stimate",fmtEur(T.tax)],["Valore oggi",fmtEur(pp.value)],["Ti resterebbe",fmtEur(T.net)],["Guadagno netto",fmtEur(T.gainNet)],
+        ["Ipotesi","regime amministrato; le perdite di un ETF non compensano i guadagni di un altro ETF; non include imposta di bollo (0,2% l'anno) né eventuali minusvalenze pregresse"]]};}
   const R=S.real,pp=R.pp,ds=S.ds,f=ds.freq.f;
   const base=[["Transazioni usate",pp.used],["Foglio",S.tx.sheet],["Colonne",`${S.tx.cols.data} · ${S.tx.cols.strumento} · ${S.tx.cols.importo}${S.tx.cols.tipo?" · "+S.tx.cols.tipo:""}`],["Valutazione al",fmtDate(ds.dates[ds.dates.length-1],f)]];
   const M={
@@ -3108,6 +3195,7 @@ const pctOf=v=>{const m=String(v||"").replace(/−/g,"-").match(/([+-]?\d[\d.]*,
 const eur10=x=>fmtN(Math.abs(x)/100*10000,0)+" €";
 const EXPLAIN=[
   [/^Rendimento annuo \(TIR\)/,v=>["È quanto sono cresciuti in media ogni anno i soldi che hai versato, tenendo conto di quando li hai versati: un euro messo nel 2019 conta più di uno messo il mese scorso.","È il numero da confrontare con un conto deposito o con un'altra persona che investe: è il tuo rendimento, non quello del fondo."]],
+  [/^Rendimento al netto delle tasse/,v=>["È il tuo rendimento annuo se oggi vendessi tutto e pagassi le imposte sul guadagno: 26% in generale, 12,5% sugli ETF di titoli di Stato.","È una stima: non considera il bollo annuo né minusvalenze che potresti avere da altri investimenti. Finché non vendi, le imposte non le paghi."]],
   [/^Rendimento ponderato nel tempo/,v=>["È il rendimento degli strumenti che hai scelto, come se avessi investito tutto all'inizio: toglie l'effetto di quando e quanto hai versato.","Se è molto diverso dal TIR, i tempi dei versamenti hanno contato: versare prima di un rialzo alza il TIR, versare prima di un calo lo abbassa."]],
   [/^(Rendimento annuo composto|CAGR|Rendimento annuo$|Rendimento annuo ·)/,v=>{const x=pctOf(v);return ["È la crescita media all'anno, come se il valore fosse salito della stessa percentuale ogni anno.",x!=null?`Con ${x>=0?"+":""}${fmtN(x,1)}% l'anno, 10.000 € diventano circa ${fmtN(10000*Math.pow(1+x/100,10),0)} € in 10 anni, se il futuro fosse come il passato (e non è detto).`:"Non dice nulla degli alti e bassi lungo la strada: per quelli guarda volatilità e drawdown."];}],
   [/^Rendimento reale/,v=>["È il rendimento dopo aver tolto l'inflazione: dice quanto è aumentato davvero quello che puoi comprare con i tuoi soldi.","Se è vicino a zero, hai solo difeso il potere d'acquisto; se è negativo, i prezzi sono saliti più del portafoglio."]],
@@ -3166,6 +3254,54 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-rc]");if(b
 $("#closeDrawer").addEventListener("click",closeReceipt);
 $("#scrim").addEventListener("click",closeReceipt);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeReceipt();});
+
+/* ---------- Report del portafoglio: una pagina stampabile (o salvabile in PDF) con i numeri già calcolati ----------
+   Nessun numero nuovo: tutto viene dal motore, come nelle sezioni del sito. Le considerazioni sono frasi costruite sui risultati, non dall'IA. */
+function buildReport(){
+  if(!S.lab||!S.ds||!S.ds.ok)return null;
+  if(!S.risk)renderRisk();
+  const ds=S.ds,f=ds.freq.f,R=S.risk,PR=R.PR,PS=R.PS,RC=R.RC,w=R.w,real=S.real&&S.real.pp?S.real:null,bn=S.bnRes&&S.bnRes.bs&&!S.bnRes.bs.error?S.bnRes:null;
+  const st=stressList(),cr=st.list.filter(c=>c.status!=="out"&&c.used);
+  const today=new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});
+  const row=(k,v,n="")=>`<tr><td>${esc(k)}</td><td class="n">${v}</td>${n!==null?`<td class="d">${n}</td>`:""}</tr>`;
+  const idx=ds.assets.map((a,i)=>i).filter(i=>w[i]>0);
+  const topRisk=idx.reduce((a,i)=>RC.pct[i]>RC.pct[a]?i:a,idx[0]);
+  const svg=id=>{const e=document.querySelector(id+" svg");if(!e)return "";const c=e.cloneNode(true);c.querySelectorAll(".cz-o").forEach(n=>n.remove());c.querySelectorAll("[class]").forEach(n=>n.classList.remove("draw","area","endpt"));c.removeAttribute("width");c.setAttribute("style","width:100%;height:auto");return c.outerHTML;};
+  /* considerazioni: frasi sui risultati, senza consigli */
+  const tips=[];
+  if(real)tips.push(`Hai versato ${fmtEur(real.pp.invested)} e oggi il portafoglio vale circa ${fmtEur(real.pp.value)}: un rendimento annuo (TIR) del ${fmtPct(real.pp.xirr,1,true)}${real.taxes?`, che diventa ${fmtPct(real.taxes.xirr,1,true)} al netto delle imposte stimate se vendessi tutto oggi`:""}.`);
+  if(idx.length>1&&Number.isFinite(RC.pct[topRisk]))tips.push(`${ds.assets[topRisk].name} pesa il ${fmtPct(w[topRisk],0)} del portafoglio ma porta il ${fmtPct(RC.pct[topRisk],0)} del rischio: è lo strumento che più decide le oscillazioni.`);
+  if(Number.isFinite(PR.mdd)&&PR.troughK!=null)tips.push(`Il calo peggiore nei dati è stato del ${fmtPct(Math.abs(PR.mdd),1)}, da ${fmtDate(ds.dates[PR.peakAtTrough],f)} a ${fmtDate(ds.dates[PR.troughK],f)}${PR.recK!=null?`, recuperato a ${fmtDate(ds.dates[PR.recK],f)}`:", non ancora recuperato"}. Su 10.000 € vuol dire averne visti circa ${fmtEur(10000*(1+PR.mdd))}.`);
+  if(Number.isFinite(PR.var95))tips.push(`In un ${PER[f]?PER[f].replace(/^in un /,""):"periodo"} sfavorevole (1 su 20) la perdita è stata intorno al ${fmtPct(PR.var95,1)}; nei periodi peggiori in media del ${fmtPct(PR.cvar95,1)}.`);
+  if(bn)tips.push(`Rispetto a ${bn.src.label}, sugli stessi mesi, il portafoglio ha reso ${fmtPct(Math.abs(bn.bs.active),1)} l'anno ${bn.bs.active>=0?"in più":"in meno"}, con una volatilità del ${fmtPct(bn.bs.volP,1)} contro il ${fmtPct(bn.bs.volB,1)}.`);
+  if(cr.length){const wc=cr.reduce((a,b)=>b.mdd<a.mdd?b:a);tips.push(`Delle crisi presenti nei dati, la più dura per questo portafoglio è stata ${wc.name} (${fmtPct(wc.mdd,1)}).`);}
+  if(idx.length===1)tips.push("Il portafoglio ha un solo strumento: la diversificazione dipende tutta da quel fondo.");
+  const html=`<div class="rp">
+  <header class="rp-h"><div><b class="rp-brand">Portfolio OS</b><span>Report del portafoglio</span></div><div class="rp-meta">${esc(S.source&&S.source.name||"")}<br>${today}</div></header>
+  <h1>Il tuo portafoglio in una pagina</h1>
+  <p class="rp-sub">${ds.assets.length} strumenti · dati ${ds.freq.adj} da ${fmtDate(ds.dates[0],f)} a ${fmtDate(ds.dates[ds.dates.length-1],f)} · pesi: ${esc(R.wLabel)}</p>
+  ${real?`<h2>Il tuo rendimento</h2><table class="rp-t">${row("Rendimento annuo (TIR)",fmtPct(real.pp.xirr,1,true),"tiene conto di quando hai versato")}${row("Al netto delle tasse",fmtPct(real.taxes.xirr,1,true),`imposte stimate ${fmtEur(real.taxes.tax)} se vendessi oggi`)}${row("Valore stimato oggi",fmtEur(real.pp.value),"")}${row("Versato",fmtEur(real.pp.invested),"")}${row("Guadagno",(real.pp.gain>=0?"+":"−")+fmtEur(Math.abs(real.pp.gain)),fmtPct(real.pp.gainPct,1,true)+" sul versato")}${real.bm?row(`Stessi versamenti in ${real.bm.label}`,fmtEur(real.bm.value),`TIR ${fmtPct(real.bm.xirr,1,true)}`):""}</table>${svg("#realChart")}`:""}
+  <h2>Allocazione e rischio per strumento</h2>
+  <table class="rp-t rp-wide"><thead><tr><th>Strumento</th><th class="n">Peso</th><th class="n">Quota del rischio</th><th class="n">Rendimento annuo</th><th class="n">Volatilità</th><th class="n">Calo massimo</th></tr></thead><tbody>
+  ${idx.map(i=>{const a=S.lab.st[i];return `<tr><td>${esc(ds.assets[i].name)}</td><td class="n">${fmtPct(w[i],1)}</td><td class="n">${fmtPct(RC.pct[i],1)}</td><td class="n">${fmtPct(a.cagr,1,true)}</td><td class="n">${fmtPct(a.vol,1)}</td><td class="n">${fmtPct(a.mdd,1)}</td></tr>`;}).join("")}</tbody></table>
+  <h2>Rischio del portafoglio</h2>
+  <table class="rp-t">${row("Rendimento annuo (dati storici)",fmtPct(PS.cagr,1,true),"come se avessi investito tutto all'inizio")}${row("Volatilità",fmtPct(RC.volP,1),"quanto oscilla in un anno")}${row("VaR 95%",fmtPct(-PR.var95,1),`perdita ${PER[f]||"in un periodo"} superata solo 1 volta su 20`)}${row("CVaR 95%",fmtPct(-PR.cvar95,1),"perdita media nei periodi peggiori")}${row("Calo massimo",fmtPct(PR.mdd,1),PR.troughK!=null?`${fmtDate(ds.dates[PR.peakAtTrough],f)} – ${fmtDate(ds.dates[PR.troughK],f)}`:"")}${row("Sortino",fmtN(PR.sortino),"rendimento per unità di rischio al ribasso")}${row("Asset effettivi",fmtN(RC.neff,1)+" su "+idx.length,"quanto sono equilibrati i pesi")}</table>
+  ${svg("#riskDD")}
+  ${bn?`<h2>Confronto con ${esc(bn.src.label)}</h2><table class="rp-t">${row("Rendimento annuo in più",fmtPct(bn.bs.active,1,true),`${fmtPct(bn.bs.cagrP,1,true)} contro ${fmtPct(bn.bs.cagrB,1,true)}`)}${row("Beta",fmtN(bn.bs.beta),"1 = si muove come l'indice")}${row("Tracking error",fmtPct(bn.bs.te,1),"quanto ti discosti dall'indice")}${row("Information ratio",fmtN(bn.bs.ir),"extra-rendimento per unità di scostamento")}</table>`:`<p class="rp-note">Per includere il confronto con un indice, apri una volta la sezione Benchmark e rigenera il report.</p>`}
+  ${cr.length?`<h2>Nelle crisi presenti nei dati</h2><table class="rp-t">${cr.map(c=>row(c.name,fmtPct(c.mdd,1),"perdita massima del portafoglio")).join("")}</table>`:""}
+  <h2>Considerazioni</h2><ul class="rp-tips">${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+  <footer class="rp-f">Analisi dei dati storici del file, calcolata in modo deterministico da Portfolio OS: i rendimenti passati non garantiscono quelli futuri. Non è un consiglio di investimento. Le imposte sono una stima (26%, 12,5% sui titoli di Stato) e non includono il bollo.</footer>
+  </div>`;
+  return html;
+}
+function printReport(){
+  const h=buildReport();if(!h)return;trackOnce("feature","report",{name:"report"});
+  let el=$("#report");if(!el){el=document.createElement("section");el.id="report";el.setAttribute("aria-hidden","true");document.body.appendChild(el);}
+  el.innerHTML=h;const old=document.title;document.title=`Portfolio OS · report · ${(S.source&&S.source.name||"portafoglio").replace(/\.(xlsx?|csv|ods)$/i,"")}`;
+  setTimeout(()=>{window.print();document.title=old;},80);
+}
+document.addEventListener("click",e=>{if(e.target.closest("#reportBtn"))printReport();});
+window.__report=()=>buildReport(); // per i test
 
 /* ---------- Home: terminale con dati ufficiali BCE e mappa dei laboratori ---------- */
 const LABS=[

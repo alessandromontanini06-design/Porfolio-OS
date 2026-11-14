@@ -168,12 +168,13 @@
       </div>
       <div id="lab" hidden style="display:flex;flex-direction:column;gap:16px">
         <nav class="lab-idx" id="labIdx" aria-label="Schede del laboratorio"></nav>
-        <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip hist"><i></i>Dato storico</span><span class="caption">Clicca qualsiasi numero per vedere formula, dati e ipotesi.</span></div>
+        <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip hist"><i></i>Dato storico</span><span class="caption">Clicca qualsiasi numero per vedere formula, dati e ipotesi.</span><button type="button" class="btn sm lime" id="reportBtn" style="margin-left:auto">Scarica il report PDF</button></div>
         <div class="card real" id="realCard" hidden></div>
         <div class="kpis" id="kpis"></div>
         <div class="bento">
           <div class="card s8">
-            <div class="head"><h3>Crescita di 100 €</h3><div class="legend" id="legend"></div></div>
+            <div class="head"><h3 id="growTitle">Crescita di 100 €</h3><div class="seg" role="group" aria-label="Cosa mostra il grafico" id="growView" hidden><button type="button" data-gv="100" aria-pressed="true">100 € investiti</button><button type="button" data-gv="money" aria-pressed="false">I tuoi soldi</button></div></div>
+            <div class="legend" id="legend" style="margin:-4px 0 8px"></div>
             <div class="chartbox" id="chartbox"></div>
             <p class="caption">Come sono andati gli <b>strumenti</b>: 100 € investiti all'inizio in ciascuno, senza versamenti, rendimenti composti periodo per periodo. Il tuo rendimento con i versamenti veri è nel riquadro «Il tuo rendimento reale», se il file contiene le transazioni.</p>
             <p class="caption" id="growthNote"></p>
@@ -226,7 +227,7 @@
         <div class="bento">
           <div class="card s7"><div class="head"><h3>Distribuzione dei rendimenti</h3><span class="eyebrow" id="histUnit"></span></div><div class="chartbox" id="riskHist"></div><p class="caption" id="histCap"></p></div>
           <div class="card s5"><div class="head"><h3>Chi porta il rischio</h3><span class="eyebrow">peso contro rischio</span></div><div id="riskContrib"></div><div id="riskConc"></div></div>
-          <div class="card s12"><div class="head"><h3>Drawdown nel tempo</h3><span class="eyebrow">distanza dal massimo precedente</span></div><div class="chartbox" id="riskDD"></div><p class="caption" id="ddCap"></p></div>
+          <div class="card s12"><div class="head"><h3>Drawdown nel tempo</h3><span class="eyebrow">distanza dal massimo precedente</span></div><div class="chartbox" id="riskDD"></div><p class="caption" id="ddCap"></p><div class="dd-why" id="ddWhy"></div></div>
           <div class="card s12"><div class="head"><h3>Scomposizione del rischio</h3><span class="eyebrow">Clicca un numero per la ricevuta</span></div><div class="tablewrap"><table class="mt" id="riskDecomp"></table></div><p class="caption" id="riskDecompCap"></p></div>
           <div class="card s12"><div class="head"><h3>Rischio per asset</h3><span class="eyebrow">Clicca un numero per la ricevuta</span></div><div class="tablewrap"><table class="mt" id="riskTable"></table></div>
             <p class="caption" id="riskTableCap">Misure storiche: descrivono il passato e non prevedono le perdite future. VaR e CVaR al 95% sui rendimenti di periodo, senza ipotesi di distribuzione normale.</p></div>
@@ -286,6 +287,7 @@
         <div class="bento">
           <div class="card s12" id="stDetail"></div>
           <div class="card s12"><div class="head"><h3>Le crisi a confronto</h3><span class="eyebrow">solo quelle presenti nei dati</span></div><div class="chartbox" id="stCompare"></div><p class="caption" id="stCompareCap"></p></div>
+          <div class="card s12" id="stSwan"></div>
           <div class="card s12" id="stCustom">
             <div class="head"><h3>Il tuo shock</h3><div class="seg" role="group" aria-label="Scenari pronti" id="stPresets">
               <button type="button" data-stp="all20">Tutto −20%</button><button type="button" data-stp="vol2">Crollo di 2σ</button><button type="button" data-stp="worst">Ripeti la crisi peggiore</button><button type="button" data-stp="clear">Azzera</button></div></div>

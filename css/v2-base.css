@@ -301,3 +301,56 @@ body.bd-on .orb-btn,body.bd-on .orb-say{display:none}
 .rc-math .kv{margin-top:12px}
 @media (min-width:1001px){.mc-form .mc-wide{grid-column:span 2}}
 #mcRate{border-color:color-mix(in oklab,var(--lime) 70%,var(--line))}
+
+/* ---------- rendimento reale: sei riquadri, quello al netto delle tasse in viola ---------- */
+@media (min-width:1001px){.real-k{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.real-k .k-net{border-color:color-mix(in oklab,var(--violet-fx) 45%,var(--line));background:color-mix(in oklab,var(--violet-fx) 6%,var(--bg))}
+.real-k .k-net>span{color:var(--violet-fx)}
+
+/* ---------- cigni neri ---------- */
+.sw-intro{color:var(--muted);max-width:80ch;margin:4px 0 16px;line-height:1.55}
+.sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:12px}
+.sw{border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.sw.worst{border-color:color-mix(in oklab,var(--violet-fx) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in oklab,var(--violet-fx) 10%,transparent)}
+.sw-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sw-h b{font-family:var(--f-display);font-size:1rem;letter-spacing:-.02em}
+.sw-h span{font-family:var(--f-display);font-weight:800;font-size:1.35rem;letter-spacing:-.03em}
+.sw p{margin:0;font-size:.84rem;color:var(--muted);line-height:1.45}
+.sw-eur{font-size:.86rem}
+.sw ul{list-style:none;margin:0;padding:8px 0 0;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:3px;font-size:.8rem}
+.sw li{display:flex;justify-content:space-between;color:var(--muted)}.sw li b{color:var(--fg);font-variant-numeric:tabular-nums}
+.sw .btn{align-self:flex-start;margin-top:auto}
+
+/* ---------- calo peggiore: contesto scritto dall'IA ---------- */
+.dd-why{margin-top:10px}
+.ai-tag{display:inline-block;margin-left:6px;font-size:.66rem;font-weight:700;padding:1px 6px;border-radius:6px;background:color-mix(in oklab,var(--violet-fx) 14%,var(--bg));color:var(--violet-fx)}
+.dd-ai{border:1px solid color-mix(in oklab,var(--violet-fx) 35%,var(--line));background:color-mix(in oklab,var(--violet-fx) 5%,var(--bg));border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.dd-ai p{margin:0;line-height:1.55}.dd-ai ul{margin:0;padding-left:18px}
+.dd-ai small{color:var(--faint);font-size:.76rem}
+
+/* ---------- report stampabile (Salva come PDF dalla finestra di stampa) ---------- */
+#report{display:none}
+@media print{
+  @page{size:A4;margin:14mm}
+  html,body{background:#fff!important;overflow:visible!important;height:auto!important}
+  body>*:not(#report){display:none!important}
+  #report{display:block!important;color:#111;font-family:var(--f-body);font-size:10.5pt}
+  .rp-h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:14px}
+  .rp-h>div:first-child{display:flex;flex-direction:column}
+  .rp-brand{font-family:var(--f-display);font-weight:800;font-size:13pt;letter-spacing:-.02em}
+  .rp-brand::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;background:#C9F24A;margin-right:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rp-h span,.rp-meta{color:#555;font-size:9pt}.rp-meta{text-align:right}
+  .rp h1{font-family:var(--f-display);font-weight:800;font-size:22pt;letter-spacing:-.04em;margin:0 0 4px}
+  .rp-sub{color:#555;margin:0 0 10px}
+  .rp h2{font-family:var(--f-display);font-weight:800;font-size:13pt;letter-spacing:-.02em;margin:18px 0 6px;break-after:avoid}
+  .rp-t{width:100%;border-collapse:collapse;break-inside:avoid}
+  .rp-t td,.rp-t th{padding:5px 6px;border-bottom:1px solid #e3e3e3;text-align:left;vertical-align:top}
+  .rp-t th{font-weight:600;color:#555;font-size:9pt}
+  .rp-t .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  .rp-t .d{color:#666;font-size:9pt}
+  .rp svg{max-height:62mm;margin-top:8px;break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rp svg text{font-size:10px;fill:#666}
+  .rp-tips{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:5px;line-height:1.45}
+  .rp-note{color:#666;font-size:9pt}
+  .rp-f{margin-top:18px;padding-top:8px;border-top:1px solid #ccc;color:#666;font-size:8.5pt}
+}
