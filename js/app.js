@@ -1767,7 +1767,9 @@ function labIndex(){
   nav.innerHTML=`<span class="eyebrow">Vai a</span>${vis.map((v,i)=>`<button type="button" class="chipbtn" data-li="${i}">${esc(v.l)}</button>`).join("")}`;
 }
 /* indice laterale: evidenzia la scheda che stai guardando */
-document.getElementById("scene-lab")?.addEventListener("scroll",()=>{if(!S.labIdx)return;let k=0;S.labIdx.forEach((v,i)=>{if(v.card.getBoundingClientRect().top<window.innerHeight*.35)k=i;});document.querySelectorAll("#labIdx [data-li]").forEach((b,i)=>b.classList.toggle("on",i===k));},{passive:true});
+document.getElementById("scene-lab")?.addEventListener("scroll",()=>{if(!S.labIdx)return;let k=0;S.labIdx.forEach((v,i)=>{if(v.card.getBoundingClientRect().top<window.innerHeight*.35)k=i;});document.querySelectorAll("#labIdx [data-li]").forEach((b,i)=>{const was=b.classList.contains("on");b.classList.toggle("on",i===k);
+  /* sul telefono l'indice è una riga che scorre di lato: la scheda attiva resta in vista */
+  if(i===k&&!was&&window.innerWidth<1100){const nav=$("#labIdx");nav.scrollTo({left:b.offsetLeft-nav.clientWidth/2+b.offsetWidth/2,behavior:"smooth"});}});},{passive:true});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-gv]");if(!b)return;S.growView=b.dataset.gv;drawChart(false);});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-li]");if(!b||!S.labIdx)return;const v=S.labIdx[+b.dataset.li];if(v)v.card.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"start"});});
 function renderLab(){
