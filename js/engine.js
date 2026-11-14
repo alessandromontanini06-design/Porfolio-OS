@@ -256,9 +256,10 @@ function parseWideSheet(name,aoa,hint){
   }
   return out.hold.length+out.alloc.length+out.total.length?out:null;
 }
-const CLASS_MAP=[[/etf|stock|azion|equity|shares/i,"Azioni ed ETF"],[/crypto|bitcoin/i,"Crypto"],[/^re$|real ?estate|immob|apparta/i,"Immobili"],[/^pe$|private/i,"Private equity"],[/p2p|lending|bond|obblig|prestit|crowd/i,"Prestiti e obbligazioni"],[/pension|previd/i,"Previdenza"],[/cash|liquid|deposit|bank|banca/i,"Liquidità"]];
+const CLASS_MAP=[[/p2p|lending|bond|obblig|prestit|crowd|treasury|govt|aggregate/i,"Prestiti e obbligazioni"],[/etf|stock|azion|equity|shares/i,"Azioni ed ETF"],[/crypto|bitcoin|\bbtc\b|\beth\b/i,"Crypto"],[/^re$|real ?estate|immob|apparta/i,"Immobili"],[/^pe$|private/i,"Private equity"],[/pension|previd/i,"Previdenza"],[/cash|liquid|deposit|bank|banca|\bcont[oi]\b/i,"Liquidità"]];
 const CLASS_ORDER=["Azioni ed ETF","Previdenza","Crypto","Immobili","Private equity","Prestiti e obbligazioni","Altro","Liquidità"];
-function assetClass(h){if(h.cls)return h.cls;for(const [rx,n] of CLASS_MAP)if(rx.test(h.type||""))return n;for(const [rx,n] of CLASS_MAP)if(rx.test(h.sec||""))return n;return "Altro";}
+/* classe di una riga del tracker: dal tipo, poi dalla sezione, poi dal nome della riga (ETF Bond → obbligazioni); «conto titoli» o «dossier» contengono investimenti, quindi non sono liquidità */
+function assetClass(h){if(h.cls)return h.cls;for(const [rx,n] of CLASS_MAP)if(rx.test(h.type||""))return n;for(const [rx,n] of CLASS_MAP)if(rx.test(h.sec||""))return n;const l=String(h.label||"");for(const [rx,n] of CLASS_MAP)if(rx.test(l)&&!(n==="Liquidità"&&/titoli|dossier|trading|broker/i.test(l)))return n;return "Altro";}
 function reshapeWide(sheets,hints){
   const parsed=(sheets||[]).filter(s=>!hints||hints[s.name]).map(s=>parseWideSheet(s.name,s.aoa,hints&&hints[s.name])).filter(Boolean);
   if(!parsed.length)return null;

@@ -1113,8 +1113,8 @@ async function rebuildFromPrices(o={}){
     // Se un simbolo non scarica, si provano le altre quotazioni dello stesso ISIN.
     const series=[];
     /* limite al minuto del piano gratuito di Alpha Vantage: si aspetta e si riprova, fino a 4 volte per simbolo */
-    const fetchSym=async sym=>{for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
-      if(j.error&&/limite/i.test(j.error)&&k<4){for(let w=20;w>0;w--){prog(`Limite al minuto di Alpha Vantage: riprovo ${sym} tra ${w} s…`);await new Promise(res=>setTimeout(res,1000));}continue;}return {r,j};}};
+    const fetchSym=async sym=>{const U=`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`,hit=netGet(U);if(hit)return {r:{ok:true,status:200},j:hit};for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
+      if(j.error&&/limite/i.test(j.error)&&k<4){for(let w=20;w>0;w--){prog(`Limite al minuto di Alpha Vantage: riprovo ${sym} tra ${w} s…`);await new Promise(res=>setTimeout(res,1000));}continue;}if(r.ok&&!j.error&&j.points&&j.points.length)netPut(U,j);return {r,j};}};
     for(const [n,p] of pos.entries()){
       let got=null,tried=[];
       for(const sym of [p.simbolo,...(p.alt||[]).filter(x=>x!==p.simbolo)].slice(0,4)){
@@ -1125,6 +1125,15 @@ async function rebuildFromPrices(o={}){
         if(/limite giornaliero/i.test(got.error))break;
       }
       /* il simbolo indicato (dal file o dall'IA) non esiste: se c'è l'ISIN, si cercano le sue quotazioni su OpenFIGI e si riprova */
+      /* quotazione con meno di 5 anni di storia: lo stesso ISIN su un'altra borsa può averne molta di più (VWCE ad Amsterdam dal 2023, a Francoforte dal 2019) */
+      const yrs=j=>{const pts=j&&j.points;return pts&&pts.length>1?(new Date(pts[pts.length-1].d)-new Date(pts[0].d))/(365.25*864e5):0;};
+      if(!got.error&&yrs(got)<5&&p.isin&&ISIN_RX.test(p.isin)){
+        let alts=(p.alt||[]).filter(x=>!tried.includes(x));
+        if(!alts.length){const jj=await getJSON(`/api/isin?isin=${p.isin}`),rr=(jj.results||[])[0];alts=(rr&&rr.simbolo?[rr.simbolo,...(rr.alternative||[])]:[]).filter(x=>!tried.includes(x));}
+        for(const s2 of alts.slice(0,3)){tried.push(s2);prog(`${p.ticker||p.nome}: cerco una quotazione con più storia (${s2})…`);
+          const {r:r2,j:j2}=await fetchSym(s2);
+          if(r2.ok&&!j2.error&&j2.points&&j2.points.length&&yrs(j2)>yrs(got)+1){got=j2;p.simboloOrig=p.simboloOrig||p.simbolo;p.simbolo=s2;}}
+      }
       if(got.error&&!/limite giornaliero/i.test(got.error)&&p.isin&&ISIN_RX.test(p.isin)&&!p.isinTried){p.isinTried=true;
         prog(`${tried[tried.length-1]||p.simbolo} non trovato: cerco le quotazioni dell'ISIN ${p.isin}…`);
         const j=await getJSON(`/api/isin?isin=${p.isin}`),r=(j.results||[])[0];
@@ -1440,12 +1449,16 @@ function renderCompare(){
     crIds.map(id=>{const nm=(ok[0].cr.find(c=>c.id===id)||ok.flatMap(r=>r.cr).find(c=>c.id===id)).name,vals=R.res.map(r=>{const c=!r.empty&&r.cr.find(x=>x.id===id);return c?c.mdd:NaN;}),m=Math.max(...vals.filter(Number.isFinite));
       return `<tr><td>Crisi: ${esc(nm)}</td>${vals.map(v=>`<td class="mono${ok.length>1&&Number.isFinite(v)&&Math.abs(v-m)<1e-12?" cmp-best":""}">${Number.isFinite(v)?fmtPct(v,1):"—"}</td>`).join("")}</tr>`;}).join("");
   const from=K.length?fmtDate(ds.dates[K[0]-1]||ds.dates[K[0]],f):"—",to=K.length?fmtDate(ds.dates[K[K.length-1]],f):"—";
+  /* chi accorcia il periodo comune: lo strumento usato con la storia più breve, se toglie almeno un anno rispetto agli altri */
+  const starts=ds.assets.map((a,i)=>R.used[i]?{n:a.name,k:a.ret.findIndex(Number.isFinite)}:null).filter(x=>x&&x.k>=0).sort((a,b)=>b.k-a.k);
+  const lim=starts.length>1&&starts[0].k-starts[1].k>=f?`<b>${esc(starts[0].n)}</b> ha prezzi solo da ${fmtDate(ds.dates[Math.max(0,starts[0].k-1)],f)} e accorcia il periodo comune: senza, si partirebbe da ${fmtDate(ds.dates[Math.max(0,starts[1].k-1)],f)} (${unitN(starts[0].k-starts[1].k,f)} in più). Se esiste una quotazione più vecchia dello stesso indice, usarla allunga il confronto.`:"";
   card.innerHTML=`<div class="head"><h3>Confronta allocazioni</h3><span class="eyebrow">stessi mesi · ${K.length} ${UNIT[f]?UNIT[f][1]:"periodi"}</span></div>
     <div class="cmp-grid"><div><div class="tablewrap"><table class="mt cmp-t"><thead><tr><th>Peso %</th>${head}</tr></thead><tbody>${inputs}<tr class="pf"><td><b>Totale</b></td>${sums}</tr></tbody></table></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${S.cmp.ports.length<3?`<button type="button" class="btn sm" id="cmpAdd">+ Aggiungi ${"ABC"[S.cmp.ports.length]}</button>`:""}<button type="button" class="btn sm" id="cmpEq">B a pesi uguali</button></div>
       <p class="caption">Se un portafoglio non somma a 100% lo riproporziono. Per confrontare strumenti che non sono nel file usa «Crea il tuo portafoglio» in home.</p></div>
     <div><div class="chartbox" id="cmpChart"></div><div class="legend">${R.res.map((r,j)=>`<span><i style="background:${CMP_COL[j]}"></i>${r.name}${r.empty?" (vuoto)":""}</span>`).join("")}</div></div></div>
     ${K.length>=12?`<div class="tablewrap"><table class="mt cmp-r"><thead><tr><th>Misura</th>${R.res.map((r,j)=>`<th><span class="cmp-dot" style="background:${CMP_COL[j]}"></span>${r.name}</th>`).join("")}</tr></thead><tbody>${met}</tbody></table></div>`:`<p style="color:var(--warn)">Servono almeno 12 ${UNIT[f]?UNIT[f][1]:"periodi"} in cui hanno dati tutti gli strumenti usati: qui ce ne sono ${K.length}.</p>`}
+    ${lim?`<p class="caption" style="color:var(--warn)">${lim}</p>`:""}
     <p class="caption">Confronto su ${K.length} ${UNIT[f]?UNIT[f][1]:"periodi"} comuni (${from} – ${to}): solo i mesi in cui hanno un prezzo tutti gli strumenti usati da almeno un portafoglio, così nessuno è avvantaggiato da una storia più lunga. Portafogli ribilanciati ogni mese ai pesi indicati, senza costi né tasse; in evidenza il valore migliore di ogni riga. Le crisi compaiono solo se cadono per intero nei mesi comuni. È il passato, non una previsione.</p>`;
   drawCompare(R);
 }
@@ -2525,8 +2538,14 @@ const BENCHES=[
   {id:"FEZ",name:"Euro Stoxx 50",desc:"ETF SPDR Euro Stoxx 50 (FEZ): 50 grandi aziende dell'area euro, quotato in dollari"},
   {id:"custom",name:"Personalizzato",desc:""}];
 S.bnData={};S.fx=null;
+/* risposte già scaricate (prezzi, ISIN, cambi, schede dei fondi): tenute per la sessione, in memoria e nel browser.
+   Rifare un'analisi o cambiare spazio non riscarica nulla; solo risposte riuscite, mai errori. */
+const NETC=new Map();
+function netGet(url){if(NETC.has(url))return NETC.get(url);try{const x=sessionStorage.getItem("pos-net:"+url);if(x){const j=JSON.parse(x);NETC.set(url,j);return j;}}catch{}return null;}
+function netPut(url,j){if(!/^\/api\/(prices|isin|fx|etfinfo)\b/.test(url)||!j||j.error)return;NETC.set(url,j);try{sessionStorage.setItem("pos-net:"+url,JSON.stringify(j));}catch{}}
 async function getJSON(url){
-  try{const r=await fetch(url,{signal:AbortSignal.timeout(40000)}),j=await r.json().catch(()=>({}));return r.ok?j:{error:j.error||`Errore del server (${r.status}).`};}
+  const c=netGet(url);if(c)return c;
+  try{const r=await fetch(url,{signal:AbortSignal.timeout(40000)}),j=await r.json().catch(()=>({}));if(r.ok)netPut(url,j);return r.ok?j:{error:j.error||`Errore del server (${r.status}).`};}
   catch(e){return {error:e instanceof TypeError?"I benchmark si scaricano dal sito pubblicato su Vercel.":"Il server non ha risposto in tempo. Riprova."};}
 }
 function bnLoad(sym){
