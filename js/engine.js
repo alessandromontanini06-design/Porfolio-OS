@@ -71,7 +71,13 @@ function cellKind(v){
 /* riga d'intestazione: la prima riga di testo seguita da una riga di dati (numeri o date).
    Primo tentativo severo (almeno metà della riga sotto è numeri/date); se non trova nulla, un secondo più tollerante
    (almeno 3 e il 30%), per gli export dei broker pieni di colonne di testo (ora, borsa, valuta, ID ordine). */
-function detectHeader(aoa){const r=detectHeaderAt(aoa,.5,2);return r>=0?r:detectHeaderAt(aoa,.3,3);}
+function detectHeader(aoa){let r=detectHeaderAt(aoa,.5,2);if(r<0)r=detectHeaderAt(aoa,.3,3);if(r<0)r=detectHeaderByNames(aoa);return r;}
+/* terzo tentativo: una riga con almeno due nomi di colonna noti (Strumento, ISIN, Valore, Peso…) seguita da una riga con almeno un numero */
+function detectHeaderByNames(aoa){
+  for(let r=0;r<Math.min(aoa.length,25);r++){const row=aoa[r]||[];if(row.filter(v=>typeof v==="string"&&headerTag(v)).length<2)continue;
+    let r2=r+1;while(r2<aoa.length&&(aoa[r2]||[]).every(isBlank))r2++;if(r2<aoa.length&&(aoa[r2]||[]).some(v=>cellKind(v)==="n"))return r;}
+  return -1;
+}
 function detectHeaderAt(aoa,frac,minN){
   const lim=Math.min(aoa.length,25);
   for(let r=0;r<lim;r++){

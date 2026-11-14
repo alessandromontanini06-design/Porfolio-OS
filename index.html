@@ -55,6 +55,7 @@
               <p class="sub">Carica il tuo Excel così com'è: movimenti, prezzi o riepilogo. Lo leggo da solo, scarico i prezzi di mercato di ogni ETF e calcolo rischio, rendimento reale e dove sei davvero investito. Ogni numero ha la sua ricevuta.</p>
               <div class="cta">
                 <label class="btn lime" for="file">Carica il tuo file <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10m0 0-4-4m4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></label>
+                <button type="button" class="btn" id="builderBtn">Crea il tuo portafoglio</button>
                 <button type="button" class="btn" id="sampleBtn">Prova con l'esempio</button>
               </div>
             </div>
@@ -373,6 +374,18 @@
   <p class="caption">Quanta usa modelli linguistici di fornitori esterni. I numeri arrivano dal motore di Portfolio OS: all'IA vanno solo i risultati riassuntivi, mai il file.</p>
 </aside>
 <div class="scrim" id="scrim"></div>
+<aside class="drawer builder" id="builder" aria-label="Crea il tuo portafoglio" aria-hidden="true">
+  <button type="button" class="btn sm x" id="closeBuilder">Chiudi</button>
+  <div class="stack" style="gap:6px"><span class="eyebrow">Senza Excel</span><h3 style="font-size:1.5rem">Crea il tuo portafoglio</h3>
+    <p class="caption" style="margin:0">Scegli gli strumenti e quanto pesa ciascuno. Scarico i prezzi di mercato e ti porto al laboratorio.</p></div>
+  <div><span class="eyebrow">Parti da un modello</span><div class="bd-presets" id="bdPresets"></div></div>
+  <div class="bd-rows" id="bdRows"></div>
+  <button type="button" class="btn sm" id="bdAdd">+ Aggiungi strumento</button>
+  <label class="bd-cap"><span class="eyebrow">Capitale (€)</span><input type="number" min="100" step="500" id="bdCap" value="10000" inputmode="decimal"></label>
+  <div class="bd-foot"><span id="bdSum"></span><button type="button" class="btn lime" id="bdGo">Analizza il portafoglio</button></div>
+  <p class="caption" id="bdNote" style="margin:0">Scrivi un ticker (VWCE) o un ISIN (IE00BK5BQT80), oppure scegli dall'elenco. Gli ISIN sono verificati su OpenFIGI prima di scaricare i prezzi.</p>
+  <datalist id="bdList"></datalist>
+</aside>
 <aside class="drawer" id="drawer" aria-label="Ricevuta del calcolo" aria-hidden="true">
   <button type="button" class="btn sm x" id="closeDrawer">Chiudi</button>
   <div id="receipt" style="display:flex;flex-direction:column;gap:18px"></div>

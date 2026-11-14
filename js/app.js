@@ -420,9 +420,9 @@ function load(sheets,source,fromUser,opts={}){
   if(opts.memory){S.recipe={status:"memory",r:opts.recipe,errors:[]};S.tplUsed=true;}
   /* ogni file nuovo: l'IA legge la struttura di tutti i fogli; un modello già confermato non la richiede */
   /* il file di esempio è noto: niente lettura con l'IA (nessun costo), solo i riconoscitori locali */
-  if(fromUser&&isFile&&aiAuto()&&!S.tplUsed&&!source.example)requestRecipe();
+  if(fromUser&&isFile&&aiAuto()&&!S.tplUsed&&!source.example&&!source.builder)requestRecipe();
   renderImport(false);
-  if(fromUser&&isFile&&(!aiAuto()||S.tplUsed||source.example))maybeAutoRebuild();
+  if(fromUser&&isFile&&(!aiAuto()||S.tplUsed||source.example||source.builder))maybeAutoRebuild();
 }
 /* ---------- Lettura con l'IA: estratto strutturato → ricetta → il motore la esegue su tutto il file ---------- */
 function aiSample(){
@@ -556,6 +556,48 @@ async function loadExample(fromUser){
 }
 $("#sampleBtn").addEventListener("click",()=>loadExample(true));
 
+/* ---------- Crea il tuo portafoglio: strumenti e pesi scelti a mano, poi lo stesso percorso di un Excel (prezzi di mercato → laboratorio) ---------- */
+const POPULAR=[["VWCE","Vanguard FTSE All-World (Acc)","IE00BK5BQT80"],["SWDA","iShares Core MSCI World (Acc)","IE00B4L5Y983"],["CSSPX","iShares Core S&P 500 (Acc)","IE00B5BMR087"],
+  ["EIMI","iShares Core MSCI EM IMI (Acc)","IE00BKM4GZ66"],["CSNDX","iShares Nasdaq 100 (Acc)","IE00B53SZB19"],["IUSN","iShares MSCI World Small Cap (Acc)","IE00BF4RFH31"],
+  ["VWRL","Vanguard FTSE All-World (Dist)","IE00B3RBWM25"],["XDWD","Xtrackers MSCI World 1C","IE00BJ0KDQ92"],["SSAC","iShares MSCI ACWI (Acc)","IE00B6R52259"],
+  ["AGGH","iShares Core Global Aggregate Bond EUR Hedged","IE00BDBRDM35"],["IEAG","iShares € Aggregate Bond","IE00B3DKXQ41"],["IBGS","iShares € Govt Bond 1-3yr","IE00B14X4Q57"],
+  ["XEON","Xtrackers EUR Overnight Rate Swap (liquidità)","LU0290358497"],["SGLN","iShares Physical Gold","IE00B4ND3602"],["4GLD","Xetra-Gold","DE000A0S9GB0"]];
+const PRESETS=[["Azionario mondo",[["VWCE",100]]],["60/40",[["SWDA",60],["AGGH",40]]],["Core e satelliti",[["SWDA",70],["EIMI",10],["IUSN",10],["CSNDX",10]]],["Prudente",[["SWDA",30],["IEAG",40],["IBGS",15],["SGLN",15]]]];
+const BD={rows:[["SWDA",80],["EIMI",20]]};
+function bdFind(v){const t=String(v||"").trim().toUpperCase(),isin=(t.match(/[A-Z]{2}[A-Z0-9]{9}\d/)||[])[0],tk=t.split(/[\s·]+/)[0];
+  return POPULAR.find(p=>p[2]===isin||p[0]===tk)||(isin?[null,null,isin]:tk?[tk,null,null]:null);}
+function bdRender(){
+  $("#bdPresets").innerHTML=PRESETS.map((p,i)=>`<button type="button" class="chipbtn" data-bdp="${i}">${esc(p[0])}</button>`).join("");
+  $("#bdList").innerHTML=POPULAR.map(p=>`<option value="${p[0]} · ${esc(p[1])}">`).join("");
+  $("#bdRows").innerHTML=BD.rows.map((r,i)=>{const f=bdFind(r[0]);return `<div class="bd-row"><div class="bd-in"><input list="bdList" data-bdi="${i}" value="${esc(r[0])}" placeholder="Ticker o ISIN" aria-label="Strumento ${i+1}" spellcheck="false"><small>${f&&f[1]?esc(f[1])+" · "+f[2]:f&&f[2]?"ISIN "+f[2]:r[0]?"ticker da verificare":""}</small></div>
+    <label class="bd-w"><input type="number" min="0" max="100" step="1" data-bdw="${i}" value="${r[1]}" aria-label="Peso dello strumento ${i+1} in percentuale" inputmode="decimal"><span>%</span></label><button type="button" class="btn sm bd-del" data-bdd="${i}" aria-label="Togli lo strumento ${i+1}">×</button></div>`;}).join("");
+  const s=BD.rows.reduce((a,r)=>a+(+r[1]||0),0),ok=BD.rows.filter(r=>String(r[0]).trim()&&+r[1]>0).length;
+  $("#bdSum").innerHTML=`Totale <b class="${Math.abs(s-100)<.01?"up":"dn"}">${fmtN(s,0)}%</b>${Math.abs(s-100)>=.01?" · li riporto a 100%":""}`;
+  $("#bdGo").disabled=!ok;
+}
+function openBuilder(){bdRender();$("#builder").classList.add("open");$("#scrim").classList.add("open");$("#builder").setAttribute("aria-hidden","false");setTimeout(()=>{const i=document.querySelector("#bdRows input");if(i)i.focus();},350);}
+function closeBuilder(){$("#builder").classList.remove("open");if(!$("#drawer").classList.contains("open"))$("#scrim").classList.remove("open");$("#builder").setAttribute("aria-hidden","true");}
+$("#builderBtn").addEventListener("click",openBuilder);
+$("#closeBuilder").addEventListener("click",closeBuilder);
+$("#scrim").addEventListener("click",closeBuilder);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#builder").classList.contains("open"))closeBuilder();});
+$("#builder").addEventListener("click",e=>{const p=e.target.closest("[data-bdp]"),d=e.target.closest("[data-bdd]");
+  if(p){BD.rows=PRESETS[+p.dataset.bdp][1].map(x=>[...x]);bdRender();}
+  if(d){BD.rows.splice(+d.dataset.bdd,1);if(!BD.rows.length)BD.rows.push(["",0]);bdRender();}
+  if(e.target.id==="bdAdd"){BD.rows.push(["",0]);bdRender();const ins=document.querySelectorAll("#bdRows input[list]");ins[ins.length-1].focus();}
+  if(e.target.id==="bdGo")bdGo();});
+$("#builder").addEventListener("change",e=>{const i=e.target.dataset.bdi,w=e.target.dataset.bdw;
+  if(i!=null){const f=bdFind(e.target.value);BD.rows[+i][0]=f&&f[0]?f[0]:String(e.target.value).trim().toUpperCase();bdRender();}
+  if(w!=null){BD.rows[+w][1]=Math.max(0,parseFloat(String(e.target.value).replace(",","."))||0);bdRender();}});
+function bdGo(){
+  const rows=BD.rows.filter(r=>String(r[0]).trim()&&+r[1]>0),s=rows.reduce((a,r)=>a+(+r[1]),0);if(!rows.length||!(s>0))return;
+  const cap=Math.max(100,parseFloat($("#bdCap").value)||10000);
+  /* un riepilogo di posizioni come quello di un Excel: lo legge il riconoscitore locale, poi i prezzi di mercato */
+  const aoa=[["Strumento","Ticker","ISIN","Valore (€)","Peso"],...rows.map(r=>{const f=bdFind(r[0])||[r[0],null,null],w=(+r[1])/s;return [f[1]||f[0]||f[2],f[0]&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(f[0])?f[0]:"",f[2]||"",Math.round(cap*w*100)/100,w];})];
+  closeBuilder();
+  load([{name:"Il mio portafoglio",aoa}],{name:"Il mio portafoglio",size:0,kind:"file",builder:true},true);
+}
+
 /* ---------- Import ---------- */
 const an=()=>S.sheets[S.sheetIdx];
 const needCount=()=>an().cols.filter(c=>S.roles[c.idx]==null).length;
@@ -563,7 +605,7 @@ function renderImport(animate){
   if(!S.res)resetImportState();
   const A=an();S.ds=P.buildDataset(A,S.roles,fixOpts());
   $("#dsName").textContent=S.source.name;
-  $("#dsChip").innerHTML=S.source.kind==="sample"?`<span class="chip sample"><i></i>Esempio · dati sintetici</span>`:isExample()?`<span class="chip sample"><i></i>Esempio · portafoglio dimostrativo</span>`:"";
+  $("#dsChip").innerHTML=S.source.kind==="sample"?`<span class="chip sample"><i></i>Esempio · dati sintetici</span>`:isExample()?`<span class="chip sample"><i></i>Esempio · portafoglio dimostrativo</span>`:(S.source.builder||(S.rb&&S.rb.origSource&&S.rb.origSource.builder))?`<span class="chip sample"><i></i>Portafoglio creato da te</span>`:"";
   renderScan(A,animate);renderLog(A,S.ds,animate);renderSummary(A,S.ds);renderSheets();renderMapping(A);renderQuality(S.ds);renderCaps(S.ds);renderChecks(A,S.ds);renderConfirm(S.ds);renderTicker();renderAI();
 }
 function playScan(){
@@ -1035,6 +1077,7 @@ async function rebuildFromPrices(o={}){
       ...pf.missing.map(m=>`Non scaricato: ${m.nome}${m.simbolo?` (${m.simbolo})`:""}. ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
     S.rbLog=[...S.aiLog];
     renderImport(false);
+    if(S.rb&&S.rb.origSource&&S.rb.origSource.builder&&!o.quiet)setTimeout(()=>{const b=$("#confirmBtn");if(b&&!b.disabled)b.click();},900);
   }catch(e){
     if(S.source!==src0)return;
     S.und={...S.und,status:"ready",err:e instanceof TypeError?"Lo storico dei prezzi si scarica nella versione del sito pubblicata su Vercel.":String(e.message||e)};renderAI();
