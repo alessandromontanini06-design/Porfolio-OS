@@ -37,7 +37,11 @@ const TOOLS = [
     benchmark: { type: "string", enum: ["sp500", "nasdaq100", "msci_world", "eurostoxx50"] },
     valuta: { type: "string", enum: ["eur", "usd"], description: "eur (predefinito) converte l'indice in euro con il cambio BCE." },
     pesi: PESI }, required: ["benchmark"] } },
-  { name: "portafoglio_utente", description: "Posizioni reali dell'utente se ha caricato un riepilogo: valori, pesi attuali, pesi target e ribilanciamento.", parameters: { type: "object", properties: {} } }
+  { name: "portafoglio_utente", description: "Posizioni reali dell'utente se ha caricato un riepilogo: valori, pesi attuali, pesi target e ribilanciamento.", parameters: { type: "object", properties: {} } },
+  { name: "rendimento_reale", description: "Rendimento vero dell'utente dalle sue transazioni: TIR, valore oggi, versato, guadagno, rendimento ponderato nel tempo; per ogni strumento acquisti, vendite, dividendi incassati, valore, guadagno in euro, TIR e quota del guadagno; e per classe di attivo. Usalo per 'quanto ho guadagnato', 'quale ETF mi ha reso di più'.", parameters: { type: "object", properties: {} } },
+  { name: "composizione", description: "Dove è investito il portafoglio, dalle schede dei fondi: paesi, aree, sviluppati/emergenti, valute, classi di attivo, dimensione e stile, settori, TER medio e costo annuo, aziende principali con peso minimo e massimo sommando tutti gli ETF, sovrapposizione tra ETF. Usalo per 'quanta Apple ho', 'quanto sono esposto al dollaro', 'quanto costa il mio portafoglio'.", parameters: { type: "object", properties: {} } },
+  { name: "confronto_allocazioni", description: "I portafogli A, B (e C) della scheda «Confronta allocazioni»: pesi e risultati sugli stessi mesi (rendimento annuo, volatilità, Sharpe, perdita massima, peggiori 12 mesi, crisi).", parameters: { type: "object", properties: {} } },
+  { name: "profilo_rischio", description: "Risultato del test «La tua allocazione è coerente con te?», se l'utente lo ha fatto: perdita che regge, perdita peggiore del portafoglio, coerenza, quota investibile entro la soglia, risposte su orizzonte e liquidità.", parameters: { type: "object", properties: {} } }
 ];
 
 const SYSTEM = `Ti chiami Quanta e sei l'analista IA di Portfolio OS, un laboratorio di analisi finanziaria. Rispondi in italiano, in modo chiaro e breve.
@@ -49,6 +53,7 @@ Regole:
 - I dati sono storici: descrivono il passato e non prevedono il futuro. Dillo quando è rilevante.
 - Non dare consigli d'investimento personalizzati (non dire "compra" o "vendi"): spiega cosa mostrano i numeri e quali sono i compromessi.
 - Usa i nomi degli asset esattamente come li restituiscono gli strumenti.
+- Per guadagni in euro e rendimento dei singoli strumenti usa rendimento_reale; per paesi, valute, settori, aziende e costi usa composizione; per i portafogli A/B/C usa confronto_allocazioni; per il test del profilo usa profilo_rischio. Le esposizioni da justETF sono parziali: se lo strumento restituisce un intervallo o un minimo, riportalo così.
 - Risposte brevi: due-cinque frasi o un elenco puntato corto. Usa **grassetto** per i numeri chiave.
 - Se i dati non bastano a rispondere, dillo e spiega cosa servirebbe.`;
 

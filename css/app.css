@@ -810,3 +810,10 @@ body[data-scene="bench"]{--pill:#5BF0A5;--pill-rgb:91,240,165}
 .fb-card{border:1px dashed var(--line);border-radius:16px;padding:12px 16px;margin-top:6px}.fb-card summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .fb-body{display:flex;flex-direction:column;gap:12px;margin-top:12px}.fb-body label{display:flex;flex-direction:column;gap:6px}.fb-body label.sw{flex-direction:row;align-items:center;gap:10px}
 .fb-body textarea{width:100%;border-radius:10px;border:1px solid var(--line);background:var(--raise);padding:10px 12px;font:inherit;color:var(--fg);resize:vertical}
+
+.lab-idx{position:sticky;top:64px;z-index:5;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:color-mix(in oklab,var(--solid) 88%,transparent);backdrop-filter:blur(10px)}
+.lab-idx::-webkit-scrollbar{display:none}.lab-idx .eyebrow{flex:none;margin-right:2px}.lab-idx .chipbtn{flex:none;white-space:nowrap;padding:6px 12px;font-size:.8rem}
+@media (max-width:760px){.lab-idx{top:56px;border-radius:14px}}
+
+.bd-hint.ok{color:var(--good,#5BF0A5)}.bd-hint.no{color:var(--bad)}
+#lab .card{scroll-margin-top:210px}@media (max-width:760px){#lab .card{scroll-margin-top:170px}}

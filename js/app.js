@@ -631,11 +631,23 @@ const BD={ports:[[["SWDA",80],["EIMI",20]]],cur:0};
 Object.defineProperty(BD,"rows",{get(){return this.ports[this.cur];},set(v){this.ports[this.cur]=v;}});
 function bdFind(v){const t=String(v||"").trim().toUpperCase(),isin=(t.match(/[A-Z]{2}[A-Z0-9]{9}\d/)||[])[0],tk=t.split(/[\s·]+/)[0];
   return POPULAR.find(p=>p[2]===isin||p[0]===tk)||(isin?[null,null,isin]:tk?[tk,null,null]:null);}
+/* verifica mentre si scrive: ISIN → quotazioni su OpenFIGI; ticker → si prova a scaricarne i prezzi. Risultato in memoria per la sessione. */
+const BDCHK=new Map();
+function bdState(v){const f=bdFind(v);if(!v||!String(v).trim())return "";if(f&&f[1])return "ok";const c=BDCHK.get(String(v).trim().toUpperCase());return c?c.st:"";}
+function bdHint(v){const t=String(v||"").trim();if(!t)return "";const f=bdFind(t);if(f&&f[1])return esc(f[1])+" · "+f[2];
+  const c=BDCHK.get(t.toUpperCase());if(!c){bdCheck(t);return "verifico…";}
+  return c.st==="wait"?"verifico…":c.st==="ok"?"✓ "+esc(c.name||c.sym):"✗ non trovato: prova con l'ISIN (lo trovi su justETF o sul sito dell'emittente)";}
+async function bdCheck(v){const k=String(v).trim().toUpperCase();if(BDCHK.has(k))return;BDCHK.set(k,{st:"wait"});
+  try{const isin=(k.match(/^[A-Z]{2}[A-Z0-9]{9}\d$/)||[])[0];
+    if(isin){const j=await getJSON(`/api/isin?isin=${isin}`),r=(j.results||[])[0];BDCHK.set(k,r&&r.simbolo?{st:"ok",name:r.nome||r.simbolo,sym:r.simbolo}:{st:"no"});}
+    else{const sym=guessSymbol(k,"ETF",null)||k,j=await getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`);BDCHK.set(k,j&&!j.error&&j.points&&j.points.length?{st:"ok",name:(j.info||"").split(" · ")[0]||sym,sym}:{st:"no"});}
+  }catch{BDCHK.set(k,{st:"no"});}
+  if($("#builder").classList.contains("open"))bdRender();}
 function bdRender(){
   $("#bdTabs").innerHTML=BD.ports.map((p,i)=>`<button type="button" class="chipbtn${i===BD.cur?" on":""}" data-bdt="${i}">Portafoglio ${"ABC"[i]}</button>`).join("")+(BD.ports.length<3?`<button type="button" class="chipbtn" data-bdt="new">+ Confronta con ${"ABC"[BD.ports.length]}</button>`:"")+(BD.ports.length>1?`<button type="button" class="chipbtn" data-bdt="del">Togli ${"ABC"[BD.cur]}</button>`:"");
   $("#bdPresets").innerHTML=PRESETS.map((p,i)=>`<button type="button" class="chipbtn" data-bdp="${i}">${esc(p[0])}</button>`).join("");
   $("#bdList").innerHTML=POPULAR.map(p=>`<option value="${p[0]} · ${esc(p[1])}">`).join("");
-  $("#bdRows").innerHTML=BD.rows.map((r,i)=>{const f=bdFind(r[0]);return `<div class="bd-row"><div class="bd-in"><input list="bdList" data-bdi="${i}" value="${esc(r[0])}" placeholder="Ticker o ISIN" aria-label="Strumento ${i+1}" spellcheck="false"><small>${f&&f[1]?esc(f[1])+" · "+f[2]:f&&f[2]?"ISIN "+f[2]:r[0]?"ticker da verificare":""}</small></div>
+  $("#bdRows").innerHTML=BD.rows.map((r,i)=>{const f=bdFind(r[0]);return `<div class="bd-row"><div class="bd-in"><input list="bdList" data-bdi="${i}" value="${esc(r[0])}" placeholder="Ticker o ISIN" aria-label="Strumento ${i+1}" spellcheck="false"><small class="bd-hint ${bdState(r[0])}">${bdHint(r[0])}</small></div>
     <label class="bd-w"><input type="number" min="0" max="100" step="1" data-bdw="${i}" value="${r[1]}" aria-label="Peso dello strumento ${i+1} in percentuale" inputmode="decimal"><span>%</span></label><button type="button" class="btn sm bd-del" data-bdd="${i}" aria-label="Togli lo strumento ${i+1}">×</button></div>`;}).join("");
   const s=BD.rows.reduce((a,r)=>a+(+r[1]||0),0),ok=BD.rows.filter(r=>String(r[0]).trim()&&+r[1]>0).length;
   $("#bdSum").innerHTML=`Totale <b class="${Math.abs(s-100)<.01?"up":"dn"}">${fmtN(s,0)}%</b>${Math.abs(s-100)>=.01?" · li riporto a 100%":""}`;
@@ -1410,6 +1422,7 @@ function cmpCalc(){
   return {res,ks,rf,mm,used};
 }
 function renderCompare(){
+  setTimeout(labIndex,60);
   const card=$("#cmpCard");if(!card)return;const ds=S.ds;
   /* nello spazio «Prove e confronti» il confronto è la scheda principale: in cima al laboratorio */
   const pc=$("#profCard"),pf=$("#pfCard");if(pc&&pf){if(isSim()){if(card.nextElementSibling!==pc)pc.parentNode.insertBefore(card,pc);}else if(pf.nextElementSibling!==card)pf.parentNode.insertBefore(card,pf.nextSibling);}
@@ -1706,6 +1719,15 @@ function renderLook(){
 /* articolo davanti a una percentuale: «l'8%», «l'11%», «l'84%», altrimenti «il» */
 const artIl=v=>/^(8|11(?!\d))/.test(String(Math.round(v*100)))?"l'":"il ";
 const hedgedTxt=e=>{const c=String(e.copertura||"").replace(/^Con copertura valutaria\s*/i,"").trim();return c&&!/^(no|nessuna?)$/i.test(c)?"coperto":null;};
+/* indice delle schede del laboratorio: solo quelle visibili, nell'ordine in cui compaiono; un clic porta alla scheda */
+const LAB_IDX=[["realCard","Rendimento reale"],["chartbox","Crescita"],["profCard","Il tuo profilo"],["pfCard","Portafoglio e ribilanciamento"],["cmpCard","Confronta allocazioni"],["lookCard","Dove sei investito"],["metrics","Metriche"],["corr","Correlazioni"],["macro","Macro"]];
+function labIndex(){
+  const nav=$("#labIdx");if(!nav)return;
+  const vis=LAB_IDX.map(([id,l])=>{const el=document.getElementById(id),card=el&&(el.classList.contains("card")?el:el.closest(".card"));return card&&!card.hidden&&card.offsetParent!==null?{card,l,y:card.getBoundingClientRect().top}:null;}).filter(Boolean).sort((a,b)=>a.y-b.y);
+  nav.hidden=vis.length<3;S.labIdx=vis;
+  nav.innerHTML=`<span class="eyebrow">Vai a</span>${vis.map((v,i)=>`<button type="button" class="chipbtn" data-li="${i}">${esc(v.l)}</button>`).join("")}`;
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-li]");if(!b||!S.labIdx)return;const v=S.labIdx[+b.dataset.li];if(v)v.card.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"start"});});
 function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;
   const starts=ds.assets.map(a=>({n:a.name,k:Math.max(0,a.first-1)})),late=starts.filter(s=>s.k>Math.min(...starts.map(x=>x.k))+1),gc=$("#growthNote");
@@ -1724,6 +1746,7 @@ function renderLab(){
   renderCompare();
   renderReal();
   renderMatrix();
+  setTimeout(labIndex,60);
   const caps=P.capabilities(ds),get=n=>caps.find(c=>c.name.startsWith(n));
   const NX=[
     {t:"Analisi del rischio",d:"VaR e CVaR storici, Sortino, contributo di ogni asset al rischio, concentrazioni.",c:get("Volatilità"),go:"risk"},
@@ -2706,6 +2729,7 @@ function realCalc(){
   return {pp,tx};
 }
 function renderReal(){
+  setTimeout(labIndex,60);
   const el=$("#realCard");if(!el)return;
   const R=realCalc();if(!R){el.hidden=true;S.real=null;return;}
   el.hidden=false;const ds=S.ds,f=ds.freq.f;
@@ -2933,6 +2957,27 @@ const TOOLS_LOCAL={
     return {pesi:fmtW(w),impatto_sul_portafoglio:fmtPct(imp.total,1,true),impatto_in_euro:fmtEur(imp.total*cap),capitale:fmtEur(cap),propagazione:prop?"attiva: asset senza shock stimati dalla covarianza storica":"spenta: asset senza shock a zero",
       asset:ds.assets.map((x,i)=>w[i]>0?{nome:x.name,shock:fmtPct(s.r[i],1,true),origine:s.implied[i]?"stimato":"indicato",contributo:fmtPct(imp.contrib[i],1,true)}:null).filter(Boolean),nota:"Shock istantaneo e ipotetico, non una previsione."};
   },
+  rendimento_reale:()=>{const R=S.real;if(!R||!R.pp)return {error:"Nessuna transazione nel file: il rendimento reale si calcola solo da un file di movimenti."};const pp=R.pp,ds=S.ds,B=pp.byAsset,tg=B.reduce((s,b)=>s+(b.ops?b.gain:0),0);
+    const pos=S.portfolio?S.portfolio.positions:[],cls=i=>{const q=pos.find(p=>(p.ticker||p.nome)===ds.assets[i].name);return q&&q.etf&&!q.etf.error?P.etfClass(q.etf):null;};
+    return {tir:fmtPct(pp.xirr,1,true),valore_oggi:fmtEur(pp.value),versato_netto:fmtEur(pp.invested),guadagno:fmtEur(pp.gain),guadagno_percentuale:fmtPct(pp.gainPct,1,true),rendimento_ponderato_nel_tempo:fmtPct(pp.twr,1,true),
+      per_strumento:ds.assets.map((a,i)=>B[i].ops?{strumento:a.name,classe:cls(i),acquisti:fmtEur(B[i].bought),vendite:fmtEur(B[i].sold),dividendi_incassati:fmtEur(B[i].income),valore_oggi:fmtEur(B[i].value),guadagno:fmtEur(B[i].gain),tir:Number.isFinite(B[i].xirr)?fmtPct(B[i].xirr,1,true):null,quota_del_guadagno:tg?fmtPct(B[i].gain/tg,0):null}:null).filter(Boolean),
+      nota:"Guadagno = valore oggi − acquisti + vendite + dividendi incassati; la somma per strumento è il guadagno totale. Prezzi di mercato di fine mese."};},
+  composizione:()=>{const pf=S.portfolio;if(!pf)return {error:"Serve un portafoglio con posizioni (file o portafoglio creato) per conoscere la composizione dei fondi."};
+    const tot=pf.positions.reduce((q,p)=>q+(p.valore||0),0),ok=p=>p.etf&&!p.etf.error,items=pf.positions.map(p=>({nome:p.ticker||p.nome,w:tot?(p.valore||0)/tot:1/pf.positions.length,etf:ok(p)?p.etf:null}));
+    if(!items.some(x=>x.etf))return {error:pf.etfLoading?"Sto ancora leggendo le schede dei fondi: riprova tra qualche secondo.":"Nessuna scheda dei fondi disponibile (servono gli ISIN)."};
+    const X=P.exposures(items.map(x=>({w:x.w,etf:x.etf}))),T=P.weightedTer(items.map(x=>({w:x.w,ter:x.etf?x.etf.ter:NaN}))),C=P.lookThrough(items.map(x=>({w:x.w,parti:x.etf?x.etf.paesi:null}))),Se=P.lookThrough(items.map(x=>({w:x.w,parti:x.etf?x.etf.settori:null})));
+    const K=P.companyExposure(items.map(x=>({nome:x.nome,w:x.w,eq:!!x.etf&&P.etfClass(x.etf)==="Azioni",top:x.etf?x.etf.partecipazioni:null}))),r=rows=>rows.slice(0,8).map(x=>`${x.nome} ${fmtPct(x.peso,1)}`);
+    return {paesi:r(C.rows),aree:r(X.reg),sviluppati_emergenti:r(X.dev),valute:r(X.ccy),classi:r(X.cls),dimensione_azioni:r(X.size),stile_azioni:r(X.style),settori:r(Se.rows),ter_medio:Number.isFinite(T.ter)?fmtPct(T.ter,2):null,costo_annuo:Number.isFinite(T.ter)?fmtEur(T.ter*tot):null,
+      aziende_principali:K&&K.rows?K.rows.slice(0,10).map(x=>`${x.nome}: ${x.hi==null?"almeno "+fmtPct(x.lo,1):fmtPct(x.hi,1)===fmtPct(x.lo,1)?fmtPct(x.lo,1):fmtPct(x.lo,1)+"–"+fmtPct(x.hi,1)} (in ${x.in.map(y=>y.f).join(", ")})`):[],
+      sovrapposizioni:K&&K.pairs?K.pairs.filter(p=>p.n>0).map(p=>`${p.a} e ${p.b}: almeno ${fmtPct(p.lo,0)} in comune`):[],
+      nota:"Fonte justETF: prime 4 voci per paesi/settori e prime 10 partecipazioni per fondo; le quote 'Altri' restano non dettagliate, le aziende hanno un minimo e un massimo."};},
+  confronto_allocazioni:()=>{if(!S.cmp||!S.ds)return {error:"La scheda «Confronta allocazioni» non è ancora aperta: costruisci il laboratorio."};const R=cmpCalc(),ds=S.ds,f=ds.freq.f;
+    return {mesi_comuni:R.ks.length,periodo:R.ks.length?`${fmtDate(ds.dates[Math.max(0,R.ks[0]-1)],f)} - ${fmtDate(ds.dates[R.ks[R.ks.length-1]],f)}`:null,
+      portafogli:R.res.map(r=>r.empty?{nome:r.name,vuoto:true}:{nome:r.name,pesi:fmtW(r.wn),rendimento_annuo:fmtPct(r.st.cagr,1,true),volatilita:fmtPct(r.st.vol,1),sharpe:fmtN(r.sharpe),perdita_massima:fmtPct(r.st.mdd,1),peggiori_12_mesi:fmtPct(r.rk.worst12,1),crisi:r.cr.map(c=>`${c.name}: ${fmtPct(c.mdd,1)}`)}),
+      nota:"Stessi mesi per tutti, ribilanciamento mensile, senza costi né tasse. È il passato."};},
+  profilo_rischio:()=>{const B=S.PR;if(!B||!B.result)return {error:"L'utente non ha ancora fatto il test «La tua allocazione è coerente con te?» (scheda «Il tuo profilo» nel laboratorio)."};const r=B.result;
+    return {perdita_che_regge:r.tol!=null?`meno del ${fmtPct(-r.tol,0)}`:r.thr!=null?`almeno il ${fmtPct(-r.thr,0)}`:null,perdita_peggiore_del_portafoglio:fmtPct(-r.worst,0),coerente:r.coh,quota_investita_entro_la_soglia:r.okMix!=null?fmtPct(r.okMix,0):null,
+      risposte:B.ans,scelte_nelle_crisi:B.cr.map((c,i)=>`${c.name} (${fmtPct(c.mdd,0)}): ${B.ch[i]||"-"}`),nota:"Profilo educativo basato sulle scelte nelle crisi rivissute; non è consulenza."};},
   portafoglio_utente:()=>S.portfolio?{da_file:S.portfolio.from,posizioni:S.portfolio.positions.map(p=>({nome:p.nome,ticker:p.ticker,valore:p.valore==null?null:`${fmtN(p.valore)} €`,peso_attuale:p.pesoAttuale==null?null:fmtPct(p.pesoAttuale,1),peso_target:p.pesoTarget==null?null:fmtPct(p.pesoTarget,1)}))}:{nota:"Nessun riepilogo di portafoglio caricato: si usano pesi uguali o quelli indicati nella domanda."}
 };
 async function askChat(text){
@@ -3134,7 +3179,7 @@ requestAnimationFrame(movePill);
 if(!HAS_G)heroIntro();
 renderPager("home");
 /* per i test automatici: caricare fogli come se fossero un file e leggere cosa ha capito il sito */
-window.__pos={pf:()=>S.portfolio,loadEtfInfo:()=>loadEtfInfo(),loadSheets:(sheets,name)=>load(sheets,{name:name||"prova.xlsx",size:0,kind:"file"},true),
+window.__pos={tool:(n,a)=>TOOLS_LOCAL[n](a||{}),pf:()=>S.portfolio,loadEtfInfo:()=>loadEtfInfo(),loadSheets:(sheets,name)=>load(sheets,{name:name||"prova.xlsx",size:0,kind:"file"},true),
   state:()=>({recipe:S.recipe?{status:S.recipe.status,tipo:S.recipe.r&&S.recipe.r.tipoFile,raw:S.recipe.r&&{c:S.recipe.r.serieInColonna,m:S.recipe.r.matriciRendimenti,provider:S.recipe.r.provider},errors:S.recipe.errors||[],msg:S.recipe.msg||null}:null,sheet:an()&&an().name,
     assets:S.ds&&S.ds.ok?S.ds.assets.map(a=>`${a.name}:${a.role}`):[],obs:S.ds&&S.ds.ok?S.ds.nObs:0,
     und:S.und&&S.und.posizioni?S.und.posizioni.map(p=>`${p.ticker}→${p.simbolo}`):null,sheets:S.sheets.map(s=>s.name),
