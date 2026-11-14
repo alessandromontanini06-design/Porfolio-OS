@@ -41,7 +41,7 @@
   const drawLines=sc=>{
     sc.querySelectorAll(".chartbox svg, .chart svg").forEach(svg=>{
       if(svg.__drawn)return;svg.__drawn=true;
-      const ps=[...svg.querySelectorAll("path,polyline")].filter(p=>{const f=p.getAttribute("fill");return (f==="none"||f===null&&p.tagName==="polyline")&&!p.getAttribute("stroke-dasharray");});
+      const ps=[...svg.querySelectorAll("path,polyline")].filter(p=>{const f=p.getAttribute("fill");return (f==="none"||f===null&&p.tagName==="polyline")&&!p.getAttribute("stroke-dasharray")&&!p.hasAttribute("pathLength");});
       ps.slice(0,6).forEach((p,i)=>{let L=0;try{L=p.getTotalLength();}catch(e){}if(!L||L<80)return;
         G.fromTo(p,{strokeDasharray:L,strokeDashoffset:L},{strokeDashoffset:0,duration:1.2,ease:"power2.inOut",delay:.15+i*.08,onComplete:()=>{p.style.strokeDasharray="";p.style.strokeDashoffset="";}});});
     });

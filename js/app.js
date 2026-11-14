@@ -14,7 +14,7 @@ const ROLE_SHORT={price:"prezzi",ret:"rendimenti",retpct:"rendimenti %"};
 const ROLE_TAG={date:"data",price:"prezzo",ret:"rend.",retpct:"rend. %",ignore:"ignora"};
 const ROLE_COLOR={date:"var(--c4)",price:"var(--c1)",ret:"var(--c3)",retpct:"var(--c3)",ignore:"var(--faint)"};
 const CONF_L={alta:"Alta",media:"Da verificare",bassa:"Da confermare",utente:"Confermata"};
-const COLORS=["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c6)"];
+const COLORS=["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c6)","var(--c7,#8C8C8C)"];
 const NET_COLORS=["#C8FF2E","#A47BFF","#47E5FF","#FF7AD9","#FFC24B","#5BF0A5"];
 const color=i=>COLORS[i%COLORS.length];
 const fmtSize=b=>b<1024?b+" B":b<1048576?fmtN(b/1024,0)+" KB":fmtN(b/1048576,1)+" MB";
@@ -622,12 +622,15 @@ document.addEventListener("click",e=>{if(e.target.id!=="fbSend")return;const t=$
   $("#fbMsg").textContent="Grazie, segnalazione inviata.";$("#fbText").value="";$("#fbStruct").checked=false;});
 
 /* ---------- Crea il tuo portafoglio: strumenti e pesi scelti a mano, poi lo stesso percorso di un Excel (prezzi di mercato → laboratorio) ---------- */
-const POPULAR=[["VWCE","Vanguard FTSE All-World (Acc)","IE00BK5BQT80"],["SWDA","iShares Core MSCI World (Acc)","IE00B4L5Y983"],["CSSPX","iShares Core S&P 500 (Acc)","IE00B5BMR087"],
-  ["EIMI","iShares Core MSCI EM IMI (Acc)","IE00BKM4GZ66"],["CSNDX","iShares Nasdaq 100 (Acc)","IE00B53SZB19"],["IUSN","iShares MSCI World Small Cap (Acc)","IE00BF4RFH31"],
-  ["VWRL","Vanguard FTSE All-World (Dist)","IE00B3RBWM25"],["XDWD","Xtrackers MSCI World 1C","IE00BJ0KDQ92"],["SSAC","iShares MSCI ACWI (Acc)","IE00B6R52259"],
-  ["AGGH","iShares Core Global Aggregate Bond EUR Hedged","IE00BDBRDM35"],["IEAG","iShares € Aggregate Bond","IE00B3DKXQ41"],["IBGS","iShares € Govt Bond 1-3yr","IE00B14X4Q57"],
-  ["XEON","Xtrackers EUR Overnight Rate Swap (liquidità)","LU0290358497"],["SGLN","iShares Physical Gold","IE00B4ND3602"],["4GLD","Xetra-Gold","DE000A0S9GB0"]];
+const POPULAR=[["VWCE","Vanguard FTSE All-World (Acc)","IE00BK5BQT80","Azioni"],["SWDA","iShares Core MSCI World (Acc)","IE00B4L5Y983","Azioni"],["CSSPX","iShares Core S&P 500 (Acc)","IE00B5BMR087","Azioni"],
+  ["EIMI","iShares Core MSCI EM IMI (Acc)","IE00BKM4GZ66","Azioni"],["CSNDX","iShares Nasdaq 100 (Acc)","IE00B53SZB19","Azioni"],["IUSN","iShares MSCI World Small Cap (Acc)","IE00BF4RFH31","Azioni"],
+  ["VWRL","Vanguard FTSE All-World (Dist)","IE00B3RBWM25","Azioni"],["XDWD","Xtrackers MSCI World 1C","IE00BJ0KDQ92","Azioni"],["SSAC","iShares MSCI ACWI (Acc)","IE00B6R52259","Azioni"],
+  ["AGGH","iShares Core Global Aggregate Bond EUR Hedged","IE00BDBRDM35","Obbligazioni"],["IEAG","iShares € Aggregate Bond","IE00B3DKXQ41","Obbligazioni"],["IBGS","iShares € Govt Bond 1-3yr","IE00B14X4Q57","Obbligazioni"],
+  ["XEON","Xtrackers EUR Overnight Rate Swap (liquidità)","LU0290358497","Liquidità"],["SGLN","iShares Physical Gold","IE00B4ND3602","Oro"],["4GLD","Xetra-Gold","DE000A0S9GB0","Oro"]];
 const PRESETS=[["Azionario mondo",[["VWCE",100]]],["60/40",[["SWDA",60],["AGGH",40]]],["Core e satelliti",[["SWDA",70],["EIMI",10],["IUSN",10],["CSNDX",10]]],["Prudente",[["SWDA",30],["IEAG",40],["IBGS",15],["SGLN",15]]]];
+const PRESET_TXT=["Un solo ETF su tutto il mondo, mercati sviluppati ed emergenti. Semplice e molto diversificato.","Il classico bilanciato: 60% azioni mondiali, 40% obbligazioni globali coperte dal cambio.","Base sul mondo sviluppato, più emergenti, piccole aziende e tecnologia USA.","Più obbligazioni e oro, meno azioni: oscillazioni più contenute."];
+const CLS_COL={"Azioni":"var(--fg)","Obbligazioni":"var(--c2)","Liquidità":"var(--faint)","Oro":"var(--c5)","Altro":"var(--line-2)"};
+const bdCls=v=>{const f=bdFind(v);return f&&f[3]?f[3]:"Altro";};
 const BD={ports:[[["SWDA",80],["EIMI",20]]],cur:0};
 Object.defineProperty(BD,"rows",{get(){return this.ports[this.cur];},set(v){this.ports[this.cur]=v;}});
 function bdFind(v){const t=String(v||"").trim().toUpperCase(),isin=(t.match(/[A-Z]{2}[A-Z0-9]{9}\d/)||[])[0],tk=t.split(/[\s·]+/)[0];
@@ -645,17 +648,33 @@ async function bdCheck(v){const k=String(v).trim().toUpperCase();if(BDCHK.has(k)
   }catch{BDCHK.set(k,{st:"no"});}
   if($("#builder").classList.contains("open"))bdRender();}
 function bdRender(){
-  $("#bdTabs").innerHTML=BD.ports.map((p,i)=>`<button type="button" class="chipbtn${i===BD.cur?" on":""}" data-bdt="${i}">Portafoglio ${"ABC"[i]}</button>`).join("")+(BD.ports.length<3?`<button type="button" class="chipbtn" data-bdt="new">+ Confronta con ${"ABC"[BD.ports.length]}</button>`:"")+(BD.ports.length>1?`<button type="button" class="chipbtn" data-bdt="del">Togli ${"ABC"[BD.cur]}</button>`:"");
-  $("#bdPresets").innerHTML=PRESETS.map((p,i)=>`<button type="button" class="chipbtn" data-bdp="${i}">${esc(p[0])}</button>`).join("");
+  const L="ABC";
+  $("#bdTabs").innerHTML=BD.ports.map((p,i)=>`<button type="button" class="chipbtn${i===BD.cur?" on":""}" role="tab" aria-selected="${i===BD.cur}" data-bdt="${i}">Portafoglio ${L[i]}</button>`).join("")+(BD.ports.length<3?`<button type="button" class="chipbtn ghost" data-bdt="new">+ Confronta con ${L[BD.ports.length]}</button>`:"")+(BD.ports.length>1?`<button type="button" class="chipbtn ghost" data-bdt="del">Togli ${L[BD.cur]}</button>`:"");
+  $("#bdPresets").innerHTML=PRESETS.map((p,i)=>{const tot=p[1].reduce((a,x)=>a+x[1],0),by={};p[1].forEach(x=>{const c=bdCls(x[0]);by[c]=(by[c]||0)+x[1];});
+    return `<button type="button" class="bd-model" data-bdp="${i}"><b>${esc(p[0])}</b><span class="bd-mbar">${Object.entries(by).map(([c,w])=>`<i style="width:${w/tot*100}%;background:${CLS_COL[c]}"></i>`).join("")}</span><small>${esc(PRESET_TXT[i]||"")}</small><em>${p[1].map(x=>`${esc(x[0])} ${x[1]}%`).join(" · ")}</em></button>`;}).join("");
   $("#bdList").innerHTML=POPULAR.map(p=>`<option value="${p[0]} · ${esc(p[1])}">`).join("");
-  $("#bdRows").innerHTML=BD.rows.map((r,i)=>{const f=bdFind(r[0]);return `<div class="bd-row"><div class="bd-in"><input list="bdList" data-bdi="${i}" value="${esc(r[0])}" placeholder="Ticker o ISIN" aria-label="Strumento ${i+1}" spellcheck="false"><small class="bd-hint ${bdState(r[0])}">${bdHint(r[0])}</small></div>
+  $("#bdRows").innerHTML=BD.rows.map((r,i)=>{const c=r[0]?bdCls(r[0]):"";return `<div class="bd-row"><div class="bd-in"><input list="bdList" data-bdi="${i}" value="${esc(r[0])}" placeholder="Ticker o ISIN" aria-label="Strumento ${i+1}" spellcheck="false"><small class="bd-hint ${bdState(r[0])}">${bdHint(r[0])}</small></div>
+    <span class="bd-cls">${c?`<i style="background:${CLS_COL[c]}"></i>${c==="Altro"?"—":c}`:""}</span>
     <label class="bd-w"><input type="number" min="0" max="100" step="1" data-bdw="${i}" value="${r[1]}" aria-label="Peso dello strumento ${i+1} in percentuale" inputmode="decimal"><span>%</span></label><button type="button" class="btn sm bd-del" data-bdd="${i}" aria-label="Togli lo strumento ${i+1}">×</button></div>`;}).join("");
-  const s=BD.rows.reduce((a,r)=>a+(+r[1]||0),0),ok=BD.rows.filter(r=>String(r[0]).trim()&&+r[1]>0).length;
+  const have=new Set(BD.rows.map(r=>(bdFind(r[0])||[])[0]).filter(Boolean));
+  $("#bdCat").innerHTML=["Azioni","Obbligazioni","Liquidità","Oro"].map(g=>`<div class="bd-cg"><span class="eyebrow"><i style="background:${CLS_COL[g]}"></i>${g}</span>${POPULAR.filter(p=>p[3]===g).map(p=>`<button type="button" class="bd-ci${have.has(p[0])?" in":""}" data-bdc="${p[0]}"${have.has(p[0])?' aria-disabled="true"':""}><b>${p[0]}</b><span>${esc(p[1])}</span><small>${p[2]}</small><em aria-hidden="true">${have.has(p[0])?"✓":"+"}</em></button>`).join("")}</div>`).join("");
+  /* riepilogo */
+  const s=BD.rows.reduce((a,r)=>a+(+r[1]||0),0),val=BD.rows.filter(r=>String(r[0]).trim()&&+r[1]>0),ok=val.length,cap=Math.max(0,parseFloat($("#bdCap").value)||0);
+  const by={};val.forEach(r=>{const c=bdCls(r[0]);by[c]=(by[c]||0)+(+r[1]);});
+  $("#bdWhich").textContent=BD.ports.length>1?"· portafoglio "+L[BD.cur]:"";
+  $("#bdClassBar").innerHTML=s>0?Object.entries(by).map(([c,w])=>`<i style="width:${w/s*100}%;background:${CLS_COL[c]}" title="${c} ${fmtN(w/s*100,0)}%"></i>`).join(""):"";
+  $("#bdClassLeg").innerHTML=Object.entries(by).map(([c,w])=>`<span><i style="background:${CLS_COL[c]}"></i>${c==="Altro"?"Altro / da verificare":c} <b>${fmtN(w/s*100,0)}%</b></span>`).join("");
+  $("#bdComp").innerHTML=val.length?val.map(r=>{const f=bdFind(r[0])||[r[0]],w=(+r[1])/(s||1);return `<div class="bd-ci2"><span><b>${esc(f[0]||f[2]||r[0])}</b><small>${esc(f[1]||"")}</small></span><span class="bd-pw"><i style="width:${w*100}%"></i></span><span class="bd-num">${fmtN(w*100,1)}%<small>${fmtN(cap*w,0)} €</small></span></div>`;}).join(""):`<p class="caption">Ancora nessuno strumento.</p>`;
+  const verified=val.filter(r=>bdState(r[0])==="ok").length,bad=val.filter(r=>bdState(r[0])==="no").length,nc=Object.keys(by).length;
+  const checks=[[Math.abs(s-100)<.01,Math.abs(s-100)<.01?"I pesi sommano a 100%":`I pesi sommano a ${fmtN(s,0)}%: li riporto a 100% in proporzione`],
+    [ok>0&&verified===ok,bad?`${bad} ${bad>1?"strumenti non trovati":"strumento non trovato"}: prova con l'ISIN`:ok&&verified===ok?`${ok} ${ok>1?"strumenti riconosciuti":"strumento riconosciuto"}`:"Verifico gli strumenti…"],
+    [ok>1,ok===1?"Un solo strumento: la diversificazione dipende tutta da lui":`${ok} strumenti, ${nc} ${nc>1?"classi":"classe"} di attivo`]];
+  $("#bdChecks").innerHTML=ok?checks.map(([g,t])=>`<li class="${g?"ok":"warn"}">${t}</li>`).join(""):"";
   $("#bdSum").innerHTML=`Totale <b class="${Math.abs(s-100)<.01?"up":"dn"}">${fmtN(s,0)}%</b>${Math.abs(s-100)>=.01?" · li riporto a 100%":""}`;
   $("#bdGo").disabled=!ok;
 }
-function openBuilder(){trackOnce("feature","pannello_crea",{name:"pannello_crea"});bdRender();$("#builder").classList.add("open");$("#scrim").classList.add("open");$("#builder").setAttribute("aria-hidden","false");setTimeout(()=>{const i=document.querySelector("#bdRows input");if(i)i.focus();},350);}
-function closeBuilder(){$("#builder").classList.remove("open");if(!$("#drawer").classList.contains("open"))$("#scrim").classList.remove("open");$("#builder").setAttribute("aria-hidden","true");}
+function openBuilder(){trackOnce("feature","pannello_crea",{name:"pannello_crea"});bdRender();$("#builder").classList.add("open");document.body.classList.add("bd-on");$("#builder").scrollTop=0;$("#builder").setAttribute("aria-hidden","false");setTimeout(()=>{const i=document.querySelector("#bdRows input");if(i)i.focus();},350);}
+function closeBuilder(){$("#builder").classList.remove("open");document.body.classList.remove("bd-on");if(!$("#drawer").classList.contains("open"))$("#scrim").classList.remove("open");$("#builder").setAttribute("aria-hidden","true");}
 $("#builderBtn").addEventListener("click",openBuilder);
 /* copia l'allocazione vera come portafoglio A: la modifichi nello spazio di prova senza toccare l'originale */
 document.addEventListener("click",e=>{if(!e.target.closest("#variantBtn")||!S.portfolio)return;trackOnce("feature","variante",{name:"variante"});const P0=S.portfolio.positions.filter(p=>p.valore>0),tot=P0.reduce((a,p)=>a+p.valore,0);if(!(tot>0))return;
@@ -668,7 +687,13 @@ $("#builder").addEventListener("click",e=>{const p=e.target.closest("[data-bdp]"
   const tb=e.target.closest("[data-bdt]");if(tb){const v=tb.dataset.bdt;if(v==="new"){BD.ports.push(BD.rows.map(r=>[...r]));BD.cur=BD.ports.length-1;}else if(v==="del"){BD.ports.splice(BD.cur,1);BD.cur=Math.max(0,BD.cur-1);}else BD.cur=+v;bdRender();}
   if(d){BD.rows.splice(+d.dataset.bdd,1);if(!BD.rows.length)BD.rows.push(["",0]);bdRender();}
   if(e.target.id==="bdAdd"){BD.rows.push(["",0]);bdRender();const ins=document.querySelectorAll("#bdRows input[list]");ins[ins.length-1].focus();}
-  if(e.target.id==="bdGo")bdGo();});
+  if(e.target.id==="bdGo")bdGo();
+  const c=e.target.closest("[data-bdc]");if(c&&!c.classList.contains("in")){const empty=BD.rows.findIndex(r=>!String(r[0]).trim());if(empty>=0)BD.rows[empty]=[c.dataset.bdc,0];else BD.rows.push([c.dataset.bdc,0]);bdRender();const k=BD.rows.findIndex(r=>r[0]===c.dataset.bdc),w=document.querySelectorAll("#bdRows input[data-bdw]");if(w[k])w[k].focus();}
+  const n=BD.rows.filter(r=>String(r[0]).trim()).length,t=BD.rows.reduce((a,r)=>a+(+r[1]||0),0);
+  if(e.target.id==="bdEq"&&n){BD.rows.forEach(r=>{if(String(r[0]).trim())r[1]=Math.round(1000/n)/10;});bdRender();}
+  if(e.target.id==="bdNorm"&&t>0){BD.rows.forEach(r=>{r[1]=Math.round((+r[1]||0)/t*1000)/10;});bdRender();}
+  if(e.target.id==="bdClear"){BD.rows=[["",0]];bdRender();}});
+$("#bdCap").addEventListener("input",()=>bdRender());
 $("#builder").addEventListener("change",e=>{const i=e.target.dataset.bdi,w=e.target.dataset.bdw;
   if(i!=null){const f=bdFind(e.target.value);BD.rows[+i][0]=f&&f[0]?f[0]:String(e.target.value).trim().toUpperCase();bdRender();}
   if(w!=null){BD.rows[+w][1]=Math.max(0,parseFloat(String(e.target.value).replace(",","."))||0);bdRender();}});
@@ -1734,13 +1759,15 @@ function renderLook(){
 const artIl=v=>/^(8|11(?!\d))/.test(String(Math.round(v*100)))?"l'":"il ";
 const hedgedTxt=e=>{const c=String(e.copertura||"").replace(/^Con copertura valutaria\s*/i,"").trim();return c&&!/^(no|nessuna?)$/i.test(c)?"coperto":null;};
 /* indice delle schede del laboratorio: solo quelle visibili, nell'ordine in cui compaiono; un clic porta alla scheda */
-const LAB_IDX=[["realCard","Rendimento reale"],["chartbox","Crescita"],["profCard","Il tuo profilo"],["pfCard","Portafoglio e ribilanciamento"],["cmpCard","Confronta allocazioni"],["lookCard","Dove sei investito"],["metrics","Metriche"],["corr","Correlazioni"],["macro","Macro"]];
+const LAB_IDX=[["realCard","Rendimento reale"],["chartbox","Crescita"],["profCard","Il tuo profilo"],["pfCard","Portafoglio e ribilanciamento"],["cmpCard","Confronta allocazioni"],["lookCard","Dove sei investito"],["metrics","Metriche"],["corr","Correlazioni"]];
 function labIndex(){
   const nav=$("#labIdx");if(!nav)return;
   const vis=LAB_IDX.map(([id,l])=>{const el=document.getElementById(id),card=el&&(el.classList.contains("card")?el:el.closest(".card"));return card&&!card.hidden&&card.offsetParent!==null?{card,l,y:card.getBoundingClientRect().top}:null;}).filter(Boolean).sort((a,b)=>a.y-b.y);
   nav.hidden=vis.length<3;S.labIdx=vis;
   nav.innerHTML=`<span class="eyebrow">Vai a</span>${vis.map((v,i)=>`<button type="button" class="chipbtn" data-li="${i}">${esc(v.l)}</button>`).join("")}`;
 }
+/* indice laterale: evidenzia la scheda che stai guardando */
+document.getElementById("scene-lab")?.addEventListener("scroll",()=>{if(!S.labIdx)return;let k=0;S.labIdx.forEach((v,i)=>{if(v.card.getBoundingClientRect().top<window.innerHeight*.35)k=i;});document.querySelectorAll("#labIdx [data-li]").forEach((b,i)=>b.classList.toggle("on",i===k));},{passive:true});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-li]");if(!b||!S.labIdx)return;const v=S.labIdx[+b.dataset.li];if(v)v.card.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"start"});});
 function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;
@@ -2849,7 +2876,7 @@ $("#chatClose").addEventListener("click",closeChat);
 $("#chatNew").addEventListener("click",()=>{if(chatBusy)return;S.chat=[];S.chatView=[];renderChat();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#chat").classList.contains("open"))closeChat();});
 function chatContext(){
-  if(!S.ds||!S.ds.ok)return "nessun dataset confermato";
+  if(!S.lab||!S.ds||!S.ds.ok)return "nessun laboratorio costruito: rispondi a domande generali sul sito e sui concetti, senza inventare numeri del portafoglio dell'utente";
   return `file «${S.source.name}», ${S.ds.assets.length} asset (${S.ds.assets.map(a=>a.name).join(", ")}), ${S.ds.nObs} osservazioni ${S.ds.freq.adj}, pesi selezionati nell'app: ${S.risk?S.risk.wLabel:(S.portfolio?"pesi attuali dell'utente":"pesi uguali")}${S.portfolio?", l'utente ha caricato un riepilogo con i suoi pesi":""}`;
 }
 function md(t){
@@ -2858,7 +2885,7 @@ function md(t){
   return h+(list?"</ul>":"");
 }
 function chatSuggestions(){
-  if(!S.lab)return [];
+  if(!S.lab)return ["Come funziona Portfolio OS?","Che cos'è il TIR?","Che file posso caricare?","Che differenza c'è tra volatilità e drawdown?"];
   const n=S.ds.assets.map(a=>a.name),s=["Qual è l'asset più rischioso?","Riassumi il portafoglio in tre punti","Quanto si è perso nel periodo peggiore?"];
   s.splice(1,2,"Come ha retto il portafoglio nelle crisi?","Con 300 € al mese, quanto avrei tra 15 anni?");
   if(n.length>=2)s.splice(1,0,"Qual è l'allocazione più efficiente con massimo 50% per asset?");
@@ -2868,11 +2895,8 @@ function chatSuggestions(){
 }
 function renderChat(){
   const log=$("#chatLog");if(!log)return;
-  if(!S.lab){
-    log.innerHTML=`<div class="msg ai"><p>Ciao! Sono <b>Quanta</b>, l'analista IA di Portfolio OS. Per rispondere ho bisogno dei tuoi dati: carica un file, conferma la mappa e costruisci il laboratorio.</p></div><div><button type="button" class="btn sm lime" data-go="map">Vai alla mappa</button></div>`;
-    $("#chatSugg").innerHTML="";return;
-  }
-  const intro=`<div class="msg ai"><p>Ciao! Chiedimi qualsiasi cosa su <b>${esc(S.source.name)}</b>: rischio, rendimenti, correlazioni, oppure "e se cambiassi i pesi?". Ogni numero lo prendo dal motore di calcolo.</p></div>`;
+  const intro=S.lab?`<div class="msg ai"><p>Ciao! Chiedimi qualsiasi cosa su <b>${esc(S.source.name)}</b>: rischio, rendimenti, correlazioni, oppure "e se cambiassi i pesi?". Ogni numero lo prendo dal motore di calcolo.</p></div>`
+    :`<div class="msg ai"><p>Ciao! Sono <b>Quanta</b>, l'analista IA di Portfolio OS. Puoi chiedermi subito come funziona il sito o cosa vuol dire un termine (TIR, volatilità, drawdown…). Per i numeri del <b>tuo</b> portafoglio carica il file o apri l'esempio e costruisci il laboratorio.</p></div>`;
   log.innerHTML=intro+S.chatView.map(v=>v.k==="user"?`<div class="msg user">${esc(v.t)}</div>`
     :v.k==="tool"?`<span class="toolchip"><i></i>calcolo: ${esc(v.t)}</span>`
     :v.k==="typing"?`<div class="typing" aria-label="Quanta sta rispondendo"><i></i><i></i><i></i></div>`
@@ -3004,7 +3028,6 @@ async function askChat(text){
   trackOnce("feature","assistente",{name:"assistente"});
   text=String(text||"").trim();
   if(chatBusy||!text)return;
-  if(!S.lab){renderChat();return;}
   chatBusy=true;$("#chatSend").disabled=true;orbBusy(true);
   S.chat.push({role:"user",text});S.chatView.push({k:"user",t:text},{k:"typing"});renderChat();
   try{
@@ -3016,7 +3039,7 @@ async function askChat(text){
       S.chat.push({role:"assistant",text:j.text||"",calls});
       if(calls.length){
         for(const c of calls){
-          let result;try{result=await (TOOLS_LOCAL[c.name]||(()=>({error:"strumento sconosciuto"})))(c.args||{});}catch(e){result={error:String(e.message||e)};}
+          let result;if(!S.lab){result={error:"Nessun portafoglio caricato: rispondi in generale e, se servono numeri, invita a caricare il file o ad aprire l'esempio."};}else try{result=await (TOOLS_LOCAL[c.name]||(()=>({error:"strumento sconosciuto"})))(c.args||{});}catch(e){result={error:String(e.message||e)};}
           S.chat.push({role:"tool",id:c.id,name:c.name,result});
           S.chatView.splice(S.chatView.length-1,0,{k:"tool",t:TOOL_L[c.name]||c.name});
         }
@@ -3168,6 +3191,7 @@ function quantaScene(name){
 function setOrb(x,y){QG.pos={x,y};orbBtn.style.translate=`${x}px ${y}px`;if(say.classList.contains("on"))placeSay();}
 function orbSpark(){const r=orbBtn.getBoundingClientRect(),s=document.createElement("i");s.className="orb-spark";s.style.left=(r.left+r.width/2)+"px";s.style.top=(r.top+r.height/2)+"px";document.body.appendChild(s);setTimeout(()=>s.remove(),700);}
 function roam(){
+  if(CALM)return; // grafica 2: Quanta resta ferma nell'angolo
   if(!HAS_G||REDUCE||narrowUI()||QG.tl||QG.opened||document.hidden||document.body.classList.contains("chat-on")||$("#drawer").classList.contains("open"))return;
   if(Date.now()-QG.lastInput<4000)return; // non disturbare mentre l'utente sta facendo qualcosa
   const r=orbBtn.getBoundingClientRect(),W=window.innerWidth,H=window.innerHeight;
