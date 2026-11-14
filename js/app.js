@@ -5,6 +5,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const {fmtN,fmtPct,fmtDate}=P;
 const REDUCE=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const CALM=true; // grafica 2: niente sfera 3D, cursore personalizzato, apertura animata e transizioni pesanti (il codice resta, basta mettere false)
 const FINE=window.matchMedia("(hover:hover) and (pointer:fine)").matches;
 const G=window.gsap,ST=window.ScrollTrigger,HAS_G=!!(G&&ST)&&!REDUCE;
 if(HAS_G)G.registerPlugin(ST);
@@ -59,7 +60,7 @@ function go(name,opts={}){
   if(go.tl){go.tl.progress(1).kill();go.tl=null;}
   const change=prev&&prev!==nxt;
   const show=()=>{if(change){prev.hidden=true;if(HAS_G)G.set(prev,{clearProps:"all"});}nxt.hidden=false;nxt.scrollTop=0;onEnter(name);renderPager(name);};
-  if(!HAS_G||REDUCE||!change){show();if(HAS_G&&!REDUCE){const it=enterItems(nxt);G.fromTo(it,{y:60,opacity:0},{y:0,opacity:1,duration:.9,ease:"expo.out",stagger:.05,clearProps:"transform,opacity"});}return;}
+  if(!HAS_G||REDUCE||!change||CALM){show();if(HAS_G&&!REDUCE){const it=enterItems(nxt);G.fromTo(it,{y:CALM?18:60,opacity:0},{y:0,opacity:1,duration:CALM?.6:.9,ease:CALM?"power3.out":"expo.out",stagger:CALM?.04:.05,clearProps:"transform,opacity"});}return;}
   if(Morph.burst)Morph.burst(.9);
   const dir=SCENES.indexOf(name)>=SCENES.indexOf(from)?1:-1,p=xfer.querySelector(".xf-p"),inn=xfer.querySelectorAll(".xf-in>*");
   xfer.style.setProperty("--xf",ACC[name]);
@@ -107,7 +108,7 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- Cursore, luce sulle tessere, inclinazione 3D ---------- */
-if(FINE&&!REDUCE){
+if(FINE&&!REDUCE&&!CALM){
   document.body.classList.add("has-cur");
   const cur=$("#cur"),ring=cur.querySelector(".r"),dot=cur.querySelector(".d");
   let mx=-100,my=-100,rx=-100,ry=-100;
@@ -152,7 +153,7 @@ function heroIntro(){
   G.from(".dock",{y:120,duration:1,ease:"expo.out",delay:.5});
   G.from(".topbar",{y:-60,opacity:0,duration:.9,ease:"expo.out",delay:.4});
 }
-if(HAS_G){
+if(HAS_G&&!CALM){
   /* Avvio: un mercato si disegna dal vivo (crollo e rimbalzo), implode in un punto, esplode in un'onda d'urto,
      il titolo appare e due serrande si aprono sulla home. Clic o tasto per accelerare; più breve dalla seconda visita. */
   const ld=document.createElement("div");ld.className="loader";ld.setAttribute("aria-hidden","true");
@@ -3191,7 +3192,7 @@ window.__quanta={roam:()=>{QG.lastInput=0;roam();},say:s=>showSay(s||current)}; 
 /* ---------- Avvio ---------- */
 load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);/* subito qualcosa da mostrare, poi il portafoglio di esempio vero */
 loadExample(false);
-morphInit();
+if(!CALM)morphInit();
 renderLabs();loadMarket();
 quantaScene("home");
 requestAnimationFrame(movePill);

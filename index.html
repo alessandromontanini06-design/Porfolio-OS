@@ -29,8 +29,9 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400..900&family=Plus+Jakarta+Sans:wght@400..800&family=JetBrains+Mono:wght@400..600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800;900&family=JetBrains+Mono:wght@400..600&display=swap">
 <link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/v2.css">
 </head>
 <body data-scene="home">
 
@@ -47,47 +48,51 @@
   <section class="scene" data-scene="home" id="scene-home" aria-label="Home">
     <div class="inner">
       <div class="bento">
-        <div class="s12 hero-tile hero-full">
-          <span class="eyebrow">AI Financial Intelligence Lab · v1.0</span>
-          <h1 id="heroTitle" aria-label="Il tuo Excel. Un laboratorio."><span class="ln"><span class="sp">Il tuo Excel.</span></span><span class="ln"><span class="sp lime">Un laboratorio.</span></span></h1>
-          <div class="hero-foot">
-            <div class="stack" style="gap:18px">
-              <p class="sub">Carica il tuo Excel così com'è: movimenti, prezzi o riepilogo. Lo leggo da solo, scarico i prezzi di mercato di ogni ETF e calcolo rischio, rendimento reale e dove sei davvero investito. Ogni numero ha la sua ricevuta.</p>
-              <div class="cta">
-                <label class="btn lime" for="file">Carica il tuo file <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10m0 0-4-4m4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></label>
-                <button type="button" class="btn" id="builderBtn">Crea il tuo portafoglio</button>
-                <button type="button" class="btn" id="sampleBtn">Prova con l'esempio</button>
-              </div>
+        <div class="s12 hero2">
+          <div>
+            <p class="kick">Per chi segna i propri investimenti su un Excel</p>
+            <h1 id="heroTitle">Quanto hai guadagnato, davvero?</h1>
+            <p class="lead">Carica il file che usi già, così com'è. Portfolio OS riconosce acquisti e vendite, scarica i prezzi di mercato di ogni ETF e ti dice quanto hai guadagnato, quanto rischi e dove sono finiti i tuoi soldi.</p>
+            <p class="fine">Il file resta sul tuo computer. Ogni numero si può aprire e verificare.</p>
+            <span class="v2-hidden" id="flowLabel"></span>
+          </div>
+          <div class="start">
+            <div class="opt primary drop" id="drop" role="button" tabindex="0" aria-label="Carica il tuo Excel">
+              <label for="file" style="cursor:pointer;flex:1"><b>Carica il tuo Excel</b><small>anche l'export di Fineco, Degiro, Directa, Trade Republic… oppure trascinalo qui</small>
+                <span class="src">In uso: <b id="dsName">—</b><span id="dsChip"></span></span><span class="err" id="fileErr" hidden></span></label>
+              <em aria-hidden="true">→</em>
+              <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" hidden>
             </div>
-            <span class="lbl" id="flowLabel">Particelle: percorsi ricampionati dai rendimenti del file</span>
+            <button type="button" class="opt" id="builderBtn"><span><b>Non ho un file</b><small>crea un portafoglio scegliendo ETF e pesi</small></span><em aria-hidden="true">→</em></button>
+            <button type="button" class="opt" id="sampleBtn"><span><b>Fammi vedere un esempio</b><small>7 ETF, 355 movimenti dal 2019</small></span><em aria-hidden="true">→</em></button>
           </div>
         </div>
-        <div class="tile lime s4 drop" id="drop">
-          <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15V4m0 0-4 4m4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
-          <div class="stack">
-            <h3>Trascina qui<br>il tuo file</h3>
-            <p>.xlsx · .xls · .csv fino a 15 MB</p>
-            <div class="src">In uso: <b id="dsName">—</b><span id="dsChip"></span></div>
-            <p class="err" id="fileErr" hidden></p>
+        <div class="s12 showcase">
+          <div class="sc-text">
+            <h2>Cosa ti risponde, per esempio</h2>
+            <p>Dal file di esempio, un piano di accumulo su sette ETF iniziato nel 2019:</p>
+            <ul class="answers">
+              <li><b>+31.791 €</b> guadagnati su 58.536 € versati, cioè <b>+10,3% l'anno</b>.</li>
+              <li><b>EUNL</b> ha fatto metà del guadagno; l'obbligazionario IEAG è ancora in perdita.</li>
+              <li>Sommando gli ETF, il <b>3,7%</b> del portafoglio è in NVIDIA.</li>
+              <li>Nel marzo 2020 il portafoglio ha perso il <b>14%</b> e ha recuperato in pochi mesi.</li>
+            </ul>
+            <button type="button" class="textlink" onclick="document.getElementById('sampleBtn').click()">Apri l'esempio completo</button>
           </div>
-          <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" hidden>
-        </div>
-        <div class="tile s4">
-          <span class="eyebrow">Come funziona</span>
-          <div class="steps4">
-            <div><b>01 Carica</b><span>Excel, CSV o riepilogo</span></div>
-            <div><b>02 Scansiona</b><span>date, prezzi, anomalie</span></div>
-            <div><b>03 Conferma</b><span>i dubbi li decidi tu</span></div>
-            <div><b>04 Analizza</b><span>formule a vista</span></div>
+          <div class="sc-receipt" aria-hidden="true">
+            <p class="rc-label">Ricevuta · rendimento annuo</p>
+            <p class="rc-num">+10,3%</p>
+            <p>Ogni anno, in media, i soldi sono cresciuti del 10,3%, tenendo conto di quando sono stati versati.</p>
+            <p class="rc-f">Σ flussi / (1 + TIR)^(giorni/365) = 0<br>355 movimenti · versato 58.536 € · valore 90.328 €</p>
           </div>
         </div>
-        <div class="tile violet s4 mkt" id="mkt" aria-label="Dati di mercato ufficiali della BCE">
+        <div class="tile violet s4 mkt v2-hidden" id="mkt" aria-label="Dati di mercato ufficiali della BCE">
           <div class="mkt-head"><span class="eyebrow">Terminale · BCE</span><span class="mkt-live"><i></i>dati ufficiali</span></div>
           <div class="mkt-rows" id="mktRows"><div class="mkt-row sk"></div><div class="mkt-row sk"></div><div class="mkt-row sk"></div></div>
           <p class="mkt-note" id="mktNote">0 numeri inventati: tassi, inflazione e cambio arrivano dalla Banca centrale europea.</p>
         </div>
-        <div class="s12 ticker" aria-label="Metriche del dataset caricato"><div class="tr" id="ticker"></div></div>
-        <div class="s12 labs" aria-label="I laboratori di Portfolio OS">
+        <div class="s12 ticker v2-hidden" aria-label="Metriche del dataset caricato"><div class="tr" id="ticker"></div></div>
+        <div class="s12 labs v2-hidden" aria-label="I laboratori di Portfolio OS">
           <div class="labs-head"><div><span class="eyebrow">Financial Intelligence Terminal</span><h2>I laboratori.<br><em>Un solo portafoglio.</em></h2></div><p>Carichi i dati una volta: ogni laboratorio li usa, l'IA li interpreta, il motore fa i conti.</p></div>
           <div class="labs-grid" id="labsGrid"></div>
         </div>
@@ -98,7 +103,7 @@
   <!-- SCANSIONE -->
   <section class="scene" data-scene="scan" id="scene-scan" aria-label="Scansione" hidden>
     <div class="inner">
-      <div class="scene-title"><div><span class="idx">02 / SCANSIONE</span><h2>Cosa c'è<br>nel <em>file</em></h2></div><p>Le prime righe del foglio come le ha lette il motore: titoli scartati, intestazione trovata, ogni colonna etichettata.</p></div>
+      <div class="scene-title"><div><span class="idx">Scansione</span><h2>Cosa c'è nel <em>file</em></h2></div><p>Le prime righe del foglio come le ha lette il motore: titoli scartati, intestazione trovata, ogni colonna etichettata.</p></div>
       <div class="bento">
         <div class="card s12">
           <div class="head"><span class="eyebrow">Anteprima del foglio</span><div class="sheets" id="sheets"></div></div>
@@ -120,7 +125,7 @@
   <!-- MAPPA -->
   <section class="scene" data-scene="map" id="scene-map" aria-label="Mappa" hidden>
     <div class="inner">
-      <div class="scene-title"><div><span class="idx">03 / MAPPA</span><h2>Ogni colonna,<br><em>spiegata</em></h2></div><p>Cosa ho capito, quanto sono sicuro e perché. Se sbaglio correggi dal menu, oppure lascia che l'IA ricostruisca il file.</p></div>
+      <div class="scene-title"><div><span class="idx">Mappa</span><h2>Ogni colonna, <em>spiegata</em></h2></div><p>Cosa ho capito, quanto sono sicuro e perché. Se sbaglio correggi dal menu, oppure lascia che l'IA ricostruisca il file.</p></div>
       <div class="bento">
         <div class="card ai s12" id="aiCard">
           <div class="head"><h3>Lettura con IA</h3><span class="chip"><i></i>Claude · proposte da confermare</span></div>
@@ -154,7 +159,7 @@
   <!-- LABORATORIO -->
   <section class="scene" data-scene="lab" id="scene-lab" aria-label="Laboratorio" hidden>
     <div class="inner">
-      <div class="scene-title"><div><span class="idx">04 / LABORATORIO</span><h2>Il tuo<br><em>laboratorio</em></h2></div><p id="labSource">Conferma la mappa dei dati per costruirlo.</p></div>
+      <div class="scene-title"><div><span class="idx">Laboratorio</span><h2>Il tuo <em>laboratorio</em></h2></div><p id="labSource">Conferma la mappa dei dati per costruirlo.</p></div>
       <div class="tile s12 empty" id="labEmpty">
         <span class="eyebrow">Ancora vuoto</span>
         <div class="big">Prima conferma la mappa</div>
@@ -209,7 +214,7 @@
   <!-- RISCHIO -->
   <section class="scene" data-scene="risk" id="scene-risk" aria-label="Rischio" hidden>
     <div class="inner">
-      <div class="scene-title"><div><span class="idx">05 / RISCHIO</span><h2>Quanto puoi<br><em>perdere</em></h2></div><div class="stack" style="align-items:flex-end"><p id="riskSub">Rischio storico del portafoglio e di ogni asset, calcolato sui dati confermati.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="riskW"></div></div></div>
+      <div class="scene-title"><div><span class="idx">Rischio</span><h2>Quanto puoi <em>perdere</em></h2></div><div class="stack" style="align-items:flex-end"><p id="riskSub">Rischio storico del portafoglio e di ogni asset, calcolato sui dati confermati.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="riskW"></div></div></div>
       <div class="tile s12 empty" id="riskEmpty">
         <span class="eyebrow">Ancora vuoto</span>
         <div class="big">Prima costruisci il laboratorio</div>
@@ -234,7 +239,7 @@
   <!-- SIMULAZIONI MONTE CARLO -->
   <section class="scene" data-scene="sim" id="scene-sim" aria-label="Simulazioni" hidden>
     <div class="inner">
-      <div class="scene-title"><div><span class="idx">06 / SIMULAZIONI</span><h2>Quanto potresti<br><em>avere</em></h2></div><div class="stack" style="align-items:flex-end"><p id="simSub">Migliaia di futuri possibili, costruiti ricampionando i rendimenti del tuo file.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="simW"></div></div></div>
+      <div class="scene-title"><div><span class="idx">Simulazioni</span><h2>Quanto potresti <em>avere</em></h2></div><div class="stack" style="align-items:flex-end"><p id="simSub">Migliaia di futuri possibili, costruiti ricampionando i rendimenti del tuo file.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="simW"></div></div></div>
       <div class="tile s12 empty" id="simEmpty">
         <span class="eyebrow">Ancora vuoto</span>
         <div class="big">Prima costruisci il laboratorio</div>
@@ -268,7 +273,7 @@
   <!-- STRESS TEST -->
   <section class="scene" data-scene="stress" id="scene-stress" aria-label="Stress test" hidden>
     <div class="inner">
-      <div class="scene-title"><div><span class="idx">07 / STRESS TEST</span><h2>Se arriva<br>la <em>tempesta</em></h2></div><div class="stack" style="align-items:flex-end"><p id="stSub">Le crisi vere, rivissute con i dati del tuo file. E gli shock che vuoi provare tu.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="stW"></div></div></div>
+      <div class="scene-title"><div><span class="idx">Stress test</span><h2>Se arriva la <em>tempesta</em></h2></div><div class="stack" style="align-items:flex-end"><p id="stSub">Le crisi vere, rivissute con i dati del tuo file. E gli shock che vuoi provare tu.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="stW"></div></div></div>
       <div class="tile s12 empty" id="stEmpty">
         <span class="eyebrow">Ancora vuoto</span>
         <div class="big">Prima costruisci il laboratorio</div>
@@ -300,7 +305,7 @@
   <!-- FRONTIERA EFFICIENTE -->
   <section class="scene" data-scene="opt" id="scene-opt" aria-label="Frontiera efficiente" hidden>
     <div class="inner">
-      <div class="scene-title"><div><span class="idx">08 / FRONTIERA</span><h2>Il portafoglio<br><em>migliore</em>?</h2></div><div class="stack" style="align-items:flex-end"><p id="opSub">La frontiera efficiente di Markowitz sui tuoi dati: il massimo rendimento storico per ogni livello di rischio.</p></div></div>
+      <div class="scene-title"><div><span class="idx">Frontiera</span><h2>Il portafoglio <em>migliore</em>?</h2></div><div class="stack" style="align-items:flex-end"><p id="opSub">La frontiera efficiente di Markowitz sui tuoi dati: il massimo rendimento storico per ogni livello di rischio.</p></div></div>
       <div class="tile s12 empty" id="opEmpty">
         <span class="eyebrow">Ancora vuoto</span>
         <div class="big">Prima costruisci il laboratorio</div>
@@ -332,7 +337,7 @@
   <!-- FINANCIAL GAMES -->
   <section class="scene" data-scene="bench" id="scene-bench" aria-label="Benchmark" hidden>
     <div class="inner">
-      <div class="scene-title"><div><span class="idx">09 / BENCHMARK</span><h2>Hai battuto<br>il <em>mercato</em>?</h2></div><div class="stack" style="align-items:flex-end"><p id="bnSub">Il tuo portafoglio contro gli indici di riferimento, sugli stessi mesi e nella stessa valuta.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="bnW"></div></div></div>
+      <div class="scene-title"><div><span class="idx">Benchmark</span><h2>Hai battuto il <em>mercato</em>?</h2></div><div class="stack" style="align-items:flex-end"><p id="bnSub">Il tuo portafoglio contro gli indici di riferimento, sugli stessi mesi e nella stessa valuta.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="bnW"></div></div></div>
       <div class="tile s12 empty" id="bnEmpty">
         <span class="eyebrow">Ancora vuoto</span>
         <div class="big">Prima costruisci il laboratorio</div>
@@ -408,7 +413,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/split-type@0.3.4/umd/index.min.js"></script>
 <script type="module" src="/js/app.js"></script>
+<script defer src="/js/motion.js"></script>
 
 </body>
 </html>
