@@ -506,7 +506,7 @@ function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
     spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
-    posizioni:T.positions.map(p=>({nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
+    posizioni:T.positions.map(p=>({nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -527,6 +527,7 @@ async function handleFile(file){
       sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
     }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
     if(!sheets.some(s=>s.aoa.length)){showError("Il file è vuoto.");return;}
+    sheets=P.normalizeExports(sheets); // export di broker a più sezioni (es. Interactive Brokers) → foglio di movimenti
     load(sheets,{name:file.name,size:file.size,kind:"file"},true);
   }catch(e){showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
 }
@@ -1004,6 +1005,8 @@ async function rebuildFromPrices(o={}){
       if(got.error&&tried.length>1)got.error+=` (provati: ${tried.join(", ")})`;
       series.push(got);
     }
+    /* senza ticker nel file l'etichetta era il nome lungo del fondo: si usa il ticker di borsa della quotazione trovata (IWDA.AMS → IWDA) */
+    const used=new Set(pos.map(p=>p.ticker));pos.forEach((p,i)=>{if(!p.labelIsName||series[i].error)return;const t=String(p.simbolo||"").split(".")[0];if(t&&!used.has(t)){used.add(t);p.ticker=t;}});
     S.isinLog=isinLog;S.noSym=noSym;
     const ok=[],bad=[];
     series.forEach((s,i)=>{(s.error?bad:ok).push({p:pos[i],s});});
@@ -2396,8 +2399,8 @@ function detectTx(sheets){
     const an=P.analyzeSheet(s.name,s.aoa),h=an.headerRow;if(h<0)return;
     const hd=(s.aoa[h]||[]).map(v=>String(v==null?"":v).trim()),find=re=>hd.findIndex(x=>re.test(x));
     const dI=an.cols.find(c=>c.suggest==="date"||c.kind==="date"),cD=dI?dI.idx:find(/^data\b|date/i);
-    const cT=find(/^(etf|ticker|strumento|titolo|simbolo|asset|prodotto|isin)\b|\bticker\b|\betf\b/i),cA=find(/importo|controvalore|ammontare|amount|valore operazione|^investit/i);
-    const cU=find(/^quote$|^quote\b|quantit|shares|units|pezzi/i),cP=find(/^prezzo|price/i),cY=find(/^tipo|operazione|^type|movimento|segno/i);
+    const cT=find(/^(etf|ticker|strumento|titolo|simbolo|asset|prodotto|isin)\b|\bticker\b|\betf\b/i),cA=find(/importo|controvalore|ammontare|amount|valore operazione|^investit|^totale\b|proceeds/i);
+    const cU=find(/^quote$|^quote\b|quantit|shares|units|pezzi/i),cP=find(/^prezzo|price|quotazione|koers|^corso/i),cSg=find(/^segno$/i),cY=cSg>=0?cSg:find(/^tipo|operazione|^type|movimento/i);/* «Segno» (A/V) vale più di «Operazione» («Compravendita») */
     /* altre colonne che identificano lo stesso strumento: servono ad abbinare i movimenti agli asset anche se nei dati hanno un altro nome */
     const alias=[find(/^isin\b|\bisin\b/i),find(/^(ticker|simbolo|symbol)\b/i),find(/^(strumento|nome|descrizione|titolo|prodotto|name)\b/i)].filter(c=>c>=0&&c!==cT);
     if(cD<0||cT<0||(cA<0&&(cU<0||cP<0)))return;
@@ -2407,7 +2410,7 @@ function detectTx(sheets){
       let amt=cA>=0?P.parseNum(row[cA]):null;amt=amt?amt.n:NaN;
       if(!Number.isFinite(amt)&&cU>=0&&cP>=0){const u=P.parseNum(row[cU]),p=P.parseNum(row[cP]);if(u&&p)amt=u.n*p.n;}
       if(!Number.isFinite(amt)||amt===0)continue;
-      const sell=/vend|sell|riscatt|prelie|rimbors|divid|cedol|coupon/i.test(ty);/* dividendi e cedole incassati escono dal portafoglio come un prelievo */
+      const qn=cU>=0?P.parseNum(row[cU]):null,sell=/^(v|s)$/i.test(ty)||/(^|[^a-z])(vend|sell|riscatt|prelie|rimbors)|divid|cedol|coupon/i.test(ty)||(!ty&&!!qn&&qn.n<0);/* dividendi e cedole incassati escono dal portafoglio come un prelievo */
       rows.push({d,ticker:tk,alias:alias.map(c=>String(row[c]==null?"":row[c]).trim()).filter(Boolean),type:ty,amount:sell?-Math.abs(amt):Math.abs(amt)});}
     if(rows.length>=2&&(!best||rows.length>best.rows.length))best={sheet:s.name,rows,cols:{data:hd[cD],strumento:hd[cT],importo:cA>=0?hd[cA]:`${hd[cU]} × ${hd[cP]}`,tipo:cY>=0?hd[cY]:null}};
   });

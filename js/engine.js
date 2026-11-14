@@ -68,7 +68,11 @@ function cellKind(v){
   if(parseDate(s,false))return "d";
   return "s";
 }
-function detectHeader(aoa){
+/* riga d'intestazione: la prima riga di testo seguita da una riga di dati (numeri o date).
+   Primo tentativo severo (almeno metà della riga sotto è numeri/date); se non trova nulla, un secondo più tollerante
+   (almeno 3 e il 30%), per gli export dei broker pieni di colonne di testo (ora, borsa, valuta, ID ordine). */
+function detectHeader(aoa){const r=detectHeaderAt(aoa,.5,2);return r>=0?r:detectHeaderAt(aoa,.3,3);}
+function detectHeaderAt(aoa,frac,minN){
   const lim=Math.min(aoa.length,25);
   for(let r=0;r<lim;r++){
     const kinds=(aoa[r]||[]).map(cellKind);
@@ -81,7 +85,7 @@ function detectHeader(aoa){
     const k2=(aoa[r2]||[]).map(cellKind);
     const ne2=k2.filter(k=>k!=="e").length;
     const nd=k2.filter(k=>k==="n"||k==="d").length;
-    if(ne2>=2&&nd>=Math.ceil(ne2*0.5))return r;
+    if(ne2>=2&&nd>=minN&&nd>=Math.ceil(ne2*frac))return r;
   }
   return -1;
 }
@@ -336,7 +340,7 @@ function txPositions(sheets,m){
   const P=new Map();let n=0;const num=(row,c)=>{if(c<0)return null;const p=parseNum(row[c]);return p?p.n:null;};
   /* colonne di contorno lette dall'intestazione: nome leggibile e ticker, per mostrare «EUNL» e non l'ISIN */
   const hd=(aoa[h]||[]).map(v=>lc(v)),fc=re=>hd.findIndex((x,i)=>i!==cT&&re.test(x));
-  const cN=fc(/^(strumento|nome|descrizione|titolo|prodotto|name|security|etf)\b/),cK=fc(/^(ticker|simbolo|symbol|codice di borsa)\b/),cI2=cI>=0?cI:fc(/^isin\b/);
+  const cN0=fc(/^(titolo|strumento|prodotto|nome|name|security|etf)\b/),cN=cN0>=0?cN0:fc(/^descrizione\b/),cK=fc(/^(ticker|simbolo|symbol|codice di borsa)\b/),cI2=cI>=0?cI:fc(/^isin\b/);
   for(let r=h+1;r<aoa.length;r++){
     const row=aoa[r]||[],t=String(row[cT]??"").trim();if(!t)continue;
     const d=cD>=0?parseDate(row[cD],true):null,px=num(row,cP),amt=num(row,cA);let q=num(row,cQ);
@@ -344,11 +348,11 @@ function txPositions(sheets,m){
     const op=cO>=0?lc(row[cO]):"";
     /* dividendi, cedole, commissioni e imposte non cambiano le quote possedute */
     if(/divid|cedol|coupon|commission|bollo|impost|tass[ae]|fee|tax/.test(op))continue;
-    const sell=/vend|sell|sale|cession|uscit|rimbors|short/.test(op),buy=/acq|buy|purch|sottoscr|entrat|compr/.test(op);
+    const sell=/^(v|s)$/.test(op)||/(^|[^a-z])(vend|sell|sale|cession|uscit|rimbors|short)/.test(op),buy=/^(a|b)$/.test(op)||/acq|buy|purch|sottoscr|entrat|savings plan|piano di accumulo|(^|[^a-z])compr(?!avend)/.test(op);
     const qty=sell?-Math.abs(q):buy?Math.abs(q):q;
-    const isin=cI2>=0?String(row[cI2]??"").trim().toUpperCase():"",it=P.get(t)||{titolo:t,nome:cN>=0?String(row[cN]??"").trim()||null:null,tk:cK>=0?String(row[cK]??"").trim().toUpperCase()||null:null,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
+    const isin=cI2>=0?String(row[cI2]??"").trim().toUpperCase():"",key=/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:t,it=P.get(key)||{titolo:t,nome:cN>=0?String(row[cN]??"").trim()||null:null,tk:cK>=0?String(row[cK]??"").trim().toUpperCase()||null:null,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
     if(px>0&&(!it.lastD||!d||d>=it.lastD)){it.last=px;it.lastD=d;}
-    it.inv+=amt!=null?(qty<0?-1:1)*Math.abs(amt):px?qty*px:0;P.set(t,it);n++;
+    it.inv+=amt!=null?(qty<0?-1:1)*Math.abs(amt):px?qty*px:0;P.set(key,it);n++;
   }
   const positions=[...P.values()].filter(x=>x.q>1e-9).map(x=>({titolo:x.titolo,nome:x.nome||null,tk:x.tk||null,isin:x.isin,quantita:x.q,prezzo:x.last,valore:x.last?x.q*x.last:null,investito:x.inv,operazioni:x.n,data:x.lastD}));
   return {errors:n?[]:["Nessun movimento leggibile."],positions,n,chiuse:[...P.values()].filter(x=>x.q<=1e-9).length};
@@ -397,7 +401,7 @@ const SYN=[
   ["ticker",/^(ticker|simbolo|symbol|codice|code|tkr)$/i],
   ["name",/^(titolo|strumento|nome|descrizione|prodotto|asset|security|instrument|name|description|wertpapier|titre)$/i],
   ["qty",/quantit|^qty$|^q\.?t[aà]\.?$|^shares$|^units$|^pezzi$|^quote$|^st[uü]ck|^n\.?\s*azioni|^nominale$/i],
-  ["price",/^(prezzo|price|kurs|cours|precio|prezzo unitario|prezzo medio|unit price|pmc)$/i],
+  ["price",/^(prezzo|price|kurs|cours|precio|prezzo unitario|prezzo medio|unit price|pmc|quotazione|koers|corso|t\.? ?price|trade price|prezzo per quota|price per share|prezzo \(€\)|prezzo eseguito)$/i],
   ["amount",/importo|controvalore|^amount$|ammontare|totale operazione|betrag|montant|^valore operazione$|net amount|^totale$/i],
   ["fee",/commission|^fees?$|spese|^costi$|tasse|^tax(es)?$|bollo/i],
   ["side",/^(tipo|operazione|segno|side|type|buy\/sell|acquisto\/vendita|movimento|tipo operazione|transaction type|action)$/i],
@@ -406,6 +410,25 @@ const SYN=[
   ["weight",/^(peso|weight|allocazione|allocation|% portafoglio|% del portafoglio|peso attuale|peso %)/i],
   ["target",/target|obiettivo|desiderat|peso ideale|ziel/i]
 ];
+/* Export dei broker che non sono tabelle semplici: li si riscrive come un foglio di movimenti ordinario, prima di ogni lettura.
+   Interactive Brokers (Activity Statement CSV): righe «Trades,Header,…» e «Trades,Data,Order,…», ISIN nella sezione «Financial Instrument Information». */
+function normalizeExports(sheets){
+  return (sheets||[]).flatMap(sh=>{
+    const A=(sh.aoa||[]).map(r=>Array.isArray(r)?r:[]),c0=A.map(r=>String(r[0]??"").trim());
+    if(!(c0.includes("Trades")&&A.some(r=>r[0]==="Trades"&&r[1]==="Header")))return [sh];
+    let H=null,FH=null;const isin=new Map(),rows=[];
+    A.forEach(r=>{
+      if(r[0]==="Financial Instrument Information"&&r[1]==="Header")FH=r;
+      else if(r[0]==="Financial Instrument Information"&&r[1]==="Data"&&FH){const s=r[FH.indexOf("Symbol")],id=r[FH.indexOf("Security ID")];if(s&&id)isin.set(String(s).trim(),String(id).trim());}
+      if(r[0]==="Trades"&&r[1]==="Header")H=r;
+      else if(r[0]==="Trades"&&r[1]==="Data"&&H&&String(r[H.indexOf("DataDiscriminator")]??"Order")==="Order"){
+        const g=k=>r[H.indexOf(k)],d=String(g("Date/Time")??"").split(",")[0].trim();
+        rows.push([d,String(g("Symbol")??"").trim(),g("Asset Category")??"",g("Currency")??"",g("Quantity"),g("T. Price"),g("Proceeds"),g("Comm/Fee")]);}
+    });
+    if(!rows.length)return [sh];
+    return [{name:sh.name+" · operazioni",aoa:[["Data","Ticker","ISIN","Categoria","Valuta","Quantità","Prezzo","Importo","Commissioni"],...rows.map(r=>[r[0],r[1],isin.get(r[1])||"",r[2],r[3],r[4],r[5],r[6],r[7]])]},sh];
+  });
+}
 function headerTag(h){const t=String(h??"").replace(/\s+/g," ").trim();if(!t)return null;for(const [k,rx] of SYN)if(rx.test(t))return k;return null;}
 /* valuta indicata nell'intestazione o nelle celle */
 function ccyOf(text){const t=String(text??"");if(/\bGBX\b|\bGBp\b|pence/.test(t))return "GBX";if(/\bUSD\b|US\$|\$/.test(t))return "USD";if(/\bGBP\b|£/.test(t))return "GBP";if(/\bCHF\b/.test(t))return "CHF";if(/\bJPY\b|¥/.test(t))return "JPY";if(/\bEUR\b|€/.test(t))return "EUR";return null;}
@@ -447,7 +470,7 @@ function localRecipe(sheets){
       if(blocks.length>=2){R.serieInColonna.push(...blocks);parts.push({kind:"affiancate",foglio:sh.name,conf:"media",d:`«${sh.name}»: ${blocks.length} tabelle affiancate con date diverse, unite per data`});continue;}
     }
     /* 4) movimenti: data + titolo/ISIN + (quantità e prezzo, oppure importo) */
-    const cT=[find("name"),find("ticker"),find("isin")].find(i=>i>=0),cQ=find("qty"),cP=find("price")>=0?find("price"):find("close"),cA=find("amount"),cS=find("side");
+    const cNm=hdr.findIndex(x=>/^(titolo|strumento|prodotto|security|instrument|nome|name|wertpapier|titre)(|$)/i.test(x)),cT=[cNm,find("name"),find("ticker"),find("isin")].find(i=>i>=0),cQ=find("qty"),cP=find("price")>=0?find("price"):find("close"),cA=find("amount"),cSg=hdr.findIndex(x=>/^segno$/i.test(x)),cS=cSg>=0?cSg:find("side");
     if(dateCols.length>=1&&cT!=null&&cT>=0&&((cQ>=0&&cP>=0)||(cA>=0&&cQ>=0))&&!R.movimenti){
       R.movimenti={foglio:sh.name,rigaIntestazione:h+1,colonnaData:colLetter(dateCols[0]),colonnaTitolo:colLetter(cT),colonnaIsin:find("isin")>=0?colLetter(find("isin")):null,colonnaQuantita:cQ>=0?colLetter(cQ):null,colonnaPrezzo:cP>=0?colLetter(cP):null,colonnaImporto:cA>=0?colLetter(cA):null,colonnaOperazione:cS>=0?colLetter(cS):null,valuta:null};
       const cc=find("ccy");if(cc>=0){const vals=new Set(aoa.slice(h+1).map(r=>String(r[cc]??"").trim().toUpperCase()).filter(Boolean));if(vals.size===1)R.movimenti.valuta=[...vals][0];}
@@ -1130,6 +1153,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
