@@ -506,7 +506,7 @@ function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
     spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
-    posizioni:T.positions.map(p=>({nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
+    posizioni:T.positions.map(p=>({nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.tk&&CRYPTO[String(p.tk).toUpperCase()]?p.tk:p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -1026,7 +1026,7 @@ async function rebuildFromPrices(o={}){
     const months={length:aoa.length-1};
     if(S.source!==src0)return;
     const orig=S.source.name.replace(/ · ricostruito$/,""),scartati=u.scartati||[];
-    const pf={monthly:avgMonthly(),from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:"senza simbolo di borsa"}))],base:"EUR"};
+    const pf={monthly:avgMonthly(),from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:/\b(btp|cct|bot|ctz|bund|oat|treasury|titolo di stato|buono)\b/i.test(p.nome||"")||/^IT000[45]/.test(p.isin||"")&&!p.ticker?"titolo di Stato: i prezzi storici di BTP e simili non sono disponibili da fonti gratuite, quindi resta fuori dalle analisi":"senza simbolo di borsa: scrivilo nella tabella per includerlo"}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},!o.quiet);
     S.portfolio=pf;S.rbLog=null;
     S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
@@ -1182,8 +1182,11 @@ function tplApply(t){
 /* un solo modo di normalizzare i simboli, da qualunque fonte: «AMS:IWDA» → IWDA.AMS, suffissi Yahoo → Alpha Vantage, ISIN → da cercare */
 function normSym(p){const t=String(p.simbolo||"").trim().toUpperCase();if(!t||/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t))return "";if(/:/.test(t))return guessSymbol(t,"ETF",null)||"";if(/\./.test(t))return avSymbol(t);if(p.isin)return "";return guessSymbol(t,"ETF",null)||t;}
 function avSymbol(x){const t=String(x||"").trim().toUpperCase();const m=t.match(/^([A-Z0-9\-]+)\.(L|DE|F|PA|AS|SW|MI)$/);if(!m)return t;return m[1]+"."+({L:"LON",DE:"DEX",F:"DEX",PA:"PAR",AS:"AMS",SW:"SWX",MI:"MIL"}[m[2]]);}
+/* cripto principali: Yahoo pubblica il prezzo in euro come BTC-EUR, ETH-EUR… */
+const CRYPTO={BTC:"BTC",BITCOIN:"BTC",XBT:"BTC",ETH:"ETH",ETHEREUM:"ETH",ETHER:"ETH",SOL:"SOL",SOLANA:"SOL",XRP:"XRP",RIPPLE:"XRP",ADA:"ADA",CARDANO:"ADA",DOGE:"DOGE",DOGECOIN:"DOGE",BNB:"BNB",DOT:"DOT",POLKADOT:"DOT",LTC:"LTC",LITECOIN:"LTC",AVAX:"AVAX",LINK:"LINK"};
 function guessSymbol(label,type,cur){
   const t=String(label).trim().toUpperCase();let m;
+  if(CRYPTO[t])return CRYPTO[t]+"-EUR";
   if((m=t.match(/^(EPA|PAR|EURONEXT):([A-Z0-9]+)$/)))return m[2]+".PAR";
   if((m=t.match(/^(BIT|MIL|BIT MI):([A-Z0-9]+)$/)))return m[2]+".MIL";
   if((m=t.match(/^(ETR|XETRA|FRA|GER):([A-Z0-9]+)$/)))return m[2]+".DEX";

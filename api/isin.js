@@ -37,7 +37,9 @@ export default async function handler(req, res) {
       todo.forEach((isin, k) => {
         const rows = ((j[k] && j[k].data) || []).filter(d => d.ticker && d.exchCode in EXCH);
         // azioni e fondi americani o canadesi: prima la borsa di casa; il resto: prima le borse in euro
-        const home = /^(US|CA)/.test(isin) ? ["US", "UN", "UW", "UQ", "UA", "UP"] : [], rank = c => (home.includes(c) ? -1 : ORDER.indexOf(c));
+        // azioni: prima la borsa del paese dell'emittente (Enel → Milano); gli ETF irlandesi o lussemburghesi seguono l'ordine in euro
+        const HOME = { US: ["US", "UN", "UW", "UQ", "UA", "UP"], CA: ["US", "UN", "UW", "UQ", "UA", "UP"], IT: ["IM"], DE: ["GY", "GR"], FR: ["FP"], NL: ["NA"], GB: ["LN"] };
+        const home = HOME[isin.slice(0, 2)] || [], rank = c => (home.includes(c) ? -1 : ORDER.indexOf(c));
         rows.sort((a, b) => rank(a.exchCode) - rank(b.exchCode));
         const fmt = d => String(d.ticker).trim().toUpperCase().replace(/\s+/g, "").replace(/\//g, "-") + EXCH[d.exchCode];
         const v = rows.length ? { isin, simbolo: fmt(rows[0]), ticker: rows[0].ticker, borsa: rows[0].exchCode, nome: rows[0].name || null, alternative: [...new Set(rows.slice(1, 6).map(fmt))] } : { isin, simbolo: null, error: (j[k] && j[k].warning) || "ISIN non trovato" };

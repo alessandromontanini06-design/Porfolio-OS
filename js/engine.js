@@ -250,7 +250,7 @@ function parseWideSheet(name,aoa,hint){
   }
   return out.hold.length+out.alloc.length+out.total.length?out:null;
 }
-const CLASS_MAP=[[/etf|stock|azion|equity|shares/i,"Azioni ed ETF"],[/crypto|bitcoin|btc/i,"Crypto"],[/^re$|real ?estate|immob|apparta/i,"Immobili"],[/^pe$|private/i,"Private equity"],[/p2p|lending|bond|obblig|prestit|crowd/i,"Prestiti e obbligazioni"],[/pension|previd/i,"Previdenza"],[/cash|liquid|cont[oi]|deposit|bank|banca/i,"Liquidità"]];
+const CLASS_MAP=[[/etf|stock|azion|equity|shares/i,"Azioni ed ETF"],[/crypto|bitcoin/i,"Crypto"],[/^re$|real ?estate|immob|apparta/i,"Immobili"],[/^pe$|private/i,"Private equity"],[/p2p|lending|bond|obblig|prestit|crowd/i,"Prestiti e obbligazioni"],[/pension|previd/i,"Previdenza"],[/cash|liquid|deposit|bank|banca/i,"Liquidità"]];
 const CLASS_ORDER=["Azioni ed ETF","Previdenza","Crypto","Immobili","Private equity","Prestiti e obbligazioni","Altro","Liquidità"];
 function assetClass(h){if(h.cls)return h.cls;for(const [rx,n] of CLASS_MAP)if(rx.test(h.type||""))return n;for(const [rx,n] of CLASS_MAP)if(rx.test(h.sec||""))return n;return "Altro";}
 function reshapeWide(sheets,hints){
@@ -347,7 +347,7 @@ function txPositions(sheets,m){
     if(q==null&&amt!=null&&px)q=Math.abs(amt)/px;if(q==null)continue;
     const op=cO>=0?lc(row[cO]):"";
     /* dividendi, cedole, commissioni e imposte non cambiano le quote possedute */
-    if(/divid|cedol|coupon|commission|bollo|impost|tass[ae]|fee|tax/.test(op))continue;
+    if(/divid|cedol|coupon|commission|bollo|impost|tass[ae]|\bfee|\btax/.test(op))continue;
     const sell=/^(v|s)$/.test(op)||/(^|[^a-z])(vend|sell|sale|cession|uscit|rimbors|short)/.test(op),buy=/^(a|b)$/.test(op)||/acq|buy|purch|sottoscr|entrat|savings plan|piano di accumulo|(^|[^a-z])compr(?!avend)/.test(op);
     const qty=sell?-Math.abs(q):buy?Math.abs(q):q;
     const isin=cI2>=0?String(row[cI2]??"").trim().toUpperCase():"",key=/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:t,it=P.get(key)||{titolo:t,nome:cN>=0?String(row[cN]??"").trim()||null:null,tk:cK>=0?String(row[cK]??"").trim().toUpperCase()||null:null,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
@@ -439,7 +439,9 @@ const GENERIC_SHEET=/^(sheet|foglio|tabelle|feuil|hoja|blatt)\s*\d*$/i;
 function localRecipe(sheets){
   const R={serieInColonna:[],serieInRiga:[],matriciRendimenti:[],movimenti:null,posizioni:[],simboli:[],scartati:[]},parts=[];
   for(const sh of sheets||[]){
-    const aoa=(sh.aoa||[]).map(r=>Array.isArray(r)?r:[]);if(!aoa.length)continue;
+    /* righe di totale o subtotale in mezzo ai dati: svuotate (stessa posizione), così non confondono il riconoscimento delle colonne */
+    const isTot=r=>{const v=r.find(x=>x!=null&&String(x).trim()!=="");return typeof v==="string"&&/^(sub ?)?totale?\b|^total\b|^somma\b/i.test(v.trim());};
+    const aoa=(sh.aoa||[]).map(r=>Array.isArray(r)?(isTot(r)?[]:r):[]);if(!aoa.length)continue;
     /* 1) tabella di rendimenti mensili: una riga con almeno 10 mesi consecutivi, anni nella colonna a sinistra */
     let mx=null;
     for(let r=0;r<Math.min(aoa.length,30)&&!mx;r++){const row=aoa[r];for(let c=0;c<row.length;c++){let k=0;while(c+k<row.length&&MONTH_TOK.test(String(row[c+k]??"").trim()))k++;if(k>=10){mx={r,c};break;}}}
@@ -470,7 +472,7 @@ function localRecipe(sheets){
       if(blocks.length>=2){R.serieInColonna.push(...blocks);parts.push({kind:"affiancate",foglio:sh.name,conf:"media",d:`«${sh.name}»: ${blocks.length} tabelle affiancate con date diverse, unite per data`});continue;}
     }
     /* 4) movimenti: data + titolo/ISIN + (quantità e prezzo, oppure importo) */
-    const cNm=hdr.findIndex(x=>/^(titolo|strumento|prodotto|security|instrument|nome|name|wertpapier|titre)(|$)/i.test(x)),cT=[cNm,find("name"),find("ticker"),find("isin")].find(i=>i>=0),cQ=find("qty"),cP=find("price")>=0?find("price"):find("close"),cA=find("amount"),cSg=hdr.findIndex(x=>/^segno$/i.test(x)),cS=cSg>=0?cSg:find("side");
+    const cNm=hdr.findIndex(x=>/^(titolo|strumento|prodotto|security|instrument|nome|name|wertpapier|titre)(\b|$)/i.test(x)),cT=[cNm,find("name"),find("ticker"),find("isin")].find(i=>i>=0),cQ=find("qty"),cP=find("price")>=0?find("price"):find("close"),cA=find("amount"),cSg=hdr.findIndex(x=>/^segno$/i.test(x)),cS=cSg>=0?cSg:find("side");
     if(dateCols.length>=1&&cT!=null&&cT>=0&&((cQ>=0&&cP>=0)||(cA>=0&&cQ>=0))&&!R.movimenti){
       R.movimenti={foglio:sh.name,rigaIntestazione:h+1,colonnaData:colLetter(dateCols[0]),colonnaTitolo:colLetter(cT),colonnaIsin:find("isin")>=0?colLetter(find("isin")):null,colonnaQuantita:cQ>=0?colLetter(cQ):null,colonnaPrezzo:cP>=0?colLetter(cP):null,colonnaImporto:cA>=0?colLetter(cA):null,colonnaOperazione:cS>=0?colLetter(cS):null,valuta:null};
       const cc=find("ccy");if(cc>=0){const vals=new Set(aoa.slice(h+1).map(r=>String(r[cc]??"").trim().toUpperCase()).filter(Boolean));if(vals.size===1)R.movimenti.valuta=[...vals][0];}
