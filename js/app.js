@@ -1189,6 +1189,8 @@ async function rebuildFromPrices(o={}){
     if(fxErr.length)throw new Error(`Non riesco a convertire in euro (${fxErr.join("; ")}). Riprova tra poco.`);
     const unknown=ok.filter(o=>!ccyOf(o.s)).map(o=>o.p.simbolo);
     const maps=ok.map(o=>eurMap(o.s,fxm));
+    /* nel frattempo è arrivato un altro file (es. l'esempio ricostruito in sottofondo mentre l'utente carica il suo): non si toccano i suoi prezzi */
+    if(S.source!==src0)return;
     S.rb={cols:ok.map((o,i)=>({name:o.p.ticker||o.p.nome,nome:o.p.nome,map:maps[i],info:o.s.info||"",sym:o.p.simbolo,src:o.s.source||"Alpha Vantage",cur:o.s.currency||null,adj:!!o.s.adjusted,orig:o.p.simboloOrig||null,removed:o.s.vol&&o.s.vol.removed||0})),fxm,origName:S.source.name.replace(/ · ricostruito$/,""),origSource:S.source.kind==="file"?S.source:(S.rb&&S.rb.origSource)||S.source};S.youngRes={};
     findYoung();
     const aoa=rbAoa();
@@ -1378,7 +1380,10 @@ function guessSymbol(label,type,cur){
 }
 function wideSnapshot(W,sym){sym=sym||new Map();
   const D=W.detail||[],N=(W.months||[]).length,fmtM=m=>{const [y,mo]=m.split("-").map(Number);return fmtDate(new Date(Date.UTC(y,mo-1,1)),12);};
-  const listed=d=>/^(Azioni ed ETF|Previdenza)$/.test(d.cls)&&guessSymbol(d.label,d.type,d.cur);
+  /* quotata: ha un codice con la borsa scritto nel file, oppure è un'azione/ETF o una previdenza con un simbolo plausibile, oppure il nome è un ticker (anche tra le obbligazioni: BNDW, BSV) */
+  const tick=d=>String(d.label).toUpperCase().replace(/\s*\(.*\)\s*$/,"").trim(),tickerish=d=>/^[A-Z][A-Z0-9]{1,5}$/.test(tick(d))&&!!d.cur&&!/^(CASH|USD|EUR|CHF|GBP)$/.test(tick(d));
+  const symOf=d=>d.sym?guessSymbol(d.sym,"ETF",d.cur):tickerish(d)&&!/^(Azioni ed ETF|Previdenza)$/.test(d.cls)?guessSymbol(tick(d),"ETF",d.cur):guessSymbol(d.label,d.type,d.cur);
+  const listed=d=>!!(d.sym||tickerish(d)||/^(Azioni ed ETF|Previdenza)$/.test(d.cls))&&!!symOf(d);
   /* un mese conta se non è nel futuro e se è compilato davvero (almeno il 30% delle voci del mese più pieno) */
   const now=new Date().toISOString().slice(0,7),cnt=i=>D.filter(d=>d.eur&&d.eur[i]>0).length,mx=Math.max(0,...W.months.map((_,i)=>cnt(i)));
   const real=i=>W.months[i]<=now&&cnt(i)>=mx*.3;
@@ -1392,7 +1397,9 @@ function wideSnapshot(W,sym){sym=sym||new Map();
   const why={"Crypto":"wallet ed exchange, non un singolo strumento quotato","Immobili":"non quotati","Private equity":"non quotato","Liquidità":"conti e saldi","Altro":"beni e investimenti non quotati","Prestiti e obbligazioni":"piattaforme senza prezzo di mercato","Previdenza":"fondo senza simbolo di borsa","Azioni ed ETF":"senza simbolo di borsa riconoscibile"};
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:W.sheets[0].name,
     local:!sym.size,spiegazione:`${sym.size?"Letto dall'IA":"Letto senza IA"} dal tuo tracker. ${li<last?`A ${fmtM(W.months[last])} i titoli quotati sono il ${fmtPct(lowNow,0)} del patrimonio: uso ${fmtM(W.months[li])}, l'ultimo mese in cui pesavano almeno il 10%.`:`Posizioni di ${fmtM(W.months[li])}.`} ${pos.length} titoli quotati per ${fmtN(Math.round(ptot))} € (${fmtPct(ptot/tot,0)} del patrimonio lordo). Ricostruendo il file con i loro prezzi storici i rendimenti diventano quelli del mercato, senza i soldi che hai aggiunto o tolto.`,
-    posizioni:pos.map(d=>({nome:d.label+(d.sec?` · ${d.sec}`:""),ticker:d.label,simbolo:sym.get(d.label.toLowerCase())||guessSymbol(d.label,d.type,d.cur),valore:Math.round(d.eur[li]*100)/100,pesoAttuale:d.eur[li]/ptot,pesoTarget:null})),
+    posizioni:pos.map(d=>({nome:d.label+(d.sec?` · ${d.sec}`:""),ticker:tickerish(d)?tick(d):d.label,simbolo:sym.get(d.label.toLowerCase())||symOf(d),
+      /* ticker europeo senza borsa scritta: se non c'è su Xetra si prova Milano, Londra, Amsterdam */
+      alt:!d.sym&&tickerish(d)&&/^(EUR|GBP|CHF)$/.test(d.cur||"")?[".MIL",".LON",".AMS"].map(x=>tick(d)+x):[],valore:Math.round(d.eur[li]*100)/100,pesoAttuale:d.eur[li]/ptot,pesoTarget:null})),
     scartati:[...by].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${fmtN(Math.round(v))} €: ${why[k]||"non quotato"}`)};
 }
 
