@@ -426,9 +426,9 @@ function load(sheets,source,fromUser,opts={}){
   if(opts.memory){S.recipe={status:"memory",r:opts.recipe,errors:[]};S.tplUsed=true;}
   /* ogni file nuovo: l'IA legge la struttura di tutti i fogli; un modello già confermato non la richiede */
   /* il file di esempio è noto: niente lettura con l'IA (nessun costo), solo i riconoscitori locali */
-  if(fromUser&&isFile&&aiAuto()&&!S.tplUsed&&!source.example&&!source.builder&&!source.pdf)requestRecipe();
+  if(fromUser&&isFile&&aiAuto()&&!S.tplUsed&&!source.example&&!source.builder)requestRecipe();
   renderImport(false);
-  if(fromUser&&isFile&&(!aiAuto()||S.tplUsed||source.example||source.builder||source.pdf))maybeAutoRebuild();
+  if(fromUser&&isFile&&(!aiAuto()||S.tplUsed||source.example||source.builder))maybeAutoRebuild();
 }
 /* ---------- Lettura con l'IA: estratto strutturato → ricetta → il motore la esegue su tutto il file ---------- */
 function aiSample(){
@@ -516,15 +516,8 @@ function txSnapshot(T,sym){
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
-let pdfJsP=null;
-const loadPdfJs=()=>pdfJsP||(pdfJsP=new Promise((ok,ko)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";ok(window.pdfjsLib);};s.onerror=()=>{pdfJsP=null;ko(new Error("nopdfjs"));};document.head.appendChild(s);}));
-async function pdfText(buf){
-  const lib=await loadPdfJs(),doc=await lib.getDocument({data:new Uint8Array(buf)}).promise,pages=[];
-  for(let i=1;i<=doc.numPages;i++){const pg=await doc.getPage(i),tc=await pg.getTextContent();pages.push({items:tc.items.filter(it=>it.str&&it.str.trim()).map(it=>({x:Math.round(it.transform[4]),y:Math.round(it.transform[5]),s:it.str}))});}
-  return pages;
-}
 async function handleFile(file){
-  if(!file)return;const opts={};
+  if(!file)return;
   if(file.size>15*1024*1024){showError("Il file supera i 15 MB. Riduci il periodo o il numero di colonne e riprova.");return;}
   const ext=(file.name.split(".").pop()||"").toLowerCase();
   try{
@@ -538,18 +531,13 @@ async function handleFile(file){
       const buf=await file.arrayBuffer();
       const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
       sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
-    }else if(ext==="pdf"){
-      /* estratto conto in PDF: il testo si estrae qui nel browser con pdf.js (il file non lascia il computer) e lo legge un lettore dedicato */
-      const pages=await pdfText(await file.arrayBuffer()),R=P.pdfStatement(pages);
-      if(!R){track("import_fail",{kind:"file",why:"pdf non riconosciuto"});showError("Questo PDF non lo so ancora leggere: per ora riconosco l'estratto conto di Trade Republic. Usa l'export Excel o CSV della banca, oppure segnalacelo dalla Mappa.");return;}
-      sheets=R.sheets;opts.pdf=R.broker;
-    }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods, .csv o l'estratto conto PDF di Trade Republic.`);return;}
+    }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
     if(!sheets.some(s=>s.aoa.length)){showError("Il file è vuoto.");return;}
     if(isSim())spaceSwitch("real",{fresh:true,stay:true});
     track("start",{how:"file"});TR.t0=Date.now();
     sheets=P.normalizeExports(sheets); // export di broker a più sezioni (es. Interactive Brokers) → foglio di movimenti
-    load(sheets,{name:file.name,size:file.size,kind:"file",...(opts.pdf?{pdf:opts.pdf}:{})},true);
-  }catch(e){if(e.message==="nopdfjs"){showError("Il lettore dei PDF non si è caricato: controlla la connessione e riprova.");return;}track("import_fail",{kind:"file",why:e.message==="noxlsx"?"lettore excel non caricato":"file illeggibile"});showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
+    load(sheets,{name:file.name,size:file.size,kind:"file"},true);
+  }catch(e){track("import_fail",{kind:"file",why:e.message==="noxlsx"?"lettore excel non caricato":"file illeggibile"});showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
 }
 const drop=$("#drop");
 ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");void 0;}));
