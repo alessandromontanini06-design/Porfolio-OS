@@ -383,7 +383,7 @@ function reveal(){}
 function load(sheets,source,fromUser,opts={}){
   const isFile=source.kind==="file";
   /* un file nuovo caricato dall'utente non è il portafoglio dell'archivio aperto prima: niente sovrascritture */
-  if(isFile&&fromUser&&!opts.recipe&&!opts.forceAuto&&!S.svResume)S.svSaved=null;
+  if(isFile&&fromUser&&!opts.recipe&&!opts.forceAuto&&!S.svResume){S.svSaved=null;S.svPrev=null;}
   if(isFile){S.rb=null;S.youngRes={};}
   if(isFile&&!opts.recipe&&!opts.forceAuto){S.fileSheets=sheets;S.recipe=null;S.conflict=null;S.agree=false;S.fp=P.structureFingerprint(sheets);S.tpl=tplGet(S.fp);}
   if(!isFile){S.fp=null;S.tpl=null;S.recipe=null;S.conflict=null;S.agree=false;}
@@ -1252,6 +1252,12 @@ function computeChecks(A,ds){
     const M=S.portfolio.missing,tot=(S.lastUnd&&S.lastUnd.posizioni||[]).reduce((q,p)=>q+(p.valore||0),0),mv=M.reduce((q,m)=>q+(((S.lastUnd&&S.lastUnd.posizioni)||[]).find(p=>p.nome===m.nome)||{}).valore||0,0);
     out.push({id:"partial",block:true,title:`Mancano ${M.length} ${M.length===1?"strumento":"strumenti"}${tot&&mv?` (${fmtPct(mv/tot,0)} del valore)`:""}`,text:M.map(m=>`${m.nome}${m.simbolo?` (${m.simbolo})`:""}: ${m.err}`).join(" · ")+" Senza di loro pesi, rischio e frontiera descrivono solo una parte del portafoglio.",acts:[["retry","Riprova a scaricarli"],["ok","Procedi senza (pesi ricalcolati sul resto)"]]});
   }
+  /* prezzi che si fermano troppo presto (risposta incompleta della fonte o cambio BCE mancante): valore e rendimento «di oggi» sarebbero di mesi fa */
+  if(S.rb&&S.source&&S.source.kind==="rebuilt"){const now=new Date(),lim=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`,mAgo=k=>{const [y,m]=k.split("-").map(Number);return (now.getFullYear()-y)*12+now.getMonth()+1-m;};
+    const old=S.rb.cols.map(c=>({c,last:[...c.map.keys()].sort().pop()})).filter(x=>x.last&&x.last<=lim&&mAgo(x.last)>2);
+    if(old.length)out.push({id:"oldpx",block:true,title:old.length===1?`Prezzi di ${old[0].c.name} fermi a ${fmtDate(new Date(old[0].last+"-15"),12)}`:`Prezzi fermi a mesi fa per ${old.length} strumenti`,
+      text:old.map(x=>`${x.c.name}: ultimo prezzo ${fmtDate(new Date(x.last+"-15"),12)}`).join(" · ")+". Il valore «di oggi», il rendimento e il rischio si fermerebbero a quella data. Di solito è una risposta incompleta della fonte dei prezzi: riprovare basta quasi sempre.",
+      acts:S.lastUnd?[["retry","Riprova a scaricarli"],["ok","Procedi comunque"]]:[["ok","Procedi comunque"]]});}
   /* 6) anomalie dei dati */
   (ds&&ds.anomalies||[]).forEach(a=>{
     if(a.type==="future")out.push({id:"future",block:true,title:"Date nel futuro",text:a.text,acts:[["drop","Escludile"]]});
@@ -1299,7 +1305,8 @@ document.addEventListener("click",async e=>{
   if(act==="rebuild"){S.autoRebuilt=S.source;rebuildFromPrices();return;}
   if(c.young&&act!=="undo"){b.disabled=true;b.textContent="Un momento…";const err=await youngDecide(c.young,act);if(err){b.disabled=false;b.textContent=err;}return;}
   if(c.young&&act==="undo"){delete S.youngRes[c.young.name];const pf=S.portfolio,log=S.rbLog||[];load([{name:"Prezzi mensili",aoa:rbAoa()}],{name:S.source.name,size:0,kind:"rebuilt"},false);S.portfolio=pf;S.aiLog=[...log];renderImport(false);return;}
-  if(id==="partial"&&act==="retry"&&S.lastUnd){S.und={...S.lastUnd,status:"ready",posizioni:S.lastUnd.posizioni.map(p=>({...p}))};S.lastSource=S.source;go("map");rebuildFromPrices();return;}
+  /* riprovando, niente risposte in memoria: prezzi e cambi si riscaricano */
+  if((id==="partial"||id==="oldpx")&&act==="retry"&&S.lastUnd){netClear(/^\/api\/(prices|fx)\b/);S.und={...S.lastUnd,status:"ready",posizioni:S.lastUnd.posizioni.map(p=>({...p}))};S.lastSource=S.source;go("map");rebuildFromPrices();return;}
   if(c.a&&c.a.type==="flat"&&act==="drop"){S.roles[c.a.col]="ignore";S.touched[c.a.col]=true;S.res[id]=act;S.doneChecks[id]={...c};hideLab();renderImport(false);return;}
   if(id==="conflict"){S.res.conflict=act;const keep=S.conflict;S.conflict=null;if(act==="auto"){S.recipeChoice="auto";load(S.fileSheets,S.source,false,{forceAuto:true});S.res.conflict="auto";}else{S.agree=false;renderImport(false);}void keep;return;}
   if(c.a&&act==="fix"){const a=c.a;(S.fix.adjust[a.col]=S.fix.adjust[a.col]||[]).push({k:a.k,factor:a.factor});}
@@ -1476,6 +1483,7 @@ function renderCompare(){
   const crIds=[...new Set(ok.flatMap(r=>r.cr.map(c=>c.id)))];
   const met=rows.map(([l,g,fm,hi])=>{const vals=R.res.map(r=>r.empty?NaN:g(r)),isB=best(null,hi),m=hi?Math.max(...vals.filter(Number.isFinite)):Math.min(...vals.filter(Number.isFinite));
     return `<tr><td>${l}</td>${vals.map(v=>`<td class="mono${ok.length>1&&Number.isFinite(v)&&Math.abs(v-m)<1e-12?" cmp-best":""}">${Number.isFinite(v)?fm(v):"—"}</td>`).join("")}</tr>`;}).join("")+
+    (()=>{const t=R.res.map(r=>r.empty?NaN:cmpTer(r));if(t.filter(Number.isFinite).length<2)return "";const m=Math.min(...t.filter(Number.isFinite));return `<tr><td>Costo annuo</td>${t.map(v=>`<td class="mono${ok.length>1&&Number.isFinite(v)&&Math.abs(v-m)<1e-12?" cmp-best":""}">${Number.isFinite(v)?fmtPct(v,2):"—"}</td>`).join("")}</tr>`;})()+
     crIds.map(id=>{const nm=(ok[0].cr.find(c=>c.id===id)||ok.flatMap(r=>r.cr).find(c=>c.id===id)).name,vals=R.res.map(r=>{const c=!r.empty&&r.cr.find(x=>x.id===id);return c?c.mdd:NaN;}),m=Math.max(...vals.filter(Number.isFinite));
       return `<tr><td>Crisi: ${esc(nm)}</td>${vals.map(v=>`<td class="mono${ok.length>1&&Number.isFinite(v)&&Math.abs(v-m)<1e-12?" cmp-best":""}">${Number.isFinite(v)?fmtPct(v,1):"—"}</td>`).join("")}</tr>`;}).join("");
   const from=K.length?fmtDate(ds.dates[K[0]-1]||ds.dates[K[0]],f):"—",to=K.length?fmtDate(ds.dates[K[K.length-1]],f):"—";
@@ -1488,10 +1496,57 @@ function renderCompare(){
       <p class="caption">Se un portafoglio non somma a 100% lo riproporziono. Per confrontare strumenti che non sono nel file usa «Crea il tuo portafoglio» in home.</p></div>
     <div><div class="chartbox" id="cmpChart"></div><div class="legend">${R.res.map((r,j)=>`<span><i style="background:${CMP_COL[j]}"></i>${r.name}${r.empty?" (vuoto)":""}</span>`).join("")}</div></div></div>
     ${K.length>=12?`<div class="tablewrap"><table class="mt cmp-r"><thead><tr><th>Misura</th>${R.res.map((r,j)=>`<th><span class="cmp-dot" style="background:${CMP_COL[j]}"></span>${r.name}</th>`).join("")}</tr></thead><tbody>${met}</tbody></table></div>`:`<p style="color:var(--warn)">Servono almeno 12 ${UNIT[f]?UNIT[f][1]:"periodi"} in cui hanno dati tutti gli strumenti usati: qui ce ne sono ${K.length}.</p>`}
+    ${K.length>=12?cmpMovesHTML(R):""}
     ${lim?`<p class="caption" style="color:var(--warn)">${lim}</p>`:""}
     <p class="caption">Confronto su ${K.length} ${UNIT[f]?UNIT[f][1]:"periodi"} comuni (${from} – ${to}): solo i mesi in cui hanno un prezzo tutti gli strumenti usati da almeno un portafoglio, così nessuno è avvantaggiato da una storia più lunga. Portafogli ribilanciati ogni mese ai pesi indicati, senza costi né tasse; in evidenza il valore migliore di ogni riga. Le crisi compaiono solo se cadono per intero nei mesi comuni. È il passato, non una previsione.</p>`;
   drawCompare(R);
 }
+/* ---------- Dalla proposta alle operazioni: quanto comprare e vendere per passare da A a B, imposte stimate sulle vendite, costi; export in Excel ---------- */
+function cmpTer(r){const C=costCalc();if(!C||!r||r.empty)return NaN;let s=0,k=0;S.ds.assets.forEach((a,i)=>{const it=C.items.find(q=>q.nome===a.name);if(r.wn[i]>0&&it&&it.ter!=null){s+=r.wn[i]*it.ter;k+=r.wn[i];}});return k>.95?s/k+C.other:NaN;}
+function cmpMoves(R){
+  if(isSim())return null;const ok=R.res.filter(r=>!r.empty);if(ok.length<2)return null;
+  const A=R.res[0],B=R.res[1];if(A.empty||B.empty)return null;
+  const pp=S.real&&S.real.pp,C=costCalc(),V=pp?pp.value:C?C.tot:null;if(!(V>0))return null;
+  const ds=S.ds,pos=(S.portfolio&&S.portfolio.positions)||[];
+  const rows=ds.assets.map((a,i)=>{const va=V*A.wn[i],vb=V*B.wn[i],d=vb-va,q=pos.find(x=>(x.ticker||x.nome)===a.name);
+    let tax=0,why="";
+    /* vendita: si realizza la quota di guadagno latente in proporzione a quanto si vende (stima col costo medio dei versamenti) */
+    if(d<-0.5&&pp&&pp.byAsset[i]&&pp.byAsset[i].value>0){const b=pp.byAsset[i],g=b.value-b.invested,ti=taxInfo(i);if(g>0){tax=-d*(g/b.value)*ti.rate;why=ti.why;}}
+    return {i,name:a.name,isin:q&&q.isin||"",full:q&&(q.etf&&!q.etf.error&&q.etf.nome||q.nome)||"",wa:A.wn[i],wb:B.wn[i],va,vb,d,tax,why};}).filter(x=>x.wa>0.0005||x.wb>0.0005);
+  return {V,rows,tax:rows.reduce((s,x)=>s+x.tax,0),buy:rows.reduce((s,x)=>s+(x.d>0?x.d:0),0),sell:rows.reduce((s,x)=>s+(x.d<0?-x.d:0),0),A,B,ta:cmpTer(A),tb:cmpTer(B)};
+}
+function cmpMovesHTML(R){
+  const M=cmpMoves(R);if(!M)return "";
+  const op=d=>Math.abs(d)<1?`<span class="cl">nessuna</span>`:d>0?`<b class="mv-buy">Compra ${fmtEur(d)}</b>`:`<b class="mv-sell">Vendi ${fmtEur(-d)}</b>`;
+  return `<div class="mv"><div class="mv-h"><h4>Per passare da ${esc(M.A.name)} a ${esc(M.B.name)}</h4><button type="button" class="btn sm lime" id="cmpXls">Scarica la proposta in Excel</button></div>
+    <div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>Oggi (${esc(M.A.name)})</th><th>Con la proposta (${esc(M.B.name)})</th><th>Operazione</th><th>Imposte stimate</th></tr></thead><tbody>
+    ${M.rows.map(x=>`<tr><td><span class="an">${esc(x.name)}</span>${x.isin?`<span class="cl">${esc(x.isin)}</span>`:""}</td><td class="mono">${fmtEur(x.va)}<span class="cl">${fmtPct(x.wa,1)}</span></td><td class="mono">${fmtEur(x.vb)}<span class="cl">${fmtPct(x.wb,1)}</span></td><td>${op(x.d)}</td><td class="mono">${x.tax>0.5?fmtEur(x.tax):"—"}${x.why&&x.tax>0.5?`<span class="cl">${esc(x.why)}</span>`:""}</td></tr>`).join("")}
+    <tr class="pf"><td><b>Totale</b></td><td class="mono">${fmtEur(M.V)}</td><td class="mono">${fmtEur(M.V)}</td><td class="mono">vendite ${fmtEur(M.sell)} · acquisti ${fmtEur(M.buy)}</td><td class="mono"><b>${M.tax>0.5?fmtEur(M.tax):"—"}</b></td></tr></tbody></table></div>
+    <p class="caption">Importi sul valore di oggi (${fmtEur(M.V)}), senza nuovi versamenti. Le imposte sono una stima: sulle vendite si realizza la parte di guadagno latente in proporzione a quanto si vende, al 26% o al 12,5% per i titoli di Stato; non considera minusvalenze da compensare, commissioni e spread.${Number.isFinite(M.ta)&&Number.isFinite(M.tb)?` Costo annuo: ${fmtPct(M.ta,2)} oggi, ${fmtPct(M.tb,2)} con la proposta (${fmtEur(Math.abs(M.tb-M.ta)*M.V)} l'anno ${M.tb<M.ta?"in meno":"in più"}).`:""}</p></div>`;
+}
+function cmpExport(){
+  if(typeof XLSX==="undefined")return;
+  const R=cmpCalc(),M=cmpMoves(R);if(!M)return;const ds=S.ds,f=ds.freq.f,B=rpBrand(),today=new Date().toLocaleDateString("it-IT");
+  const r2=v=>Math.round(v*100)/100,p4=v=>Math.round(v*1e4)/1e4;
+  const s1=[["Strumento","Nome","ISIN",`Peso ${M.A.name}`,`Peso ${M.B.name}`,`Valore ${M.A.name} (€)`,`Valore ${M.B.name} (€)`,"Operazione","Importo (€)","Imposte stimate (€)"],
+    ...M.rows.map(x=>[x.name,x.full,x.isin,p4(x.wa),p4(x.wb),r2(x.va),r2(x.vb),Math.abs(x.d)<1?"nessuna":x.d>0?"Acquisto":"Vendita",r2(Math.abs(x.d)),r2(x.tax)]),
+    ["Totale","","",1,1,r2(M.V),r2(M.V),"",r2(M.buy+M.sell),r2(M.tax)]];
+  const res=[M.A,M.B],crIds=[...new Set(M.B.cr.map(c=>c.id))].filter(id=>M.A.cr.some(c=>c.id===id));
+  const s2=[["Misura",M.A.name,M.B.name],["Rendimento annuo",p4(M.A.st.cagr),p4(M.B.st.cagr)],["Volatilità",p4(M.A.st.vol),p4(M.B.st.vol)],["Sharpe",r2(M.A.sharpe),r2(M.B.sharpe)],["Perdita massima",p4(M.A.st.mdd),p4(M.B.st.mdd)],["VaR 95% in un mese",p4(-M.A.rk.var95),p4(-M.B.rk.var95)],
+    ...crIds.map(id=>{const a=M.A.cr.find(c=>c.id===id),b=M.B.cr.find(c=>c.id===id);return [`Crisi: ${a.name}`,p4(a.mdd),p4(b.mdd)];}),
+    ...(Number.isFinite(M.ta)&&Number.isFinite(M.tb)?[["Costo annuo (TER e altri costi)",p4(M.ta),p4(M.tb)]]:[])];
+  const s3=[["Proposta di portafoglio"],["Data",today],...(B.studio?[["Preparata da",B.studio]]:[]),["File",S.source&&S.source.name||""],["Periodo del confronto",`${R.ks.length} ${UNIT[f]?UNIT[f][1]:"periodi"} comuni, ${fmtDate(ds.dates[R.ks[0]-1]||ds.dates[R.ks[0]],f)} – ${fmtDate(ds.dates[R.ks[R.ks.length-1]],f)}`],
+    ["Ipotesi","Portafogli ribilanciati ogni mese ai pesi indicati, senza costi né tasse. Importi sul valore di oggi, senza nuovi versamenti."],["Imposte","Stima: guadagno latente realizzato in proporzione alla vendita, 26% (12,5% titoli di Stato). Non considera minusvalenze, commissioni e spread."],
+    ["Avvertenza","Analisi dei dati storici calcolata da Portfolio OS: i rendimenti passati non garantiscono quelli futuri."]];
+  const wb=XLSX.utils.book_new(),pct=(ws,cols,rows)=>{rows.forEach(r=>cols.forEach(c=>{const a=XLSX.utils.encode_cell({r,c});if(ws[a]&&typeof ws[a].v==="number")ws[a].z="0.0%";}));};
+  const w1=XLSX.utils.aoa_to_sheet(s1);pct(w1,[3,4],s1.map((_,i)=>i).slice(1));w1["!cols"]=[{wch:14},{wch:44},{wch:14},{wch:10},{wch:10},{wch:14},{wch:14},{wch:12},{wch:12},{wch:16}];
+  const w2=XLSX.utils.aoa_to_sheet(s2);s2.forEach((r,i)=>{if(i&&!/Sharpe/.test(r[0]))pct(w2,[1,2],[i]);});w2["!cols"]=[{wch:34},{wch:12},{wch:12}];
+  const w3=XLSX.utils.aoa_to_sheet(s3);w3["!cols"]=[{wch:22},{wch:100}];
+  XLSX.utils.book_append_sheet(wb,w1,"Operazioni");XLSX.utils.book_append_sheet(wb,w2,"Confronto");XLSX.utils.book_append_sheet(wb,w3,"Note");
+  const nm=svFileName().replace(/[^\w\- ]+/g,"").trim()||"portafoglio";
+  XLSX.writeFile(wb,`Proposta ${nm} ${new Date().toISOString().slice(0,10)}.xlsx`);trackOnce("feature","proposta_excel",{name:"proposta_excel"});
+}
+document.addEventListener("click",e=>{if(e.target.closest("#cmpXls"))cmpExport();});
 function drawCompare(R){
   const el=$("#cmpChart");if(!el)return;const ds=S.ds,K=R.ks,VW=640,VH=280,ml=46,mr=10,mt=10,mb=26,iw=VW-ml-mr,ih=VH-mt-mb;
   const L=R.res.filter(r=>!r.empty);if(!K.length||!L.length){el.innerHTML="";return;}
@@ -1605,6 +1660,67 @@ function renderPortfolio(){
     <p class="caption">Ipotesi: portafoglio ribilanciato ogni mese ai pesi indicati, sullo storico di ${ds.nObs} mesi. ${S.rb?"Prezzi di mercato convertiti in euro con il cambio BCE di fine mese.":"Valori come nel file."}${pf.missing.length?` Esclusi perché senza prezzi: ${pf.missing.map(m=>esc(m.nome)).join(", ")}.`:""}</p>${reb}`;
 }
 
+/* ---------- Quanto costa il portafoglio: TER di ogni strumento (justETF per gli ETF, dal KID per i fondi), altri costi, confronto con strumenti a basso costo ----------
+   Le scelte restano in questo browser (pos-costs-v1): TER inseriti per ISIN o nome, altri costi annui, TER di confronto. */
+const CO_KEY="pos-costs-v1",CO_R=.05,CO_Y=20;
+function coPrefs(){try{return JSON.parse(localStorage.getItem(CO_KEY)||"{}")||{};}catch{return {};}}
+function coSave(p){try{localStorage.setItem(CO_KEY,JSON.stringify(p));}catch{}}
+const coKey=p=>p.isin&&ISIN_RX.test(p.isin)?p.isin:String(p.ticker||p.nome||"").trim().toLowerCase();
+function costCalc(){
+  const pf=S.portfolio;if(!pf||!pf.positions||!pf.positions.length||isSim())return null;
+  const tot=pf.positions.reduce((a,p)=>a+(p.valore>0?p.valore:0),0);if(!(tot>0))return null;
+  const pr=coPrefs(),own=pr.ter||{},cheap=Number.isFinite(pr.cheap)?pr.cheap:.002,other=Number.isFinite(pr.other)?pr.other:0;
+  const items=pf.positions.map(p=>{const k=coKey(p),j=p.etf&&!p.etf.error&&Number.isFinite(p.etf.ter)?p.etf.ter:null,u=Number.isFinite(own[k])?own[k]:null,t=u!=null?u:j,v=p.valore>0?p.valore:0;
+    return {p,k,nome:p.ticker||p.nome||"—",full:p.etf&&!p.etf.error&&p.etf.nome||p.nome||"",isin:p.isin&&ISIN_RX.test(p.isin)?p.isin:null,v,w:v/tot,ter:t,src:u!=null?"tu":j!=null?"justETF":null,etfTer:j,
+      y:t!=null?v*t:NaN,d20:t!=null?P.terDrag(v,t,CO_R,CO_Y):NaN,save:t!=null&&t>cheap?P.terDrag(v,t,CO_R,CO_Y)-P.terDrag(v,cheap,CO_R,CO_Y):0};});
+  const known=items.filter(x=>x.ter!=null),kv=known.reduce((a,x)=>a+x.v,0);
+  const ter=kv>0?known.reduce((a,x)=>a+x.v*x.ter,0)/kv:NaN;
+  const sum=k=>known.reduce((a,x)=>a+x[k],0);
+  /* altri costi (gestione della banca, consulenza, deposito) in % del patrimonio: si sommano al TER sull'intero valore */
+  const oy=tot*other,od20=other>0?P.terDrag(tot,other,CO_R,CO_Y):0;
+  return {items,tot,ter,coverage:kv/tot,missing:items.filter(x=>x.ter==null),cheap,other,
+    year:sum("y")+oy,d20:sum("d20")+od20,save:sum("save"),pending:!!(pf.etfLoading||pf.isinStatus==="loading")};
+}
+function renderCost(){
+  const el=$("#costCard");if(!el)return;
+  const C=costCalc();if(!C||!S.lab){el.hidden=true;return;}
+  el.hidden=false;
+  const eur=v=>!Number.isFinite(v)?"—":Math.abs(v)<10?fmtN(v,2)+" €":fmtEur(v),pc=(v,d=2)=>Number.isFinite(v)?fmtPct(v,d):"—";
+  const full=C.coverage>.999,anyCost=C.items.some(x=>x.ter!=null)||C.other>0;
+  const lead=!anyCost?`Inserisci il costo annuo di ogni strumento: per gli ETF lo leggo da solo, per i fondi è nel KID alla voce «Costi correnti».`
+    :`Il portafoglio costa <b>${pc(C.ter+C.other)}</b> l'anno: circa <b>${eur(C.year)}</b> quest'anno${full?"":` sulla parte con costo noto (${fmtPct(C.coverage,0)})`}. In ${CO_Y} anni, con un rendimento lordo del 5%, sono <b>${eur(C.d20)}</b> di capitale in meno.`;
+  const rows=C.items.slice().sort((a,b)=>(b.ter??-1)-(a.ter??-1)).map(x=>{
+    const tag=x.src==="justETF"?`<span class="co-src">justETF</span>`:x.src==="tu"?`<span class="co-src tu">inserito${x.etfTer!=null?` · <button type="button" class="linkbtn" data-cor="${esc(x.k)}">usa justETF ${fmtPct(x.etfTer,2)}</button>`:""}</span>`:`<span class="co-src miss">${C.pending?"cerco…":"manca · dal KID"}</span>`;
+    const hi=x.ter!=null&&x.ter>=.01;
+    return `<tr class="${hi?"co-hi":""}"><td><span class="an">${esc(x.nome)}</span><span class="cl">${esc([x.full&&x.full!==x.nome?x.full:"",x.isin||""].filter(Boolean).join(" · "))}</span></td>
+      <td class="mono">${eur(x.v)}</td>
+      <td><label class="co-in"><input type="number" inputmode="decimal" min="0" max="10" step="0.01" data-cok="${esc(x.k)}" value="${x.ter!=null?+(x.ter*100).toFixed(3):""}" placeholder="—" aria-label="Costo annuo di ${esc(x.nome)} in percentuale"><i>%</i></label>${tag}</td>
+      <td class="mono">${eur(x.y)}</td><td class="mono">${eur(x.d20)}</td><td class="mono">${x.save>0?eur(x.save):"—"}</td></tr>`;}).join("");
+  el.innerHTML=`<div class="head"><div><span class="eyebrow">Costi</span><h3 style="margin-top:4px">Quanto costa il portafoglio</h3></div><span class="chip hist"><i></i>TER e costi annui</span></div>
+    <p class="co-lead">${lead}</p>
+    <div class="look-kpi k4 co-k">
+      <div><span class="eyebrow">Costo annuo</span><b>${anyCost?pc(C.ter+C.other):"—"}</b><small>${C.other>0?`TER ${pc(C.ter)} + altri ${pc(C.other)}`:"TER medio ponderato"}</small></div>
+      <div><span class="eyebrow">Quest'anno</span><b>${anyCost?eur(C.year):"—"}</b><small>pagati anche quando il mercato scende</small></div>
+      <div><span class="eyebrow">In ${CO_Y} anni</span><b class="dn">${anyCost?eur(C.d20):"—"}</b><small>capitale in meno, effetto composto</small></div>
+      <div class="co-alt"><span class="eyebrow">Con strumenti al <label class="co-in sm"><input type="number" inputmode="decimal" min="0" max="3" step="0.01" id="coCheap" value="${+(C.cheap*100).toFixed(3)}" aria-label="TER di confronto in percentuale"><i>%</i></label></span><b class="${C.save>0?"up":""}">${C.save>0?"+"+eur(C.save):"—"}</b><small>${C.save>0?`in ${CO_Y} anni, a parità di rendimento lordo`:"nessuno strumento costa di più"}</small></div>
+    </div>
+    <div class="tablewrap"><table class="mt co-t"><thead><tr><th>Strumento</th><th>Valore</th><th>Costo annuo (TER)</th><th>L'anno</th><th>In ${CO_Y} anni</th><th>Differenza con ${pc(C.cheap)}</th></tr></thead><tbody>${rows}
+      <tr class="pf"><td><b>Totale</b>${C.missing.length?`<span class="cl">senza costo: ${C.missing.map(x=>esc(x.nome)).join(", ")}</span>`:""}</td><td class="mono">${eur(C.tot)}</td><td class="mono">${pc(C.ter)}</td><td class="mono">${eur(C.year)}</td><td class="mono">${eur(C.d20)}</td><td class="mono">${C.save>0?eur(C.save):"—"}</td></tr></tbody></table></div>
+    <div class="co-other"><label><span>Altri costi annui sul patrimonio <small>gestione o consulenza della banca, deposito titoli</small></span><span class="co-in"><input type="number" inputmode="decimal" min="0" max="5" step="0.05" id="coOther" value="${C.other?+(C.other*100).toFixed(3):""}" placeholder="0"><i>%</i></span></label></div>
+    <p class="caption">«In ${CO_Y} anni» è il capitale in meno per colpa dei costi, senza nuovi versamenti, se gli strumenti rendessero il 5% l'anno lordo: V · [(1 + 5%)ⁿ − (1 + 5% − costo)ⁿ]; conta anche il rendimento perso sui costi pagati. «Differenza» confronta ogni strumento con uno che costa ${pc(C.cheap)} l'anno e rende lo stesso al lordo. Non comprende commissioni d'ingresso e d'uscita, spread, bollo e imposte. Il TER è già tolto dai prezzi, quindi rendimenti e rischio del sito lo includono. Per i fondi della banca il costo è nel KID, alla voce «Costi correnti» o «Commissioni di gestione e altri costi»: i valori che inserisci restano in questo browser.</p>`;
+}
+document.addEventListener("change",e=>{const t=e.target;if(!t||!t.closest||!t.closest("#costCard"))return;
+  const pr=coPrefs(),v=t.value===""?null:parseFloat(String(t.value).replace(",","."))/100;
+  if(t.dataset.cok){pr.ter=pr.ter||{};if(v==null||!Number.isFinite(v)||v<0)delete pr.ter[t.dataset.cok];else pr.ter[t.dataset.cok]=Math.min(v,.1);trackOnce("feature","costi",{name:"costi"});}
+  else if(t.id==="coCheap"){if(v!=null&&Number.isFinite(v)&&v>=0)pr.cheap=Math.min(v,.03);else delete pr.cheap;}
+  else if(t.id==="coOther"){if(v!=null&&Number.isFinite(v)&&v>0)pr.other=Math.min(v,.05);else delete pr.other;}
+  else return;
+  coSave(pr);renderCost();
+  /* il campo successivo resta a portata: dopo il ridisegno torna il fuoco su quello che segue */
+  const nx=t.dataset.cok?[...document.querySelectorAll("#costCard [data-cok]")].find(x=>!x.value):null;if(nx)nx.focus();
+});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-cor]");if(!b)return;const pr=coPrefs();if(pr.ter)delete pr.ter[b.dataset.cor];coSave(pr);renderCost();});
+
 /* ---------- Laboratorio ---------- */
 function hideLab(){
   setTimeout(renderLabs,0);
@@ -1648,6 +1764,7 @@ async function svSave(name){
 }
 async function svOfferRender(){
   const el=$("#svOffer");if(!el)return;
+  renderChange();
   if(!svCanSave()||svPref()==="0"&&!S.svSaved){el.hidden=true;return;}
   /* portafoglio già in archivio: si aggiorna la revisione */
   if(S.svSaved){const r=await svSave();el.hidden=!r;if(r)el.innerHTML=`<span class="sv-ok">✓ <b>${esc(r.name)}</b> è nell'archivio · revisione del ${new Date(r.reviewedAt).toLocaleDateString("it-IT",{day:"numeric",month:"long"})} salvata. <button type="button" class="linkbtn" data-ar="open">Apri l'archivio</button></span>`;return;}
@@ -1656,6 +1773,8 @@ async function svOfferRender(){
   el.innerHTML=`<div><b>Vuoi tenerlo nell'archivio?</b><span>Resta solo in questo browser, su questo computer: lo ritrovi la prossima volta, con la storia delle revisioni. Nessun server.</span></div>
     <label class="sv-name"><span>Nome</span><input type="text" id="svName" maxlength="80" value="${esc(svFileName())}" placeholder="es. il nome del cliente"></label>
     <label class="sv-al"><input type="checkbox" id="svAlways"> salva sempre</label><button type="button" class="btn sm lime" data-sv="yes">Salva nell'archivio</button><button type="button" class="btn sm" data-sv="no">No, grazie</button>`;
+  /* oppure: è un file nuovo di un cliente già in archivio → si aggiorna quello e si vede cosa è cambiato (il più simile per strumenti viene per primo) */
+  const R=await svRank();if(R.length)el.insertAdjacentHTML("beforeend",`<div class="sv-upd"><span>oppure è un aggiornamento di</span><select id="svUpd" aria-label="Portafoglio dell'archivio da aggiornare">${R.map(r=>`<option value="${esc(r.id)}">${esc(r.name)} · rivisto il ${new Date(r.reviewedAt).toLocaleDateString("it-IT",{day:"numeric",month:"short",year:"numeric"})}</option>`).join("")}</select><button type="button" class="btn sm" data-sv="upd">Aggiorna</button></div>`);
 }
 async function svBadge(){const L=await svList(),b=$("#archN");if(b){b.hidden=!L.length;b.textContent=L.length;}return L;}
 /* home: gli ultimi quattro, più il rimando all'archivio */
@@ -1669,7 +1788,7 @@ async function svOpen(id){
   const r=await svGet(id);if(!r)return svHome();
   trackOnce("feature","riprendi",{name:"riprendi"});closeArchive();
   if(isSim())spaceSwitch("real",{stay:true});
-  S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;
+  S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=r.snap||null;
   load(r.sheets,{name:r.file||r.name,size:0,kind:"file"},true);
   go("scan",{force:true});
   /* la mappa è già confermata in memoria: appena il file è pronto (anche dopo i prezzi di mercato) si costruisce il laboratorio */
@@ -1678,6 +1797,44 @@ async function svOpen(id){
     const b=$("#confirmBtn");if(!busy&&b&&!b.disabled&&S.ds&&S.ds.ok){if(!R.ready){R.ready=Date.now();}else if(Date.now()-R.ready>1200){S.svResume=null;if(R.riskW)S.riskW=R.riskW;if(R.fi){S.fi={in:{...fiDefaults(),...R.fi,cap:fiDefaults().cap}};}S.svSaved=id;b.click();return;}}else R.ready=0;
     setTimeout(tick,400);};
   setTimeout(tick,600);
+}
+/* ---------- Cosa è cambiato dall'ultima revisione: i numeri di oggi contro l'ultima fotografia salvata nell'archivio ----------
+   Funziona riaprendo un portafoglio dall'archivio (prezzi aggiornati) e caricando un file nuovo dello stesso cliente («Aggiorna» nella proposta di salvataggio). */
+function chgCalc(){
+  const a=S.svPrev;if(!a||!S.lab||!S.ds||!S.ds.ok||isSim())return null;
+  let b;try{b=svSnap();}catch{return null;}
+  const fin=v=>v!=null&&Number.isFinite(v);
+  const dV=fin(a.value)&&fin(b.value)?b.value-a.value:NaN,dI=fin(a.invested)&&fin(b.invested)?b.invested-a.invested:NaN,mkt=Number.isFinite(dV)&&Number.isFinite(dI)?dV-dI:NaN;
+  const wa=new Map(a.weights||[]),wb=new Map(b.weights||[]),names=[...new Set([...wa.keys(),...wb.keys()])];
+  const W=names.map(n=>({n,a:wa.get(n)||0,b:wb.get(n)||0})).map(x=>({...x,d:x.b-x.a,st:!wa.has(x.n)?"nuovo":!wb.has(x.n)?"uscito":""})).sort((x,y)=>Math.abs(y.d)-Math.abs(x.d));
+  return {a,b,dV,dI,mkt,W,days:Math.max(0,Math.round((b.at-a.at)/864e5))};
+}
+function renderChange(){
+  const el=$("#chgCard");if(!el)return;const X=chgCalc();
+  /* riaperto lo stesso giorno senza differenze: niente da raccontare */
+  if(!X||X.days<1&&!(Math.abs(X.dV)>=1)&&!X.W.some(x=>Math.abs(x.d)>=.005||x.st)){el.hidden=true;return;}
+  el.hidden=false;const {a,b}=X,fin=v=>v!=null&&Number.isFinite(v),sg=v=>(v>=0?"+":"−")+fmtEur(Math.abs(v)),pt=v=>(v>=0?"+":"−")+fmtN(Math.abs(v)*100,1)+" punti";
+  const when=new Date(a.at).toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});
+  const lead=Number.isFinite(X.dV)?`Dal ${when} il portafoglio è passato da <b>${fmtEur(a.value)}</b> a <b>${fmtEur(b.value)}</b>${Number.isFinite(X.mkt)?`: ${X.dI>0.5?`<b>${fmtEur(X.dI)}</b> versati`:X.dI<-0.5?`<b>${fmtEur(-X.dI)}</b> ritirati`:"nessun versamento"} e <b class="${X.mkt>=0?"up":"dn"}">${sg(X.mkt)}</b> dai mercati`:` (${sg(X.dV)})`}.`
+    :`Ultima revisione il ${when}: ecco come sono cambiati rendimento, rischio e pesi.`;
+  const k=(l,v,s,c="")=>`<div><span class="eyebrow">${l}</span><b class="${c}">${v}</b><small>${s}</small></div>`;
+  const kp=[fin(b.value)?k("Valore",fmtEur(b.value),fin(a.value)?`${sg(X.dV)} · era ${fmtEur(a.value)}`:"",""):"",
+    Number.isFinite(X.dI)?k("Versato nel frattempo",X.dI>=0?fmtEur(X.dI):"−"+fmtEur(-X.dI),fin(a.invested)?`in tutto ${fmtEur(b.invested)}`:""):"",
+    Number.isFinite(X.mkt)?k("Effetto dei mercati",sg(X.mkt),"valore − versamenti",X.mkt>=0?"up":"dn"):"",
+    fin(b.xirr)&&fin(a.xirr)?k("Rendimento annuo (TIR)",fmtPct(b.xirr,1,true),`${pt(b.xirr-a.xirr)} · era ${fmtPct(a.xirr,1,true)}`):fin(b.cagr)&&fin(a.cagr)?k("Rendimento annuo",fmtPct(b.cagr,1,true),`era ${fmtPct(a.cagr,1,true)}`):"",
+    fin(b.vol)&&fin(a.vol)?k("Volatilità",fmtPct(b.vol,1),`era ${fmtPct(a.vol,1)}`):""].filter(Boolean);
+  const moved=X.W.filter(x=>Math.abs(x.d)>=.005||x.st);
+  el.innerHTML=`<div class="head"><div><span class="eyebrow">Dall'ultima revisione · ${when} · ${X.days===0?"oggi":X.days===1?"ieri":`${X.days} giorni fa`}</span><h3 style="margin-top:4px">Cosa è cambiato</h3></div><span class="chip hist"><i></i>archivio</span></div>
+    <p class="co-lead">${lead}</p>
+    <div class="look-kpi k${Math.min(4,Math.max(2,kp.length))} chg-k">${kp.slice(0,4).join("")}</div>
+    ${moved.length?`<div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>Peso prima</th><th>Peso oggi</th><th>Differenza</th></tr></thead><tbody>${moved.map(x=>`<tr><td><span class="an">${esc(x.n)}</span>${x.st?`<span class="cl">${x.st}</span>`:""}</td><td class="mono">${x.a?fmtPct(x.a,1):"—"}</td><td class="mono">${x.b?fmtPct(x.b,1):"—"}</td><td class="mono">${pt(x.d)}</td></tr>`).join("")}</tbody></table></div>`:`<p class="caption">I pesi degli strumenti sono rimasti gli stessi (differenze sotto mezzo punto).</p>`}
+    <p class="caption">Confronto tra la fotografia salvata nell'archivio il ${when} (dati fino a ${esc(a.last||"—")}) e quella di oggi (dati fino a ${esc(b.last||"—")}). «Effetto dei mercati» è la variazione del valore meno i soldi versati nel frattempo: comprende guadagni, perdite, dividendi reinvestiti e costi.</p>`;
+}
+/* portafogli dell'archivio ordinati per somiglianza col file aperto: strumenti in comune, poi stesso nome del file, poi revisione più recente */
+async function svRank(){
+  if(!S.ds||!S.ds.ok)return [];const cur=new Set(S.ds.assets.map(a=>a.name)),fn=svFileName().toLowerCase();
+  return (await svList()).map(r=>{const s=new Set(r.assets||[]),inter=[...cur].filter(x=>s.has(x)).length;return {r,sc:inter/Math.max(1,new Set([...cur,...s]).size)+((r.file||"").toLowerCase()===fn?.2:0)};})
+    .sort((a,b)=>b.sc-a.sc||b.r.reviewedAt-a.r.reviewedAt).map(x=>x.r);
 }
 /* ---------- Pagina Archivio ---------- */
 const arDue=r=>Date.now()-r.reviewedAt>182*864e5;
@@ -1760,6 +1917,7 @@ document.addEventListener("click",async e=>{
   const a=b.dataset.sv;
   if(a==="yes"){const al=$("#svAlways");if(al&&al.checked){try{localStorage.setItem("pos-save","1");}catch{}}const r=await svSave(($("#svName")||{}).value);const el=$("#svOffer");el.innerHTML=r?`<span class="sv-ok">✓ Salvato nell'archivio come <b>${esc(r.name)}</b>. <button type="button" class="linkbtn" data-ar="open">Apri l'archivio</button></span>`:`<span class="sv-ok">Non riesco a salvare in questo browser (forse è in navigazione privata).</span>`;svHome();}
   if(a==="no"){const al=$("#svAlways");if(al&&al.checked){try{localStorage.setItem("pos-save","0");}catch{}}$("#svOffer").hidden=true;}
+  if(a==="upd"){const sel=$("#svUpd"),old=sel?await svGet(sel.value):null;if(old){S.svSaved=old.id;S.svPrev=old.snap||null;const r=await svSave();const el=$("#svOffer");el.innerHTML=r?`<span class="sv-ok">✓ <b>${esc(r.name)}</b> aggiornato · revisione di oggi salvata. <button type="button" class="linkbtn" data-ar="open">Apri l'archivio</button></span>`:`<span class="sv-ok">Non riesco a salvare in questo browser.</span>`;renderChange();svHome();setTimeout(labIndex,60);}return;}
   if(a==="never"){try{localStorage.setItem("pos-save","0");}catch{}$("#svOffer").hidden=true;}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#archive")&&$("#archive").classList.contains("open"))closeArchive();});
@@ -1851,9 +2009,10 @@ async function loadEtfInfo(){
   for(const p of list){const j=await getJSON(`/api/etfinfo?isin=${p.isin}&v=2`);p.etf=j&&!j.error?j:{error:(j&&j.error)||"non disponibile"};renderLook();}
   pf.etfLoading=false;pf.etfDone=true;renderLook();renderReal();/* classi di attivo nel guadagno per strumento */
 }
-const LOOK_TABS=[["geo","Aree e paesi"],["conc","Concentrazione"],["ccy","Valute"],["style","Classi e stile"],["sect","Settori"],["ter","Costi (TER)"]];
+const LOOK_TABS=[["geo","Aree e paesi"],["conc","Concentrazione"],["ccy","Valute"],["style","Classi e stile"],["sect","Settori"]];
 document.addEventListener("click",e=>{const b=e.target.closest("[data-look]");if(!b)return;S.lookTab=b.dataset.look;renderLook();});
 function renderLook(){
+  renderCost();
   const card=$("#lookCard"),body=$("#lookBody");if(!card||!body)return;
   const pf=S.portfolio,ds=S.ds;if(!pf||!S.lab||!ds||!ds.ok){card.hidden=true;return;}
   card.hidden=false;
@@ -1865,7 +2024,7 @@ function renderLook(){
   const ok=x=>x.etf&&!x.etf.error;
   const L=k=>P.lookThrough(items.map(x=>({w:x.w,parti:ok(x)?x.etf[k]:null}))),C=L("paesi"),Se=L("settori");
   const X=P.exposures(items.map(x=>({w:x.w,etf:ok(x)?x.etf:null})));
-  const T=P.weightedTer(items.map(x=>({w:x.w,ter:ok(x)?x.etf.ter:NaN})));
+  const CC=costCalc(),T=CC&&Number.isFinite(CC.ter)?{ter:CC.ter,coverage:CC.coverage}:P.weightedTer(items.map(x=>({w:x.w,ter:ok(x)?x.etf.ter:NaN})));
   const sp=n=>/^Altr|^Non |^Senza area|, altre|Non dettagliato/.test(n);
   const bars=(rows,col,lim=10)=>{const mx=Math.max(...rows.map(x=>x.peso),1e-9);return `<ul class="look">${[...rows.filter(r=>!sp(r.nome)).slice(0,lim),...rows.filter(r=>sp(r.nome))].map(r=>`<li class="${sp(r.nome)?"oth":""}"><span>${esc(r.nome)}</span><i><em style="width:${Math.min(100,r.peso*100/mx)}%;background:${col}"></em></i><b>${fmtPct(r.peso,1)}</b></li>`).join("")}</ul>`;};
   const get=(rows,n)=>(rows.find(r=>r.nome===n)||{peso:0}).peso;
@@ -1917,7 +2076,7 @@ function renderLook(){
 const artIl=v=>/^(8|11(?!\d))/.test(String(Math.round(v*100)))?"l'":"il ";
 const hedgedTxt=e=>{const c=String(e.copertura||"").replace(/^Con copertura valutaria\s*/i,"").trim();return c&&!/^(no|nessuna?)$/i.test(c)?"coperto":null;};
 /* indice delle schede del laboratorio: solo quelle visibili, nell'ordine in cui compaiono; un clic porta alla scheda */
-const LAB_IDX=[["realCard","Rendimento reale"],["chartbox","Crescita"],["profCard","Il tuo profilo"],["pfCard","Portafoglio e ribilanciamento"],["cmpCard","Confronta allocazioni"],["lookCard","Dove sei investito"],["metrics","Metriche"],["corr","Correlazioni"]];
+const LAB_IDX=[["chgCard","Cosa è cambiato"],["realCard","Rendimento reale"],["costCard","Costi"],["chartbox","Crescita"],["profCard","Il tuo profilo"],["pfCard","Portafoglio e ribilanciamento"],["cmpCard","Confronta allocazioni"],["lookCard","Dove sei investito"],["metrics","Metriche"],["corr","Correlazioni"]];
 function labIndex(){
   const nav=$("#labIdx");if(!nav)return;
   const vis=LAB_IDX.map(([id,l])=>{const el=document.getElementById(id),card=el&&(el.classList.contains("card")?el:el.closest(".card"));return card&&!card.hidden&&card.offsetParent!==null?{card,l,y:card.getBoundingClientRect().top}:null;}).filter(Boolean).sort((a,b)=>a.y-b.y);
@@ -2951,6 +3110,7 @@ S.bnData={};S.fx=null;
 /* risposte già scaricate (prezzi, ISIN, cambi, schede dei fondi): tenute per la sessione, in memoria e nel browser.
    Rifare un'analisi o cambiare spazio non riscarica nulla; solo risposte riuscite, mai errori. */
 const NETC=new Map();
+function netClear(rx){[...NETC.keys()].filter(k=>rx.test(k)).forEach(k=>NETC.delete(k));try{Object.keys(sessionStorage).filter(k=>k.startsWith("pos-net:")&&rx.test(k.slice(8))).forEach(k=>sessionStorage.removeItem(k));}catch{}}
 function netGet(url){if(NETC.has(url))return NETC.get(url);try{const x=sessionStorage.getItem("pos-net:"+url);if(x){const j=JSON.parse(x);NETC.set(url,j);return j;}}catch{}return null;}
 function netPut(url,j){if(!/^\/api\/(prices|isin|fx|etfinfo)\b/.test(url)||!j||j.error)return;NETC.set(url,j);try{sessionStorage.setItem("pos-net:"+url,JSON.stringify(j));}catch{}}
 async function getJSON(url){
@@ -3627,6 +3787,7 @@ function buildReport(o={}){
   ${svg("#riskDD")}
   ${bn?`<h2>Confronto con ${esc(bn.src.label)}</h2><table class="rp-t">${row("Rendimento annuo in più",fmtPct(bn.bs.active,1,true),`${fmtPct(bn.bs.cagrP,1,true)} contro ${fmtPct(bn.bs.cagrB,1,true)}`)}${row("Beta",fmtN(bn.bs.beta),"1 = si muove come l'indice")}${row("Tracking error",fmtPct(bn.bs.te,1),"quanto ti discosti dall'indice")}${row("Information ratio",fmtN(bn.bs.ir),"extra-rendimento per unità di scostamento")}</table>`:`<p class="rp-note">Per includere il confronto con un indice, apri una volta la sezione Benchmark e rigenera il report.</p>`}
   ${cr.length?`<h2>Nelle crisi presenti nei dati</h2><table class="rp-t">${cr.map(c=>row(c.name,fmtPct(c.mdd,1),"perdita massima del portafoglio")).join("")}</table>`:""}
+  ${(()=>{const C=costCalc();if(!C||!C.items.some(x=>x.ter!=null))return "";return `<h2>Quanto costa</h2><table class="rp-t">${row("Costo annuo",fmtPct(C.ter+C.other,2),C.other>0?`TER ${fmtPct(C.ter,2)} + altri costi ${fmtPct(C.other,2)}`:"TER medio ponderato")}${row("Costi quest'anno",fmtEur(C.year),"pagati anche quando il mercato scende")}${row(`In ${CO_Y} anni`,fmtEur(C.d20),"capitale in meno con un rendimento lordo del 5%")}${C.save>100?row(`Con strumenti al ${fmtPct(C.cheap,2)}`,"+"+fmtEur(C.save),`in ${CO_Y} anni`):""}</table>${C.missing.length?`<p class="rp-note">Senza costo noto: ${C.missing.map(x=>esc(x.nome)).join(", ")}.</p>`:""}`;})()}
   ${o.prop?reportProposal():""}
   ${o.note?`<h2>Note del consulente</h2><div class="rp-note-box">${esc(o.note).replace(/\n/g,"<br>")}</div>`:""}
   <h2>Considerazioni</h2><ul class="rp-tips">${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
@@ -3657,7 +3818,8 @@ function reportProposal(){
     </tbody></table>
     ${svgOf("#cmpChart")}
     <p class="rp-leg">${R.res.map((r,i)=>r.empty?"":`<span><i style="background:${i===0?"#161616":["","var(--c2)","var(--c3)"][i]}"></i>${lab(i)}</span>`).join("")} · crescita di 100 € sugli stessi mesi</p>
-    <ul class="rp-tips">${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`;
+    <ul class="rp-tips">${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+    ${(()=>{const M=cmpMoves(R);if(!M||M.sell<1)return "";return `<h2>Per passare alla proposta</h2><table class="rp-t rp-wide"><thead><tr><th>Strumento</th><th class="n">Oggi</th><th class="n">Con la proposta</th><th class="n">Operazione</th><th class="n">Imposte stimate</th></tr></thead><tbody>${M.rows.map(x=>`<tr><td>${esc(x.name)}${x.isin?` <span class="d">${esc(x.isin)}</span>`:""}</td><td class="n">${fmtEur(x.va)}</td><td class="n">${fmtEur(x.vb)}</td><td class="n">${Math.abs(x.d)<1?"—":(x.d>0?"Compra ":"Vendi ")+fmtEur(Math.abs(x.d))}</td><td class="n">${x.tax>0.5?fmtEur(x.tax):"—"}</td></tr>`).join("")}<tr><td><b>Totale</b></td><td class="n">${fmtEur(M.V)}</td><td class="n">${fmtEur(M.V)}</td><td class="n">vendite ${fmtEur(M.sell)}</td><td class="n"><b>${M.tax>0.5?fmtEur(M.tax):"—"}</b></td></tr></tbody></table><p class="rp-note">Importi sul valore di oggi. Imposte stimate sul guadagno latente realizzato con le vendite (26%, 12,5% per i titoli di Stato), senza minusvalenze, commissioni e spread.${Number.isFinite(M.ta)&&Number.isFinite(M.tb)?` Costo annuo: ${fmtPct(M.ta,2)} oggi, ${fmtPct(M.tb,2)} con la proposta.`:""}</p>`;})()}`;
 }
 function svgOf(id){const e=document.querySelector(id+" svg");if(!e)return "";const c=e.cloneNode(true);c.querySelectorAll(".cz-o").forEach(n=>n.remove());c.removeAttribute("width");c.setAttribute("style","width:100%;height:auto");return c.outerHTML;}
 const RP_KEY="pos-brand-v1";
@@ -3692,6 +3854,116 @@ function printReport(o={}){
 }
 document.addEventListener("click",e=>{if(e.target.closest("#reportBtn"))openReportDlg();});
 window.__report=o=>buildReport(o||{}); // per i test
+
+/* ---------- Presentazione al cliente: le stesse analisi in poche pagine a tutto schermo, numeri grandi e frasi semplici ----------
+   Pensata per il primo incontro: il consulente gira lo schermo verso il cliente. Frecce o clic per andare avanti, Esc per uscire.
+   Ogni pagina c'è solo se ci sono i dati; nome del cliente e prossimi passi si scrivono direttamente sulla pagina. */
+const PZ={i:0,slides:[],client:"",next:""};
+function pzSlides(){
+  if(!S.lab||!S.ds||!S.ds.ok)return [];
+  if(!S.risk)renderRisk();
+  const ds=S.ds,f=ds.freq.f,R=S.risk,PR=R.PR,w=R.w,real=S.real&&S.real.pp?S.real:null,B=rpBrand(),C=costCalc();
+  const value=real?real.pp.value:C?C.tot:null,today=new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});
+  const eur=v=>fmtEur(Math.round(v)),big=(v,cls="")=>`<b class="pz-big ${cls}">${v}</b>`;
+  const out=[];
+  /* 1 · copertina */
+  out.push({id:"cover",html:`<div class="pz-cover">
+    ${B.logo?`<img class="pz-logo" src="${B.logo}" alt="">`:""}${B.studio?`<span class="pz-studio">${esc(B.studio)}</span>`:""}
+    <h1>Il portafoglio di <span class="pz-ed" contenteditable="true" spellcheck="false" data-pz="client" data-ph="nome del cliente">${esc(PZ.client)}</span></h1>
+    <p class="pz-sub">${value?`${eur(value)} · `:""}${ds.assets.length} strumenti · ${today}</p>
+    <p class="pz-hint">Usa le frecce ← → oppure clicca per andare avanti</p></div>`});
+  /* 1b · cosa è cambiato dall'ultimo incontro */
+  {const X=chgCalc(),ce=$("#chgCard");if(X&&ce&&!ce.hidden&&Number.isFinite(X.dV)){const when=new Date(X.a.at).toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});
+    out.push({id:"change",html:`<span class="pz-k">Dall'ultimo incontro · ${when}</span>
+      <h2>Il portafoglio è passato da ${eur(X.a.value)} a <em>${eur(X.b.value)}</em>.</h2>
+      <div class="pz-row">${Number.isFinite(X.dI)?`<div>${big((X.dI>=0?"+":"−")+eur(Math.abs(X.dI)))}<span>${X.dI>=0?"versati nel frattempo":"ritirati nel frattempo"}</span></div>`:""}${Number.isFinite(X.mkt)?`<div>${big((X.mkt>=0?"+":"−")+eur(Math.abs(X.mkt)),X.mkt>=0?"up":"dn")}<span>dai mercati</span></div>`:""}${X.a.xirr!=null&&X.b.xirr!=null&&Number.isFinite(X.b.xirr)?`<div>${big(fmtPct(X.b.xirr,1,true))}<span>rendimento all'anno oggi, era ${fmtPct(X.a.xirr,1,true)}</span></div>`:""}</div>`});}}
+  /* 2 · quanto ha reso */
+  if(real){const pp=real.pp,t=real.taxes;out.push({id:"real",html:`<span class="pz-k">Quanto hai guadagnato</span>
+    <h2>Hai versato ${eur(pp.invested)}.<br>Oggi valgono <em>${eur(pp.value)}</em>.</h2>
+    <div class="pz-row">${[[`${pp.gain>=0?"+":"−"}${eur(Math.abs(pp.gain))}`,"guadagno",pp.gain>=0?"up":"dn"],[fmtPct(pp.xirr,1,true),"rendimento all'anno, tenendo conto di quando hai versato",""],t?[fmtPct(t.xirr,1,true),`al netto delle tasse, se vendessi tutto oggi (circa ${eur(t.tax)} di imposte)`,""]:null].filter(Boolean).map(([v,l,c])=>`<div>${big(v,c)}<span>${l}</span></div>`).join("")}</div>
+    ${real.bm?`<p class="pz-foot">Con gli stessi versamenti, nelle stesse date, ${esc(real.bm.label)} varrebbe oggi ${eur(real.bm.value)}.</p>`:""}`});}
+  /* 3 · dove sono i soldi */
+  {const idx=ds.assets.map((a,i)=>i).filter(i=>w[i]>0.0005).sort((a,b)=>w[b]-w[a]),pos=(S.portfolio&&S.portfolio.positions)||[];
+    const cls=i=>{const q=pos.find(x=>(x.ticker||x.nome)===ds.assets[i].name);return q&&q.etf&&!q.etf.error?P.etfClass(q.etf):"";};
+    const top=idx[0],mx=w[top];
+    out.push({id:"where",html:`<span class="pz-k">Dove sono i tuoi soldi</span>
+      <h2>${idx.length===1?`Tutto in un solo strumento: <em>${esc(ds.assets[top].name)}</em>.`:mx>=.5?`Più di metà è in <em>${esc(ds.assets[top].name)}</em>.`:`${idx.length} strumenti, il più grande pesa il ${fmtPct(mx,0)}.`}</h2>
+      <ul class="pz-bars">${idx.map(i=>`<li><span><b>${esc(ds.assets[i].name)}</b><small>${esc(cls(i))}</small></span><i><em style="width:${w[i]/mx*100}%"></em></i><strong>${fmtPct(w[i],0)}</strong>${value?`<small class="pz-eur">${eur(w[i]*value)}</small>`:""}</li>`).join("")}</ul>`});}
+  /* 4 · quanto costa */
+  if(C&&C.items.some(x=>x.ter!=null)){const tc=C.ter+C.other;out.push({id:"cost",html:`<span class="pz-k">Quanto ti costa</span>
+    <h2>Ogni anno paghi circa <em>${eur(C.year)}</em> di costi.</h2>
+    <div class="pz-row"><div>${big(fmtPct(tc,2))}<span>del patrimonio, ogni anno, anche quando il mercato scende</span></div><div>${big(eur(C.d20),"dn")}<span>di capitale in meno in ${CO_Y} anni, per l'effetto composto</span></div>${C.save>100?`<div>${big("+"+eur(C.save),"up")}<span>in ${CO_Y} anni con strumenti che costano ${fmtPct(C.cheap,2)} l'anno</span></div>`:""}</div>
+    <p class="pz-foot">Stima con un rendimento lordo del 5% l'anno e senza nuovi versamenti.${C.coverage<.999?` Costo noto per il ${fmtPct(C.coverage,0)} del portafoglio.`:""}</p>`});}
+  /* 5 · quanto rischia */
+  if(Number.isFinite(PR.mdd)&&PR.troughK!=null){const v0=value||10000;out.push({id:"risk",html:`<span class="pz-k">Quanto può scendere</span>
+    <h2>Nel momento peggiore questo portafoglio ha perso il <em>${fmtPct(Math.abs(PR.mdd),0)}</em>.</h2>
+    <div class="pz-row"><div>${big("−"+eur(Math.abs(PR.mdd)*v0),"dn")}<span>su ${eur(v0)} di oggi, ${fmtDate(ds.dates[PR.peakAtTrough],f)} – ${fmtDate(ds.dates[PR.troughK],f)}</span></div>
+      <div>${big(PR.recK!=null?unitN(PR.recK-PR.troughK,f):"—")}<span>${PR.recK!=null?"per tornare dove era":"non ancora recuperato"}</span></div>
+      ${Number.isFinite(PR.var95)?`<div>${big("−"+eur(PR.var95*v0),"dn")}<span>in un mese brutto, uno ogni venti</span></div>`:""}</div>
+    <p class="pz-foot">Dati storici dei suoi strumenti, con i pesi di oggi. Il passato non dice cosa succederà, ma mostra quanto si è mosso.</p>`});}
+  /* 6 · le crisi vere */
+  {const cr=stressList().list.filter(c=>c.status!=="out"&&c.used&&Number.isFinite(c.mdd));if(cr.length){const v0=value||10000,wc=cr.reduce((a,b)=>b.mdd<a.mdd?b:a);
+    out.push({id:"crises",html:`<span class="pz-k">Se arriva la tempesta</span>
+      <h2>Nelle crisi vere, la peggiore è stata <em>${esc(wc.name)}</em>.</h2>
+      <ul class="pz-cr">${cr.map(c=>`<li><span>${esc(c.name)}</span><b class="dn">${fmtPct(c.mdd,0)}</b><small>${eur(c.mdd*v0)}</small></li>`).join("")}</ul>
+      <p class="pz-foot">Perdita massima del portafoglio di oggi durante ogni crisi presente nei dati, sul valore di oggi.</p>`});}}
+  /* 7 · la proposta */
+  if(cmpReady()){const Rc=cmpCalc(),a=Rc.res[0],b=Rc.res[1];if(a&&b&&!a.empty&&!b.empty){const v0=value||10000;
+    const terOf=r=>{if(!C)return NaN;let s=0,k=0;ds.assets.forEach((x,i)=>{const it=C.items.find(q=>q.nome===x.name);if(r.wn[i]>0&&it&&it.ter!=null){s+=r.wn[i]*it.ter;k+=r.wn[i];}});return k>.95?s/k+C.other:NaN;};
+    const ta=terOf(a),tb=terOf(b);
+    const line=(l,x,y,fm,better)=>`<tr><td>${l}</td><td>${fm(x)}</td><td class="${better(y,x)?"pz-win":""}">${fm(y)}</td></tr>`;
+    const lo=(y,x)=>y<x-1e-9,hi=(y,x)=>y>x+1e-9,abs=(y,x)=>Math.abs(y)<Math.abs(x)-1e-9;
+    const crIds=[...new Set(b.cr.map(c=>c.id))].filter(id=>a.cr.some(c=>c.id===id)).slice(0,2);
+    out.push({id:"prop",html:`<span class="pz-k">La proposta</span>
+      <h2>${Math.abs(b.st.mdd)<Math.abs(a.st.mdd)?`Nel momento peggiore avrebbe perso <em>${eur(Math.abs(b.st.mdd)*v0)}</em> invece di ${eur(Math.abs(a.st.mdd)*v0)}.`:`Stessi mesi, stesse crisi: il confronto onesto.`}</h2>
+      <table class="pz-t"><thead><tr><th></th><th>Oggi</th><th>Proposta</th></tr></thead><tbody>
+      ${line("Rendimento all'anno",a.st.cagr,b.st.cagr,x=>fmtPct(x,1,true),hi)}${line("Quanto oscilla in un anno",a.st.vol,b.st.vol,x=>fmtPct(x,1),lo)}${line("Calo peggiore",a.st.mdd,b.st.mdd,x=>fmtPct(x,1),abs)}
+      ${crIds.map(id=>{const ca=a.cr.find(c=>c.id===id),cb=b.cr.find(c=>c.id===id);return line(esc(ca.name),ca.mdd,cb.mdd,x=>fmtPct(x,1),abs);}).join("")}
+      ${Number.isFinite(ta)&&Number.isFinite(tb)?line("Costo all'anno",ta,tb,x=>fmtPct(x,2),lo):""}</tbody></table>
+      ${(()=>{const M=cmpMoves(Rc);return M&&M.sell>1?`<p class="pz-move">Per passarci: vendite per <b>${eur(M.sell)}</b>, acquisti per <b>${eur(M.buy)}</b>${M.tax>1?`, imposte stimate <b>${eur(M.tax)}</b>`:", nessuna imposta stimata"}.</p>`:"";})()}
+      <p class="pz-foot">Stessi ${unitN(Rc.ks.length,f)} di dati per entrambi, ribilanciati ai pesi indicati. Non è una previsione: è come sarebbero andati.</p>`});}}
+  /* 8 · prossimi passi */
+  out.push({id:"next",html:`<span class="pz-k">Prossimi passi</span>
+    <h2>Cosa facciamo adesso</h2>
+    <div class="pz-ed pz-notes" contenteditable="true" spellcheck="true" data-pz="next" data-ph="Scrivi qui cosa avete deciso: ribilanciare, il prossimo incontro, i documenti da portare…">${esc(PZ.next).replace(/\n/g,"<br>")}</div>
+    ${B.studio?`<p class="pz-contact"><b>${esc(B.studio)}</b>${B.contact?` · ${esc(B.contact)}`:""}</p>`:""}
+    <p class="pz-foot">Analisi dei dati storici del file, calcolata da Portfolio OS. I rendimenti passati non garantiscono quelli futuri.</p>`});
+  return out;
+}
+function openPresent(){
+  PZ.slides=pzSlides();if(!PZ.slides.length)return;
+  if(!PZ.client&&S.svSaved)svGet(S.svSaved).then(r=>{if(r&&!PZ.client){PZ.client=r.name;const e=document.querySelector('#present [data-pz="client"]');if(e&&!e.textContent)e.textContent=r.name;}});
+  let el=$("#present");if(!el){el=document.createElement("section");el.id="present";el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-label","Presentazione al cliente");document.body.appendChild(el);}
+  el.innerHTML=`<div class="pz-stage">${PZ.slides.map((s,i)=>`<article class="pz-s pz-${s.id}" data-i="${i}" aria-hidden="true">${s.html}</article>`).join("")}</div>
+    <div class="pz-bar"><span class="pz-brand"><span class="mk" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M2 13.5 6.5 8l3.5 3 6-7.5" stroke="#130A24" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Portfolio OS</span>
+      <div class="pz-dots">${PZ.slides.map((s,i)=>`<button type="button" data-pzg="${i}" aria-label="Pagina ${i+1}"></button>`).join("")}</div>
+      <div class="pz-nav"><button type="button" class="btn sm" data-pzm="-1" aria-label="Pagina precedente">←</button><button type="button" class="btn sm lime" data-pzm="1" aria-label="Pagina successiva">→</button><button type="button" class="btn sm" id="pzClose">Esci</button></div></div>`;
+  el.hidden=false;document.body.classList.add("pz-on");PZ.i=0;pzShow(0);trackOnce("feature","presenta",{name:"presenta"});
+  try{if(document.documentElement.requestFullscreen&&!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});}catch{}
+}
+function pzShow(i){
+  const el=$("#present");if(!el)return;PZ.i=Math.max(0,Math.min(PZ.slides.length-1,i));
+  el.querySelectorAll(".pz-s").forEach((s,k)=>{s.classList.toggle("on",k===PZ.i);s.classList.toggle("past",k<PZ.i);s.setAttribute("aria-hidden",String(k!==PZ.i));});
+  el.querySelectorAll("[data-pzg]").forEach((b,k)=>b.setAttribute("aria-current",String(k===PZ.i)));
+  el.querySelector('[data-pzm="-1"]').disabled=PZ.i===0;el.querySelector('[data-pzm="1"]').disabled=PZ.i===PZ.slides.length-1;
+}
+function closePresent(){const el=$("#present");if(!el||el.hidden)return;el.hidden=true;document.body.classList.remove("pz-on");try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch{}}
+document.addEventListener("click",e=>{
+  if(e.target.closest("#presentBtn")){openPresent();return;}
+  const el=$("#present");if(!el||el.hidden||!el.contains(e.target))return;
+  if(e.target.closest("#pzClose")){closePresent();return;}
+  const g=e.target.closest("[data-pzg]");if(g){pzShow(+g.dataset.pzg);return;}
+  const m=e.target.closest("[data-pzm]");if(m){pzShow(PZ.i+ +m.dataset.pzm);return;}
+  /* clic sulla pagina (non sui campi da scrivere né sulla barra): avanti */
+  if(!e.target.closest(".pz-ed,.pz-bar,a,button,input"))pzShow(PZ.i+1);
+});
+/* in fase di cattura: la presentazione si prende i tasti prima del resto del sito (frecce delle sezioni, Esc delle ricevute) */
+document.addEventListener("keydown",e=>{const el=$("#present");if(!el||el.hidden)return;e.stopImmediatePropagation();
+  if(e.target.closest&&e.target.closest(".pz-ed")){if(e.key==="Escape")e.target.blur();return;}
+  if(e.key==="Escape"){closePresent();}else if(e.key==="ArrowRight"||e.key===" "||e.key==="PageDown"){e.preventDefault();pzShow(PZ.i+1);}else if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();pzShow(PZ.i-1);}else if(e.key==="Home")pzShow(0);else if(e.key==="End")pzShow(PZ.slides.length-1);},true);
+document.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.pz;if(!k)return;PZ[k]=e.target.innerText.trim();});
+document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement){/* uscita dal tutto schermo con Esc: la presentazione resta aperta finché non si preme Esci */}});
+window.__present={open:openPresent,close:closePresent,show:i=>pzShow(i),slides:()=>PZ.slides.map(s=>s.id)}; // per i test
 
 /* ---------- Home: terminale con dati ufficiali BCE e mappa dei laboratori ---------- */
 const LABS=[

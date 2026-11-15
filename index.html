@@ -79,6 +79,7 @@
               <li><b>Quanto rischi</b>: cosa sarebbe successo nel 2008, nel 2020 o in uno scenario estremo.</li>
               <li><b>Quando puoi smettere di lavorare</b>, con la tua età, la tua spesa e la tua pensione.</li>
               <li><b>Dove sono i tuoi soldi</b>: paesi, valute, aziende ripetute in più ETF.</li>
+              <li><b>Quanto ti costano</b>: i costi dei fondi in euro, oggi e in vent'anni.</li>
             </ul>
             <div class="aud-cta"><button type="button" class="btn lime" onclick="document.getElementById('file').click()">Carica il tuo Excel</button><button type="button" class="btn" onclick="document.getElementById('sampleBtn').click()">Guarda un esempio</button></div>
           </div>
@@ -87,10 +88,12 @@
             <h2>Analisi del cliente in minuti, non in ore</h2>
             <ul>
               <li><b>Leggi il portafoglio del cliente</b> dall'export della banca o del broker, o dal suo Excel, senza ricopiare nulla.</li>
-              <li><b>Confronta la situazione di oggi con la tua proposta</b>, sugli stessi mesi e con gli stessi numeri.</li>
-              <li><b>Spiega con parole semplici</b>: ogni numero ha la sua ricevuta, con formula e significato.</li>
-              <li><b>Consegna un report PDF</b> con rendimento, rischio, crisi, obiettivi e confronto con l'indice.</li>
+              <li><b>Mostra quanto costano i suoi fondi</b>, in euro e in vent'anni, contro strumenti a basso costo.</li>
+              <li><b>Dimostra la tua proposta</b> sugli stessi mesi e nelle stesse crisi, con le operazioni da fare e le imposte stimate.</li>
+              <li><b>Presentala a tutto schermo</b> al primo incontro, poi consegna il report col nome del tuo studio.</li>
+              <li><b>Alla revisione successiva</b> vedi cosa è cambiato: versamenti, mercati, pesi.</li>
             </ul>
+            <p class="aud-trust">Il file del cliente resta nel tuo browser: nessun account, nessun server per i dati, nessun prodotto da vendere.</p>
             <div class="aud-cta"><button type="button" class="btn primary" onclick="document.getElementById('file').click()">Analizza il portafoglio di un cliente</button><button type="button" class="btn" onclick="document.getElementById('builderBtn').click()">Costruisci una proposta</button></div>
           </div>
         </div>
@@ -196,8 +199,10 @@
       <div id="lab" hidden style="display:flex;flex-direction:column;gap:16px">
         <nav class="lab-idx" id="labIdx" aria-label="Schede del laboratorio"></nav>
         <div class="sv-offer" id="svOffer" hidden></div>
-        <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip hist"><i></i>Dato storico</span><span class="caption">Clicca qualsiasi numero per vedere formula, dati e ipotesi.</span><button type="button" class="btn sm lime" id="reportBtn" style="margin-left:auto">Scarica il report PDF</button></div>
+        <div class="card co" id="chgCard" hidden></div>
+        <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip hist"><i></i>Dato storico</span><span class="caption">Clicca qualsiasi numero per vedere formula, dati e ipotesi.</span><button type="button" class="btn sm" id="presentBtn" style="margin-left:auto">Presenta al cliente</button><button type="button" class="btn sm lime" id="reportBtn">Scarica il report PDF</button></div>
         <div class="card real" id="realCard" hidden></div>
+        <div class="card co" id="costCard" hidden></div>
         <div class="kpis" id="kpis"></div>
         <div class="bento">
           <div class="card s8">

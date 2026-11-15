@@ -720,3 +720,4 @@ body.rp-on{overflow:hidden}
 .rb-form input,.rb-t input.tgt{font-family:var(--f-body);font-variant-numeric:tabular-nums}
 .bd-row input,.bd-cap input{font-family:var(--f-body);font-variant-numeric:tabular-nums}
 .cmp-t input.cmp-w{font-family:var(--f-body);font-variant-numeric:tabular-nums}
+.co-in input{font-family:var(--f-body);font-variant-numeric:tabular-nums}
