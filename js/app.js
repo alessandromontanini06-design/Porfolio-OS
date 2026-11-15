@@ -516,63 +516,36 @@ function txSnapshot(T,sym){
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
-/* da file a fogli (array di righe); null se il formato non è supportato */
-async function readSheets(file){
-  const ext=(file.name.split(".").pop()||"").toLowerCase();let sheets;
-  if(ext==="csv"||ext==="txt"){
-    const buf=await file.arrayBuffer();let text=new TextDecoder("utf-8").decode(buf);
-    if(text.includes(String.fromCharCode(0xFFFD)))text=new TextDecoder("windows-1252").decode(buf);
-    sheets=[{name:file.name.replace(/\.[^.]+$/,""),aoa:P.parseCSV(text)}];
-  }else if(["xlsx","xls","xlsm","ods"].includes(ext)){
-    if(!window.XLSX)throw new Error("noxlsx");
-    const buf=await file.arrayBuffer();
-    const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
-    sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
-  }else return null;
-  return sheets;
-}
-async function handleFile(file,more){
+async function handleFile(file){
   if(!file)return;
-  /* più file insieme: sono più conti dello stesso patrimonio */
-  if(more&&more.length>1)return addAccounts([...more],true);
   if(file.size>15*1024*1024){showError("Il file supera i 15 MB. Riduci il periodo o il numero di colonne e riprova.");return;}
   const ext=(file.name.split(".").pop()||"").toLowerCase();
   try{
-    let sheets=await readSheets(file);
-    if(!sheets){showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
+    let sheets;
+    if(ext==="csv"||ext==="txt"){
+      const buf=await file.arrayBuffer();let text=new TextDecoder("utf-8").decode(buf);
+      if(text.includes(String.fromCharCode(0xFFFD)))text=new TextDecoder("windows-1252").decode(buf);
+      sheets=[{name:file.name.replace(/\.[^.]+$/,""),aoa:P.parseCSV(text)}];
+    }else if(["xlsx","xls","xlsm","ods"].includes(ext)){
+      if(!window.XLSX)throw new Error("noxlsx");
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
+      sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
+    }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
     if(!sheets.some(s=>s.aoa.length)){showError("Il file è vuoto.");return;}
     if(isSim())spaceSwitch("real",{fresh:true,stay:true});
     track("start",{how:"file"});TR.t0=Date.now();
     sheets=P.normalizeExports(sheets); // export di broker a più sezioni (es. Interactive Brokers) → foglio di movimenti
-    S.conti=[{name:file.name.replace(/\.(xlsx|xlsm|xls|ods|csv|txt)$/i,""),sheets}];
     load(sheets,{name:file.name,size:file.size,kind:"file"},true);
   }catch(e){track("import_fail",{kind:"file",why:e.message==="noxlsx"?"lettore excel non caricato":"file illeggibile"});showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
 }
 const drop=$("#drop");
 ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");void 0;}));
 ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");void 0;}));
-drop.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0],e.dataTransfer.files));
+drop.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0]));
 window.addEventListener("dragover",e=>{if([...(e.dataTransfer?e.dataTransfer.types:[])].includes("Files"))void 0;});
 window.addEventListener("dragleave",e=>{if(!e.relatedTarget)void 0;});
-$("#file").addEventListener("change",e=>{handleFile(e.target.files[0],[...e.target.files]);e.target.value="";});
-/* ---------- Più conti: banca, broker, conto del coniuge → un solo patrimonio ----------
-   I movimenti di ogni file vengono riscritti in un formato comune e uniti in un foglio con la colonna «Conto». */
-async function addAccounts(files,fresh){
-  const base=fresh||!S.conti||!S.conti.length?[]:S.conti.slice(),add=[];
-  for(const f of files){try{const sh=await readSheets(f);if(sh&&sh.some(x=>x.aoa.length))add.push({name:f.name.replace(/\.(xlsx|xlsm|xls|ods|csv|txt)$/i,""),sheets:P.normalizeExports(sh)});else{showError(`«${f.name}»: formato non supportato o file vuoto.`);return;}}catch(e){showError(`Non riesco a leggere «${f.name}».`);return;}}
-  /* stesso nome due volte (due «Movimenti titoli»): si distinguono con un numero */
-  const all=[...base,...add];all.forEach((c,i)=>{const same=all.filter(x=>x.name===c.name);if(same.length>1)c.name=`${c.name} (${same.indexOf(c)+1})`;});
-  const M=P.mergeAccounts(all);
-  if(M.error){showError(`Per unire più conti servono elenchi di movimenti (acquisti, vendite, cedole). Non riesco a leggerli in: ${M.error.map(esc).join(", ")}. Puoi aprire quel file da solo.`);return;}
-  S.conti=all;trackOnce("feature","piu_conti",{name:"piu_conti"});
-  if(isSim())spaceSwitch("real",{fresh:true,stay:true});
-  load(M.sheets,{name:`${all.length} conti · ${all.map(c=>c.name).join(" + ")}`.slice(0,120),size:0,kind:"file"},true);
-}
-document.addEventListener("click",e=>{if(e.target.closest("#addAccBtn"))$("#fileMore").click();});
-document.addEventListener("change",e=>{if(e.target.id!=="fileMore"||!e.target.files.length)return;const fs=[...e.target.files];e.target.value="";
-  /* il conto già aperto entra solo se è un file caricato (non l'esempio né una prova) */
-  if(!S.conti||!S.conti.length||isExample()||isSim()){showError("Prima carica il file del primo conto, poi aggiungi gli altri.");return;}
-  addAccounts(fs,false);});
+$("#file").addEventListener("change",e=>{handleFile(e.target.files[0]);e.target.value="";});
 /* portafoglio di esempio: un vero Excel (movimenti dal 2019, 7 ETF con ISIN) letto come un file caricato dall'utente */
 const EXAMPLE={url:"esempio/Portfolio_OS_esempio.xlsx",name:"Portfolio_OS_esempio.xlsx"};
 const isExample=()=>!!(S.source&&(S.source.example||(S.source.kind==="rebuilt"&&S.rb&&S.rb.origSource&&S.rb.origSource.example)));
@@ -1203,7 +1176,7 @@ async function rebuildFromPrices(o={}){
       series.push(got);
     }
     /* senza ticker nel file l'etichetta era il nome lungo del fondo: si usa il ticker di borsa della quotazione trovata (IWDA.AMS → IWDA) */
-    const used=new Set(pos.map(p=>p.ticker));pos.forEach((p,i)=>{if(!p.labelIsName||series[i].error)return;const t=String(p.simbolo||"").split(".")[0];/* i fondi comuni su Yahoo hanno codici tipo 0P0000ABTK: resta il nome del fondo */if(t&&!/^0P[0-9A-Z]{8}$/.test(t)&&!used.has(t)){used.add(t);p.ticker=t;}});
+    const used=new Set(pos.map(p=>p.ticker));pos.forEach((p,i)=>{if(!p.labelIsName||series[i].error)return;const t=String(p.simbolo||"").split(".")[0];if(t&&!used.has(t)){used.add(t);p.ticker=t;}});
     S.isinLog=isinLog;S.noSym=noSym;
     const ok=[],bad=[];
     series.forEach((s,i)=>{(s.error?bad:ok).push({p:pos[i],s});});
@@ -1223,7 +1196,7 @@ async function rebuildFromPrices(o={}){
     const months={length:aoa.length-1};
     if(S.source!==src0)return;
     const orig=S.source.name.replace(/ · ricostruito$/,""),scartati=u.scartati||[];
-    const pf={monthly:avgMonthly(),from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:/\b(btp|cct|bot|ctz|bund|oat|treasury|titolo di stato|buono)\b/i.test(p.nome||"")||/^IT000[45]/.test(p.isin||"")&&!p.ticker?"titolo di Stato: i prezzi storici di BTP e simili non sono disponibili da fonti gratuite, quindi resta fuori da rischio e frontiera; entra però nel rendimento del conto, con cedole e prezzo di oggi":"senza simbolo di borsa: scrivilo nella tabella per includerlo"}))],base:"EUR"};
+    const pf={monthly:avgMonthly(),from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:/\b(btp|cct|bot|ctz|bund|oat|treasury|titolo di stato|buono)\b/i.test(p.nome||"")||/^IT000[45]/.test(p.isin||"")&&!p.ticker?"titolo di Stato: i prezzi storici di BTP e simili non sono disponibili da fonti gratuite, quindi resta fuori dalle analisi":"senza simbolo di borsa: scrivilo nella tabella per includerlo"}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},!o.quiet);
     S.portfolio=pf;S.rbLog=null;
     S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
@@ -1277,7 +1250,7 @@ function computeChecks(A,ds){
   /* portafoglio ricostruito a cui mancano strumenti: niente risultati parziali in silenzio */
   if(S.portfolio&&S.portfolio.missing&&S.portfolio.missing.length&&S.source&&S.source.kind==="rebuilt"){
     const M=S.portfolio.missing,tot=(S.lastUnd&&S.lastUnd.posizioni||[]).reduce((q,p)=>q+(p.valore||0),0),mv=M.reduce((q,m)=>q+(((S.lastUnd&&S.lastUnd.posizioni)||[]).find(p=>p.nome===m.nome)||{}).valore||0,0);
-    out.push({id:"partial",block:true,title:`${M.length===1?"Manca":"Mancano"} ${M.length} ${M.length===1?"strumento":"strumenti"}${tot&&mv?` (${fmtPct(mv/tot,0)} del valore)`:""}`,text:M.map(m=>`${m.nome}${m.simbolo?` (${m.simbolo})`:""}: ${m.err}`).join(" · ")+" Senza di loro pesi, rischio e frontiera descrivono solo una parte del portafoglio. Il rendimento del conto, se il file ha i movimenti, li comprende.",acts:[["retry","Riprova a scaricarli"],["ok","Procedi senza (pesi ricalcolati sul resto)"]]});
+    out.push({id:"partial",block:true,title:`Mancano ${M.length} ${M.length===1?"strumento":"strumenti"}${tot&&mv?` (${fmtPct(mv/tot,0)} del valore)`:""}`,text:M.map(m=>`${m.nome}${m.simbolo?` (${m.simbolo})`:""}: ${m.err}`).join(" · ")+" Senza di loro pesi, rischio e frontiera descrivono solo una parte del portafoglio.",acts:[["retry","Riprova a scaricarli"],["ok","Procedi senza (pesi ricalcolati sul resto)"]]});
   }
   /* prezzi che si fermano troppo presto (risposta incompleta della fonte o cambio BCE mancante): valore e rendimento «di oggi» sarebbero di mesi fa */
   if(S.rb&&S.source&&S.source.kind==="rebuilt"){const now=new Date(),lim=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`,mAgo=k=>{const [y,m]=k.split("-").map(Number);return (now.getFullYear()-y)*12+now.getMonth()+1-m;};
@@ -1695,13 +1668,10 @@ function coSave(p){try{localStorage.setItem(CO_KEY,JSON.stringify(p));}catch{}}
 const coKey=p=>p.isin&&ISIN_RX.test(p.isin)?p.isin:String(p.ticker||p.nome||"").trim().toLowerCase();
 function costCalc(){
   const pf=S.portfolio;if(!pf||!pf.positions||!pf.positions.length||isSim())return null;
-  /* anche i titoli del conto senza prezzi di mercato (BTP, obbligazioni, fondi non trovati): valore dal conto intero */
-  const seen=new Set(pf.positions.flatMap(p=>[p.isin,(p.nome||"").toLowerCase(),(p.ticker||"").toLowerCase()].filter(Boolean)));
-  const extra=((S.account&&S.account.items)||[]).filter(x=>x.stato==="aperto"&&x.value>0&&!seen.has(x.isin)&&!seen.has(String(x.nome||x.titolo||"").toLowerCase())).map(x=>({nome:x.nome||x.titolo,isin:x.isin,valore:x.value,bond:!!bondInfo(x.nome||x.titolo)||!!x.per100}));
-  const all=[...pf.positions,...extra],tot=all.reduce((a,p)=>a+(p.valore>0?p.valore:0),0);if(!(tot>0))return null;
+  const tot=pf.positions.reduce((a,p)=>a+(p.valore>0?p.valore:0),0);if(!(tot>0))return null;
   const pr=coPrefs(),own=pr.ter||{},cheap=Number.isFinite(pr.cheap)?pr.cheap:.002,other=Number.isFinite(pr.other)?pr.other:0;
-  const items=all.map(p=>{const k=coKey(p),j=p.bond?0:p.etf&&!p.etf.error&&Number.isFinite(p.etf.ter)?p.etf.ter:null,u=Number.isFinite(own[k])?own[k]:null,t=u!=null?u:j,v=p.valore>0?p.valore:0;
-    return {p,k,nome:p.ticker||p.nome||"—",full:p.etf&&!p.etf.error&&p.etf.nome||p.nome||"",isin:p.isin&&ISIN_RX.test(p.isin)?p.isin:null,v,w:v/tot,ter:t,src:u!=null?"tu":p.bond?"titolo":j!=null?"justETF":null,etfTer:p.bond?null:j,
+  const items=pf.positions.map(p=>{const k=coKey(p),j=p.etf&&!p.etf.error&&Number.isFinite(p.etf.ter)?p.etf.ter:null,u=Number.isFinite(own[k])?own[k]:null,t=u!=null?u:j,v=p.valore>0?p.valore:0;
+    return {p,k,nome:p.ticker||p.nome||"—",full:p.etf&&!p.etf.error&&p.etf.nome||p.nome||"",isin:p.isin&&ISIN_RX.test(p.isin)?p.isin:null,v,w:v/tot,ter:t,src:u!=null?"tu":j!=null?"justETF":null,etfTer:j,
       y:t!=null?v*t:NaN,d20:t!=null?P.terDrag(v,t,CO_R,CO_Y):NaN,save:t!=null&&t>cheap?P.terDrag(v,t,CO_R,CO_Y)-P.terDrag(v,cheap,CO_R,CO_Y):0};});
   const known=items.filter(x=>x.ter!=null),kv=known.reduce((a,x)=>a+x.v,0);
   const ter=kv>0?known.reduce((a,x)=>a+x.v*x.ter,0)/kv:NaN;
@@ -1720,7 +1690,7 @@ function renderCost(){
   const lead=!anyCost?`Inserisci il costo annuo di ogni strumento: per gli ETF lo leggo da solo, per i fondi è nel KID alla voce «Costi correnti».`
     :`Il portafoglio costa <b>${pc(C.ter+C.other)}</b> l'anno: circa <b>${eur(C.year)}</b> quest'anno${full?"":` sulla parte con costo noto (${fmtPct(C.coverage,0)})`}. In ${CO_Y} anni, con un rendimento lordo del 5%, sono <b>${eur(C.d20)}</b> di capitale in meno.`;
   const rows=C.items.slice().sort((a,b)=>(b.ter??-1)-(a.ter??-1)).map(x=>{
-    const tag=x.src==="titolo"?`<span class="co-src">titolo: nessun costo di gestione</span>`:x.src==="justETF"?`<span class="co-src">justETF</span>`:x.src==="tu"?`<span class="co-src tu">inserito${x.etfTer!=null?` · <button type="button" class="linkbtn" data-cor="${esc(x.k)}">usa justETF ${fmtPct(x.etfTer,2)}</button>`:""}</span>`:`<span class="co-src miss">${C.pending?"cerco…":"manca · dal KID"}</span>`;
+    const tag=x.src==="justETF"?`<span class="co-src">justETF</span>`:x.src==="tu"?`<span class="co-src tu">inserito${x.etfTer!=null?` · <button type="button" class="linkbtn" data-cor="${esc(x.k)}">usa justETF ${fmtPct(x.etfTer,2)}</button>`:""}</span>`:`<span class="co-src miss">${C.pending?"cerco…":"manca · dal KID"}</span>`;
     const hi=x.ter!=null&&x.ter>=.01;
     return `<tr class="${hi?"co-hi":""}"><td><span class="an">${esc(x.nome)}</span><span class="cl">${esc([x.full&&x.full!==x.nome?x.full:"",x.isin||""].filter(Boolean).join(" · "))}</span></td>
       <td class="mono">${eur(x.v)}</td>
@@ -1818,7 +1788,7 @@ async function svOpen(id){
   const r=await svGet(id);if(!r)return svHome();
   trackOnce("feature","riprendi",{name:"riprendi"});closeArchive();
   if(isSim())spaceSwitch("real",{stay:true});
-  S.conti=[{name:r.name,sheets:r.sheets}];S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=r.snap||null;
+  S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=r.snap||null;
   load(r.sheets,{name:r.file||r.name,size:0,kind:"file"},true);
   go("scan",{force:true});
   /* la mappa è già confermata in memoria: appena il file è pronto (anche dopo i prezzi di mercato) si costruisce il laboratorio */
@@ -3363,79 +3333,10 @@ function taxCalc(pp){
   const fl=(S.real&&S.real.tx?S.real.tx:[]).filter(x=>x.i>=0).map(x=>({t:x.d,v:-x.amount}));fl.push({t:ds.dates[ds.dates.length-1],v:net});
   return {tax,net,rows,xirr:fl.length>1?P.xirr(fl):NaN,gainNet:net-pp.invested};
 }
-/* ---------- Il conto intero, dai movimenti: anche titoli senza storico dei prezzi (azioni vendute, obbligazioni) ---------- */
-/* prezzo di oggi scritto a mano per i titoli senza prezzi di mercato (BTP, obbligazioni, fondi non trovati): resta in questo browser */
-const PX_KEY="pos-px-v1";
-function pxPrefs(){try{return JSON.parse(localStorage.getItem(PX_KEY)||"{}")||{};}catch{return {};}}
-const pxKey=x=>x.isin||String(x.titolo||"").trim().toLowerCase();
-/* BTP e obbligazioni: cedola e scadenza dal nome («BTP 3,35% 01MZ35», «BTP 1,45% 15MG25»), rendimento a scadenza dal prezzo */
-const BMON={GE:0,FB:1,MZ:2,AP:3,MG:4,GN:5,LG:6,AG:7,ST:8,OT:9,NV:10,DC:11};
-function bondInfo(name){const t=String(name||"").toUpperCase(),c=t.match(/(\d{1,2}(?:[.,]\d{1,3})?)\s?%/),m=t.match(/(\d{2})(GE|FB|MZ|AP|MG|GN|LG|AG|ST|OT|NV|DC)(\d{2})\b/);
-  if(!m)return null;return {cpn:c?parseFloat(c[1].replace(",","."))/100:null,mat:new Date(Date.UTC(2000+ +m[3],BMON[m[2]],+m[1]))};}
-function bondYtm(px,cpn,mat,today){
-  const yrs=(mat-today)/(365.25*864e5);if(!(px>0)||!(yrs>0)||cpn==null)return NaN;
-  const n=Math.max(1,Math.ceil(yrs*2)),f=yrs*2-(n-1),pv=y=>{let s=0;for(let k=0;k<n;k++){const t=f+k;s+=cpn/2*100/Math.pow(1+y/2,t);}return s+100/Math.pow(1+y/2,f+n-1);};
-  let a=-.5,b=1;for(let i=0;i<80;i++){const m=(a+b)/2;if(pv(m)>px)a=m;else b=m;}return (a+b)/2;}
-function accountCalc(R){
-  if(!S.fileSheets||!S.ds||!S.ds.ok)return null;
-  const ds=S.ds,today=ds.dates[ds.dates.length-1];
-  /* valore di oggi dei titoli aperti: dai prezzi di mercato (come nel calcolo del TIR) se il titolo è tra quelli ricostruiti */
-  let valueOf=null;
-  if(R&&R.pp){const pos=(S.portfolio&&S.portfolio.positions)||[],key=v=>String(v||"").trim().toLowerCase();
-    const akas=ds.assets.map(a=>{const c=S.rb&&S.rb.cols.find(x=>x.name===a.name),q=pos.find(x=>(x.ticker||x.nome)===a.name);return new Set([a.name,c&&c.nome,c&&c.sym,q&&q.isin,q&&q.nome,q&&q.ticker].filter(Boolean).map(key));});
-    valueOf=x=>{const i=akas.findIndex(s=>s.has(key(x.isin))||s.has(key(x.titolo))||(x.tk&&s.has(key(x.tk))));const b=i>=0?R.pp.byAsset[i]:null;return b&&b.value>0?{v:b.value,how:"prezzi di mercato"}:null;};}
-  /* valore di oggi = quote × ultimo prezzo di mercato in euro della serie scaricata: non dipende da tagli del periodo o esclusioni dalle analisi */
-  const pos=(S.portfolio&&S.portfolio.positions)||[],lastPx=c=>{const k=[...c.map.keys()].sort().pop();return k?c.map.get(k).v:null;};
-  const mkt=x=>{if(!S.rb)return null;const q=pos.find(p=>(x.isin&&p.isin===x.isin)||String(p.nome||"").toLowerCase()===String(x.nome||x.titolo||"").toLowerCase());
-    const c=q&&S.rb.cols.find(c=>c.name===(q.ticker||q.nome)||c.sym===q.simbolo);const v=c?lastPx(c):null;return v>0?{v:x.q*v,how:"prezzi di mercato"}:null;};
-  /* un prezzo scritto a mano vale solo per i titoli senza prezzi di mercato */
-  const own=pxPrefs(),mk=valueOf;
-  valueOf=x=>{const m=mkt(x)||(mk?mk(x):null);if(m)return m;const u=own[pxKey(x)];return u&&u.p>0?{v:x.q*u.p/(x.per100?100:1),how:"prezzo inserito",px:u.p,at:u.at}:null;};
-  try{return P.accountFromSheets(S.fileSheets,valueOf,today);}catch(e){return null;}
-}
-document.addEventListener("change",e=>{const k=e.target.dataset&&e.target.dataset.axp;if(!k)return;const v=parseFloat(String(e.target.value).replace(",","."));const o=pxPrefs();if(v>0)o[k]={p:v,at:Date.now()};else delete o[k];try{localStorage.setItem(PX_KEY,JSON.stringify(o));}catch{}trackOnce("feature","prezzo_manuale",{name:"prezzo_manuale"});renderReal();renderCost();});
-function accountHTML(AC){
-  if(!AC||AC.items.length<1)return "";
-  const T=AC.tot,eur=v=>`${v>=0?"+":"−"}${fmtEur(Math.abs(v))}`,ds=S.ds,today=ds.dates[ds.dates.length-1];
-  const ret=x=>{if(x.gain==null)return "—";const end=x.stato==="chiuso"&&x.lastFlowD?x.lastFlowD:today,span=x.firstD?(end-x.firstD)/864e5:999; /* periodo in cui il titolo è stato tenuto davvero */return span<182||!Number.isFinite(x.xirr)?`${fmtPct(x.bought>0?x.gain/x.bought:NaN,1,true)}<small>in tutto</small>`:`${fmtPct(x.xirr,1,true)}<small>l'anno</small>`;};
-  const st={aperto:"in portafoglio",chiuso:"venduto",prima:"comprato prima"};
-  const own=pxPrefs(),now=new Date();
-  const bnd=x=>{const b=bondInfo(x.nome||x.titolo);if(!b)return "";const px=(own[pxKey(x)]||{}).p||x.last,y=x.stato==="aperto"&&b.mat>now?bondYtm(px,b.cpn,b.mat,now):NaN;
-    return ` · ${b.cpn!=null?`cedola ${fmtPct(b.cpn,2)} · `:""}${b.mat>now?"scade":"scaduto"} il ${b.mat.toLocaleDateString("it-IT",{timeZone:"UTC"})}${Number.isFinite(y)?` · rendimento a scadenza ${fmtPct(y,2)} lordo al prezzo ${fmtN(px,2)}`:""}`;};
-  const manual=x=>x.stato==="aperto"&&x.how!=="prezzi di mercato";
-  const rows=AC.items.map(x=>`<tr class="${x.stato}"><td><b>${esc(x.nome||x.titolo)}</b><small>${esc(x.isin||"")}${esc(bnd(x))}${x.how==="ultimo prezzo pagato"?" · valore all'ultimo prezzo pagato: scrivi il prezzo di oggi":x.how==="prezzo inserito"?` · prezzo inserito da te`:""}</small></td><td><span class="ac-st ${x.stato}">${x.stato==="chiuso"&&(bondInfo(x.nome||x.titolo)||{mat:now}).mat<now&&bondInfo(x.nome||x.titolo)?"rimborsato":st[x.stato]}</span></td><td class="mono">${x.bought>0?fmtEur(x.bought):"—"}</td><td class="mono">${x.sold+x.income>0?fmtEur(x.sold+x.income):"—"}</td><td class="mono">${x.value>0?fmtEur(x.value):"—"}${manual(x)?`<label class="co-in sm ac-px"><span>prezzo oggi</span><input type="number" inputmode="decimal" min="0" step="0.01" data-axp="${esc(pxKey(x))}" value="${+(((own[pxKey(x)]||{}).p)||x.last||0).toFixed(4)}" aria-label="Prezzo di oggi di ${esc(x.nome||x.titolo)}${x.per100?", su 100 di nominale":""}"></label>`:""}</td><td class="mono ${x.gain==null?"":x.gain>=0?"up":"dn"}">${x.gain==null?"—":eur(x.gain)}</td><td class="mono ac-r">${ret(x)}</td></tr>`).join("");
-  const notes=[];
-  AC.renamed.forEach(([a,b])=>notes.push(`<b>${esc(a)}</b> e <b>${esc(b)}</b> sono lo stesso titolo con un nome nuovo: li ho uniti.`));
-  AC.prior.forEach(x=>notes.push(`<b>${esc(x.nome||x.titolo)}</b>: ${x.sold>0?`venduto per ${fmtEur(x.sold)}`:"movimentato"}, ma comprato prima dell'inizio del file, quindi il costo d'acquisto non c'è e resta fuori dal rendimento. Per averlo, carica il file o l'estratto dall'apertura del conto.`));
-  if(AC.items.some(x=>x.how==="ultimo prezzo pagato"))notes.push("Per i titoli senza prezzi di mercato il valore di oggi è stimato con l'ultimo prezzo pagato.");
-  const open=AC.items.filter(x=>x.stato==="aperto").length,closed=AC.items.filter(x=>x.stato==="chiuso").length;
-  /* più conti: il valore di oggi di un titolo presente in due conti si divide in proporzione alle quote */
-  let perConto="";
-  if(S.conti&&S.conti.length>1){const byK=new Map(AC.items.map(x=>[x.isin||String(x.nome||x.titolo).toLowerCase(),x]));
-    const rowsC=S.conti.map(c=>{let A=null;try{A=P.accountFromSheets(c.sheets,x=>{const g=byK.get(x.isin||String(x.nome||x.titolo).toLowerCase());return g&&g.q>0&&g.value>0?{v:g.value*x.q/g.q,how:g.how}:null;},today);}catch{}return {c,A};}).filter(x=>x.A);
-    if(rowsC.length>1)perConto=`<h4 class="ac-h">Conto per conto</h4><div class="tablewrap"><table class="mt"><thead><tr><th>Conto</th><th>Comprato</th><th>Incassato</th><th>Valore oggi</th><th>Guadagno</th><th>Rendimento (TIR)</th></tr></thead><tbody>${rowsC.map(({c,A})=>`<tr><td><b>${esc(c.name)}</b><small>${A.items.length} titoli</small></td><td class="mono">${fmtEur(A.tot.bought)}</td><td class="mono">${fmtEur(A.tot.sold+A.tot.income)}</td><td class="mono">${fmtEur(A.tot.open)}</td><td class="mono ${A.tot.gain>=0?"up":"dn"}">${eur(A.tot.gain)}</td><td class="mono">${fmtPct(A.tot.xirr,1,true)}</td></tr>`).join("")}</tbody></table></div>`;}
-  return `<div class="ac"><div class="head"><div><span class="eyebrow">Dai movimenti del file · ${AC.items.length} titoli: ${open} in portafoglio, ${closed} venduti${AC.prior.length?`, ${AC.prior.length} comprati prima del file`:""}</span><h3 style="margin-top:4px">Il tuo conto, tutto insieme</h3></div><span class="chip hist"><i></i>vendite comprese</span></div>
-    <div class="ac-k">
-      <div class="k"><span>Rendimento annuo del conto (TIR)</span><b>${fmtPct(T.xirr,1,true)}</b><small>acquisti, vendite, dividendi e valore di oggi</small></div>
-      <div class="k"><span>Guadagno totale</span><b class="${T.gain>=0?"up":"dn"}">${eur(T.gain)}</b><small>${fmtPct(T.bought>0?T.gain/T.bought:NaN,1,true)} su quanto hai comprato</small></div>
-      <div class="k"><span>Comprato</span><b>${fmtEur(T.bought)}</b><small>somma degli acquisti</small></div>
-      <div class="k"><span>Incassato</span><b>${fmtEur(T.sold+T.income)}</b><small>vendite ${fmtEur(T.sold)} · dividendi e cedole ${fmtEur(T.income)}</small></div>
-      <div class="k"><span>Ancora investito</span><b>${fmtEur(T.open)}</b><small>valore di oggi dei titoli in portafoglio</small></div>
-    </div>
-    ${perConto}
-    <div class="tablewrap"><table class="mt ac-t"><thead><tr><th>Titolo</th><th>Stato</th><th>Comprato</th><th>Incassato</th><th>Valore oggi</th><th>Guadagno</th><th>Rendimento</th></tr></thead><tbody>${rows}</tbody></table></div>
-    ${notes.length?`<ul class="ac-notes">${notes.map(n=>`<li>${n}</li>`).join("")}</ul>`:""}
-    <p class="caption">Guadagno = incassato + valore di oggi − comprato. Per i titoli tenuti meno di 6 mesi il rendimento è il guadagno in percentuale, non annuo (su poche settimane l'annuo sarebbe fuorviante). Imposte, bollo e commissioni non abbinate a un titolo non sono incluse.</p></div>`;
-}
 function renderReal(){
   setTimeout(labIndex,60);
   const el=$("#realCard");if(!el)return;
-  /* «Il tuo conto, tutto insieme» è spento: con alcuni file reali leggeva male le colonne (un titolo «Transazioni», rendimenti falsi). Va rifatto con calma. */
-  const R=realCalc(),AC=null;S.account=null;setTimeout(renderCost,0);
-  /* conto intero utile anche quando il TIR sui prezzi di mercato non si può fare (nessun titolo con storico) */
-  const acOnly=AC&&AC.items.length>=1&&(!R||R.error);
-  if(acOnly){el.hidden=false;el.innerHTML=accountHTML(AC);S.real=null;return;}
-  if(!R){el.hidden=true;S.real=null;return;}
+  const R=realCalc();if(!R){el.hidden=true;S.real=null;return;}
   el.hidden=false;const ds=S.ds,f=ds.freq.f;
   if(R.error){el.innerHTML=`<div class="head"><h3>Il tuo rendimento reale</h3><span class="chip hist"><i></i>dalle tue transazioni</span></div><p style="color:var(--muted)">Ho trovato ${S.tx.rows.length} transazioni nel foglio «${esc(S.tx.sheet)}», ma nessuna corrisponde agli strumenti dei dati (${esc(ds.assets.map(a=>a.name).join(", "))}).</p>`;S.real=null;return;}
   const pp=R.pp,un=[...new Set(pp.unmatched.map(x=>x.ticker))],c=(k,v)=>`<button type="button" class="cellbtn" data-rc="rl-${k}">${v}</button>`;
@@ -3466,7 +3367,6 @@ function renderReal(){
       </div></div>
     <p class="caption" style="margin-top:12px">Il valore segue i rendimenti degli strumenti nei dati e aggiunge ogni versamento a fine ${UNIT[f]?UNIT[f][0]:"periodo"}. ${S.source.kind==="rebuilt"?"I rendimenti sono quelli di mercato convertiti in euro con il cambio BCE di fine mese; il valore può differire un po' da quello del tuo broker (prezzi di fine mese, borsa diversa).":"I rendimenti vengono dai prezzi del file: se sono prezzi medi pagati, il valore è una stima."}${un.length?` Transazioni non collegate (strumento non nei dati): ${esc(un.join(", "))}.`:""}${pp.before?` ${pp.before} transazioni sono prima dell'inizio dei dati e sono contate dal primo periodo.`:""} TIR e rendimento ponderato su meno di un anno o due possono cambiare molto: non sono previsioni.</p>`;
   el.insertAdjacentHTML("beforeend",attribHTML(R));
-  if(AC&&AC.items.length>R.pp.byAsset.filter(b=>b.ops>0).length){el.insertAdjacentHTML("afterbegin",accountHTML(AC)+`<div class="ac-sep"><span>Nel dettaglio: i titoli con prezzi di mercato, mese per mese</span></div>`);}
   drawReal();
   {const gv=$("#growView");if(gv)gv.hidden=false;if(S.growView==="money")drawChart(false);}
 }
@@ -4064,89 +3964,6 @@ document.addEventListener("keydown",e=>{const el=$("#present");if(!el||el.hidden
 document.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.pz;if(!k)return;PZ[k]=e.target.innerText.trim();});
 document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement){/* uscita dal tutto schermo con Esc: la presentazione resta aperta finché non si preme Esci */}});
 window.__present={open:openPresent,close:closePresent,show:i=>pzShow(i),slides:()=>PZ.slides.map(s=>s.id)}; // per i test
-
-/* ---------- Lettera al cliente: bozza scritta qui con i numeri verificati, l'IA (facoltativa) la rende più scorrevole ----------
-   Il nome del cliente non va all'IA: c'è il segnaposto [NOME], sostituito nel browser. Dopo la riscrittura si controlla che ogni cifra sia tra quelle dei fatti. */
-const LT={tono:"cordiale",nome:"",testo:"",ai:false,warn:""};
-function letterDraft(tono){
-  if(!S.lab||!S.ds||!S.ds.ok)return null;
-  if(!S.risk)renderRisk();
-  const F=tono==="formale",tu=(a,b)=>F?b:a,eur=v=>fmtEur(Math.round(v)),B=rpBrand(),ds=S.ds,f=ds.freq.f,PR=S.risk.PR;
-  const pp=S.real&&S.real.pp,tx=S.real&&S.real.taxes,AC=S.account,C=costCalc(),X=chgCalc(),facts=[],par=[];
-  const today=new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});
-  par.push(`${F?"Gentile":"Ciao"} [NOME],`);
-  par.push(tu(`grazie per l'incontro di oggi, ${today}. Ti riassumo quello che abbiamo visto insieme.`,`La ringrazio per l'incontro di oggi, ${today}. Le riassumo quanto abbiamo visto insieme.`));
-  const acOK=AC&&AC.items&&AC.items.length>(pp?pp.byAsset.filter(b=>b.ops>0).length:0);
-  if(acOK){const T=AC.tot;facts.push(`valore di oggi ${eur(T.open)}`,`comprato ${eur(T.bought)}`,`incassato ${eur(T.sold+T.income)}`,`guadagno ${eur(T.gain)}`,`rendimento annuo ${fmtPct(T.xirr,1,true)}`);
-    par.push(tu(`I titoli che hai ancora valgono oggi circa ${eur(T.open)}. In tutto hai comprato per ${eur(T.bought)} e incassato ${eur(T.sold+T.income)} tra vendite, cedole e dividendi: il guadagno complessivo è di ${eur(T.gain)}, un rendimento del ${fmtPct(T.xirr,1,true)} l'anno tenendo conto di quando sono entrati e usciti i soldi.`,
-      `I titoli in portafoglio valgono oggi circa ${eur(T.open)}. Complessivamente ha acquistato per ${eur(T.bought)} e incassato ${eur(T.sold+T.income)} tra vendite, cedole e dividendi: il guadagno complessivo è di ${eur(T.gain)}, pari a un rendimento del ${fmtPct(T.xirr,1,true)} annuo, considerando le date dei movimenti.`));}
-  else if(pp){facts.push(`versato ${eur(pp.invested)}`,`valore ${eur(pp.value)}`,`guadagno ${eur(pp.gain)}`,`TIR ${fmtPct(pp.xirr,1,true)}`);if(tx)facts.push(`netto tasse ${fmtPct(tx.xirr,1,true)}`,`imposte ${eur(tx.tax)}`);
-    par.push(tu(`Hai versato ${eur(pp.invested)} e oggi il portafoglio vale circa ${eur(pp.value)}: un guadagno di ${eur(pp.gain)}. Il rendimento annuo, tenendo conto di quando hai versato, è del ${fmtPct(pp.xirr,1,true)}${tx?`, circa ${fmtPct(tx.xirr,1,true)} al netto delle tasse se vendessi tutto oggi (imposte stimate ${eur(tx.tax)})`:""}.`,
-      `Ha versato ${eur(pp.invested)} e oggi il portafoglio vale circa ${eur(pp.value)}: un guadagno di ${eur(pp.gain)}. Il rendimento annuo, considerando le date dei versamenti, è del ${fmtPct(pp.xirr,1,true)}${tx?`, circa ${fmtPct(tx.xirr,1,true)} al netto delle imposte in caso di vendita oggi (imposte stimate ${eur(tx.tax)})`:""}.`));}
-  if(X&&Number.isFinite(X.dV)){const when=new Date(X.a.at).toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});facts.push(`prima ${eur(X.a.value)}`,`ora ${eur(X.b.value)}`);
-    if(Number.isFinite(X.mkt))facts.push(`versato nel frattempo ${eur(Math.abs(X.dI))}`,`mercati ${eur(Math.abs(X.mkt))}`);
-    par.push(tu(`Dal nostro incontro del ${when} il valore è passato da ${eur(X.a.value)} a ${eur(X.b.value)}${Number.isFinite(X.mkt)?`: ${X.dI>=0?`${eur(X.dI)} li hai versati tu`:`${eur(-X.dI)} li hai ritirati`}, ${X.mkt>=0?`${eur(X.mkt)} li hanno aggiunti i mercati`:`i mercati hanno tolto ${eur(-X.mkt)}`}`:""}.`,
-      `Dal nostro incontro del ${when} il valore è passato da ${eur(X.a.value)} a ${eur(X.b.value)}${Number.isFinite(X.mkt)?`: ${X.dI>=0?`${eur(X.dI)} versati da Lei`:`${eur(-X.dI)} ritirati`}, ${X.mkt>=0?`${eur(X.mkt)} dovuti ai mercati`:`${eur(-X.mkt)} persi sui mercati`}`:""}.`));}
-  if(C&&C.items.some(x=>x.ter!=null)){const tc=C.ter+C.other;facts.push(`costo annuo ${fmtPct(tc,2)}`,`costi quest'anno ${eur(C.year)}`,`in ${CO_Y} anni ${eur(C.d20)}`);if(C.save>100)facts.push(`differenza ${eur(C.save)}`,`strumenti al ${fmtPct(C.cheap,2)}`);
-    par.push(tu(`Abbiamo guardato anche i costi: gli strumenti che hai costano circa il ${fmtPct(tc,2)} l'anno, cioè circa ${eur(C.year)} quest'anno. Su ${CO_Y} anni, con un rendimento lordo del 5%, vuol dire circa ${eur(C.d20)} di capitale in meno${C.save>100?`; con strumenti che costano il ${fmtPct(C.cheap,2)} la differenza sarebbe di circa ${eur(C.save)}`:""}.`,
-      `Abbiamo esaminato anche i costi: gli strumenti in portafoglio costano circa il ${fmtPct(tc,2)} annuo, ovvero circa ${eur(C.year)} quest'anno. Su ${CO_Y} anni, ipotizzando un rendimento lordo del 5%, corrispondono a circa ${eur(C.d20)} di capitale in meno${C.save>100?`; con strumenti al ${fmtPct(C.cheap,2)} annuo la differenza sarebbe di circa ${eur(C.save)}`:""}.`));}
-  if(Number.isFinite(PR.mdd)&&PR.troughK!=null){const v0=(AC&&AC.tot&&AC.tot.open)||(pp&&pp.value)||(C&&C.tot)||null,cr=stressList().list.filter(c=>c.status!=="out"&&c.used&&Number.isFinite(c.mdd)),wc=cr.length?cr.reduce((a,b)=>b.mdd<a.mdd?b:a):null;
-    facts.push(`calo massimo ${fmtPct(Math.abs(PR.mdd),0)}`);if(v0)facts.push(`${eur(Math.abs(PR.mdd)*v0)}`);if(wc)facts.push(`${wc.name} ${fmtPct(wc.mdd,0)}`);
-    par.push(tu(`Sul rischio: nei dati storici, nel momento peggiore questo portafoglio ha perso il ${fmtPct(Math.abs(PR.mdd),0)}${v0?` (circa ${eur(Math.abs(PR.mdd)*v0)} sul valore di oggi)`:""}${wc?`; la crisi più dura è stata ${wc.name}`:""}. Non è una previsione, ma ci dice quanto può muoversi.`,
-      `Quanto al rischio: nei dati storici, nella fase peggiore il portafoglio ha perso il ${fmtPct(Math.abs(PR.mdd),0)}${v0?` (circa ${eur(Math.abs(PR.mdd)*v0)} sul valore attuale)`:""}${wc?`; la crisi più severa è stata ${wc.name}`:""}. Non si tratta di una previsione, ma indica l'ampiezza delle possibili oscillazioni.`));}
-  if(cmpReady()){const Rc=cmpCalc(),a=Rc.res[0],b=Rc.res[1];if(a&&b&&!a.empty&&!b.empty){const M=cmpMoves(Rc);
-    facts.push(`proposta calo ${fmtPct(Math.abs(b.st.mdd),1)}`,`attuale calo ${fmtPct(Math.abs(a.st.mdd),1)}`,`proposta volatilità ${fmtPct(b.st.vol,1)}`,`attuale volatilità ${fmtPct(a.st.vol,1)}`);
-    if(M&&M.sell>1)facts.push(`vendite ${eur(M.sell)}`,`acquisti ${eur(M.buy)}`,`imposte ${eur(M.tax)}`);
-    const cs=Number.isFinite(M&&M.ta)&&Number.isFinite(M&&M.tb)?tu(` e costerebbe il ${fmtPct(M.tb,2)} l'anno invece del ${fmtPct(M.ta,2)}`,` e costerebbe il ${fmtPct(M.tb,2)} annuo anziché il ${fmtPct(M.ta,2)}`):"";if(cs)facts.push(fmtPct(M.tb,2),fmtPct(M.ta,2));
-    par.push(tu(`La proposta di cui abbiamo parlato, provata sugli stessi anni, avrebbe oscillato del ${fmtPct(b.st.vol,1)} invece del ${fmtPct(a.st.vol,1)}, con un calo peggiore del ${fmtPct(Math.abs(b.st.mdd),1)} invece del ${fmtPct(Math.abs(a.st.mdd),1)}${cs}.${M&&M.sell>1?` Per passarci servono vendite per circa ${eur(M.sell)} e acquisti per ${eur(M.buy)}${M.tax>1?`, con imposte stimate di circa ${eur(M.tax)}`:""}.`:""}`,
-      `La proposta discussa, verificata sugli stessi anni, avrebbe avuto una volatilità del ${fmtPct(b.st.vol,1)} anziché del ${fmtPct(a.st.vol,1)}, con un calo massimo del ${fmtPct(Math.abs(b.st.mdd),1)} anziché del ${fmtPct(Math.abs(a.st.mdd),1)}${cs}.${M&&M.sell>1?` Il passaggio richiede vendite per circa ${eur(M.sell)} e acquisti per ${eur(M.buy)}${M.tax>1?`, con imposte stimate di circa ${eur(M.tax)}`:""}.`:""}`));}}
-  const nx=(PZ.next||"").trim();if(nx){par.push(tu(`Come d'accordo, i prossimi passi: ${nx}`,`Come concordato, i prossimi passi sono: ${nx}`));facts.push(nx);}
-  par.push(tu(`I numeri vengono dai dati storici dei tuoi strumenti: il passato non garantisce i risultati futuri. Per qualsiasi dubbio scrivimi pure.`,`I dati sono storici e non garantiscono i risultati futuri. Resto a disposizione per qualsiasi chiarimento.`));
-  par.push(F?"Cordiali saluti,\n[FIRMA]":"A presto,\n[FIRMA]");
-  return {testo:par.join("\n\n"),fatti:facts.join("\n"),firma:[B.studio,B.contact].filter(Boolean).join("\n")};
-}
-/* cifre della lettera che non compaiono nei fatti né nella bozza: da controllare */
-function letterCheck(txt,ref){const norm=v=>v.replace(/\s/g,"").replace(/[.,]$/,""),have=new Set((ref.match(/[−+-]?\d[\d.,]*\s?(%|€)/g)||[]).map(norm));
-  return [...new Set((txt.match(/[−+-]?\d[\d.,]*\s?(%|€)/g)||[]).map(norm))].filter(x=>!have.has(x)&&!have.has(x.replace(/^[+−-]/,""))&&![...have].some(h=>h.replace(/^[+−-]/,"")===x.replace(/^[+−-]/,"")));}
-function letterFinal(){const D=letterDraft(LT.tono)||{firma:""};return LT.testo.replace(/\[NOME\]/g,LT.nome||"[NOME]").replace(/\[FIRMA\]/g,D.firma||"");}
-function openLetter(){
-  const D=letterDraft(LT.tono);if(!D)return;
-  if(!LT.ai)LT.testo=D.testo;if(!LT.nome&&PZ.client)LT.nome=PZ.client;
-  let el=$("#letter");if(!el){el=document.createElement("section");el.id="letter";el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-labelledby","ltT");document.body.appendChild(el);}
-  el.innerHTML=`<div class="lt-box"><div class="lt-h"><h3 id="ltT">Lettera al cliente</h3><button type="button" class="btn sm" id="ltClose">Chiudi</button></div>
-    <p class="caption">Una bozza con i numeri di questa analisi: correggila come vuoi, poi copiala nella tua mail.</p>
-    <div class="lt-opts"><label><span>Nome del cliente</span><input type="text" id="ltNome" maxlength="80" value="${esc(LT.nome)}" placeholder="es. Marco"></label>
-      <div class="seg" role="group" aria-label="Tono"><button type="button" data-ltt="cordiale" aria-pressed="${LT.tono==="cordiale"}">Del tu</button><button type="button" data-ltt="formale" aria-pressed="${LT.tono==="formale"}">Del Lei</button></div>
-      <button type="button" class="btn sm" id="ltAi"${aiAuto()?"":` title="L'IA è spenta nelle impostazioni della privacy"`}>Rendila più scorrevole con l'IA</button></div>
-    <div class="lt-warn" id="ltWarn"${LT.warn?"":" hidden"}>${LT.warn}</div>
-    <textarea id="ltText" rows="18" spellcheck="true">${esc(LT.testo)}</textarea>
-    <div class="lt-f"><span class="caption">${D.firma?`[FIRMA] diventa: ${esc(D.firma.replace(/\n/g," · "))}`:`[FIRMA]: scrivi il nome dello studio nel report per averlo qui`}</span><button type="button" class="btn sm" id="ltMail">Apri nella mail</button><button type="button" class="btn sm lime" id="ltCopy">Copia il testo</button></div></div>`;
-  el.hidden=false;document.body.classList.add("rp-on");trackOnce("feature","lettera",{name:"lettera"});
-}
-function closeLetter(){const el=$("#letter");if(el){el.hidden=true;document.body.classList.remove("rp-on");}}
-async function letterAi(){
-  const D=letterDraft(LT.tono),btn=$("#ltAi");if(!D)return;
-  if(!aiAuto()){LT.warn="L'IA è spenta nelle impostazioni della privacy: la bozza resta com'è.";openLetter();return;}
-  btn.disabled=true;btn.textContent="L'IA sta scrivendo…";
-  try{const r=await fetch("/api/letter",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bozza:$("#ltText").value.replace(new RegExp(LT.nome?LT.nome.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"):"$^","g"),"[NOME]"),fatti:D.fatti,tono:LT.tono}),signal:AbortSignal.timeout(55000)});
-    const j=await r.json().catch(()=>({}));if(!r.ok||!j.testo)throw new Error(j.error||"nessuna risposta");
-    const bad=letterCheck(j.testo,D.testo+"\n"+D.fatti+"\n"+$("#ltText").value);LT.testo=j.testo;LT.ai=true;
-    LT.warn=bad.length?`Controlla queste cifre: non sono tra quelle dell'analisi (${bad.map(esc).join(", ")}).`:"Riscritta dall'IA: le cifre sono tutte quelle dell'analisi. Rileggila comunque prima di mandarla.";
-  }catch(e){LT.warn=esc(String(e.message||"L'IA non ha risposto: resta la bozza."));}
-  openLetter();
-}
-document.addEventListener("click",e=>{
-  if(e.target.closest("#letterBtn")){LT.ai=false;LT.warn="";openLetter();return;}
-  const el=$("#letter");if(!el||el.hidden||!el.contains(e.target))return;
-  if(e.target.id==="ltClose"||e.target===el){closeLetter();return;}
-  const t=e.target.closest("[data-ltt]");if(t){LT.tono=t.dataset.ltt;LT.ai=false;LT.warn="";openLetter();return;}
-  if(e.target.id==="ltAi"){letterAi();return;}
-  if(e.target.id==="ltCopy"){const txt=letterFinal();(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{e.target.textContent="Copiato ✓";}).catch(()=>{const ta=$("#ltText");ta.value=txt;ta.select();document.execCommand("copy");e.target.textContent="Copiato ✓";});return;}
-  if(e.target.id==="ltMail"){const B=rpBrand(),sub=`${B.studio?B.studio+" · ":""}Il riepilogo del nostro incontro`;location.href=`mailto:?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(letterFinal().slice(0,1800))}`;return;}
-});
-document.addEventListener("input",e=>{if(e.target.id==="ltText")LT.testo=e.target.value;if(e.target.id==="ltNome")LT.nome=e.target.value.trim();});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#letter")&&!$("#letter").hidden)closeLetter();});
-window.__letter={draft:t=>letterDraft(t||"cordiale"),check:letterCheck,open:openLetter,final:letterFinal}; // per i test
 
 /* ---------- Home: terminale con dati ufficiali BCE e mappa dei laboratori ---------- */
 const LABS=[

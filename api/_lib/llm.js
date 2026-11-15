@@ -245,7 +245,7 @@ export async function chat({ system, messages, tools, order }) {
         const { j, model } = await geminiCall({
           systemInstruction: { parts: [{ text: system }] },
           contents: toGemini(messages),
-          ...(tools && tools.length ? { tools: [{ functionDeclarations: tools.map(t => ({ name: t.name, description: t.description, parameters: upperTypes(t.parameters) })) }] } : {}),
+          tools: [{ functionDeclarations: tools.map(t => ({ name: t.name, description: t.description, parameters: upperTypes(t.parameters) })) }],
           generationConfig: { temperature: 0.2 }
         }, ms);
         const parts = j.candidates?.[0]?.content?.parts || [];
@@ -255,9 +255,9 @@ export async function chat({ system, messages, tools, order }) {
         return { text, calls, provider: p, model };
       }
       const { j, model } = await groqCall({
-        temperature: 0.2,
+        temperature: 0.2, tool_choice: "auto",
         messages: toOpenAI(system, messages),
-        ...(tools && tools.length ? { tool_choice: "auto", tools: tools.map(t => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })) } : {})
+        tools: tools.map(t => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }))
       }, ms);
       const msg = j.choices?.[0]?.message || {};
       const calls = (msg.tool_calls || []).map(c => { let args = {}; try { args = JSON.parse(c.function.arguments || "{}"); } catch {} return { id: c.id || newId(), name: c.function.name, args }; });

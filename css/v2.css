@@ -641,25 +641,6 @@ body.rp-on{overflow:hidden}
 .ar-det>*{min-width:0}.ar-edit input,.ar-edit textarea{width:100%;box-sizing:border-box}.ar-hist .tablewrap{overflow-x:auto}.ar-hist table{width:100%}.ar-hist td,.ar-hist th{white-space:nowrap}
 .ar-hist .mt{min-width:0}.ar-hist .mt td,.ar-hist .mt th{padding:9px 8px;font-size:.88rem}.ar-hist .mt td:first-child{white-space:normal}
 
-/* ---------- il conto intero, dai movimenti ---------- */
-.ac{display:flex;flex-direction:column;gap:12px}
-.ac-k{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
-.ac-k .k{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px;background:var(--raise);min-width:0}
-.ac-k .k:first-child{background:var(--lime);border-color:var(--lime)}
-.ac-k .k>span{font-size:.76rem;color:var(--muted)}.ac-k .k:first-child>span,.ac-k .k:first-child small{color:#3a4a10}
-.ac-k .k b{font-family:var(--f-display);font-weight:800;font-size:clamp(1.15rem,1.9vw,1.55rem);letter-spacing:-.03em}
-.ac-k .k small{font-size:.74rem;color:var(--muted)}
-.ac-t td small{display:block;color:var(--faint);font-size:.74rem;font-weight:400}
-.ac-t tr.prima td{color:var(--muted)}
-.ac-st{font-size:.76rem;padding:3px 8px;border-radius:999px;background:var(--raise);white-space:nowrap}
-.ac-st.aperto{background:color-mix(in oklab,var(--lime) 35%,var(--bg))}
-.ac-st.prima{background:color-mix(in oklab,var(--violet-fx) 12%,var(--bg));color:var(--violet-fx)}
-.ac-r small{display:inline;margin-left:4px}
-.ac-notes{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:.9rem;color:var(--muted)}.ac-notes b{color:var(--fg)}
-.ac-sep{display:flex;align-items:center;gap:12px;margin:22px 0 6px;color:var(--muted);font-size:.86rem}
-.ac-sep::before,.ac-sep::after{content:"";flex:1;height:1px;background:var(--line)}
-@media (max-width:1000px){.ac-k{grid-template-columns:repeat(2,minmax(0,1fr))}.ac-k .k:first-child{grid-column:1/-1}}
-
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
 .scene-title h2 em{color:var(--lime-text)}

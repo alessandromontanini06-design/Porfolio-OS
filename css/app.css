@@ -877,15 +877,3 @@ body.pz-on{overflow:hidden}body.pz-on .dock,body.pz-on .orb-btn,body.pz-on .orb-
 .pz-move{font-size:clamp(16px,1.4vw,21px);color:#333;max-width:70ch}
 .aud-trust{font-size:.86rem;color:var(--muted);margin:2px 0 14px;padding-left:12px;border-left:3px solid var(--lime)}
 .aud-card.pro .aud-trust{color:rgba(255,255,255,.72)}
-.ac-px{display:flex;justify-content:flex-end;gap:6px;margin-top:6px;font-size:.72rem;color:var(--muted)}.ac-px input{width:84px}
-.ac-h{margin:16px 0 6px;font-family:var(--f-display);font-size:1rem;letter-spacing:-.01em}
-.ac-t td:first-child{min-width:220px;max-width:380px;white-space:normal}.ac-t td:first-child small{display:block;white-space:normal}
-/* ---- Lettera al cliente ---- */
-#letter{position:fixed;inset:0;z-index:250;background:rgba(10,10,10,.42);display:grid;place-items:center;padding:16px}
-.lt-box{background:var(--bg,#fff);border-radius:20px;padding:22px 24px;width:min(820px,100%);max-height:calc(100vh - 32px);overflow:auto;display:flex;flex-direction:column;gap:12px;box-shadow:0 30px 80px rgba(0,0,0,.25)}
-.lt-h{display:flex;justify-content:space-between;align-items:center}.lt-h h3{font-family:var(--f-display);font-size:1.4rem;letter-spacing:-.02em}
-.lt-opts{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}.lt-opts label{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
-.lt-opts input{border-radius:10px;border:1px solid var(--line);background:var(--raise);padding:8px 10px;color:var(--fg);min-width:200px}
-#ltText{width:100%;border-radius:12px;border:1px solid var(--line);background:var(--raise);padding:14px 16px;font:400 .95rem/1.55 var(--f-body);color:var(--fg);resize:vertical}
-.lt-warn{font-size:.85rem;padding:10px 12px;border-radius:10px;background:color-mix(in oklab,var(--lime) 18%,var(--bg));border:1px solid color-mix(in oklab,var(--lime) 55%,var(--line))}
-.lt-f{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.lt-f .caption{margin-right:auto}

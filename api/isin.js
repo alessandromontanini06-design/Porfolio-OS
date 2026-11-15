@@ -21,21 +21,6 @@ const ORDER = ["NA", "GY", "GR", "FP", "IM", "LN", "US", "UN", "UW", "UQ", "UA",
 const cache = new Map(), TTL = 7 * 24 * 3600 * 1000;
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 
-/* riserva per i fondi comuni (Eurizon, Fonditalia, Amundi…): non sono quotati in borsa, quindi OpenFIGI non dà un simbolo.
-   Yahoo Finance, cercando l'ISIN, a volte conosce il fondo con un codice tipo 0P0000ABTK.F (prezzo della quota in euro). */
-const YUA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" };
-async function yahooFund(isin) {
-  try {
-    const r = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${isin}&quotesCount=6&newsCount=0`, { headers: YUA, signal: AbortSignal.timeout(10000) });
-    if (!r.ok) return null;
-    const q = ((await r.json()).quotes || []).filter(x => /^(MUTUALFUND|ETF)$/.test(x.quoteType) && x.symbol);
-    if (!q.length) return null;
-    const pref = x => /\.(F|DE|MI|AS|PA)$/.test(x.symbol) ? 0 : /^0P/.test(x.symbol) ? 1 : 2;
-    q.sort((a, b) => pref(a) - pref(b));
-    return { isin, simbolo: q[0].symbol, ticker: q[0].symbol, borsa: q[0].exchange || null, nome: q[0].longname || q[0].shortname || null, tipo: q[0].quoteType === "MUTUALFUND" ? "fondo" : "etf", fonte: "Yahoo Finance (ricerca per ISIN)", alternative: q.slice(1, 4).map(x => x.symbol) };
-  } catch { return null; }
-}
-
 export default async function handler(req, res) {
   if (req.method !== "GET") { res.status(405).json({ error: "Usa una richiesta GET." }); return; }
   if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
@@ -58,10 +43,8 @@ export default async function handler(req, res) {
         rows.sort((a, b) => rank(a.exchCode) - rank(b.exchCode));
         const fmt = d => String(d.ticker).trim().toUpperCase().replace(/\s+/g, "").replace(/\//g, "-") + EXCH[d.exchCode];
         const v = rows.length ? { isin, simbolo: fmt(rows[0]), ticker: rows[0].ticker, borsa: rows[0].exchCode, nome: rows[0].name || null, alternative: [...new Set(rows.slice(1, 6).map(fmt))] } : { isin, simbolo: null, error: (j[k] && j[k].warning) || "ISIN non trovato" };
-        out.push(v);
+        cache.set(isin, { t: Date.now(), v }); out.push(v);
       });
-      for (const v of out.filter(o => todo.includes(o.isin) && !o.simbolo)) { const y = await yahooFund(v.isin); if (y) Object.assign(v, y, { error: undefined }); }
-      out.filter(o => todo.includes(o.isin)).forEach(v => cache.set(v.isin, { t: Date.now(), v }));
     } catch (e) {
       todo.forEach(isin => out.push({ isin, simbolo: null, error: `Ricerca non disponibile (${e.message}).` }));
     }
