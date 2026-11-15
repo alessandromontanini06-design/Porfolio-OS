@@ -24,6 +24,7 @@
   };
   if(ST&&home){
     const sc={scroller:home,start:"top 85%"};
+    G.from(".aud-card",{y:28,opacity:0,duration:.8,ease:"power3.out",stagger:.12,scrollTrigger:{...sc,trigger:".audience"}});
     G.from(".sc-text h2,.sc-text>p",{y:20,opacity:0,duration:.8,ease:"power3.out",stagger:.08,scrollTrigger:{...sc,trigger:".showcase"}});
     G.from(".answers li",{y:16,opacity:0,duration:.7,ease:"power3.out",stagger:.1,scrollTrigger:{...sc,trigger:".answers"}});
     G.fromTo(".sc-receipt",{y:40,rotate:-4,opacity:0},{y:0,rotate:1.2,opacity:1,duration:1.1,ease:"power3.out",scrollTrigger:{...sc,trigger:".showcase"}});

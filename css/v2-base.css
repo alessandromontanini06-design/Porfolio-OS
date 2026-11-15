@@ -519,3 +519,22 @@ body.bd-on .orb-btn,body.bd-on .orb-say{display:none}
   .fi-mini{display:block;position:sticky;top:-14px;z-index:2;margin:-20px -20px 0;padding:12px 20px;background:var(--fg);color:#fff;border-radius:18px 18px 0 0;font-size:.95rem}
   .fi-mini b{color:#C9F24A}
 }
+
+/* ---------- home: per chi è (privati e consulenti) ---------- */
+.audience{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:8px 4px 24px}
+.aud-card{border:1px solid var(--line);border-radius:22px;padding:28px;display:flex;flex-direction:column;gap:14px;background:var(--bg);box-shadow:var(--shadow)}
+.aud-card.pro{background:var(--fg);color:#fff;border-color:var(--fg)}
+.aud-tag{align-self:flex-start;font-size:.8rem;font-weight:700;padding:5px 11px;border-radius:999px;background:var(--lime);color:#111}
+.aud-card.pro .aud-tag{background:color-mix(in oklab,var(--violet-fx) 85%,#fff);color:#fff}
+.aud-card h2{font-family:var(--f-display);font-weight:800;font-size:clamp(1.6rem,2.6vw,2.2rem);letter-spacing:-.04em;line-height:1.05;margin:0;text-transform:none;color:inherit}
+.aud-card ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.aud-card li{position:relative;padding-left:20px;line-height:1.45;color:var(--muted)}
+.aud-card li b{color:var(--fg)}
+.aud-card.pro li{color:rgba(255,255,255,.72)}.aud-card.pro li b{color:#fff}
+.aud-card li::before{content:"";position:absolute;left:0;top:.55em;width:8px;height:8px;border-radius:2px;background:var(--lime)}
+.aud-card.pro li::before{background:var(--violet-fx)}
+.aud-cta{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:6px}
+.aud-card.pro .btn.primary{background:var(--lime);border-color:var(--lime);color:#111}
+.aud-card.pro .btn:not(.primary){background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.aud-card.pro .btn:not(.primary):hover{background:rgba(255,255,255,.08);color:#fff}
+@media (max-width:900px){.audience{grid-template-columns:1fr}.aud-card{padding:22px}}
