@@ -509,7 +509,172 @@ function pacMerge(sheets){
   const drop=new Set(found.map(f=>f.i));
   return [merged,...sheets.filter((_,i)=>!drop.has(i))];
 }
+/* ===== Export dei broker, in qualsiasi lingua → un foglio di movimenti ordinario =====
+   Ogni riga diventa [Data, Operazione, Titolo, ISIN, Ticker, Quantità, Prezzo, Importo, Valuta] con Operazione = Acquisto / Vendita / Dividendo.
+   1) lettura per colonne con nomi in italiano, inglese, olandese, tedesco, francese, svedese, spagnolo;
+   2) regole per chi scrive l'operazione in un testo (XTB «OPEN BUY 34 @ 11.74», Degiro «Koop 4 @ 63,08 EUR», Saxo «Buy 3 @ 134.85 USD», eToro);
+   3) exchange di cripto (Bitvavo, Kraken/CoinTracking, Crypto.com).
+   Versamenti, prelievi, commissioni, imposte e interessi si scartano: non cambiano le quote. */
+const BK_MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,gen:0,mag:4,giu:5,lug:6,ago:7,set:8,ott:9,dic:11,mrt:2,mei:4,okt:9,maj:4};
+function bkDate(v){
+  if(v instanceof Date)return isNaN(v)?null:new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate()));
+  if(typeof v==="number"&&v>19000101&&v<21001231&&Number.isInteger(v))v=String(v);
+  if(typeof v==="number")return parseDate(v,true);
+  let s=String(v??"").trim();if(!s||s==="-")return null;let m;
+  if((m=s.match(/^(\d{4})(\d{2})(\d{2})(?:[;,\s].*)?$/)))return new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  if((m=s.match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/))&&BK_MON[m[1].toLowerCase()]!=null)return new Date(Date.UTC(+m[3],BK_MON[m[1].toLowerCase()],+m[2]));
+  if((m=s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3})[a-z]*\.?[\s\-](\d{4})/))&&BK_MON[m[2].toLowerCase()]!=null)return new Date(Date.UTC(+m[3],BK_MON[m[2].toLowerCase()],+m[1]));
+  if((m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2})(?:\s.*)?$/)))return new Date(Date.UTC(2000+ +m[3],+m[2]-1,+m[1]));
+  if(/^\d{4}-\d{2}-\d{2}[T ]/.test(s))s=s.slice(0,10);else s=s.replace(/\s+\d{1,2}:\d{2}.*$/,"");
+  return parseDate(s,true);
+}
+/* numeri con valute e simboli: «€3343.11», «$420.10», «-$694.48», «89,162.28 SEK», «£110.79», «1 234,5» */
+function bkNum(v,dec){
+  if(typeof v==="number")return Number.isFinite(v)?v:null;
+  let s=String(v??"").trim();if(!s||s==="-"||s==="—")return null;
+  s=s.replace(/[A-Za-z€$£¥\s'"]/g,"").replace(/^\((.*)\)$/,"-$1");if(!s||!/\d/.test(s))return null;
+  if(dec===","){s=s.replace(/\./g,"").replace(",",".");}
+  else if(dec==="."){s=s.replace(/,/g,"");}
+  else{const p=parseNum(s);return p?p.n:null;}
+  const n=parseFloat(s);return Number.isFinite(n)?n:null;
+}
+/* separatore decimale del foglio: «12,5» e «1.234,56» → virgola; «12.5» e «1,234.56» → punto */
+function bkDec(cells){let c=0,d=0;cells.forEach(v=>{if(typeof v!=="string")return;const t=v.replace(/[^\d.,\-]/g,"");if(/^-?\d{1,3}(\.\d{3})+,\d+$|^-?\d+,\d{1,6}$/.test(t))c++;else if(/^-?\d{1,3}(,\d{3})+\.\d+$|^-?\d+\.\d{1,8}$/.test(t))d++;});return c>d?",":d>c?".":null;}
+const BK_BUY=/\b(buy|bought|purchase|kauf|kaufen|achat|koop|kopen|aankoop|k[öo]p|acquisto|acquisti|compra|compravendita acquisto|sottoscri\w*|market buy|limit buy|stop buy|buy trade|reinvest shares|savings ?plan|sparplan|spaarplan|subscription|einzahlung sparplan)\b/i;
+const BK_SELL=/\b(sell|sold|sale|verkauf|vente|verkoop|verkopen|s[äa]lj|vendita|vendite|market sell|limit sell|stop sell|sell trade|redemption|rimborso)\b/i;
+const BK_DIV=/(dividend|dividende|utdelning|dividendo|cedol|coupon|distribution|ertrag)/i,BK_NODIV=/(belasting|tax|steuer|imposta|withholding|ritenuta|fee|commission)/i;
+const BK_ISIN=/\b([A-Z]{2}[A-Z0-9]{9}\d)\b/;
+/* simbolo con la borsa in formato MIC (Saxo «VWRA:xlon») → formato del sito */
+const BK_MIC={xlon:".LON",xams:".AMS",xetr:".DEX",xfra:".DEX",xmil:".MIL",xpar:".PAR",xswx:".SWX",xbru:".BRU",xmad:".MCE",xnas:"",xnys:"",arcx:"",bats:""};
+function bkTicker(t){const s=String(t??"").trim();if(!s)return "";const m=s.match(/^([A-Za-z0-9.\-]+):([a-z]{4})$/);if(m&&m[2] in BK_MIC)return m[1].toUpperCase()+BK_MIC[m[2]];return s.replace(/\/(USD|EUR|GBP|CHF)$/i,"").toUpperCase();}
+const BK_COLS={
+  date:/^(datum|date|data|fecha|timestamp( \(utc\))?|time|trade ?date|tradedate|transaction time.*|date de transaction|trade date\/time|datetime|date operation|data operazione|data esecuzione|buchungstag|datum transactie)$/i,
+  date2:/^(valutadatum|value date|settlement date|settledate|date de r[eè]glement|data valuta|valuta)$/i,
+  side:/^(type|typ av transaktion|transaction type|transactietype|type mutatie|action|buy\/sell|buy \/ sell|side|way|transaction|type de transaction|transaction category|operazione|tipo|tipo operazione|segno|event|category|transaktionsart|order type)$/i,
+  name:/^(name|naam|asset name|instrument|product|produit|prodotto|security|v[äa]rdepapper\/beskrivning|v[äa]rdepapper|titolo|strumento|holdingname|title|security \/ isin|description|descrizione|omschrijving|opmerking|wertpapier|bezeichnung|nom)$/i,
+  isin:/^(isin|isin code|instrument isin|asset id|identifier|codice isin|isin-code)$/i,
+  ticker:/^(ticker|symbol|symbole|instrument symbol|simbolo|asset|code)$/i,
+  qty:/^(quantity|quantit[aàé]|antal|aantal|no\. of shares|asset quantity|units|volume|number of shares|shares|quantity transacted|quantit[àa]|st[üu]ck|anzahl|nominale)$/i,
+  price:/^(price|kurs|koers|prix|unit price|price \/ share|asset price|tradeprice|trade price|price per share|share price|quote price|price at transaction|price per share in account currency|asset price in chf|prezzo|prezzo unitario|kurs \(eur\)|cours)$/i,
+  amount:/^(amount|belopp|bedrag|total|trademoney|net amount|montant de l'op[ée]ration|montant|total amount|subtotal|value|waarde|waarde \(netto\)|transaction amount|total trade value|cash flow|importo|controvalore|betrag|total \(eur\)|total\s*\(.*\))$/i,
+  ccy:/^(currency|valuta|transaktionsvaluta|currencyprimary|currency \(total\)|devise du prix|transaction currency|asset currency|instrument currency|price currency|valuta koers|account currency|devise du compte|divisa|w[äa]hrung|currency \(price \/ share\))$/i
+};
+function bkStd(name,rows,how){
+  const ok=rows.filter(r=>r&&r[0]&&r[1]&&(r[2]||r[3]||r[4]));if(ok.length<1)return null;
+  /* dividendi: quantità e prezzo a zero (non vuoti), così la riga dell'intestazione si riconosce anche se il primo movimento è un dividendo */
+  ok.forEach(r=>{if(r[1]==="Dividendo"){if(r[5]==null)r[5]=0;if(r[6]==null)r[6]=0;}if(r[6]==null&&r[5]&&r[7]!=null)r[6]=r[7]/r[5];});
+  ok.sort((a,b)=>a[0]-b[0]);
+  return {name:`★ Movimenti · ${name}`,how,aoa:[["Data","Operazione","Titolo","ISIN","Ticker","Quantità","Prezzo","Importo","Valuta"],...ok]};
+}
+/* operazione di una riga: Acquisto / Vendita / Dividendo / null (da scartare) */
+function bkSide(txt,qty){
+  const t=String(txt??"");
+  if(BK_DIV.test(t)&&!BK_NODIV.test(t)&&!/reinvest shares/i.test(t))return "Dividendo";
+  if(BK_SELL.test(t))return "Vendita";if(BK_BUY.test(t))return "Acquisto";
+  if(/^(a|b)$/i.test(t.trim()))return "Acquisto";if(/^(v|s)$/i.test(t.trim()))return "Vendita";
+  if(!t.trim()&&qty!=null&&qty!==0)return qty>0?"Acquisto":"Vendita";
+  return null;
+}
+function brokerMoves(sh,onlySpecific){
+  const A=(sh.aoa||[]).map(r=>Array.isArray(r)?r:[]);if(A.length<2)return null;
+  /* intestazione: la prima riga (entro le prime 15) con almeno 4 nomi di colonna noti */
+  let h=-1,H=null,bh=1;
+  const SPEC=/^(comment|event|details|units|quote price|received \/ paid amount|cur\.|transaction kind|native amount|omschrijving|product)$/i;
+  for(let r=0;r<Math.min(A.length,15);r++){const row=A[r].map(v=>String(v??"").trim().replace(/^﻿/,"").replace(/^"|"$/g,""));const hits=row.filter(x=>x&&(SPEC.test(x)||Object.values(BK_COLS).some(rx=>rx.test(x)))).length;if(hits>bh&&hits>=Math.min(4,Math.max(2,row.filter(Boolean).length*.4))){bh=hits;h=r;H=row;}}
+  if(h<0)return null;
+  const body=A.slice(h+1).filter(r=>r.some(v=>!isBlank(v))),dec=bkDec(body.flat()),low=H.map(x=>x.toLowerCase());
+  const col=(k,not=[])=>H.findIndex((x,i)=>BK_COLS[k].test(x)&&!not.includes(i));
+  const get=(r,i)=>i>=0?r[i]:null,N=(r,i)=>i>=0?bkNum(r[i],dec):null,S=(r,i)=>i>=0?String(r[i]??"").trim():"";
+  const has=x=>low.includes(x);
+  /* --- XTB: «OPEN BUY 34/42.5658 @ 11.7480», «CLOSE BUY 1 @ 26.280» (chiusura di un acquisto = vendita) --- */
+  if(has("comment")&&has("symbol")&&has("type")&&has("amount")){
+    const cD=low.indexOf("time"),cS=low.indexOf("symbol"),cC=low.indexOf("comment"),cA=low.indexOf("amount"),cT=low.indexOf("type");
+    const rows=body.map(r=>{const c=S(r,cC),m=c.match(/(OPEN|CLOSE)\s+(BUY|SELL)\s+([\d.]+)(?:\/[\d.]+)?\s*@\s*([\d.]+)/i),d=bkDate(get(r,cD)),tk=bkTicker(get(r,cS)),a=N(r,cA);
+      if(m){const buy=(m[1].toUpperCase()==="OPEN")===(m[2].toUpperCase()==="BUY");return [d,buy?"Acquisto":"Vendita",tk,"",tk,+m[3],+m[4],a!=null?Math.abs(a):+m[3]*+m[4],""];}
+      if(BK_DIV.test(S(r,cT))&&!BK_NODIV.test(S(r,cT))&&a)return [d,"Dividendo",tk,"",tk,null,null,Math.abs(a),""];return null;});
+    const out=bkStd("XTB",rows,"XTB");if(out)return out;}
+  /* --- Degiro, estratto del conto: descrizione «Koop 4 @ 63,08 EUR» / «Buy …» / «Acquisto …», importo nella colonna dopo la valuta --- */
+  const cDesc=H.findIndex(x=>/^(omschrijving|description|descrizione|beschreibung)$/i.test(x)),cProd=H.findIndex(x=>/^(product|produit|prodotto|produkt)$/i.test(x)),cIs0=col("isin");
+  if(cDesc>=0&&cProd>=0&&cIs0>=0&&body.some(r=>/@/.test(S(r,cDesc)))){
+    const cD=col("date"),cMut=H.findIndex(x=>/^(mutatie|change|variazione|änderung|mouvement)$/i.test(x));
+    const rows=body.map(r=>{const t=S(r,cDesc),d=bkDate(get(r,cD)),m=t.match(/^(koop|verkoop|buy|sell|acquisto|vendita|kauf|verkauf|achat|vente)\s+([\d.,]+)\s*@\s*([\d.,]+)\s*([A-Z]{3})?/i);
+      const amt=cMut>=0?bkNum(get(r,cMut+1),","):null,isin=S(r,cIs0);
+      if(m){const sell=/^(verkoop|sell|vendita|verkauf|vente)$/i.test(m[1]),q=bkNum(m[2],","),p=bkNum(m[3],",");return [d,sell?"Vendita":"Acquisto",S(r,cProd),isin,"",q,p,amt!=null?Math.abs(amt):q*p,m[4]||""];}
+      if(BK_DIV.test(t)&&!BK_NODIV.test(t)&&amt>0)return [d,"Dividendo",S(r,cProd),isin,"",null,null,amt,S(r,cMut)];return null;});
+    const out=bkStd("Degiro",rows,"Degiro (estratto del conto)");if(out)return out;}
+  /* --- Saxo: «Buy 3 @ 134.85 USD» nella colonna Event --- */
+  if(has("event")&&(has("instrument isin")||has("instrument"))){
+    const cD=col("date"),cE=low.indexOf("event"),cN=low.indexOf("instrument"),cI=low.indexOf("instrument isin"),cY=low.indexOf("instrument symbol"),cA=low.indexOf("amount");
+    const rows=body.map(r=>{const e=S(r,cE),d=bkDate(get(r,cD)),m=e.match(/^(buy|sell)\s+([\d.,]+)\s*@\s*([\d.,]+)\s*([A-Z]{3})?/i),a=N(r,cA);
+      if(m)return [d,/sell/i.test(m[1])?"Vendita":"Acquisto",S(r,cN),S(r,cI),bkTicker(get(r,cY)),bkNum(m[2],"."),bkNum(m[3],"."),a!=null?Math.abs(a):null,m[4]||""];
+      if(BK_DIV.test(e)&&a>0)return [d,"Dividendo",S(r,cN),S(r,cI),bkTicker(get(r,cY)),null,null,a,""];return null;});
+    const out=bkStd("Saxo",rows,"Saxo");if(out)return out;}
+  /* --- eToro: «Open Position» / «Position closed» con «NKE/USD» nei dettagli e le unità --- */
+  if(has("details")&&has("units")&&has("type")){
+    const cD=col("date"),cT=low.indexOf("type"),cDe=low.indexOf("details"),cU=low.indexOf("units"),cA=low.indexOf("amount");
+    const rows=body.map(r=>{const t=S(r,cT),d=bkDate(get(r,cD)),tk=bkTicker(get(r,cDe)),u=N(r,cU),a=N(r,cA);
+      if(/open position/i.test(t)&&u)return [d,"Acquisto",tk,"",tk,Math.abs(u),null,a!=null?Math.abs(a):null,"USD"];
+      if(/position closed/i.test(t)&&u)return [d,"Vendita",tk,"",tk,Math.abs(u),null,a!=null?Math.abs(a):null,"USD"];
+      if(/dividend/i.test(t)&&a>0)return [d,"Dividendo",tk,"",tk,null,null,a,"USD"];return null;});
+    const out=bkStd("eToro",rows,"eToro");if(out)return out;}
+  /* --- Bitvavo: Type buy/sell, Currency = la cripto, Amount = quantità, pagato in Received / Paid Amount --- */
+  if(has("quote price")&&has("currency")&&has("received / paid amount")){
+    const cD=low.indexOf("date"),cT=low.indexOf("type"),cC=low.indexOf("currency"),cQ=low.indexOf("amount"),cP=low.indexOf("quote price"),cA=low.indexOf("received / paid amount"),cQC=low.indexOf("quote currency");
+    const rows=body.map(r=>{const t=S(r,cT).toLowerCase(),d=bkDate(get(r,cD)),tk=S(r,cC).toUpperCase(),q=N(r,cQ),a=N(r,cA);if(!/^(buy|sell)$/.test(t)||!q)return null;
+      return [d,t==="sell"?"Vendita":"Acquisto",tk,"",tk,Math.abs(q),N(r,cP),a!=null?Math.abs(a):null,S(r,cQC)||"EUR"];});
+    const out=bkStd("Bitvavo",rows,"Bitvavo");if(out)return out;}
+  /* --- Kraken / CoinTracking: «Trade» con Buy/Cur. e Sell/Cur.: cripto comprata con euro (o venduta per euro) --- */
+  if(has("type")&&has("buy")&&has("sell")&&low.filter(x=>x==="cur.").length>=2){
+    const cT=low.indexOf("type"),cB=low.indexOf("buy"),cBC=cB+1,cS=low.indexOf("sell"),cSC=cS+1,cD=low.indexOf("date"),FIAT=/^(EUR|USD|CHF|GBP)$/;
+    const rows=body.map(r=>{if(!/^trade$/i.test(S(r,cT)))return null;const d=bkDate(get(r,cD)),b=N(r,cB),bc=S(r,cBC).toUpperCase(),s=N(r,cS),sc=S(r,cSC).toUpperCase();
+      if(FIAT.test(sc)&&!FIAT.test(bc)&&b)return [d,"Acquisto",bc,"",bc,b,s/b,s,sc];
+      if(FIAT.test(bc)&&!FIAT.test(sc)&&s)return [d,"Vendita",sc,"",sc,s,b/s,b,bc];return null;});
+    const out=bkStd("Exchange di cripto",rows,"Kraken / CoinTracking");if(out)return out;}
+  /* --- Crypto.com: acquisti con carta o euro (crypto_purchase, viban_purchase), vendite in euro (crypto_viban_exchange) --- */
+  if(has("transaction kind")&&has("native amount")){
+    const cD=col("date"),cK=low.indexOf("transaction kind"),cC=low.indexOf("currency"),cQ=low.indexOf("amount"),cTC=low.indexOf("to currency"),cTQ=low.indexOf("to amount"),cN=low.indexOf("native amount"),cNC=low.indexOf("native currency");
+    const rows=body.map(r=>{const k=S(r,cK),d=bkDate(get(r,cD)),n=Math.abs(N(r,cN)||0);
+      if(/^(crypto_purchase|viban_purchase|recurring_buy_order)$/.test(k)){const tk=(k==="viban_purchase"?S(r,cTC):S(r,cC)).toUpperCase(),q=Math.abs((k==="viban_purchase"?N(r,cTQ):N(r,cQ))||0);return q?[d,"Acquisto",tk,"",tk,q,n/q,n,S(r,cNC)||"EUR"]:null;}
+      if(/^crypto_viban_exchange$/.test(k)){const tk=S(r,cC).toUpperCase(),q=Math.abs(N(r,cQ)||0);return q?[d,"Vendita",tk,"",tk,q,n/q,n,S(r,cNC)||"EUR"]:null;}return null;});
+    const out=bkStd("Crypto.com",rows,"Crypto.com");if(out)return out;}
+  if(onlySpecific)return null;
+  /* --- lettura per colonne (tutti gli altri) --- */
+  const cD=col("date"),cSd=(()=>{const c=H.map((x,i)=>BK_COLS.side.test(x)?i:-1).filter(i=>i>=0);
+      /* più colonne «tipo»: vale quella dove compaiono più parole di acquisto e vendita */
+      let best=-1,bs=-1;c.forEach(i=>{const n=body.slice(0,300).filter(r=>BK_BUY.test(S(r,i))||BK_SELL.test(S(r,i))||BK_DIV.test(S(r,i))||/^(a|b|v|s)$/i.test(S(r,i))).length;if(n>bs){bs=n;best=i;}});return bs>0?best:-1;})();
+  const cI=col("isin"),cTk=col("ticker"),cN=col("name",[cTk]),cQ=col("qty"),cP=col("price"),cA=col("amount"),cC=col("ccy");
+  if(cD<0||(cI<0&&cTk<0&&cN<0)||(cQ<0&&cA<0))return null;
+  /* serve un'indicazione di acquisto/vendita: la colonna del tipo, oppure quantità con il segno */
+  if(cSd<0&&!(cQ>=0&&body.some(r=>N(r,cQ)<0)))return null;
+  const rows=body.map(r=>{
+    const side=bkSide(cSd>=0?get(r,cSd):"",N(r,cQ));if(!side)return null;
+    const d=bkDate(get(r,cD));if(!d)return null;
+    let name=S(r,cN),isin=S(r,cI).toUpperCase(),tk=bkTicker(get(r,cTk));
+    if(!BK_ISIN.test(isin)){const m=(name.match(BK_ISIN)||[])[1];isin=m||(BK_ISIN.test(isin)?isin:"");}
+    name=name.replace(/\s*\/\s*ISIN\s+[A-Z0-9]{12}\s*$/i,"").trim();
+    if(isin&&!BK_ISIN.test(isin))isin="";if(!name&&!isin&&!tk)return null;
+    let q=N(r,cQ),p=N(r,cP),a=N(r,cA);
+    if(side==="Dividendo"){const v=a!=null?Math.abs(a):null;return v?[d,side,name||tk||isin,isin,tk,null,null,v,S(r,cC)]:null;}
+    if(q==null&&a!=null&&p)q=Math.abs(a/p);if(q==null||q===0)return null;
+    if(p==null&&a!=null)p=Math.abs(a/q);
+    return [d,side,name||tk||isin,isin,tk,Math.abs(q),p!=null?Math.abs(p):null,a!=null?Math.abs(a):p!=null?Math.abs(q*p):null,S(r,cC)];});
+  const out=bkStd(sh.name,rows,"lettura per colonne");if(out)out.sideCol=cSd>=0;
+  /* almeno 1 acquisto o vendita: un elenco di soli dividendi non basta per un portafoglio */
+  return out&&out.aoa.slice(1).some(r=>r[1]!=="Dividendo")?out:null;
+}
+
 function normalizeExports(sheets){
+  /* formati dedicati (XTB, Degiro, Saxo, eToro, cripto): prima di tutto, così nessun altro riconoscitore li legge a metà */
+  const spec=(sheets||[]).map(sh=>{let bm=null;try{bm=brokerMoves(sh,true);}catch(e){}return bm;});
+  if(spec.some(Boolean))return (sheets||[]).flatMap((sh,i)=>spec[i]?[spec[i],sh]:[sh]);
+  /* export di broker in altre lingue: solo se la lettura normale non trova già movimenti utilizzabili nello stesso foglio */
+  const gen=(sheets||[]).map(sh=>{const A=sh.aoa||[];if(A.some(r=>Array.isArray(r)&&r[0]==="Trades"&&r[1]==="Header"))return null;
+    /* fogli che sono chiaramente altro (serie di prezzi, riepiloghi di posizioni, tabelle di rendimenti): non si toccano */
+    let other=false;try{const L=localRecipe([sh]);other=!!(L&&!L.recipe.movimenti&&(L.recipe.serieInColonna.length||L.recipe.posizioni.length||L.recipe.matriciRendimenti.length));}catch(e){}
+    /* una colonna acquisto/vendita è la prova che è un elenco di movimenti, anche se date e numeri sembrano una serie di prezzi */
+    let bm=null;try{bm=brokerMoves(sh);}catch(e){}
+    return bm&&(!other||bm.sideCol)?bm:null;});
+  if(gen.some(Boolean))return (sheets||[]).flatMap((sh,i)=>gen[i]?[gen[i],sh]:[sh]);
   sheets=pacMerge(sheets);
   return (sheets||[]).flatMap(sh=>{
     const A=(sh.aoa||[]).map(r=>Array.isArray(r)?r:[]),c0=A.map(r=>String(r[0]??"").trim());
@@ -578,7 +743,9 @@ function localRecipe(sheets){
       continue;
     }
     /* 5) riepilogo di posizioni senza date: nome/ticker/ISIN + valore o peso */
-    const cV=find("value")>=0?find("value"):cA,cW=tags.findIndex((t,i)=>t==="weight"&&!/target|obiettivo/i.test(hdr[i])),cG=tags.findIndex((t,i)=>t==="target"||(t==="weight"&&/target|obiettivo/i.test(hdr[i]))),cTk=find("ticker"),cIs=find("isin"),cN=find("name");
+    /* valore: quello di mercato di oggi, non quello di carico (quanto è stato pagato) */
+    const vCols=tags.map((t,i)=>t==="value"||t==="amount"?i:-1).filter(i=>i>=0),vScore=i=>{const x=hdr[i].toLowerCase();return (/mercato|market|attuale|corrente|oggi|current/.test(x)?2:0)+(/€|eur/.test(x)?1:0)-(/carico|acquisto|cost|investit|medio|book/.test(x)?5:0);};
+    const cV=vCols.length?vCols.sort((a,b)=>vScore(b)-vScore(a))[0]:-1,cW=tags.findIndex((t,i)=>t==="weight"&&!/target|obiettivo/i.test(hdr[i])),cG=tags.findIndex((t,i)=>t==="target"||(t==="weight"&&/target|obiettivo/i.test(hdr[i]))),cTk=find("ticker"),cIs=find("isin"),cN=find("name");
     /* colonne riconosciute dal contenuto: codici brevi (SWDA, CSNDX) e codici con la borsa (AMS:IWDA, ETR:XXSC, come in Google Finanza) */
     let tEnd=h+1;while(tEnd<aoa.length&&(aoa[tEnd]||[]).some(v=>!isBlank(v)))tEnd++; // la tabella finisce alla prima riga vuota
     const colFrac=(c,rx)=>{const v=aoa.slice(h+1,tEnd).map(r=>r[c]).filter(x=>typeof x==="string"&&x.trim()&&!/^(totale|total)\b/i.test(x.trim()));return v.length>=2?v.filter(x=>rx.test(x.trim())).length/v.length:0;};
@@ -592,7 +759,9 @@ function localRecipe(sheets){
         if(!nm&&!code&&!isin)continue;if(/^(totale|total|somma)\b/i.test(nm)||/^(totale|total|somma)\b/i.test(code))continue;
         if(!code&&!isin&&!ex){const v=cV>=0?parseNum(row[cV]):null;if(nm)sc.push(`${nm}${v?` ${fmtN(v.n,0)} €`:""}: senza ticker né ISIN`);continue;}
         const v=cV>=0?parseNum(row[cV]):null;
-        pos.push({nome:nm,ticker:code||isin,isin:isin||null,simbolo:ex||code||"",valore:v?v.n:null,pesoAttuale:cW>=0?w(row[cW]):null,pesoTarget:cG>=0?w(row[cG]):null});}
+        /* codici in stile Reuters delle piattaforme di trading («1BMW.MI», «AMD.O», «NOVC.FRA»): come etichetta il codice senza la borsa */
+        const ric=code.match(/^\d?([A-Z][A-Z0-9]{0,9})\.(MI|O|N|OQ|FRA|DE|F|PA|AS|L|SW|MC|BR|VI|ST|CO|HE|OL|TO|TSX)$/i),lab=ric?ric[1].toUpperCase():code;
+        pos.push({nome:nm,ticker:lab||isin,isin:isin||null,simbolo:ex||code||"",valore:v?v.n:null,pesoAttuale:cW>=0?w(row[cW]):null,pesoTarget:cG>=0?w(row[cG]):null});}
       if(pos.length){R.posizioni=pos;R.scartati.push(...sc);parts.push({kind:"posizioni",foglio:sh.name,conf:"media",d:`«${sh.name}»: riepilogo di ${pos.length} posizioni senza storico`});continue;}
     }
   }
@@ -1356,6 +1525,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

@@ -16,7 +16,7 @@ function rateLimited(req, bucket, perHour) {
   recent.push(now); hits.set(k, recent); return false;
 }
 
-const EXCH = { IM: ".MIL", NA: ".AMS", GY: ".DEX", GR: ".DEX", GF: ".DEX", FP: ".PAR", LN: ".LON", US: "", UN: "", UW: "", UQ: "", UA: "", UP: "" };
+const EXCH = { IM: ".MIL", NA: ".AMS", GY: ".DEX", GR: ".DEX", GF: ".DEX", FP: ".PAR", LN: ".LON", SW: ".SWX", SE: ".SWX", US: "", UN: "", UW: "", UQ: "", UA: "", UP: "" };
 const ORDER = ["NA", "GY", "GR", "FP", "IM", "LN", "US", "UN", "UW", "UQ", "UA", "UP", "GF"];
 const cache = new Map(), TTL = 7 * 24 * 3600 * 1000;
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         const rows = ((j[k] && j[k].data) || []).filter(d => d.ticker && d.exchCode in EXCH);
         // azioni e fondi americani o canadesi: prima la borsa di casa; il resto: prima le borse in euro
         // azioni: prima la borsa del paese dell'emittente (Enel → Milano); gli ETF irlandesi o lussemburghesi seguono l'ordine in euro
-        const HOME = { US: ["US", "UN", "UW", "UQ", "UA", "UP"], CA: ["US", "UN", "UW", "UQ", "UA", "UP"], IT: ["IM"], DE: ["GY", "GR"], FR: ["FP"], NL: ["NA"], GB: ["LN"] };
+        const HOME = { US: ["US", "UN", "UW", "UQ", "UA", "UP"], CA: ["US", "UN", "UW", "UQ", "UA", "UP"], IT: ["IM"], DE: ["GY", "GR"], FR: ["FP"], NL: ["NA"], GB: ["LN"], CH: ["SW", "SE"] };
         const home = HOME[isin.slice(0, 2)] || [], rank = c => (home.includes(c) ? -1 : ORDER.indexOf(c));
         rows.sort((a, b) => rank(a.exchCode) - rank(b.exchCode));
         const fmt = d => String(d.ticker).trim().toUpperCase().replace(/\s+/g, "").replace(/\//g, "-") + EXCH[d.exchCode];

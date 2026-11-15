@@ -512,7 +512,7 @@ function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
     spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
-    posizioni:T.positions.map(p=>({nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.tk&&CRYPTO[String(p.tk).toUpperCase()]?p.tk:p.titolo,"",T.valuta)||""),valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
+    posizioni:T.positions.map(p=>({nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.tk&&!ISIN_RX.test(p.tk)?p.tk:p.titolo,"",T.valuta)||""),alt:!p.isin&&p.tk&&/^[A-Z0-9]{2,6}$/.test(String(p.tk).toUpperCase())&&!CRYPTO[String(p.tk).toUpperCase()]?[".LON",".DEX",".AMS",".MIL",".PAR",".SWX"].map(x=>String(p.tk).toUpperCase()+x):[],valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -724,8 +724,29 @@ function renderImport(animate){
   const A=an();S.ds=P.buildDataset(A,S.roles,fixOpts());
   $("#dsName").textContent=S.source.name;
   $("#dsChip").innerHTML=S.source.kind==="sample"?`<span class="chip sample"><i></i>Esempio · dati sintetici</span>`:isExample()?`<span class="chip sample"><i></i>Esempio · portafoglio dimostrativo</span>`:(S.source.builder||(S.rb&&S.rb.origSource&&S.rb.origSource.builder))?`<span class="chip sample"><i></i>Portafoglio creato da te</span>`:"";
-  renderScan(A,animate);renderLog(A,S.ds,animate);renderSummary(A,S.ds);renderSheets();renderMapping(A);renderQuality(S.ds);renderCaps(S.ds);renderChecks(A,S.ds);renderConfirm(S.ds);renderTicker();renderAI();
+  renderScan(A,animate);renderLog(A,S.ds,animate);renderSummary(A,S.ds);renderSheets();renderMapping(A);renderQuality(S.ds);renderCaps(S.ds);renderChecks(A,S.ds);renderConfirm(S.ds);renderTicker();renderAI();renderDeadEnd();
 }
+/* ---------- File senza un portafoglio da analizzare: lo si dice subito, con cosa serve e cosa fare (niente attese a vuoto) ---------- */
+function renderDeadEnd(){
+  const busy=(S.recipe&&S.recipe.status==="loading")||(S.und&&/loading|rebuilding/.test(S.und.status||""));
+  const hasPos=S.und&&S.und.posizioni&&S.und.posizioni.length;
+  /* movimenti letti ma nessun titolo ancora in portafoglio: tutto venduto (le colonne di prezzi del file non sono un portafoglio) */
+  const moves=(S.sheets||[]).some(x=>/^★ Movimenti/.test(x.name)),sold=S.source&&S.source.kind==="file"&&!busy&&moves&&!hasPos;
+  const dead=S.source&&S.source.kind==="file"&&!busy&&(!(S.ds&&S.ds.ok)||sold)&&!hasPos;
+  /* in scansione sotto «Cosa ho trovato», in mappa in cima, prima della lettura con l'IA */
+  const aiCard=[...document.querySelectorAll("#scene-map .card")].find(c=>/Lettura con IA/.test((c.querySelector("h3")||{}).textContent||""));
+  [["summary",document.getElementById("summary"),"after"],["map",aiCard,"before"]].forEach(([id,host,where])=>{if(!host)return;let el=document.querySelector(`.deadend[data-at="${id}"]`);
+    if(!dead){if(el)el.remove();return;}
+    if(!el){el=document.createElement("div");el.className="deadend";el.dataset.at=id;el.setAttribute("role","alert");where==="after"?host.after(el):host.before(el);}
+    const sheets=(S.sheets||[]).filter(x=>!x.virtual).length;
+    el.innerHTML=sold?`<b>Tutti i titoli di questo file risultano venduti</b>
+      <p>Ho letto gli acquisti e le vendite, ma alla fine del periodo non resta nessun titolo in portafoglio: non c'è un portafoglio di oggi da analizzare. Se il conto ha titoli comprati prima dell'inizio del file, scarica l'elenco dei movimenti dall'apertura del conto, oppure la situazione del portafoglio di oggi.</p>`:`<b>In questo file non trovo un portafoglio da analizzare</b>
+      <p>Ho letto ${sheets===1?"il foglio":`${sheets} fogli`}, ma non ci sono acquisti e vendite di titoli, né le posizioni di oggi con il loro valore, né prezzi nel tempo. Capita con gli estratti che contengono solo versamenti, dividendi, commissioni o scambi tra cripto.</p>
+      <p class="caption">Per analizzare un portafoglio serve almeno una di queste tre cose: un elenco di acquisti e vendite (data, titolo o ISIN, quantità e prezzo o importo); le posizioni di oggi (titolo o ISIN e valore); i prezzi nel tempo (date e prezzi).</p>
+      <div class="row">${aiAuto()&&!(S.recipe&&S.recipe.status==="error")?"":`<button type="button" class="btn sm lime" data-dead="ai">Prova la lettura con l'IA</button>`}<button type="button" class="btn sm" data-dead="file">Carica un altro file</button><button type="button" class="btn sm" data-dead="example">Guarda un esempio</button></div>`;});
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-dead]");if(!b)return;const a=b.dataset.dead;
+  if(a==="ai"){requestRecipe();renderDeadEnd();}else if(a==="file")$("#file").click();else if(a==="example")$("#sampleBtn").click();});
 function playScan(){
   S.scanPlayed=true;
   const sc=document.querySelector(".scan");if(sc&&!REDUCE){sc.classList.remove("play");void sc.offsetWidth;sc.classList.add("play");}
@@ -969,6 +990,7 @@ function rebuildBanner(){
   return `<div class="rb-banner"><b>Ricostruito con i prezzi di mercato</b><span>Dal tuo file «${esc(S.rb.origName)}» ho preso solo <b>quali strumenti</b> hai e <b>quanto</b>: ${n} ${n===1?"strumento":"strumenti"}. I prezzi sotto sono quelli di mercato di ogni strumento, in euro: qui vedi gli ultimi 12 mesi. Il dettaglio delle fonti è nella mappa.</span></div>`;
 }
 function renderAI(){
+  setTimeout(renderDeadEnd,0);
   const el=$("#aiBody");if(!el)return;const a=S.ai;
   const rebuilt=S.source&&S.source.kind==="rebuilt"&&S.portfolio&&S.rb&&!S.und;
   const h3=document.querySelector("#aiCard .head h3"),chip=document.querySelector("#aiCard .head .chip");
@@ -1147,13 +1169,18 @@ async function rebuildFromPrices(o={}){
       if(j.error&&/limite/i.test(j.error)&&k<4){for(let w=20;w>0;w--){prog(`Limite al minuto di Alpha Vantage: riprovo ${sym} tra ${w} s…`);await new Promise(res=>setTimeout(res,1000));}continue;}if(r.ok&&!j.error&&j.points&&j.points.length)netPut(U,j);return {r,j};}};
     for(const [n,p] of pos.entries()){
       let got=null,tried=[];
-      for(const sym of [p.simbolo,...(p.alt||[]).filter(x=>x!==p.simbolo)].slice(0,4)){
+      let short=null;
+      const cands=[p.simbolo,...(p.alt||[]).filter(x=>x!==p.simbolo)].filter(Boolean).slice(0,7);
+      for(const sym of cands){
         tried.push(sym);prog(`Scarico lo storico di ${p.ticker||p.nome} (${sym}) · ${n+1} di ${pos.length}…`);
         const {r,j}=await fetchSym(sym);
+        /* meno di 6 mesi di prezzi: si tiene come riserva e si prova la quotazione successiva (stesso titolo su un'altra borsa) */
+        if(r.ok&&!j.error&&j.points&&j.points.length&&j.points.length<6&&sym!==cands[cands.length-1]){if(!short||j.points.length>short.j.points.length)short={sym,j};continue;}
         if(r.ok&&!j.error&&j.points&&j.points.length){got=j;if(sym!==p.simbolo){p.simboloOrig=p.simbolo;p.simbolo=sym;}break;}
         got={symbol:sym,error:j.error||`Errore ${r.status} per ${sym}.`};
         if(/limite giornaliero/i.test(got.error))break;
       }
+      if((!got||got.error)&&short){got=short.j;if(short.sym!==p.simbolo){p.simboloOrig=p.simbolo;p.simbolo=short.sym;}}
       /* il simbolo indicato (dal file o dall'IA) non esiste: se c'è l'ISIN, si cercano le sue quotazioni su OpenFIGI e si riprova */
       /* quotazione con meno di 5 anni di storia: lo stesso ISIN su un'altra borsa può averne molta di più (VWCE ad Amsterdam dal 2023, a Francoforte dal 2019) */
       const yrs=j=>{const pts=j&&j.points;return pts&&pts.length>1?(new Date(pts[pts.length-1].d)-new Date(pts[0].d))/(365.25*864e5):0;};
@@ -1264,6 +1291,8 @@ function computeChecks(A,ds){
   (ds&&ds.anomalies||[]).forEach(a=>{
     if(a.type==="future")out.push({id:"future",block:true,title:"Date nel futuro",text:a.text,acts:[["drop","Escludile"]]});
     else if(a.type==="flat")out.push({id:a.id,block:true,title:"Prezzi costanti",text:a.text,acts:canRebuild?[["rebuild","Usa i prezzi di mercato (consigliato)"],["drop","Escludi questa serie"]]:[["drop","Escludi questa serie"]],a});
+    /* prezzi di mercato rettificati (Yahoo): frazionamenti già corretti, un salto grande è un movimento vero */
+    else if((a.type==="split"||a.type==="unit")&&S.source&&S.source.kind==="rebuilt"&&S.rb&&S.rb.cols.every(c=>c.adj))return;
     else if(a.type==="split"||a.type==="unit")out.push({id:a.id,block:true,title:a.type==="unit"?"Possibile cambio di unità":"Possibile frazionamento",text:a.text,acts:[["fix",a.type==="unit"?"Correggi la scala":"Correggi i prezzi precedenti"],["exclude","Escludi questo periodo"],["keep","È un movimento vero"]],a});
   });
   const stale=(ds&&ds.anomalies||[]).filter(a=>a.type==="stale");
