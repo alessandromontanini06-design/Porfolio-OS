@@ -4064,6 +4064,89 @@ document.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset
 document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement){/* uscita dal tutto schermo con Esc: la presentazione resta aperta finché non si preme Esci */}});
 window.__present={open:openPresent,close:closePresent,show:i=>pzShow(i),slides:()=>PZ.slides.map(s=>s.id)}; // per i test
 
+/* ---------- Lettera al cliente: bozza scritta qui con i numeri verificati, l'IA (facoltativa) la rende più scorrevole ----------
+   Il nome del cliente non va all'IA: c'è il segnaposto [NOME], sostituito nel browser. Dopo la riscrittura si controlla che ogni cifra sia tra quelle dei fatti. */
+const LT={tono:"cordiale",nome:"",testo:"",ai:false,warn:""};
+function letterDraft(tono){
+  if(!S.lab||!S.ds||!S.ds.ok)return null;
+  if(!S.risk)renderRisk();
+  const F=tono==="formale",tu=(a,b)=>F?b:a,eur=v=>fmtEur(Math.round(v)),B=rpBrand(),ds=S.ds,f=ds.freq.f,PR=S.risk.PR;
+  const pp=S.real&&S.real.pp,tx=S.real&&S.real.taxes,AC=S.account,C=costCalc(),X=chgCalc(),facts=[],par=[];
+  const today=new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});
+  par.push(`${F?"Gentile":"Ciao"} [NOME],`);
+  par.push(tu(`grazie per l'incontro di oggi, ${today}. Ti riassumo quello che abbiamo visto insieme.`,`La ringrazio per l'incontro di oggi, ${today}. Le riassumo quanto abbiamo visto insieme.`));
+  const acOK=AC&&AC.items&&AC.items.length>(pp?pp.byAsset.filter(b=>b.ops>0).length:0);
+  if(acOK){const T=AC.tot;facts.push(`valore di oggi ${eur(T.open)}`,`comprato ${eur(T.bought)}`,`incassato ${eur(T.sold+T.income)}`,`guadagno ${eur(T.gain)}`,`rendimento annuo ${fmtPct(T.xirr,1,true)}`);
+    par.push(tu(`I titoli che hai ancora valgono oggi circa ${eur(T.open)}. In tutto hai comprato per ${eur(T.bought)} e incassato ${eur(T.sold+T.income)} tra vendite, cedole e dividendi: il guadagno complessivo è di ${eur(T.gain)}, un rendimento del ${fmtPct(T.xirr,1,true)} l'anno tenendo conto di quando sono entrati e usciti i soldi.`,
+      `I titoli in portafoglio valgono oggi circa ${eur(T.open)}. Complessivamente ha acquistato per ${eur(T.bought)} e incassato ${eur(T.sold+T.income)} tra vendite, cedole e dividendi: il guadagno complessivo è di ${eur(T.gain)}, pari a un rendimento del ${fmtPct(T.xirr,1,true)} annuo, considerando le date dei movimenti.`));}
+  else if(pp){facts.push(`versato ${eur(pp.invested)}`,`valore ${eur(pp.value)}`,`guadagno ${eur(pp.gain)}`,`TIR ${fmtPct(pp.xirr,1,true)}`);if(tx)facts.push(`netto tasse ${fmtPct(tx.xirr,1,true)}`,`imposte ${eur(tx.tax)}`);
+    par.push(tu(`Hai versato ${eur(pp.invested)} e oggi il portafoglio vale circa ${eur(pp.value)}: un guadagno di ${eur(pp.gain)}. Il rendimento annuo, tenendo conto di quando hai versato, è del ${fmtPct(pp.xirr,1,true)}${tx?`, circa ${fmtPct(tx.xirr,1,true)} al netto delle tasse se vendessi tutto oggi (imposte stimate ${eur(tx.tax)})`:""}.`,
+      `Ha versato ${eur(pp.invested)} e oggi il portafoglio vale circa ${eur(pp.value)}: un guadagno di ${eur(pp.gain)}. Il rendimento annuo, considerando le date dei versamenti, è del ${fmtPct(pp.xirr,1,true)}${tx?`, circa ${fmtPct(tx.xirr,1,true)} al netto delle imposte in caso di vendita oggi (imposte stimate ${eur(tx.tax)})`:""}.`));}
+  if(X&&Number.isFinite(X.dV)){const when=new Date(X.a.at).toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});facts.push(`prima ${eur(X.a.value)}`,`ora ${eur(X.b.value)}`);
+    if(Number.isFinite(X.mkt))facts.push(`versato nel frattempo ${eur(Math.abs(X.dI))}`,`mercati ${eur(Math.abs(X.mkt))}`);
+    par.push(tu(`Dal nostro incontro del ${when} il valore è passato da ${eur(X.a.value)} a ${eur(X.b.value)}${Number.isFinite(X.mkt)?`: ${X.dI>=0?`${eur(X.dI)} li hai versati tu`:`${eur(-X.dI)} li hai ritirati`}, ${X.mkt>=0?`${eur(X.mkt)} li hanno aggiunti i mercati`:`i mercati hanno tolto ${eur(-X.mkt)}`}`:""}.`,
+      `Dal nostro incontro del ${when} il valore è passato da ${eur(X.a.value)} a ${eur(X.b.value)}${Number.isFinite(X.mkt)?`: ${X.dI>=0?`${eur(X.dI)} versati da Lei`:`${eur(-X.dI)} ritirati`}, ${X.mkt>=0?`${eur(X.mkt)} dovuti ai mercati`:`${eur(-X.mkt)} persi sui mercati`}`:""}.`));}
+  if(C&&C.items.some(x=>x.ter!=null)){const tc=C.ter+C.other;facts.push(`costo annuo ${fmtPct(tc,2)}`,`costi quest'anno ${eur(C.year)}`,`in ${CO_Y} anni ${eur(C.d20)}`);if(C.save>100)facts.push(`differenza ${eur(C.save)}`,`strumenti al ${fmtPct(C.cheap,2)}`);
+    par.push(tu(`Abbiamo guardato anche i costi: gli strumenti che hai costano circa il ${fmtPct(tc,2)} l'anno, cioè circa ${eur(C.year)} quest'anno. Su ${CO_Y} anni, con un rendimento lordo del 5%, vuol dire circa ${eur(C.d20)} di capitale in meno${C.save>100?`; con strumenti che costano il ${fmtPct(C.cheap,2)} la differenza sarebbe di circa ${eur(C.save)}`:""}.`,
+      `Abbiamo esaminato anche i costi: gli strumenti in portafoglio costano circa il ${fmtPct(tc,2)} annuo, ovvero circa ${eur(C.year)} quest'anno. Su ${CO_Y} anni, ipotizzando un rendimento lordo del 5%, corrispondono a circa ${eur(C.d20)} di capitale in meno${C.save>100?`; con strumenti al ${fmtPct(C.cheap,2)} annuo la differenza sarebbe di circa ${eur(C.save)}`:""}.`));}
+  if(Number.isFinite(PR.mdd)&&PR.troughK!=null){const v0=(AC&&AC.tot&&AC.tot.open)||(pp&&pp.value)||(C&&C.tot)||null,cr=stressList().list.filter(c=>c.status!=="out"&&c.used&&Number.isFinite(c.mdd)),wc=cr.length?cr.reduce((a,b)=>b.mdd<a.mdd?b:a):null;
+    facts.push(`calo massimo ${fmtPct(Math.abs(PR.mdd),0)}`);if(v0)facts.push(`${eur(Math.abs(PR.mdd)*v0)}`);if(wc)facts.push(`${wc.name} ${fmtPct(wc.mdd,0)}`);
+    par.push(tu(`Sul rischio: nei dati storici, nel momento peggiore questo portafoglio ha perso il ${fmtPct(Math.abs(PR.mdd),0)}${v0?` (circa ${eur(Math.abs(PR.mdd)*v0)} sul valore di oggi)`:""}${wc?`; la crisi più dura è stata ${wc.name}`:""}. Non è una previsione, ma ci dice quanto può muoversi.`,
+      `Quanto al rischio: nei dati storici, nella fase peggiore il portafoglio ha perso il ${fmtPct(Math.abs(PR.mdd),0)}${v0?` (circa ${eur(Math.abs(PR.mdd)*v0)} sul valore attuale)`:""}${wc?`; la crisi più severa è stata ${wc.name}`:""}. Non si tratta di una previsione, ma indica l'ampiezza delle possibili oscillazioni.`));}
+  if(cmpReady()){const Rc=cmpCalc(),a=Rc.res[0],b=Rc.res[1];if(a&&b&&!a.empty&&!b.empty){const M=cmpMoves(Rc);
+    facts.push(`proposta calo ${fmtPct(Math.abs(b.st.mdd),1)}`,`attuale calo ${fmtPct(Math.abs(a.st.mdd),1)}`,`proposta volatilità ${fmtPct(b.st.vol,1)}`,`attuale volatilità ${fmtPct(a.st.vol,1)}`);
+    if(M&&M.sell>1)facts.push(`vendite ${eur(M.sell)}`,`acquisti ${eur(M.buy)}`,`imposte ${eur(M.tax)}`);
+    const cs=Number.isFinite(M&&M.ta)&&Number.isFinite(M&&M.tb)?tu(` e costerebbe il ${fmtPct(M.tb,2)} l'anno invece del ${fmtPct(M.ta,2)}`,` e costerebbe il ${fmtPct(M.tb,2)} annuo anziché il ${fmtPct(M.ta,2)}`):"";if(cs)facts.push(fmtPct(M.tb,2),fmtPct(M.ta,2));
+    par.push(tu(`La proposta di cui abbiamo parlato, provata sugli stessi anni, avrebbe oscillato del ${fmtPct(b.st.vol,1)} invece del ${fmtPct(a.st.vol,1)}, con un calo peggiore del ${fmtPct(Math.abs(b.st.mdd),1)} invece del ${fmtPct(Math.abs(a.st.mdd),1)}${cs}.${M&&M.sell>1?` Per passarci servono vendite per circa ${eur(M.sell)} e acquisti per ${eur(M.buy)}${M.tax>1?`, con imposte stimate di circa ${eur(M.tax)}`:""}.`:""}`,
+      `La proposta discussa, verificata sugli stessi anni, avrebbe avuto una volatilità del ${fmtPct(b.st.vol,1)} anziché del ${fmtPct(a.st.vol,1)}, con un calo massimo del ${fmtPct(Math.abs(b.st.mdd),1)} anziché del ${fmtPct(Math.abs(a.st.mdd),1)}${cs}.${M&&M.sell>1?` Il passaggio richiede vendite per circa ${eur(M.sell)} e acquisti per ${eur(M.buy)}${M.tax>1?`, con imposte stimate di circa ${eur(M.tax)}`:""}.`:""}`));}}
+  const nx=(PZ.next||"").trim();if(nx){par.push(tu(`Come d'accordo, i prossimi passi: ${nx}`,`Come concordato, i prossimi passi sono: ${nx}`));facts.push(nx);}
+  par.push(tu(`I numeri vengono dai dati storici dei tuoi strumenti: il passato non garantisce i risultati futuri. Per qualsiasi dubbio scrivimi pure.`,`I dati sono storici e non garantiscono i risultati futuri. Resto a disposizione per qualsiasi chiarimento.`));
+  par.push(F?"Cordiali saluti,\n[FIRMA]":"A presto,\n[FIRMA]");
+  return {testo:par.join("\n\n"),fatti:facts.join("\n"),firma:[B.studio,B.contact].filter(Boolean).join("\n")};
+}
+/* cifre della lettera che non compaiono nei fatti né nella bozza: da controllare */
+function letterCheck(txt,ref){const norm=v=>v.replace(/\s/g,"").replace(/[.,]$/,""),have=new Set((ref.match(/[−+-]?\d[\d.,]*\s?(%|€)/g)||[]).map(norm));
+  return [...new Set((txt.match(/[−+-]?\d[\d.,]*\s?(%|€)/g)||[]).map(norm))].filter(x=>!have.has(x)&&!have.has(x.replace(/^[+−-]/,""))&&![...have].some(h=>h.replace(/^[+−-]/,"")===x.replace(/^[+−-]/,"")));}
+function letterFinal(){const D=letterDraft(LT.tono)||{firma:""};return LT.testo.replace(/\[NOME\]/g,LT.nome||"[NOME]").replace(/\[FIRMA\]/g,D.firma||"");}
+function openLetter(){
+  const D=letterDraft(LT.tono);if(!D)return;
+  if(!LT.ai)LT.testo=D.testo;if(!LT.nome&&PZ.client)LT.nome=PZ.client;
+  let el=$("#letter");if(!el){el=document.createElement("section");el.id="letter";el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-labelledby","ltT");document.body.appendChild(el);}
+  el.innerHTML=`<div class="lt-box"><div class="lt-h"><h3 id="ltT">Lettera al cliente</h3><button type="button" class="btn sm" id="ltClose">Chiudi</button></div>
+    <p class="caption">Una bozza con i numeri di questa analisi: correggila come vuoi, poi copiala nella tua mail.</p>
+    <div class="lt-opts"><label><span>Nome del cliente</span><input type="text" id="ltNome" maxlength="80" value="${esc(LT.nome)}" placeholder="es. Marco"></label>
+      <div class="seg" role="group" aria-label="Tono"><button type="button" data-ltt="cordiale" aria-pressed="${LT.tono==="cordiale"}">Del tu</button><button type="button" data-ltt="formale" aria-pressed="${LT.tono==="formale"}">Del Lei</button></div>
+      <button type="button" class="btn sm" id="ltAi"${aiAuto()?"":` title="L'IA è spenta nelle impostazioni della privacy"`}>Rendila più scorrevole con l'IA</button></div>
+    <div class="lt-warn" id="ltWarn"${LT.warn?"":" hidden"}>${LT.warn}</div>
+    <textarea id="ltText" rows="18" spellcheck="true">${esc(LT.testo)}</textarea>
+    <div class="lt-f"><span class="caption">${D.firma?`[FIRMA] diventa: ${esc(D.firma.replace(/\n/g," · "))}`:`[FIRMA]: scrivi il nome dello studio nel report per averlo qui`}</span><button type="button" class="btn sm" id="ltMail">Apri nella mail</button><button type="button" class="btn sm lime" id="ltCopy">Copia il testo</button></div></div>`;
+  el.hidden=false;document.body.classList.add("rp-on");trackOnce("feature","lettera",{name:"lettera"});
+}
+function closeLetter(){const el=$("#letter");if(el){el.hidden=true;document.body.classList.remove("rp-on");}}
+async function letterAi(){
+  const D=letterDraft(LT.tono),btn=$("#ltAi");if(!D)return;
+  if(!aiAuto()){LT.warn="L'IA è spenta nelle impostazioni della privacy: la bozza resta com'è.";openLetter();return;}
+  btn.disabled=true;btn.textContent="L'IA sta scrivendo…";
+  try{const r=await fetch("/api/letter",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bozza:$("#ltText").value.replace(new RegExp(LT.nome?LT.nome.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"):"$^","g"),"[NOME]"),fatti:D.fatti,tono:LT.tono}),signal:AbortSignal.timeout(55000)});
+    const j=await r.json().catch(()=>({}));if(!r.ok||!j.testo)throw new Error(j.error||"nessuna risposta");
+    const bad=letterCheck(j.testo,D.testo+"\n"+D.fatti+"\n"+$("#ltText").value);LT.testo=j.testo;LT.ai=true;
+    LT.warn=bad.length?`Controlla queste cifre: non sono tra quelle dell'analisi (${bad.map(esc).join(", ")}).`:"Riscritta dall'IA: le cifre sono tutte quelle dell'analisi. Rileggila comunque prima di mandarla.";
+  }catch(e){LT.warn=esc(String(e.message||"L'IA non ha risposto: resta la bozza."));}
+  openLetter();
+}
+document.addEventListener("click",e=>{
+  if(e.target.closest("#letterBtn")){LT.ai=false;LT.warn="";openLetter();return;}
+  const el=$("#letter");if(!el||el.hidden||!el.contains(e.target))return;
+  if(e.target.id==="ltClose"||e.target===el){closeLetter();return;}
+  const t=e.target.closest("[data-ltt]");if(t){LT.tono=t.dataset.ltt;LT.ai=false;LT.warn="";openLetter();return;}
+  if(e.target.id==="ltAi"){letterAi();return;}
+  if(e.target.id==="ltCopy"){const txt=letterFinal();(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>{e.target.textContent="Copiato ✓";}).catch(()=>{const ta=$("#ltText");ta.value=txt;ta.select();document.execCommand("copy");e.target.textContent="Copiato ✓";});return;}
+  if(e.target.id==="ltMail"){const B=rpBrand(),sub=`${B.studio?B.studio+" · ":""}Il riepilogo del nostro incontro`;location.href=`mailto:?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(letterFinal().slice(0,1800))}`;return;}
+});
+document.addEventListener("input",e=>{if(e.target.id==="ltText")LT.testo=e.target.value;if(e.target.id==="ltNome")LT.nome=e.target.value.trim();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#letter")&&!$("#letter").hidden)closeLetter();});
+window.__letter={draft:t=>letterDraft(t||"cordiale"),check:letterCheck,open:openLetter,final:letterFinal}; // per i test
+
 /* ---------- Home: terminale con dati ufficiali BCE e mappa dei laboratori ---------- */
 const LABS=[
   {n:"01",t:"Portfolio Intelligence",d:"Metriche, rischio, contributi, benchmark e il tuo rendimento reale.",c:"var(--lime)",go:"lab",g:"M4 20 10 12l4 4 8-11"},
