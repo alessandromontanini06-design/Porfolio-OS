@@ -63,7 +63,7 @@ button.del:hover{background:#fff4f5}
 <main>
   <p class="kick">Privacy</p>
   <h1>Come trattiamo i tuoi <em>dati</em></h1>
-  <p class="lead">In breve: il file lo legge il tuo browser e non lo salviamo su nessun server. Quando serve l'aiuto dell'IA mandiamo solo un estratto, e puoi spegnerla. Qui sotto trovi tutto nel dettaglio, e in fondo le impostazioni per cambiare o cancellare tutto.</p>
+  <p class="lead">In breve: il file lo legge il tuo browser e non lo salviamo su nessun server. Per capire un file nuovo mandiamo all'IA solo un estratto, e puoi spegnerla. Qui sotto trovi tutto nel dettaglio, e in fondo le impostazioni per cambiare o cancellare tutto.</p>
 
   <div class="sum">
     <div><b>Il file resta tuo</b><span>Viene letto nel browser. Nessun server ne tiene una copia.</span></div>
@@ -72,14 +72,14 @@ button.del:hover{background:#fff4f5}
   </div>
 
   <h2>1. Il tuo file</h2>
-  <p>Quando carichi un Excel o un CSV, il file viene aperto e letto <b>dal tuo browser</b>, sul tuo computer. Il motore di calcolo (rendimenti, rischio, simulazioni, stress test, FIRE) gira anch'esso nel browser. Non carichiamo il file su un server e non ne conserviamo copie.</p>
+  <p>Quando carichi un Excel, un CSV o un estratto conto PDF, il file viene aperto e letto <b>dal tuo browser</b>, sul tuo computer. Il motore di calcolo (rendimenti, rischio, simulazioni, stress test, FIRE) gira anch'esso nel browser. Non carichiamo il file su un server e non ne conserviamo copie.</p>
 
   <h2>2. Quando interviene l'IA</h2>
   <p>Alcune funzioni usano un modello di intelligenza artificiale di un fornitore esterno (a seconda della disponibilità: Google Gemini, Groq o Anthropic Claude). Il nostro server inoltra la richiesta e non la conserva. Ecco cosa viene mandato:</p>
   <div class="tw"><table>
     <thead><tr><th>Funzione</th><th>Quando</th><th>Cosa viene mandato</th></tr></thead>
     <tbody>
-      <tr><td>Lettura del file</td><td>Quando carichi un file che il motore non riconosce da solo (si può spegnere, vedi sotto)</td><td>Un estratto per capirne la struttura: nome del file, nomi dei fogli, intestazioni e alcune righe di esempio, con i valori tagliati a 28 caratteri. Non il file intero.</td></tr>
+      <tr><td>Lettura del file</td><td>Quando carichi un tipo di file nuovo. Se quel tipo di file l'hai già confermato in passato, l'IA non viene chiamata; per gli estratti PDF di Trade Republic non serve mai. Si può spegnere, vedi sotto.</td><td>Un estratto per capirne la struttura: nome del file, nomi dei fogli, intestazioni e alcune righe di esempio, con i valori tagliati a 28 caratteri. Non il file intero.</td></tr>
       <tr><td>Ricostruzione con i prezzi di mercato</td><td>Quando il file è un riepilogo o un elenco di movimenti da capire</td><td>Le prime righe di ogni foglio (al massimo una trentina), per riconoscere strumenti e quantità.</td></tr>
       <tr><td>«Correggi con l'IA»</td><td>Solo se premi il pulsante</td><td>Le intestazioni e le righe con un possibile problema (al massimo 90), per proporre una correzione.</td></tr>
       <tr><td>Ricerca degli ISIN mancanti</td><td>Quando nel file mancano gli ISIN</td><td>Nome e ticker degli strumenti senza ISIN. Nessuna quantità né valore.</td></tr>
@@ -127,7 +127,7 @@ button.del:hover{background:#fff4f5}
 
   <h2 id="impostazioni">Le tue impostazioni su questo browser</h2>
   <div class="box">
-    <div class="set"><div><b>Lettura automatica con l'IA</b><small>Quando un file non viene riconosciuto, ne manda un estratto all'IA per capirlo. Spenta: leggi e mappi il file a mano.</small></div><label class="sw"><input type="checkbox" id="setAi"><span></span></label></div>
+    <div class="set"><div><b>Lettura automatica con l'IA</b><small>Quando carichi un tipo di file nuovo, ne manda un estratto all'IA per capirlo. Spenta: il file lo leggono solo i riconoscitori del sito, e se serve lo mappi a mano.</small></div><label class="sw"><input type="checkbox" id="setAi"><span></span></label></div>
     <div class="set"><div><b>Salva sempre le analisi su questo computer</b><small>Spenta: il sito te lo chiede ogni volta (o non te lo chiede più, se l'hai detto).</small></div><label class="sw"><input type="checkbox" id="setSave"><span></span></label></div>
     <div class="set"><div><b>Analisi salvate</b><small id="savedInfo">Controllo…</small></div><button type="button" class="del" id="delSaved">Cancella le analisi</button></div>
     <div class="set"><div><b>Tutto quello che il sito ricorda</b><small>Analisi, mappe dei file, preferenze e dati della sezione Indipendenza.</small></div><button type="button" class="del" id="delAll">Cancella tutto</button></div>

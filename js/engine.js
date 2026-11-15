@@ -479,6 +479,55 @@ function pacMerge(sheets){
   const drop=new Set(found.map(f=>f.i));
   return [merged,...sheets.filter((_,i)=>!drop.has(i))];
 }
+/* ===== Estratti conto in PDF =====
+   Il testo arriva già estratto nel browser (pdf.js): per ogni pagina gli elementi con posizione x, y e testo.
+   Qui si riconoscono gli estratti noti e si riscrivono come un foglio di movimenti ordinario.
+   Oggi: estratto conto di Trade Republic (Italia), dove compravendite, piani di accumulo e dividendi stanno nella descrizione,
+   per esempio «Savings plan execution IE00B4L5Y983 iShares … quantity: 0.811252». */
+const PDF_MON={gen:0,feb:1,mar:2,apr:3,mag:4,giu:5,lug:6,ago:7,set:8,ott:9,nov:10,dic:11,jan:0,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,dec:11};
+function pdfLines(pages){
+  /* righe: elementi con la stessa y (tolleranza 2), dall'alto in basso, da sinistra a destra */
+  return pages.map(pg=>{const rows=[];[...pg.items].sort((a,b)=>b.y-a.y||a.x-b.x).forEach(it=>{const s=String(it.s||"").trim();if(!s)return;const r=rows.find(r=>Math.abs(r.y-it.y)<=2);if(r)r.items.push({x:it.x,s});else rows.push({y:it.y,items:[{x:it.x,s}]});});
+    rows.forEach(r=>r.items.sort((a,b)=>a.x-b.x));return rows;});
+}
+function pdfTradeRepublic(pages){
+  const P2=pdfLines(pages),all=P2.flat().map(r=>r.items.map(i=>i.s).join(" ")).join("\n");
+  if(!/trade republic/i.test(all)||!/TRANSAZIONI SUL CONTO|ACCOUNT TRANSACTIONS/i.test(all))return null;
+  const out=[],num=t=>{const v=parseNum(String(t).replace(/€/g,"").trim());return v?v.n:null;};
+  let cols=null;
+  for(const rows of P2){
+    /* colonne dalla riga d'intestazione della pagina */
+    const hdr=rows.find(r=>r.items.some(i=>/^DATA$|^DATE$/i.test(i.s))&&r.items.some(i=>/^SALDO$|^BALANCE$/i.test(i.s)));
+    if(hdr){const fx=re=>{const i=hdr.items.find(i=>re.test(i.s));return i?i.x:null;};cols={desc:fx(/DESCRIZIONE|DESCRIPTION/i),inn:fx(/IN ENTRATA|MONEY IN/i),out:fx(/IN USCITA|MONEY OUT/i),bal:fx(/^SALDO$|^BALANCE$/i),date:fx(/^DATA$|^DATE$/i)};}
+    if(!cols||cols.desc==null||cols.bal==null)continue;
+    /* blocchi: una transazione inizia con «gg mmm» nella colonna della data */
+    let cur=null;const blocks=[];
+    rows.forEach(r=>{const first=r.items[0],isDate=first&&first.x<cols.desc-20&&/^\d{1,2} [a-z]{3}$/i.test(first.s);
+      if(isDate){cur={day:first.s,lines:[r]};blocks.push(cur);}else if(cur)cur.lines.push(r);});
+    for(const b of blocks){
+      const items=b.lines.flatMap(r=>r.items);
+      const year=(items.find(i=>i.x<cols.desc-20&&/^(19|20)\d{2}$/.test(i.s))||{}).s;
+      const desc=items.filter(i=>i.x>=cols.desc-4&&i.x<Math.min(cols.inn??cols.out,cols.out??cols.inn)-8).map(i=>i.s).join(" ").replace(/\s+/g," ").trim();
+      /* importi: pdf.js a volte unisce importo e saldo («2.001,00 € -2.006,75 €») o descrizione e importo in un solo pezzo.
+         Si leggono tutte le cifre in euro nell'ordine: la prima è l'importo, l'ultima il saldo. */
+      const money=[];b.lines.forEach(r=>r.items.forEach(it=>{for(const m of it.s.matchAll(/(-?\d{1,3}(?:\.\d{3})*,\d{2})\s*€/g))money.push({x:it.x,v:num(m[1])});}));
+      if(!year||!money.length||money[0].v==null)continue;
+      const amt=Math.abs(money[0].v),isIn=money.length>1&&cols.inn!=null&&cols.out!=null?Math.abs(money[0].x-cols.inn)<Math.abs(money[0].x-cols.out):true;
+      const [dd,mm]=b.day.toLowerCase().split(" "),mo=PDF_MON[mm];if(mo==null)continue;
+      const d=new Date(Date.UTC(+year,mo,+dd));
+      const tr=desc.match(/(Buy trade|Sell trade|Savings plan execution|Acquisto|Vendita|Esecuzione (?:del )?piano di accumulo)\s+([A-Z]{2}[A-Z0-9]{9}\d)\s+(.*?),?\s*(?:quantity|quantità):\s*([\d.,]+)/i);
+      if(tr){const sell=/sell|vendita/i.test(tr[1]),q=parseFloat(tr[4].replace(",","."));
+        out.push([d,sell?"Vendita":/savings|piano/i.test(tr[1])?"Piano di accumulo":"Acquisto",tr[3].replace(/\s+/g," ").trim(),tr[2],sell?-q:q,sell?amt:-amt]);continue;}
+      const dv=desc.match(/Dividend for ISIN\s+([A-Z]{2}[A-Z0-9]{9}\d)|Dividendo.*?([A-Z]{2}[A-Z0-9]{9}\d)/i);
+      if(dv){out.push([d,"Dividendo","",dv[1]||dv[2],"",isIn?amt:-amt]);continue;}
+    }
+  }
+  if(!out.length)return null;
+  out.sort((a,b)=>a[0]-b[0]);
+  return {broker:"Trade Republic",n:out.length,sheets:[{name:"★ Movimenti · Trade Republic (PDF)",aoa:[["Data","Operazione","Strumento","ISIN","Quantità","Importo"],...out]}]};
+}
+/* tutti i lettori di PDF noti, nell'ordine; null se nessuno riconosce il documento */
+function pdfStatement(pages){return pdfTradeRepublic(pages);}
 function normalizeExports(sheets){
   sheets=pacMerge(sheets);
   return (sheets||[]).flatMap(sh=>{
@@ -1326,6 +1375,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={pdfStatement,pdfTradeRepublic,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
