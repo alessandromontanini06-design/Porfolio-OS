@@ -3430,7 +3430,8 @@ function accountHTML(AC){
 function renderReal(){
   setTimeout(labIndex,60);
   const el=$("#realCard");if(!el)return;
-  const R=realCalc(),AC=accountCalc(R);S.account=AC;setTimeout(renderCost,0);
+  /* «Il tuo conto, tutto insieme» è spento: con alcuni file reali leggeva male le colonne (un titolo «Transazioni», rendimenti falsi). Va rifatto con calma. */
+  const R=realCalc(),AC=null;S.account=null;setTimeout(renderCost,0);
   /* conto intero utile anche quando il TIR sui prezzi di mercato non si può fare (nessun titolo con storico) */
   const acOnly=AC&&AC.items.length>=1&&(!R||R.error);
   if(acOnly){el.hidden=false;el.innerHTML=accountHTML(AC);S.real=null;return;}
