@@ -21,6 +21,10 @@ const TOOLS = [
     probabilita: { type: "number", description: "Sicurezza richiesta in decimali (0.9 = i soldi bastano nel 90% dei futuri). Predefinito 0.9." },
     capitale: { type: "number", description: "Capitale di partenza in euro; se omesso, quello della simulazione." },
     risparmio_mensile: { type: "number", description: "Euro risparmiati ogni mese finché non si arriva al numero FIRE." },
+    eta: { type: "number", description: "Età attuale: se c'è, calcola a che età si può smettere di lavorare (tutta la vita, con pensione)." },
+    eta_fine: { type: "number", description: "Fino a che età devono durare i soldi. Predefinito 90." },
+    pensione: { type: "number", description: "Pensione mensile netta in euro di oggi." },
+    eta_pensione: { type: "number", description: "Età da cui arriva la pensione. Predefinito 67." },
     pesi: PESI } } },
   { name: "monte_carlo", description: "Simula migliaia di futuri del portafoglio ricampionando i rendimenti storici del file: capitale finale per percentili (nominale e al netto dell'inflazione), probabilità di raggiungere un obiettivo, probabilità di perdita, capitale esaurito con i prelievi. Usalo per domande su obiettivi, piani di accumulo, prelievi o orizzonti futuri. I parametri omessi prendono i valori impostati nell'app.", parameters: { type: "object", properties: {
     anni: { type: "number", description: "Orizzonte in anni (1-60)." },

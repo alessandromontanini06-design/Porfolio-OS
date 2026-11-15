@@ -906,6 +906,43 @@ function fireRate(o){
   const curve=rates.map(r=>({rate:r,success:fireSuccess(q,r)}));
   return {swr:lo,target,curve,at4:fireSuccess(q,.04),years:q.years,n:q.n};
 }
+/* Tutta la vita, mese per mese e in euro di oggi: si risparmia fino all'età di stop, poi si preleva la spesa
+   (meno la pensione, dall'età in cui arriva) fino all'età finale. Stessi numeri casuali per ogni età provata
+   (common random numbers): le età si confrontano a parità di fortuna, e il successo cresce con l'età di stop. */
+function fireLife(o){
+  const f=12,hist=fireRealRet(o.ret||[],f,o.infl).filter(Number.isFinite),m=hist.length;if(m<12)return {error:"Servono almeno 12 rendimenti storici per simulare."};
+  const age=Math.round(o.age),end=Math.round(o.endAge),R=Math.round(o.retireAge),n=o.n||600,months=(end-age)*f;
+  const feeF=Math.pow(1-Math.max(0,Math.min(.2,+o.costs||0)),1/f),spend=+o.spend||0,pen=+o.pension||0,penAge=o.pensionAge||200,save=+o.save||0,initial=Math.max(0,+o.initial||0);
+  const side=+o.side||0,sideEnd=o.sideUntil||penAge; // reddito part-time dopo lo stop (Barista FIRE), fino a sideUntil
+  const method=["boot","block","normal"].includes(o.method)?o.method:"boot",block=Math.max(2,Math.min(m,o.block||12)),rnd=makeRng(o.seed==null?21:o.seed);
+  const mean=hist.reduce((a,x)=>a+x,0)/m,sd=Math.sqrt(hist.reduce((a,x)=>a+(x-mean)**2,0)/Math.max(1,m-1));
+  const gauss=()=>{let u=0;while(u===0)u=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rnd());};
+  const Y=end-age+1,cap=o.keepPaths?new Float64Array(n*Y):null;let ok=0;const atR=new Float64Array(n),depAge=[];
+  for(let s=0;s<n;s++){
+    let W=initial,pos=0,dead=false;if(cap)cap[s*Y]=W;
+    for(let t=1;t<=months;t++){
+      let r;if(method==="normal")r=Math.max(-.99,mean+sd*gauss());else if(method==="block"){if((t-1)%block===0)pos=Math.floor(rnd()*m);else pos=(pos+1)%m;r=hist[pos];}else r=hist[Math.floor(rnd()*m)];
+      const a=age+(t-1)/f;
+      if(!dead){W=W*(1+r)*feeF;if(a<R)W+=save;else{W-=Math.max(0,spend-(a>=penAge?pen:0)-(a<sideEnd?side:0));if(W<=0){W=0;dead=true;depAge.push(Math.floor(a));}}}
+      if(t===(R-age)*f)atR[s]=W;
+      if(cap&&t%f===0)cap[s*Y+t/f]=W;
+    }
+    if(R<=age)atR[s]=initial;if(!dead)ok++;
+  }
+  const out={success:ok/n,n,retireAge:R,capAtRetire:quantile(Array.from(atR).sort((a,b)=>a-b),.5),capAtRetireBad:quantile(Array.from(atR).sort((a,b)=>a-b),.1)};
+  if(depAge.length)out.depMedianAge=quantile(depAge.sort((a,b)=>a-b),.5);
+  if(cap){out.fan=[];for(let y=0;y<Y;y++){const col=[];for(let s=0;s<n;s++)col.push(cap[s*Y+y]);col.sort((a,b)=>a-b);out.fan.push({age:age+y,p10:quantile(col,.1),p25:quantile(col,.25),p50:quantile(col,.5),p75:quantile(col,.75),p90:quantile(col,.9)});}}
+  return out;
+}
+/* età più bassa in cui si può smettere con successo ≥ obiettivo (ricerca binaria: il successo cresce con l'età) */
+function fireAge(o){
+  const target=o.target||.9,age=Math.round(o.age),last=Math.round(o.endAge)-1,run=R=>fireLife({...o,retireAge:R});
+  const first=run(age);if(first.error)return first;
+  if(first.success>=target)return {age:age,already:true,res:first,target};
+  const top=run(last);if(top.success<target)return {age:null,res:top,target};
+  let lo=age,hi=last;while(hi-lo>1){const mid=(lo+hi)>>1;if(run(mid).success>=target)hi=mid;else lo=mid;}
+  return {age:hi,res:run(hi),target};
+}
 /* anni per arrivare al numero FIRE, in euro di oggi: primo anno in cui il percentile scelto del capitale reale supera l'obiettivo */
 function fireWhen(o){
   const R=monteCarlo({ret:o.ret,f:o.f||12,years:Math.min(60,o.maxYears||50),initial:o.initial,monthly:o.monthly,infl:o.infl,costs:o.costs,method:o.method,n:o.n||1000,block:o.block,seed:o.seed==null?11:o.seed});
@@ -1245,6 +1282,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={fireLife,fireAge,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

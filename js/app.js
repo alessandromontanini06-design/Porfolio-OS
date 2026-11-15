@@ -21,10 +21,10 @@ const fmtSize=b=>b<1024?b+" B":b<1048576?fmtN(b/1024,0)+" KB":fmtN(b/1048576,1)+
 const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,corrView:"mat",scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null,macro:null,rfSrc:"ecb"};
 
 /* ---------- Scene e dock ---------- */
-const SCENES=["home","scan","map","lab","risk","sim","stress","opt","bench"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
+const SCENES=["home","scan","map","lab","risk","sim","fire","stress","opt","bench"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",fire:"Indipendenza",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
 let current="home";
 /* colore d'accento di ogni sezione (lo stesso del CSS) */
-const ACC={home:"212,255,58",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165"};
+const ACC={home:"212,255,58",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",fire:"201,242,74",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165"};
 /* la pillola del dock insegue il pulsante attivo con una molla, anche mentre l'etichetta si allarga */
 const pillS={x:0,w:0,on:false,until:0};
 function movePill(){pillS.until=performance.now()+900;if(pillS.on)return;pillS.on=true;
@@ -93,6 +93,7 @@ function onEnter(name){
   if(name==="scan"&&!S.scanPlayed)setTimeout(playScan,HAS_G?450:0);
   if(name==="risk")renderRisk();
   if(name==="sim")renderSim();
+  if(name==="fire")renderFI();
   if(name==="stress")renderStress();
   if(name==="opt")renderOpt();
   if(name==="bench")renderBench();
@@ -1605,14 +1606,14 @@ function renderPortfolio(){
 function hideLab(){
   setTimeout(renderLabs,0);
   disposeNet();S.lab=null;
-  $("#lab").hidden=true;$("#labEmpty").hidden=false;$("#navLab").classList.add("off");$("#navRisk").classList.add("off");$("#navSim").classList.add("off");$("#navStress").classList.add("off");$("#navOpt").classList.add("off");$("#navBench").classList.add("off");S.risk=null;S.mc=null;S.stress=null;S.opt=null;S.optW=null;
+  $("#lab").hidden=true;$("#labEmpty").hidden=false;$("#navLab").classList.add("off");$("#navRisk").classList.add("off");$("#navSim").classList.add("off");$("#navFire").classList.add("off");$("#navStress").classList.add("off");$("#navOpt").classList.add("off");$("#navBench").classList.add("off");S.risk=null;S.mc=null;S.stress=null;S.opt=null;S.optW=null;
 }
 function showLab(instant,stay){
   setTimeout(renderLabs,0);
   const ds=S.ds,f=ds.freq.f;
   S.lab={st:ds.assets.map(a=>P.stats(a,f,ds.dates)),W:ds.assets.map(a=>P.wealth(a,ds.dates.length)),C:ds.assets.map(a=>ds.assets.map(b=>P.corr(a,b)))};
   S.labFx={};
-  $("#lab").hidden=false;$("#labEmpty").hidden=true;$("#navLab").classList.remove("off");$("#navRisk").classList.remove("off");$("#navSim").classList.remove("off");$("#navStress").classList.remove("off");$("#navOpt").classList.remove("off");$("#navBench").classList.remove("off");renderPager(current);S.mc=null;S.mcIn=null;S.stress=null;S.st=null;S.opt=null;S.opIn=null;S.optW=null;if(S.riskW==="opt")S.riskW=null;
+  $("#lab").hidden=false;$("#labEmpty").hidden=true;$("#navLab").classList.remove("off");$("#navRisk").classList.remove("off");$("#navSim").classList.remove("off");$("#navFire").classList.remove("off");$("#navStress").classList.remove("off");$("#navOpt").classList.remove("off");$("#navBench").classList.remove("off");renderPager(current);S.mc=null;S.mcIn=null;S.stress=null;S.st=null;S.opt=null;S.opIn=null;S.optW=null;if(S.riskW==="opt")S.riskW=null;
   if(!S.macro||S.macro.status!=="ready"||S.macro.key!==ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]))S.macro=null;
   renderLab();reveal($("#lab"));renderLook();loadEtfInfo();
   if(!S.macro)fetchMacro().then(()=>{if(S.macro)S.macro.key=ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]);});
@@ -1979,7 +1980,7 @@ function renderRisk(){
   drawHist(PR,f);drawContrib();drawUnderwater(PR,f);renderDecomp();renderRiskTable();renderRiskPro();
   if(current==="risk")Morph.shape("risk");
 }
-document.addEventListener("click",e=>{const b=e.target.closest("[data-rw]");if(!b)return;S.riskW=b.dataset.rw;renderRisk();if(current==="sim")renderSim();if(current==="stress")renderStress();if(current==="bench")renderBench();});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-rw]");if(!b)return;S.riskW=b.dataset.rw;renderRisk();if(current==="sim")renderSim();if(current==="fire")renderFI();if(current==="stress")renderStress();if(current==="bench")renderBench();});
 function drawHist(PR,f){
   const s=PR.sorted,B=28,lo=s[0],hi=s[s.length-1],span=(hi-lo)||1,cnt=new Array(B).fill(0);
   s.forEach(x=>{cnt[Math.min(B-1,Math.floor((x-lo)/span*B))]++;});
@@ -2158,65 +2159,133 @@ function runSim(){
   R.wLabel=label;R.w=w;R.nAsked=I.n;R.histAnn=histAnn;R.rate=I.rate;R.nHist=fin.length;R.histFrom=pa.ret.findIndex(Number.isFinite);
   S.mc=R;return R;
 }
-/* ---------- FIRE: quanto puoi prelevare, quanto ti serve, quando ci arrivi (tutto in euro di oggi) ---------- */
-let fireT=0;
-function fireInputs(){
-  const I=S.mcIn,F=S.fire||(S.fire={spend:2000,years:30,target:.9,save:Math.max(0,I.monthly)});
-  const num=(id,d)=>{const v=parseFloat(String($(id).value).replace(",","."));return Number.isFinite(v)?v:d;};
-  if($("#fiSpend").value!==""||F._init){F.spend=Math.max(100,num("#fiSpend",F.spend));F.years=Math.max(5,Math.min(60,Math.round(num("#fiYears",F.years))));F.save=Math.max(0,num("#fiSave",F.save));}
-  F._init=true;$("#fiSpend").value=F.spend;$("#fiYears").value=F.years;$("#fiSave").value=F.save;
-  document.querySelectorAll("#fiTarget [data-fit]").forEach(b=>b.setAttribute("aria-pressed",String(Math.abs(+b.dataset.fit-F.target)<1e-9)));
-  return F;
+/* ================= Indipendenza finanziaria (FIRE) =================
+   Domanda: a che età posso smettere di lavorare? Tutta la vita mese per mese, in euro di oggi, sui rendimenti storici del portafoglio
+   (ricampionati), con risparmi fino allo stop, prelievi dopo, pensione dall'età indicata. Età FIRE = la più bassa con successo ≥ sicurezza. */
+const FI_KEY="pos-fire-v1";
+function fiDefaults(){
+  const pfv=S.portfolio?S.portfolio.positions.reduce((a,p)=>a+(p.valore||0),0):0,I=S.mcIn||simDefaults();
+  let saved={};try{saved=JSON.parse(localStorage.getItem(FI_KEY)||"{}")||{};}catch{}
+  return {age:35,end:90,save:Math.max(0,I.monthly||300),spend:2000,pen:0,penAge:67,target:.9,...saved,cap:pfv>0?Math.round(pfv):(I.init||10000)};
 }
-function renderFire(){
-  if(!S.mcIn||!S.ds||!S.ds.ok)return;
-  const ds=S.ds,f=ds.freq.f,I=S.mcIn,F=fireInputs(),{w}=riskWeights(),pa=pfAsset(w,"Portafoglio"),C=I.init;
-  const key=[w.map(x=>x.toFixed(4)).join(),F.years,F.target,I.infl,I.costs,I.method].join("|");
-  $("#fireKpis").innerHTML=`<div class="fire-wait">Calcolo ${S.fireRes&&S.fireRes.key===key?"":"migliaia di futuri…"}</div>`;
-  clearTimeout(fireT);fireT=setTimeout(()=>{
-    let R=S.fireRes&&S.fireRes.key===key?S.fireRes:null;
-    if(!R){R=P.fireRate({ret:pa.ret,f,years:F.years,infl:I.infl/100,costs:I.costs/100,target:F.target,method:I.method,block:f,n:1000});R.key=key;}
-    if(R.error){$("#fireKpis").innerHTML=`<div class="fire-wait">${esc(R.error)}</div>`;return;}
-    const draw=C*R.swr/12,need=F.spend*12/R.swr,have=C>=need;
-    const W=have?null:P.fireWhen({ret:pa.ret,f,initial:C,monthly:F.save,infl:I.infl/100,costs:I.costs/100,goal:need,method:I.method,block:f,n:1000});
-    S.fireRes={...R,key,draw,need,have,W,C,F:{...F},infl:I.infl,costs:I.costs,label:riskWeights().label,nHist:pa.ret.filter(Number.isFinite).length};
-    const c=(k,v)=>`<button type="button" class="v" data-rc="fi-${k}">${v}</button>`,yrs=y=>y==null?`oltre ${W?W.maxYears:50} anni`:y===0?"già oggi":y===1?"tra 1 anno":`tra ${y} anni`;
-    $("#fireKpis").innerHTML=[
-      ["Con quello che hai oggi",c("draw",fmtEur(draw)+"/mese"),`per ${F.years} anni, in euro di oggi, partendo da ${fmtEur(C)}`],
-      ["Il tuo numero FIRE",c("need",fmtEur(need)),`il capitale per prelevare ${fmtEur(F.spend)} al mese`],
-      ["Quando ci arrivi",c("when",have?"Ci sei già":yrs(W&&W.median)),have?`il capitale di oggi copre ${fmtEur(F.spend)} al mese`:`risparmiando ${fmtEur(F.save)} al mese · scenario sfavorevole: ${yrs(W&&W.bad)}`],
-      ["Tasso di prelievo sostenibile",c("swr",fmtPct(R.swr,1)+" l'anno"),`la regola del 4% qui riesce nel ${fmtPct(R.at4,0)} dei futuri`]
-    ].map(([l,v,s],i)=>`<div class="kpi${i===0?"":""}"><span class="eyebrow">${l}</span>${v}<small>${s}</small></div>`).join("");
-    drawFire();
-    $("#fireTxt").innerHTML=`<p><b>FIRE</b> (Financial Independence, Retire Early) vuol dire mettere da parte abbastanza da vivere dei rendimenti e dei prelievi, senza più dipendere dallo stipendio.</p>
-      <p>La famosa <b>regola del 4%</b> (Bengen, 1994) dice che prelevando ogni anno il 4% del capitale iniziale, aggiornato all'inflazione, i soldi sono durati 30 anni in quasi tutti i periodi storici americani. Qui la stessa domanda è fatta con <b>i rendimenti del tuo portafoglio</b>: ${fmtPct(R.swr,1)} l'anno è il prelievo più alto che riesce nel ${fmtPct(F.target,0)} dei futuri simulati.</p>
-      <p class="caption">Prelievi costanti in euro di oggi, rendimenti storici del portafoglio (${esc(S.fireRes.label)}, ${S.fireRes.nHist} mesi) al netto dell'inflazione (${fmtPct(I.infl/100,1)}) e dei costi (${fmtPct(I.costs/100,2)}). Niente tasse, pensione o altre entrate. Non è una previsione né un consiglio.</p>`;
-  },40);
+function fiRead(){
+  const F=S.fi.in,num=(id,d)=>{const v=parseFloat(String($(id).value).replace(",","."));return Number.isFinite(v)?v:d;};
+  F.age=Math.max(18,Math.min(80,Math.round(num("#fiAge",F.age))));F.end=Math.max(F.age+5,Math.min(105,Math.round(num("#fiEnd",F.end))));
+  F.cap=Math.max(0,num("#fiCap",F.cap));F.save=Math.max(0,num("#fiSave",F.save));F.spend=Math.max(100,num("#fiSpend",F.spend));
+  F.pen=Math.max(0,num("#fiPen",F.pen));F.penAge=Math.max(55,Math.min(75,Math.round(num("#fiPenAge",F.penAge))));
+  try{const {cap,...keep}=F;localStorage.setItem(FI_KEY,JSON.stringify(keep));}catch{}
 }
-function drawFire(){
-  const R=S.fireRes;if(!R||!R.curve.length)return;
-  const VW=640,VH=250,ml=46,mr=16,mt=16,mb=34,iw=VW-ml-mr,ih=VH-mt-mb,pts=R.curve,x0=pts[0].rate,x1=pts.at(-1).rate;
-  const X=v=>ml+(v-x0)/(x1-x0)*iw,Y=v=>mt+ih-v*ih;let g="";
+function fiFill(){const F=S.fi.in;$("#fiAge").value=F.age;$("#fiEnd").value=F.end;$("#fiCap").value=Math.round(F.cap);$("#fiSave").value=F.save;$("#fiSpend").value=F.spend;$("#fiPen").value=F.pen;$("#fiPenAge").value=F.penAge;
+  document.querySelectorAll("#fiTarget [data-fit]").forEach(b=>b.setAttribute("aria-pressed",String(Math.abs(+b.dataset.fit-F.target)<1e-9)));}
+let fiT=0,fiRun=0;
+function renderFI(){
+  const box=$("#fiBox"),empty=$("#fiEmpty");
+  if(!S.lab||!S.ds||!S.ds.ok){box.hidden=true;empty.hidden=false;$("#fiW").innerHTML="";return;}
+  box.hidden=false;empty.hidden=true;if(!S.riskW)S.riskW=S.portfolio?"now":"equal";
+  if(!S.mcIn)S.mcIn=simDefaults();
+  if(!S.fi){S.fi={in:fiDefaults()};fiFill();}
+  $("#fiW").innerHTML=wOpts().map(o=>`<button type="button" data-rw="${o[0]}" aria-pressed="${S.riskW===o[0]}">${o[1]}</button>`).join("");
+  fiCompute();
+}
+function fiCompute(){
+  const run=++fiRun,F={...S.fi.in},I=S.mcIn,ds=S.ds,{w,label}=riskWeights(),ret=pfAsset(w,"Portafoglio").ret;
+  const base={ret,age:F.age,endAge:F.end,initial:F.cap,save:F.save,spend:F.spend,pension:F.pen,pensionAge:F.penAge,infl:I.infl/100,costs:I.costs/100,target:F.target,method:I.method,block:12};
+  $("#fiHero").innerHTML=`<div class="fi-wait">Simulo la tua vita finanziaria…</div>`;
+  const step=(fn)=>new Promise(ok=>setTimeout(()=>{if(run===fiRun)ok(fn());},0));
+  (async()=>{
+    const A=await step(()=>P.fireAge({...base,n:600}));if(!A||run!==fiRun)return;
+    if(A.error){$("#fiHero").innerHTML=`<div class="fi-wait">${esc(A.error)}</div>`;return;}
+    const R=A.age!=null?A.age:F.end-1,life=await step(()=>P.fireLife({...base,retireAge:R,n:600,keepPaths:true}));
+    const years=Math.max(5,F.end-Math.max(R,F.age)),sw=await step(()=>P.fireRate({ret,f:12,years,infl:I.infl/100,costs:I.costs/100,target:F.target,method:I.method,block:12,n:700}));
+    S.fi.res={A,life,sw,F,label,nHist:ret.filter(Number.isFinite).length,infl:I.infl,costs:I.costs};
+    fiHero();fiKpis();fiLifeChart();fiCurve();fiNotes();
+    /* leve e varianti: più calcoli, arrivano subito dopo */
+    const lev=[["Risparmi 200 € in più al mese",{save:F.save+200}],["Risparmi 500 € in più al mese",{save:F.save+500}],["Spendi 200 € in meno al mese",{spend:Math.max(100,F.spend-200)}],[`Pensione più alta di 300 € al mese (dai ${F.penAge} anni)`,{pension:F.pen+300}],["Fondi con costi più bassi (−0,2% l'anno)",{costs:Math.max(0,I.costs-.2)/100}],["Ti servono i soldi fino a 5 anni in meno",{endAge:Math.max(F.age+6,F.end-5)}]];
+    const L=[];for(const [t,o] of lev){const r=await step(()=>P.fireAge({...base,...o,n:600}));if(run!==fiRun)return;L.push({t,age:r.age,already:r.already});fiLevers(L,lev.length);}
+    const vars=[["Lean FIRE","vivere con il 30% in meno",{spend:F.spend*.7}],["FIRE classico","la tua spesa di oggi",{}],["Fat FIRE","50% di spesa in più",{spend:F.spend*1.5}],["Coast FIRE","smetti di risparmiare da oggi",{save:0}],["Barista FIRE","lasci il lavoro pieno, part-time da 800 € al mese fino alla pensione",{side:800,sideUntil:F.penAge}]];
+    const V=[];for(const [t,d,o] of vars){const r=await step(()=>P.fireAge({...base,...o,n:600}));if(run!==fiRun)return;V.push({t,d,age:r.age,already:r.already});fiVars(V,vars.length);}
+  })();
+}
+const fiYearOf=age=>new Date().getFullYear()+(age-S.fi.res.F.age);
+function fiHero(){
+  const {A,life,F}=S.fi.res,c=(k,v)=>`<button type="button" class="cellbtn" data-rc="fi-${k}">${v}</button>`;
+  const share=life.capAtRetire>0?Math.min(1,F.cap/life.capAtRetire):1;
+  let big,sub;
+  if(A.already){big=`Sei già <em>indipendente</em>.`;sub=`Con ${fmtEur(F.cap)} puoi coprire ${fmtEur(F.spend)} al mese fino a ${F.end} anni nel ${fmtPct(A.res.success,0)} dei futuri simulati${F.pen?`, contando ${fmtEur(F.pen)} di pensione dai ${F.penAge}`:""}.`;}
+  else if(A.age==null){big=`Con questi numeri non ci arrivi prima dei <em>${F.end} anni</em>.`;sub=`Anche lavorando fino a ${F.end-1} anni i soldi bastano solo nel ${fmtPct(A.res.success,0)} dei futuri. Guarda qui sotto cosa ti avvicina di più.`;}
+  else{big=`Puoi smettere di lavorare a ${c("age",`<em>${A.age} anni</em>`)}`;sub=`nel ${fiYearOf(A.age)}, tra ${A.age-F.age} ${A.age-F.age===1?"anno":"anni"}. Con ${fmtEur(F.spend)} al mese fino a ${F.end} anni${F.pen?` e ${fmtEur(F.pen)} di pensione dai ${F.penAge}`:""}, i soldi bastano nel ${fmtPct(A.res.success,0)} dei futuri simulati.`;}
+  $("#fiHero").innerHTML=`<p class="fi-q">Con il tuo portafoglio e i tuoi numeri</p><h3 class="fi-a">${big}</h3><p class="fi-s">${sub}</p>
+    ${A.age!=null&&!A.already?`<div class="fi-prog"><div class="fi-bar"><i style="width:${(share*100).toFixed(1)}%"></i></div><div class="fi-pl"><span>Oggi hai il <b>${fmtPct(share,0)}</b> del capitale che avrai quando smetti (${fmtEur(life.capAtRetire)} nello scenario mediano)</span><span>${F.age} anni → ${A.age} anni</span></div></div>`:""}`;
+}
+function fiKpis(){
+  const {A,life,sw,F}=S.fi.res,c=(k,v)=>`<button type="button" class="v" data-rc="fi-${k}">${v}</button>`;
+  $("#fiKpis").innerHTML=[
+    ["Età in cui puoi smettere",c("age",A.already?"Già oggi":A.age==null?`oltre ${F.end-1}`:`${A.age} anni`),A.age!=null&&!A.already?`nel ${fiYearOf(A.age)}`:"con questi numeri"],
+    ["Capitale quando smetti",c("cap",fmtEur(life.capAtRetire)),`scenario mediano · sfavorevole ${fmtEur(life.capAtRetireBad)}`],
+    ["Prelievo sostenibile",c("swr",fmtPct(sw.swr,1)+" l'anno"),`del capitale, per ${sw.years} anni · regola del 4%: riesce nel ${fmtPct(sw.at4,0)} dei casi`],
+    ["Con quello che hai oggi",c("draw",fmtEur(F.cap*sw.swr/12)+"/mese"),`se smettessi adesso, per ${sw.years} anni`]
+  ].map(([l,v,s])=>`<div class="kpi"><span class="eyebrow">${l}</span>${v}<span class="s">${s}</span></div>`).join("");
+}
+function fiLifeChart(){
+  const {life,F,A}=S.fi.res,fan=life.fan;if(!fan)return;
+  const VW=900,VH=300,ml=62,mr=16,mt=16,mb=34,iw=VW-ml-mr,ih=VH-mt-mb,n=fan.length,R=A.age!=null?A.age:null;
+  const hi=Math.max(...fan.map(x=>x.p90))*1.05||1,X=a=>ml+(a-fan[0].age)/((fan.at(-1).age-fan[0].age)||1)*iw,Y=v=>mt+ih-v/hi*ih;let g="";
+  if(R!=null&&!A.already)g+=`<rect x="${X(fan[0].age)}" y="${mt}" width="${X(R)-X(fan[0].age)}" height="${ih}" fill="var(--raise)"/><text x="${X(fan[0].age)+8}" y="${mt+16}" style="fill:var(--muted)">lavori e risparmi</text><text x="${X(R)+8}" y="${mt+16}" style="fill:var(--muted)">vivi dei tuoi investimenti</text>`;
+  niceTicks(0,hi,4).filter(v=>v>=0&&v<=hi).forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${ml-8}" y="${Y(v)+4}" text-anchor="end">${fmtK(v)}</text>`;});
+  fan.forEach(x=>{if(x.age%5===0)g+=`<text x="${X(x.age)}" y="${VH-10}" text-anchor="middle">${x.age}</text>`;});
+  const band=(a,b,op)=>{let d="";fan.forEach((x,i)=>{d+=(i?"L":"M")+X(x.age).toFixed(1)+","+Y(x[a]).toFixed(1);});for(let i=n-1;i>=0;i--)d+="L"+X(fan[i].age).toFixed(1)+","+Y(fan[i][b]).toFixed(1);return `<path d="${d}Z" fill="var(--lime)" opacity="${op}"/>`;};
+  g+=band("p90","p10",.28)+band("p75","p25",.55);
+  let d="";fan.forEach((x,i)=>{d+=(i?"L":"M")+X(x.age).toFixed(1)+","+Y(x.p50).toFixed(1);});g+=`<path d="${d}" fill="none" stroke="var(--fg)" stroke-width="2.6"/>`;
+  let d2="";fan.forEach((x,i)=>{d2+=(i?"L":"M")+X(x.age).toFixed(1)+","+Y(x.p10).toFixed(1);});g+=`<path d="${d2}" fill="none" stroke="var(--c2)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  if(R!=null&&!A.already)g+=`<line x1="${X(R)}" x2="${X(R)}" y1="${mt}" y2="${mt+ih}" stroke="var(--fg)" stroke-width="1.5"/><circle cx="${X(R)}" cy="${Y(life.capAtRetire)}" r="6" fill="var(--lime)" stroke="var(--fg)" stroke-width="1.5"/><text x="${X(R)-8}" y="${Y(life.capAtRetire)-12}" text-anchor="end" style="fill:var(--fg);font-weight:600">smetti a ${R} anni · ${fmtK(life.capAtRetire)}</text>`;
+  if(F.pen>0&&F.penAge<F.end)g+=`<line x1="${X(F.penAge)}" x2="${X(F.penAge)}" y1="${mt+24}" y2="${mt+ih}" stroke="var(--muted)" stroke-dasharray="2 4"/><text x="${X(F.penAge)+6}" y="${mt+ih-8}" style="fill:var(--muted)">pensione</text>`;
+  $("#fiLife").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Capitale per età, scenari dal più sfavorevole al più favorevole">${g}</svg>`;
+  $("#fiLifeLeg").innerHTML=`<span><i style="background:var(--fg);height:3px"></i>scenario mediano</span><span><i style="background:var(--c2);height:2px"></i>scenario sfavorevole (10 futuri su 100 vanno peggio)</span><span><i style="background:#C9F24A;opacity:.75"></i>metà centrale dei futuri</span><span><i style="background:#C9F24A;opacity:.35"></i>8 futuri su 10</span>`;
+  $("#fiLifeCap").textContent=life.depMedianAge!=null&&life.success<1?`Nei futuri in cui i soldi finiscono prima dei ${F.end} anni, succede in media verso i ${Math.round(life.depMedianAge)} anni.`:`In nessuno dei futuri simulati i soldi finiscono prima dei ${F.end} anni.`;
+}
+function fiLevers(L,tot){
+  const {A,F}=S.fi.res,base=A.already?F.age:A.age==null?F.end:A.age;
+  $("#fiLevers").innerHTML=L.map(x=>{const a=x.already?F.age:x.age==null?F.end:x.age,d=a-base;
+    return `<div class="fi-lv"><span>${esc(x.t)}</span><b>${x.already?"già oggi":x.age==null?`oltre ${F.end-1}`:`${a} anni`}</b><em class="${d<0?"good":d>0?"bad":""}">${d===0?"=":d<0?`${d} ${d===-1?"anno":"anni"}`:`+${d}`}</em><i style="--w:${Math.min(100,Math.abs(d)*8)}%"></i></div>`;}).join("")+(L.length<tot?`<div class="fi-wait">calcolo…</div>`:`<p class="caption" style="margin-top:8px">Ogni riga cambia una sola cosa rispetto ai tuoi numeri e ricalcola tutta la vita con gli stessi futuri simulati.</p>`);
+}
+function fiVars(V,tot){
+  const F=S.fi.res.F;
+  $("#fiVars").innerHTML=V.map(x=>`<div class="fi-var"><div><b>${esc(x.t)}</b><small>${esc(x.d)}</small></div><span>${x.already?"già oggi":x.age==null?`oltre ${F.end-1}`:`${x.age} anni`}</span></div>`).join("")+(V.length<tot?`<div class="fi-wait">calcolo…</div>`:"");
+}
+function fiCurve(){
+  const {sw,F}=S.fi.res;if(!sw.curve||!sw.curve.length)return;
+  const VW=640,VH=250,ml=46,mr=16,mt=16,mb=34,iw=VW-ml-mr,ih=VH-mt-mb,pts=sw.curve,x0=pts[0].rate,x1=pts.at(-1).rate,X=v=>ml+(v-x0)/(x1-x0)*iw,Y=v=>mt+ih-v*ih;let g="";
   [0,.25,.5,.75,1].forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${ml-8}" y="${Y(v)+4}" text-anchor="end">${fmtPct(v,0)}</text>`;});
   pts.forEach(p=>{g+=`<text x="${X(p.rate)}" y="${VH-12}" text-anchor="middle">${fmtPct(p.rate,1).replace(",0","")}</text>`;});
-  g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(R.target)}" y2="${Y(R.target)}" stroke="var(--c2)" stroke-dasharray="4 4"/><text x="${VW-mr}" y="${Y(R.target)-6}" text-anchor="end" style="fill:var(--c2)">sicurezza ${fmtPct(R.target,0)}</text>`;
+  g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(F.target)}" y2="${Y(F.target)}" stroke="var(--c2)" stroke-dasharray="4 4"/><text x="${VW-mr}" y="${Y(F.target)-6}" text-anchor="end" style="fill:var(--c2)">sicurezza ${fmtPct(F.target,0)}</text>`;
   g+=`<line x1="${X(.04)}" x2="${X(.04)}" y1="${mt}" y2="${mt+ih}" stroke="var(--muted)" stroke-dasharray="2 4"/><text x="${X(.04)-6}" y="${mt+ih-8}" text-anchor="end" style="fill:var(--muted)">regola del 4%</text>`;
-  let d="";pts.forEach((p,i)=>{d+=(i?"L":"M")+X(p.rate).toFixed(1)+","+Y(p.success).toFixed(1);});
-  g+=`<path d="${d}" fill="none" stroke="var(--fg)" stroke-width="2.6" stroke-linejoin="round"/>`;
-  pts.forEach(p=>{g+=`<circle cx="${X(p.rate)}" cy="${Y(p.success)}" r="3" fill="var(--fg)"><title>${fmtPct(p.rate,1)} l'anno: riesce nel ${fmtPct(p.success,0)} dei futuri</title></circle>`;});
-  if(R.swr>=x0&&R.swr<=x1)g+=`<circle cx="${X(R.swr)}" cy="${Y(R.target)}" r="6" fill="var(--lime)" stroke="var(--fg)" stroke-width="1.5"/><text x="${X(R.swr)-10}" y="${Y(R.target)+20}" text-anchor="end" style="fill:var(--fg);font-weight:600">${fmtPct(R.swr,1)}</text>`;
-  $("#fireChart").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Probabilità che i soldi bastino al variare del prelievo annuo">${g}</svg><p class="caption" style="margin-top:6px">Asse orizzontale: prelievo annuo in % del capitale iniziale. Asse verticale: quota di futuri in cui i soldi durano ${R.F.years} anni.</p>`;
+  let d="";pts.forEach((p,i)=>{d+=(i?"L":"M")+X(p.rate).toFixed(1)+","+Y(p.success).toFixed(1);});g+=`<path d="${d}" fill="none" stroke="var(--fg)" stroke-width="2.6" stroke-linejoin="round"/>`;
+  pts.forEach(p=>{g+=`<circle cx="${X(p.rate)}" cy="${Y(p.success)}" r="3" fill="var(--fg)"/>`;});
+  if(sw.swr>=x0&&sw.swr<=x1)g+=`<circle cx="${X(sw.swr)}" cy="${Y(F.target)}" r="6" fill="var(--lime)" stroke="var(--fg)" stroke-width="1.5"/><text x="${X(sw.swr)-10}" y="${Y(F.target)+20}" text-anchor="end" style="fill:var(--fg);font-weight:600">${fmtPct(sw.swr,1)}</text>`;
+  $("#fiCurve").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Probabilità che i soldi bastino al variare del prelievo annuo">${g}</svg>`;
+  $("#fiCurveTxt").innerHTML=`<p><b>FIRE</b> (Financial Independence, Retire Early) vuol dire mettere da parte abbastanza da vivere dei propri investimenti, senza dipendere dallo stipendio.</p>
+    <p>La <b>regola del 4%</b> (Bengen, 1994) dice che prelevando ogni anno il 4% del capitale iniziale, aggiornato all'inflazione, i soldi sono durati 30 anni in quasi tutti i periodi storici americani. Sul tuo portafoglio, per ${sw.years} anni, il prelievo più alto che regge nel ${fmtPct(F.target,0)} dei futuri è il <b>${fmtPct(sw.swr,1)}</b> l'anno.</p>
+    <p class="caption">Asse orizzontale: prelievo annuo in % del capitale al momento dello stop. Asse verticale: quota di futuri in cui i soldi bastano.</p>`;
+}
+function fiNotes(){
+  const R=S.fi.res;
+  $("#fiNotes").innerHTML=[`Tutto è in <b>euro di oggi</b>: spesa, pensione e prelievi crescono con l'inflazione (${fmtPct(R.infl/100,1)} l'anno, dalla sezione Simulazioni).`,
+    `I rendimenti sono quelli storici del portafoglio (${esc(R.label)}, ${R.nHist} mesi), ricampionati in migliaia di futuri e al netto dei costi (${fmtPct(R.costs/100,2)} l'anno). Il futuro può essere diverso dal passato.`,
+    "Non ci sono le tasse: sui prelievi si paga il 26% (12,5% sui titoli di Stato) solo sulla parte di guadagno. Alzano un po' la spesa da coprire.",
+    "La pensione è quella che scrivi tu: il sito non la stima. Per una stima puoi usare il simulatore dell'INPS.",
+    "Il portafoglio resta lo stesso per tutta la vita. Molti riducono le azioni avvicinandosi allo stop: cambia rischio e risultati.",
+    "Non è una previsione né un consiglio: serve a capire quali scelte contano di più."].map(t=>`<li>${t}</li>`).join("");
 }
 function fiReceipt(m){
-  const R=S.fireRes,F=R.F,base=[["Rendimenti usati",`${R.nHist} mesi storici del portafoglio (${R.label}), al netto dell'inflazione ${fmtPct(R.infl/100,2)}`],["Costi annui",fmtPct(R.costs/100,2)],["Futuri simulati",`${R.n} per ogni tasso provato`],["Anni di prelievo",F.years],["Sicurezza richiesta",fmtPct(R.target,0)]];
-  const fx="r̃ = (1 + r) / (1 + π)^(1/12) − 1   (rendimenti in euro di oggi)\nWₜ = Wₜ₋₁ · (1 + r̃ₜ) · (1 − c)^(1/12) − prelievo mensile\nSWR = tasso più alto con P(W > 0 per tutti gli anni) ≥ sicurezza   (ricerca per bisezione)";
-  if(m==="draw")return {title:"Prelievo mensile sostenibile",value:fmtEur(R.draw)+"/mese",formula:fx+"\nprelievo = capitale × SWR / 12",kv:[["Capitale di partenza",fmtEur(R.C)],["SWR",fmtPct(R.swr,2)],...base]};
-  if(m==="need")return {title:"Numero FIRE",value:fmtEur(R.need),formula:fx+"\nnumero FIRE = spesa mensile × 12 / SWR",kv:[["Spesa mensile",fmtEur(F.spend)],["SWR",fmtPct(R.swr,2)],...base]};
-  if(m==="when")return {title:"Quando arrivi al numero FIRE",value:R.have?"già oggi":R.W&&R.W.median!=null?`${R.W.median} anni`:"oltre l'orizzonte",formula:"capitale simulato con versamenti mensili, in euro di oggi\nanni = primo anno in cui il capitale supera il numero FIRE (mediana dei futuri; sfavorevole = 10° percentile)",kv:[["Numero FIRE",fmtEur(R.need)],["Capitale di oggi",fmtEur(R.C)],["Risparmio mensile",fmtEur(F.save)],["Scenario mediano",R.W&&R.W.median!=null?`${R.W.median} anni`:"—"],["Scenario sfavorevole",R.W&&R.W.bad!=null?`${R.W.bad} anni`:"—"],["Scenario favorevole",R.W&&R.W.good!=null?`${R.W.good} anni`:"—"],...base]};
-  return {title:"Tasso di prelievo sostenibile",value:fmtPct(R.swr,2)+" l'anno",formula:fx,kv:[["Successo della regola del 4%",fmtPct(R.at4,1)],...R.curve.map(p=>[`Prelievo ${fmtPct(p.rate,1)}`,`riesce nel ${fmtPct(p.success,0)} dei futuri`]),...base]};
+  const R=S.fi.res,F=R.F,A=R.A,base=[["Età oggi",F.age],["I soldi devono durare fino a",`${F.end} anni`],["Capitale oggi",fmtEur(F.cap)],["Risparmio mensile",fmtEur(F.save)],["Spesa mensile",fmtEur(F.spend)],["Pensione",F.pen?`${fmtEur(F.pen)} al mese dai ${F.penAge} anni`:"non contata"],["Sicurezza richiesta",fmtPct(F.target,0)],["Rendimenti",`${R.nHist} mesi storici (${R.label}), al netto dell'inflazione ${fmtPct(R.infl/100,2)} e dei costi ${fmtPct(R.costs/100,2)}`],["Futuri simulati",`${A.res.n} per ogni età provata, sempre gli stessi`]];
+  const fx="r̃ = (1 + r) / (1 + π)^(1/12) − 1   (rendimento del mese in euro di oggi)\nprima dello stop: Wₜ = Wₜ₋₁ · (1 + r̃ₜ) · (1 − c)^(1/12) + risparmio\ndopo lo stop:    Wₜ = Wₜ₋₁ · (1 + r̃ₜ) · (1 − c)^(1/12) − (spesa − pensione)\nsuccesso = quota di futuri con W > 0 fino all'età finale";
+  if(m==="age")return {title:"Età in cui puoi smettere di lavorare",value:A.already?"già oggi":A.age==null?`oltre ${F.end-1} anni`:`${A.age} anni`,formula:fx+"\nEtà FIRE = età di stop più bassa con successo ≥ sicurezza   (ricerca binaria)",kv:[["Successo a quell'età",fmtPct(A.res.success,1)],...base]};
+  if(m==="cap")return {title:"Capitale quando smetti",value:fmtEur(R.life.capAtRetire),formula:fx+"\nvalore = mediana dei capitali all'età di stop (sfavorevole = 10° percentile)",kv:[["Scenario sfavorevole",fmtEur(R.life.capAtRetireBad)],...base]};
+  if(m==="draw")return {title:"Prelievo mensile sostenibile",value:fmtEur(F.cap*R.sw.swr/12)+"/mese",formula:"prelievo = capitale × SWR / 12\nSWR = tasso annuo più alto con successo ≥ sicurezza per "+R.sw.years+" anni",kv:[["SWR",fmtPct(R.sw.swr,2)],...base]};
+  return {title:"Tasso di prelievo sostenibile",value:fmtPct(R.sw.swr,2)+" l'anno",formula:"Wₜ = Wₜ₋₁ · (1 + r̃ₜ) · (1 − c)^(1/12) − prelievo\nSWR = tasso più alto con P(W > 0 per "+R.sw.years+" anni) ≥ sicurezza   (bisezione)",kv:[["Successo della regola del 4%",fmtPct(R.sw.at4,1)],...R.sw.curve.map(p=>[`Prelievo ${fmtPct(p.rate,1)}`,`riesce nel ${fmtPct(p.success,0)} dei futuri`]),...base]};
 }
-document.addEventListener("input",e=>{if(e.target.closest("#fireForm")){clearTimeout(fireT);fireT=setTimeout(renderFire,350);}});
-document.addEventListener("click",e=>{const b=e.target.closest("[data-fit]");if(!b||!S.fire)return;S.fire.target=+b.dataset.fit;renderFire();});
+document.addEventListener("input",e=>{if(e.target.closest("#fiForm")&&S.fi){clearTimeout(fiT);fiT=setTimeout(()=>{fiRead();fiCompute();},450);}});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-fit]");if(!b||!S.fi)return;S.fi.in.target=+b.dataset.fit;fiFill();fiCompute();});
 function renderSim(){
   const box=$("#simBox"),empty=$("#simEmpty");
   if(!S.lab||!S.ds||!S.ds.ok){box.hidden=true;empty.hidden=false;$("#simW").innerHTML="";return;}
@@ -2228,7 +2297,7 @@ function renderSim(){
   document.querySelectorAll("#mcMethod [data-mcm]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mcm===S.mcIn.method)));
   document.querySelectorAll("#mcN [data-mcn]").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.mcn===S.mcIn.n)));
   document.querySelectorAll("#mcReal [data-mcr]").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.mcr==="1")===S.mcIn.real)));
-  const R=runSim();setTimeout(renderFire,30);
+  const R=runSim();
   if(R.error){$("#mcKpis").innerHTML=`<div class="kpi"><span class="eyebrow">Dati insufficienti</span><span class="v txt">${esc(R.error)}</span>${rebuildHint()}</div>`;["#mcFan","#mcDist","#mcTable","#mcNotes","#mcLegend"].forEach(id=>$(id).innerHTML="");return;}
   const real=S.mcIn.real,pf=real?R.pFinalReal:R.pFinal,yrs=unitN(R.years,1),btn=(k,v)=>`<button type="button" class="v" data-rc="mc-${k}">${v}</button>`;
   $("#simSub").textContent=`${fmtN(R.n,0).replace(",00","")} percorsi di ${yrs} con ${R.wLabel}, ricampionando ${R.hist.m} rendimenti ${S.ds.freq.adj} del file.`;
@@ -3103,10 +3172,15 @@ const TOOLS_LOCAL={
     const pw=a.pesi?parseWeights(a.pesi):null;if(pw&&pw.error)return pw;
     const w=pw?pw.w:riskWeights().w,ret=pfAsset(w,"p").ret,years=Math.max(5,Math.min(60,Math.round(num(a.anni,F.years)))),target=Math.max(.5,Math.min(.99,num(a.probabilita,F.target))),spend=Math.max(100,num(a.spesa_mensile,F.spend)),cap=Math.max(0,num(a.capitale,I.init)),save=Math.max(0,num(a.risparmio_mensile,F.save));
     const R=P.fireRate({ret,f,years,infl:I.infl/100,costs:I.costs/100,target,method:I.method,block:f,n:800});if(R.error)return {error:R.error};
+    /* con l'età: a che età si può smettere, su tutta la vita (risparmi, prelievi, pensione) */
+    let eta=null;const FI=S.fi?S.fi.in:null,age=num(a.eta,FI?FI.age:NaN);
+    if(Number.isFinite(age)){const end=num(a.eta_fine,FI?FI.end:90),A=P.fireAge({ret,age,endAge:end,initial:cap,save,spend,pension:num(a.pensione,FI?FI.pen:0),pensionAge:num(a.eta_pensione,FI?FI.penAge:67),infl:I.infl/100,costs:I.costs/100,target,method:I.method,block:12,n:500});
+      eta=A.error?{error:A.error}:{eta_oggi:age,soldi_fino_a:end,puoi_smettere_a:A.already?"già oggi":A.age==null?`non prima dei ${end} anni`:A.age,successo:fmtPct(A.res.success,0)};}
     const need=spend*12/R.swr,W=cap>=need?null:P.fireWhen({ret,f,initial:cap,monthly:save,infl:I.infl/100,costs:I.costs/100,goal:need,method:I.method,block:f,n:800});
     return {nota:"Tutto in euro di oggi, prelievi aggiornati all'inflazione, rendimenti storici del portafoglio. Niente tasse, pensione o altre entrate.",
       anni_di_prelievo:years,sicurezza:fmtPct(target,0),tasso_prelievo_sostenibile:fmtPct(R.swr,2)+" l'anno",successo_regola_4_per_cento:fmtPct(R.at4,0),
       prelievo_mensile_con_capitale_attuale:fmtEur(cap*R.swr/12),capitale_attuale:fmtEur(cap),spesa_mensile:fmtEur(spend),numero_fire:fmtEur(need),
+      eta_fire:eta,
       quando:cap>=need?"già raggiunto":{risparmio_mensile:fmtEur(save),anni_scenario_mediano:W&&W.median!=null?W.median:"oltre 50",anni_scenario_sfavorevole:W&&W.bad!=null?W.bad:"oltre 50"}};
   },
   monte_carlo:(a)=>{
@@ -3228,7 +3302,7 @@ function receipt(key){
   const ds=S.ds,L=S.lab,f=ds.freq.f,parts=key.split("-"),kind=parts[0];
   if(kind==="rk"&&S.risk)return riskReceipt(parts[1],parts[2]);
   if(kind==="mc"&&S.mc)return mcReceipt(parts[1],parts[2]);
-  if(kind==="fi"&&S.fireRes)return fiReceipt(parts[1]);
+  if(kind==="fi"&&S.fi&&S.fi.res)return fiReceipt(parts[1]);
   if(kind==="st"&&S.stress)return stReceipt(parts[1],parts[2],parts[3]);
   if(kind==="op"&&S.opt)return opReceipt(parts[1],parts[2]);
   if(kind==="bn"&&S.bnRes)return bnReceipt(parts[1],parts[2]);
@@ -3271,6 +3345,8 @@ const pctOf=v=>{const m=String(v||"").replace(/−/g,"-").match(/([+-]?\d[\d.]*,
 const eur10=x=>fmtN(Math.abs(x)/100*10000,0)+" €";
 const EXPLAIN=[
   [/^Rendimento annuo \(TIR\)/,v=>["È quanto sono cresciuti in media ogni anno i soldi che hai versato, tenendo conto di quando li hai versati: un euro messo nel 2019 conta più di uno messo il mese scorso.","È il numero da confrontare con un conto deposito o con un'altra persona che investe: è il tuo rendimento, non quello del fondo."]],
+  [/^Età in cui puoi smettere/,v=>["È l'età più bassa in cui puoi lasciare il lavoro e vivere dei tuoi investimenti (più la pensione, se l'hai indicata) fino all'età scelta, nella sicurezza scelta.","Lo trovo provando le età una per una su migliaia di futuri possibili, sempre gli stessi: cambia solo quando smetti."]],
+  [/^Capitale quando smetti/,v=>["È quanto avrai investito, in euro di oggi, il giorno in cui smetti di lavorare, nello scenario di mezzo.","Lo scenario sfavorevole indica cosa succede se i mercati vanno peggio: 10 futuri su 100 finiscono sotto."]],
   [/^Prelievo mensile sostenibile/,v=>["È quanto potresti prelevare ogni mese, aumentandolo ogni anno con l'inflazione, senza esaurire i soldi per tutti gli anni scelti, nel livello di sicurezza scelto.","Se prelevi di più, la probabilità che i soldi finiscano prima sale in fretta: guarda la curva sotto."]],
   [/^Numero FIRE/,v=>["È il capitale che ti serve per coprire la spesa mensile scelta solo con i prelievi dal portafoglio.","Più è lungo il periodo e più vuoi essere sicuro, più alto è il numero. Pensione e altre entrate lo abbassano, le tasse lo alzano."]],
   [/^Quando arrivi al numero FIRE/,v=>["È tra quanti anni il capitale, con i tuoi risparmi mensili, arriva al numero FIRE, in euro di oggi.","Lo scenario sfavorevole (10 futuri su 100 vanno peggio) è quello da usare per decidere."]],
@@ -3423,6 +3499,7 @@ async function loadMarket(){
 
 /* ---------- Quanta si presenta: fumetti per sezione e qualche giro per lo schermo ---------- */
 const QTIPS={
+  fire:{t:"Chiedimi: «Se risparmio 300 € in più, quando posso smettere?»",q:"Se risparmio 300 € in più al mese, a che età posso smettere di lavorare?"},
   home:{t:"Ciao, sono <b>Quanta</b>! Carica un file e chiedimi qualsiasi cosa sui tuoi investimenti.",q:null},
   scan:{t:"Sto guardando il tuo file con il motore. Se qualcosa non torna, chiedimelo.",q:null},
   map:{t:"Una colonna non ti è chiara? Te la spiego io.",q:null},

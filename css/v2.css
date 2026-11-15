@@ -436,6 +436,50 @@ body.bd-on .orb-btn,body.bd-on .orb-say{display:none}
 .fire-txt p{margin:0 0 10px;line-height:1.55}
 @media (max-width:1000px){.fire .fire-form,.fire-k{grid-template-columns:repeat(2,minmax(0,1fr))}.fire-two{grid-template-columns:1fr}}
 
+/* ---------- Indipendenza finanziaria (FIRE) ---------- */
+.fi-teaser{display:flex!important;justify-content:space-between;align-items:center;gap:16px;text-align:left;cursor:pointer;color:var(--fg);border:1px solid var(--lime)!important;background:color-mix(in oklab,var(--lime) 14%,var(--bg))!important;font:inherit}
+.fi-teaser>span{display:flex;flex-direction:column;gap:4px}.fi-teaser b{font-family:var(--f-display);font-size:1.35rem;letter-spacing:-.03em}.fi-teaser small{color:var(--muted)}.fi-teaser em{font-style:normal;font-size:1.6rem}
+.fi-hero{border-radius:22px;padding:30px 32px;background:var(--fg);color:#fff;position:relative;overflow:hidden}
+.fi-hero .fi-q{margin:0 0 8px;color:rgba(255,255,255,.62);font-size:.95rem}
+.fi-hero .fi-a{font-family:var(--f-display);font-weight:800;font-size:clamp(2rem,4.6vw,3.6rem);letter-spacing:-.045em;line-height:1.02;margin:0 0 12px;color:#fff}
+.fi-hero .fi-a em{font-style:normal;color:var(--lime)}
+.fi-hero .fi-a .cellbtn{font:inherit;color:inherit;letter-spacing:inherit;border:0;padding:0;background:none;text-decoration:underline;text-decoration-color:rgba(201,242,74,.5);text-decoration-thickness:3px;text-underline-offset:8px}
+.fi-hero .fi-s{margin:0;max-width:70ch;color:rgba(255,255,255,.8);font-size:1.02rem;line-height:1.5}
+.fi-prog{margin-top:22px}
+.fi-bar{height:10px;border-radius:6px;background:rgba(255,255,255,.14);overflow:hidden}.fi-bar i{display:block;height:100%;background:var(--lime);border-radius:6px;transition:width .8s cubic-bezier(.2,.75,.2,1)}
+.fi-pl{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:.86rem;color:rgba(255,255,255,.7)}.fi-pl b{color:#fff}
+.fi-wait{color:var(--muted);padding:6px 0}.fi-hero .fi-wait{color:rgba(255,255,255,.7)}
+.fi-form{display:grid;grid-template-columns:1fr 1.4fr 1fr 1fr;gap:20px}
+.fi-group{display:flex;flex-direction:column;gap:10px;min-width:0}
+.fi-gl{font-family:var(--f-display);font-weight:800;font-size:1rem;letter-spacing:-.02em}
+.fi-form label{display:flex;flex-direction:column;gap:5px}.fi-form label>span{font-size:.82rem;color:var(--muted)}
+.fi-form input{width:100%;border-radius:12px;border:1px solid var(--line);background:var(--raise);padding:10px 12px;font:inherit;font-size:1rem;color:var(--fg);font-variant-numeric:tabular-nums}
+.fi-form input:focus{outline:2px solid var(--fg);outline-offset:1px}
+.fi-form small{font-size:.74rem;color:var(--faint)}
+.fi-seg{display:flex;flex-direction:column;gap:8px}.fi-seg .seg{align-self:flex-start}
+#fiKpis .kpi .s{font-size:.8rem;color:var(--muted)}#fiKpis .kpi:first-child .s{color:#3a4a10}
+.fi-levers{display:flex;flex-direction:column;gap:2px}
+.fi-lv{display:grid;grid-template-columns:minmax(0,1fr) 80px 70px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);position:relative}
+.fi-lv span{font-size:.92rem}.fi-lv b{text-align:right;font-variant-numeric:tabular-nums}
+.fi-lv em{font-style:normal;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted)}.fi-lv em.good{color:var(--good)}.fi-lv em.bad{color:var(--bad)}
+.fi-lv i{position:absolute;left:0;bottom:-1px;height:2px;width:var(--w);background:var(--lime)}
+.fi-vars{display:flex;flex-direction:column;gap:8px}
+.fi-var{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.fi-var div{display:flex;flex-direction:column;gap:2px}.fi-var b{font-family:var(--f-display);letter-spacing:-.02em}.fi-var small{color:var(--muted);font-size:.8rem}
+.fi-var>span{font-family:var(--f-display);font-weight:800;font-size:1.25rem;letter-spacing:-.03em;white-space:nowrap}
+.fi-var:nth-child(2){border-color:var(--fg)}
+.fi-two{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:start}.fi-txt p{margin:0 0 10px;line-height:1.55}
+@media (max-width:1000px){.fi-form{grid-template-columns:1fr 1fr}.fi-two{grid-template-columns:1fr}}
+@media (max-width:760px){.fi-hero{padding:22px 20px;border-radius:18px}.fi-form{grid-template-columns:1fr}.fi-lv{grid-template-columns:minmax(0,1fr) 70px 56px}}
+@media (max-width:760px){#fiKpis .kpi .v{font-size:1.45rem;white-space:nowrap}#fiKpis .kpi{padding:14px}}
+
+/* menu in alto: allineato dopo il marchio (non al centro), così non copre mai il cambio di spazio a destra */
+@media (min-width:1341px){
+  .dock{left:calc(max(20px,(100vw - 1360px)/2 + 20px) + 196px);transform:none;max-width:none}
+  .dock button{padding:9px 8px;font-size:.86rem}
+}
+@media (max-width:1340px){.dock{position:fixed;top:60px;left:0;right:0;transform:none;max-width:none;background:rgba(255,255,255,.92);border-bottom:1px solid var(--line);border-radius:0;overflow-x:auto;justify-content:flex-start;padding:0 12px}.scene{padding-top:120px}}
+
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
 .scene-title h2 em{color:var(--lime-text)}

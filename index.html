@@ -265,17 +265,7 @@
         </form>
         <div class="kpis" id="mcKpis"></div>
         <div class="bento">
-          <div class="card s12 fire" id="fireCard">
-            <div class="head"><div><span class="eyebrow">Indipendenza finanziaria · FIRE</span><h3 style="margin-top:4px">Quando puoi vivere dei tuoi investimenti?</h3></div></div>
-            <form class="fire-form" id="fireForm" autocomplete="off">
-              <label><span class="eyebrow">Spesa mensile da coprire (€)</span><input type="number" min="100" step="100" id="fiSpend" inputmode="decimal"><small>in euro di oggi</small></label>
-              <label><span class="eyebrow">Per quanti anni</span><input type="number" min="5" max="60" step="1" id="fiYears"><small>es. dai 55 ai 85 anni = 30</small></label>
-              <label><span class="eyebrow">Risparmio mensile (€)</span><input type="number" min="0" step="50" id="fiSave" inputmode="decimal"><small>finché non ci arrivi</small></label>
-              <div><span class="eyebrow">Quanto vuoi essere sicuro</span><div class="seg" role="group" aria-label="Probabilità di successo" id="fiTarget"><button type="button" data-fit="0.75">75%</button><button type="button" data-fit="0.9">90%</button><button type="button" data-fit="0.95">95%</button></div><small>dei futuri simulati in cui i soldi bastano</small></div>
-            </form>
-            <div class="fire-k" id="fireKpis"></div>
-            <div class="fire-two"><div><div class="chartbox" id="fireChart"></div></div><div class="fire-txt" id="fireTxt"></div></div>
-          </div>
+          <button type="button" class="card s12 fi-teaser" data-go="fire"><span><span class="eyebrow">Indipendenza finanziaria · FIRE</span><b>Quando puoi smettere di lavorare?</b><small>Età, spesa, pensione e risparmi: la risposta sui rendimenti del tuo portafoglio.</small></span><em aria-hidden="true">→</em></button>
           <div class="card s12"><div class="head"><h3>Il ventaglio dei futuri</h3><div class="seg" role="group" aria-label="Valori nominali o reali" id="mcReal"><button type="button" data-mcr="0">Nominale</button><button type="button" data-mcr="1">Al netto dell'inflazione</button></div></div><div class="chartbox" id="mcFan"></div><div class="legend" id="mcLegend"></div><p class="caption" id="mcFanCap"></p></div>
           <div class="card s7"><div class="head"><h3>Dove finisci</h3><span class="eyebrow" id="mcDistUnit"></span></div><div class="chartbox" id="mcDist"></div><p class="caption" id="mcDistCap"></p></div>
           <div class="card s5"><div class="head"><h3>Percentili</h3><span class="eyebrow">Clicca un numero per la ricevuta</span></div><div class="tablewrap"><table class="mt mc-t" id="mcTable"></table></div></div>
@@ -286,6 +276,43 @@
   </section>
 
   <!-- STRESS TEST -->
+  <section class="scene" data-scene="fire" id="scene-fire" aria-label="Indipendenza finanziaria" hidden>
+    <div class="inner">
+      <div class="scene-title"><div><span class="idx">Indipendenza finanziaria</span><h2>Quando puoi <em>smettere</em>?</h2></div><div class="stack" style="align-items:flex-end"><p id="fiSub">La tua età, quanto spendi, quanto risparmi: la risposta sui rendimenti veri del tuo portafoglio.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="fiW"></div></div></div>
+      <div class="tile s12 empty" id="fiEmpty">
+        <span class="eyebrow">Ancora vuoto</span>
+        <div class="big">Prima costruisci il laboratorio</div>
+        <p style="color:var(--muted);max-width:52ch">Il calcolo usa i rendimenti storici del tuo portafoglio: carica un file o crea un portafoglio, poi conferma la mappa.</p>
+        <div><button type="button" class="btn lime" data-go="map">Vai alla mappa</button></div>
+      </div>
+      <div id="fiBox" hidden style="display:flex;flex-direction:column;gap:16px">
+        <div class="fi-hero" id="fiHero"></div>
+        <form class="card fi-form" id="fiForm" autocomplete="off">
+          <div class="fi-group"><span class="fi-gl">Tu</span>
+            <label><span>Età oggi</span><input type="number" min="18" max="80" step="1" id="fiAge" inputmode="numeric"></label>
+            <label><span>I soldi devono durare fino a</span><input type="number" min="60" max="105" step="1" id="fiEnd" inputmode="numeric"><small>anni di età</small></label></div>
+          <div class="fi-group"><span class="fi-gl">Soldi</span>
+            <label><span>Capitale investito oggi (€)</span><input type="number" min="0" step="1000" id="fiCap" inputmode="decimal"></label>
+            <label><span>Risparmi ogni mese (€)</span><input type="number" min="0" step="50" id="fiSave" inputmode="decimal"><small>finché lavori</small></label>
+            <label><span>Spesa mensile da coprire (€)</span><input type="number" min="100" step="100" id="fiSpend" inputmode="decimal"><small>in euro di oggi</small></label></div>
+          <div class="fi-group"><span class="fi-gl">Pensione</span>
+            <label><span>Pensione mensile (€)</span><input type="number" min="0" step="100" id="fiPen" inputmode="decimal"><small>netta, in euro di oggi · 0 se non vuoi contarla</small></label>
+            <label><span>Da che età</span><input type="number" min="55" max="75" step="1" id="fiPenAge" inputmode="numeric"></label></div>
+          <div class="fi-group"><span class="fi-gl">Sicurezza</span>
+            <div class="fi-seg"><div class="seg" role="group" aria-label="Probabilità di successo" id="fiTarget"><button type="button" data-fit="0.75">75%</button><button type="button" data-fit="0.9">90%</button><button type="button" data-fit="0.95">95%</button></div><small>dei futuri simulati in cui i soldi bastano fino alla fine</small></div></div>
+        </form>
+        <div class="kpis" id="fiKpis"></div>
+        <div class="bento">
+          <div class="card s12"><div class="head"><h3>La tua vita finanziaria</h3><span class="eyebrow">capitale in euro di oggi, per età</span></div><div class="chartbox" id="fiLife"></div><div class="legend" id="fiLifeLeg"></div><p class="caption" id="fiLifeCap"></p></div>
+          <div class="card s7"><div class="head"><h3>Cosa ti avvicina di più</h3><span class="eyebrow">età in cui puoi smettere</span></div><div class="fi-levers" id="fiLevers"></div></div>
+          <div class="card s5"><div class="head"><h3>I tipi di FIRE</h3><span class="eyebrow">stessi dati, scelte diverse</span></div><div class="fi-vars" id="fiVars"></div></div>
+          <div class="card s12"><div class="head"><h3>La regola del 4% sul tuo portafoglio</h3><span class="eyebrow">prelievo annuo e probabilità che basti</span></div><div class="fi-two"><div class="chartbox" id="fiCurve"></div><div class="fi-txt" id="fiCurveTxt"></div></div></div>
+          <div class="card s12"><div class="head"><h3>Ipotesi e limiti</h3><span class="eyebrow">leggili prima dei numeri</span></div><ul class="mc-notes" id="fiNotes"></ul></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="scene" data-scene="stress" id="scene-stress" aria-label="Stress test" hidden>
     <div class="inner">
       <div class="scene-title"><div><span class="idx">Stress test</span><h2>Se arriva la <em>tempesta</em></h2></div><div class="stack" style="align-items:flex-end"><p id="stSub">Le crisi vere, rivissute con i dati del tuo file. E gli shock che vuoi provare tu.</p><div class="seg" role="group" aria-label="Pesi del portafoglio" id="stW"></div></div></div>
@@ -388,6 +415,7 @@
   <button type="button" data-go="lab" id="navLab" class="off" data-l="Laboratorio"><span class="n">04</span><span class="lbl">Laboratorio</span></button>
   <button type="button" data-go="risk" id="navRisk" class="off" data-l="Rischio"><span class="n">05</span><span class="lbl">Rischio</span></button>
   <button type="button" data-go="sim" id="navSim" class="off" data-l="Simulazioni"><span class="n">06</span><span class="lbl">Simulazioni</span></button>
+  <button type="button" data-go="fire" id="navFire" class="off" data-l="Indipendenza"><span class="n">07</span><span class="lbl">Indipendenza</span></button>
   <button type="button" data-go="stress" id="navStress" class="off" data-l="Stress test"><span class="n">07</span><span class="lbl">Stress test</span></button>
   <button type="button" data-go="opt" id="navOpt" class="off" data-l="Frontiera"><span class="n">08</span><span class="lbl">Frontiera</span></button>
   <button type="button" data-go="bench" id="navBench" class="off" data-l="Benchmark"><span class="n">09</span><span class="lbl">Benchmark</span></button>
