@@ -2158,6 +2158,65 @@ function runSim(){
   R.wLabel=label;R.w=w;R.nAsked=I.n;R.histAnn=histAnn;R.rate=I.rate;R.nHist=fin.length;R.histFrom=pa.ret.findIndex(Number.isFinite);
   S.mc=R;return R;
 }
+/* ---------- FIRE: quanto puoi prelevare, quanto ti serve, quando ci arrivi (tutto in euro di oggi) ---------- */
+let fireT=0;
+function fireInputs(){
+  const I=S.mcIn,F=S.fire||(S.fire={spend:2000,years:30,target:.9,save:Math.max(0,I.monthly)});
+  const num=(id,d)=>{const v=parseFloat(String($(id).value).replace(",","."));return Number.isFinite(v)?v:d;};
+  if($("#fiSpend").value!==""||F._init){F.spend=Math.max(100,num("#fiSpend",F.spend));F.years=Math.max(5,Math.min(60,Math.round(num("#fiYears",F.years))));F.save=Math.max(0,num("#fiSave",F.save));}
+  F._init=true;$("#fiSpend").value=F.spend;$("#fiYears").value=F.years;$("#fiSave").value=F.save;
+  document.querySelectorAll("#fiTarget [data-fit]").forEach(b=>b.setAttribute("aria-pressed",String(Math.abs(+b.dataset.fit-F.target)<1e-9)));
+  return F;
+}
+function renderFire(){
+  if(!S.mcIn||!S.ds||!S.ds.ok)return;
+  const ds=S.ds,f=ds.freq.f,I=S.mcIn,F=fireInputs(),{w}=riskWeights(),pa=pfAsset(w,"Portafoglio"),C=I.init;
+  const key=[w.map(x=>x.toFixed(4)).join(),F.years,F.target,I.infl,I.costs,I.method].join("|");
+  $("#fireKpis").innerHTML=`<div class="fire-wait">Calcolo ${S.fireRes&&S.fireRes.key===key?"":"migliaia di futuri…"}</div>`;
+  clearTimeout(fireT);fireT=setTimeout(()=>{
+    let R=S.fireRes&&S.fireRes.key===key?S.fireRes:null;
+    if(!R){R=P.fireRate({ret:pa.ret,f,years:F.years,infl:I.infl/100,costs:I.costs/100,target:F.target,method:I.method,block:f,n:1000});R.key=key;}
+    if(R.error){$("#fireKpis").innerHTML=`<div class="fire-wait">${esc(R.error)}</div>`;return;}
+    const draw=C*R.swr/12,need=F.spend*12/R.swr,have=C>=need;
+    const W=have?null:P.fireWhen({ret:pa.ret,f,initial:C,monthly:F.save,infl:I.infl/100,costs:I.costs/100,goal:need,method:I.method,block:f,n:1000});
+    S.fireRes={...R,key,draw,need,have,W,C,F:{...F},infl:I.infl,costs:I.costs,label:riskWeights().label,nHist:pa.ret.filter(Number.isFinite).length};
+    const c=(k,v)=>`<button type="button" class="v" data-rc="fi-${k}">${v}</button>`,yrs=y=>y==null?`oltre ${W?W.maxYears:50} anni`:y===0?"già oggi":y===1?"tra 1 anno":`tra ${y} anni`;
+    $("#fireKpis").innerHTML=[
+      ["Con quello che hai oggi",c("draw",fmtEur(draw)+"/mese"),`per ${F.years} anni, in euro di oggi, partendo da ${fmtEur(C)}`],
+      ["Il tuo numero FIRE",c("need",fmtEur(need)),`il capitale per prelevare ${fmtEur(F.spend)} al mese`],
+      ["Quando ci arrivi",c("when",have?"Ci sei già":yrs(W&&W.median)),have?`il capitale di oggi copre ${fmtEur(F.spend)} al mese`:`risparmiando ${fmtEur(F.save)} al mese · scenario sfavorevole: ${yrs(W&&W.bad)}`],
+      ["Tasso di prelievo sostenibile",c("swr",fmtPct(R.swr,1)+" l'anno"),`la regola del 4% qui riesce nel ${fmtPct(R.at4,0)} dei futuri`]
+    ].map(([l,v,s],i)=>`<div class="kpi${i===0?"":""}"><span class="eyebrow">${l}</span>${v}<small>${s}</small></div>`).join("");
+    drawFire();
+    $("#fireTxt").innerHTML=`<p><b>FIRE</b> (Financial Independence, Retire Early) vuol dire mettere da parte abbastanza da vivere dei rendimenti e dei prelievi, senza più dipendere dallo stipendio.</p>
+      <p>La famosa <b>regola del 4%</b> (Bengen, 1994) dice che prelevando ogni anno il 4% del capitale iniziale, aggiornato all'inflazione, i soldi sono durati 30 anni in quasi tutti i periodi storici americani. Qui la stessa domanda è fatta con <b>i rendimenti del tuo portafoglio</b>: ${fmtPct(R.swr,1)} l'anno è il prelievo più alto che riesce nel ${fmtPct(F.target,0)} dei futuri simulati.</p>
+      <p class="caption">Prelievi costanti in euro di oggi, rendimenti storici del portafoglio (${esc(S.fireRes.label)}, ${S.fireRes.nHist} mesi) al netto dell'inflazione (${fmtPct(I.infl/100,1)}) e dei costi (${fmtPct(I.costs/100,2)}). Niente tasse, pensione o altre entrate. Non è una previsione né un consiglio.</p>`;
+  },40);
+}
+function drawFire(){
+  const R=S.fireRes;if(!R||!R.curve.length)return;
+  const VW=640,VH=250,ml=46,mr=16,mt=16,mb=34,iw=VW-ml-mr,ih=VH-mt-mb,pts=R.curve,x0=pts[0].rate,x1=pts.at(-1).rate;
+  const X=v=>ml+(v-x0)/(x1-x0)*iw,Y=v=>mt+ih-v*ih;let g="";
+  [0,.25,.5,.75,1].forEach(v=>{g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${ml-8}" y="${Y(v)+4}" text-anchor="end">${fmtPct(v,0)}</text>`;});
+  pts.forEach(p=>{g+=`<text x="${X(p.rate)}" y="${VH-12}" text-anchor="middle">${fmtPct(p.rate,1).replace(",0","")}</text>`;});
+  g+=`<line x1="${ml}" x2="${VW-mr}" y1="${Y(R.target)}" y2="${Y(R.target)}" stroke="var(--c2)" stroke-dasharray="4 4"/><text x="${VW-mr}" y="${Y(R.target)-6}" text-anchor="end" style="fill:var(--c2)">sicurezza ${fmtPct(R.target,0)}</text>`;
+  g+=`<line x1="${X(.04)}" x2="${X(.04)}" y1="${mt}" y2="${mt+ih}" stroke="var(--muted)" stroke-dasharray="2 4"/><text x="${X(.04)-6}" y="${mt+ih-8}" text-anchor="end" style="fill:var(--muted)">regola del 4%</text>`;
+  let d="";pts.forEach((p,i)=>{d+=(i?"L":"M")+X(p.rate).toFixed(1)+","+Y(p.success).toFixed(1);});
+  g+=`<path d="${d}" fill="none" stroke="var(--fg)" stroke-width="2.6" stroke-linejoin="round"/>`;
+  pts.forEach(p=>{g+=`<circle cx="${X(p.rate)}" cy="${Y(p.success)}" r="3" fill="var(--fg)"><title>${fmtPct(p.rate,1)} l'anno: riesce nel ${fmtPct(p.success,0)} dei futuri</title></circle>`;});
+  if(R.swr>=x0&&R.swr<=x1)g+=`<circle cx="${X(R.swr)}" cy="${Y(R.target)}" r="6" fill="var(--lime)" stroke="var(--fg)" stroke-width="1.5"/><text x="${X(R.swr)-10}" y="${Y(R.target)+20}" text-anchor="end" style="fill:var(--fg);font-weight:600">${fmtPct(R.swr,1)}</text>`;
+  $("#fireChart").innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Probabilità che i soldi bastino al variare del prelievo annuo">${g}</svg><p class="caption" style="margin-top:6px">Asse orizzontale: prelievo annuo in % del capitale iniziale. Asse verticale: quota di futuri in cui i soldi durano ${R.F.years} anni.</p>`;
+}
+function fiReceipt(m){
+  const R=S.fireRes,F=R.F,base=[["Rendimenti usati",`${R.nHist} mesi storici del portafoglio (${R.label}), al netto dell'inflazione ${fmtPct(R.infl/100,2)}`],["Costi annui",fmtPct(R.costs/100,2)],["Futuri simulati",`${R.n} per ogni tasso provato`],["Anni di prelievo",F.years],["Sicurezza richiesta",fmtPct(R.target,0)]];
+  const fx="r̃ = (1 + r) / (1 + π)^(1/12) − 1   (rendimenti in euro di oggi)\nWₜ = Wₜ₋₁ · (1 + r̃ₜ) · (1 − c)^(1/12) − prelievo mensile\nSWR = tasso più alto con P(W > 0 per tutti gli anni) ≥ sicurezza   (ricerca per bisezione)";
+  if(m==="draw")return {title:"Prelievo mensile sostenibile",value:fmtEur(R.draw)+"/mese",formula:fx+"\nprelievo = capitale × SWR / 12",kv:[["Capitale di partenza",fmtEur(R.C)],["SWR",fmtPct(R.swr,2)],...base]};
+  if(m==="need")return {title:"Numero FIRE",value:fmtEur(R.need),formula:fx+"\nnumero FIRE = spesa mensile × 12 / SWR",kv:[["Spesa mensile",fmtEur(F.spend)],["SWR",fmtPct(R.swr,2)],...base]};
+  if(m==="when")return {title:"Quando arrivi al numero FIRE",value:R.have?"già oggi":R.W&&R.W.median!=null?`${R.W.median} anni`:"oltre l'orizzonte",formula:"capitale simulato con versamenti mensili, in euro di oggi\nanni = primo anno in cui il capitale supera il numero FIRE (mediana dei futuri; sfavorevole = 10° percentile)",kv:[["Numero FIRE",fmtEur(R.need)],["Capitale di oggi",fmtEur(R.C)],["Risparmio mensile",fmtEur(F.save)],["Scenario mediano",R.W&&R.W.median!=null?`${R.W.median} anni`:"—"],["Scenario sfavorevole",R.W&&R.W.bad!=null?`${R.W.bad} anni`:"—"],["Scenario favorevole",R.W&&R.W.good!=null?`${R.W.good} anni`:"—"],...base]};
+  return {title:"Tasso di prelievo sostenibile",value:fmtPct(R.swr,2)+" l'anno",formula:fx,kv:[["Successo della regola del 4%",fmtPct(R.at4,1)],...R.curve.map(p=>[`Prelievo ${fmtPct(p.rate,1)}`,`riesce nel ${fmtPct(p.success,0)} dei futuri`]),...base]};
+}
+document.addEventListener("input",e=>{if(e.target.closest("#fireForm")){clearTimeout(fireT);fireT=setTimeout(renderFire,350);}});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-fit]");if(!b||!S.fire)return;S.fire.target=+b.dataset.fit;renderFire();});
 function renderSim(){
   const box=$("#simBox"),empty=$("#simEmpty");
   if(!S.lab||!S.ds||!S.ds.ok){box.hidden=true;empty.hidden=false;$("#simW").innerHTML="";return;}
@@ -2169,7 +2228,7 @@ function renderSim(){
   document.querySelectorAll("#mcMethod [data-mcm]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mcm===S.mcIn.method)));
   document.querySelectorAll("#mcN [data-mcn]").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.mcn===S.mcIn.n)));
   document.querySelectorAll("#mcReal [data-mcr]").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.mcr==="1")===S.mcIn.real)));
-  const R=runSim();
+  const R=runSim();setTimeout(renderFire,30);
   if(R.error){$("#mcKpis").innerHTML=`<div class="kpi"><span class="eyebrow">Dati insufficienti</span><span class="v txt">${esc(R.error)}</span>${rebuildHint()}</div>`;["#mcFan","#mcDist","#mcTable","#mcNotes","#mcLegend"].forEach(id=>$(id).innerHTML="");return;}
   const real=S.mcIn.real,pf=real?R.pFinalReal:R.pFinal,yrs=unitN(R.years,1),btn=(k,v)=>`<button type="button" class="v" data-rc="mc-${k}">${v}</button>`;
   $("#simSub").textContent=`${fmtN(R.n,0).replace(",00","")} percorsi di ${yrs} con ${R.wLabel}, ricampionando ${R.hist.m} rendimenti ${S.ds.freq.adj} del file.`;
@@ -2965,7 +3024,7 @@ document.addEventListener("click",e=>{if(!e.target.closest("[data-rebuild]"))ret
 
 /* ---------- Analista in chat: l'IA capisce, il motore calcola ---------- */
 S.chat=[];S.chatView=[];let chatBusy=false;
-const TOOL_L={panoramica:"panoramica dei dati",metriche:"metriche per asset",rischio_portafoglio:"rischio del portafoglio",confronta_pesi:"confronto tra allocazioni",correlazioni:"correlazioni",macro:"tassi e inflazione",portafoglio_utente:"il tuo portafoglio",monte_carlo:"simulazione Monte Carlo",crisi_storiche:"crisi storiche",stress_shock:"stress test",ottimizza:"frontiera efficiente",confronta_benchmark:"confronto con il benchmark"};
+const TOOL_L={indipendenza_finanziaria:"indipendenza finanziaria (FIRE)",panoramica:"panoramica dei dati",metriche:"metriche per asset",rischio_portafoglio:"rischio del portafoglio",confronta_pesi:"confronto tra allocazioni",correlazioni:"correlazioni",macro:"tassi e inflazione",portafoglio_utente:"il tuo portafoglio",monte_carlo:"simulazione Monte Carlo",crisi_storiche:"crisi storiche",stress_shock:"stress test",ottimizza:"frontiera efficiente",confronta_benchmark:"confronto con il benchmark"};
 function openChat(){$("#chat").classList.add("open");$("#chat").setAttribute("aria-hidden","false");document.body.classList.add("chat-on");renderChat();setTimeout(()=>$("#chatIn").focus(),300);}
 function closeChat(){$("#chat").classList.remove("open");$("#chat").setAttribute("aria-hidden","true");document.body.classList.remove("chat-on");setTimeout(()=>$("#chatBtn").focus({preventScroll:true}),350);}
 const orbBusy=on=>document.querySelectorAll(".orb").forEach(o=>o.classList.toggle("busy",on));
@@ -3039,6 +3098,17 @@ const TOOLS_LOCAL={
     return {A:pfSummary(a.w),B:pfSummary(b.w),nota:"Stessi dati storici; portafogli ribilanciati a ogni periodo."};},
   correlazioni:()=>{const ds=S.ds,out=[];ds.assets.forEach((a,i)=>ds.assets.forEach((b,j)=>{if(j>i)out.push({coppia:`${a.name} / ${b.name}`,correlazione:fmtN(S.lab.C[i][j].r)});}));return {correlazioni:out};},
   macro:()=>{const mm=macroFor(S.rfSrc);return mm?{tasso_privo_di_rischio_medio:fmtPct(mm.rf,2),fonte_tasso:`${mm.rfName} · ${mm.source}`,inflazione_media_annua:fmtPct(mm.infl,2),periodo:`${mm.from} - ${mm.to}`}:{nota:"Dati macro non disponibili: lo Sharpe usa un tasso dello 0%."};},
+  indipendenza_finanziaria:(a)=>{
+    const I={...(S.mcIn||simDefaults())},F=S.fire||{spend:2000,years:30,target:.9,save:Math.max(0,I.monthly)},num=(v,d)=>Number.isFinite(+v)&&v!==null&&v!==""?+v:d,ds=S.ds,f=ds.freq.f;
+    const pw=a.pesi?parseWeights(a.pesi):null;if(pw&&pw.error)return pw;
+    const w=pw?pw.w:riskWeights().w,ret=pfAsset(w,"p").ret,years=Math.max(5,Math.min(60,Math.round(num(a.anni,F.years)))),target=Math.max(.5,Math.min(.99,num(a.probabilita,F.target))),spend=Math.max(100,num(a.spesa_mensile,F.spend)),cap=Math.max(0,num(a.capitale,I.init)),save=Math.max(0,num(a.risparmio_mensile,F.save));
+    const R=P.fireRate({ret,f,years,infl:I.infl/100,costs:I.costs/100,target,method:I.method,block:f,n:800});if(R.error)return {error:R.error};
+    const need=spend*12/R.swr,W=cap>=need?null:P.fireWhen({ret,f,initial:cap,monthly:save,infl:I.infl/100,costs:I.costs/100,goal:need,method:I.method,block:f,n:800});
+    return {nota:"Tutto in euro di oggi, prelievi aggiornati all'inflazione, rendimenti storici del portafoglio. Niente tasse, pensione o altre entrate.",
+      anni_di_prelievo:years,sicurezza:fmtPct(target,0),tasso_prelievo_sostenibile:fmtPct(R.swr,2)+" l'anno",successo_regola_4_per_cento:fmtPct(R.at4,0),
+      prelievo_mensile_con_capitale_attuale:fmtEur(cap*R.swr/12),capitale_attuale:fmtEur(cap),spesa_mensile:fmtEur(spend),numero_fire:fmtEur(need),
+      quando:cap>=need?"già raggiunto":{risparmio_mensile:fmtEur(save),anni_scenario_mediano:W&&W.median!=null?W.median:"oltre 50",anni_scenario_sfavorevole:W&&W.bad!=null?W.bad:"oltre 50"}};
+  },
   monte_carlo:(a)=>{
     const I={...(S.mcIn||simDefaults())},num=(v,d)=>Number.isFinite(+v)&&v!==null&&v!==""?+v:d,ds=S.ds,f=ds.freq.f;
     const pw=a.pesi?parseWeights(a.pesi):null;if(pw&&pw.error)return pw;
@@ -3158,6 +3228,7 @@ function receipt(key){
   const ds=S.ds,L=S.lab,f=ds.freq.f,parts=key.split("-"),kind=parts[0];
   if(kind==="rk"&&S.risk)return riskReceipt(parts[1],parts[2]);
   if(kind==="mc"&&S.mc)return mcReceipt(parts[1],parts[2]);
+  if(kind==="fi"&&S.fireRes)return fiReceipt(parts[1]);
   if(kind==="st"&&S.stress)return stReceipt(parts[1],parts[2],parts[3]);
   if(kind==="op"&&S.opt)return opReceipt(parts[1],parts[2]);
   if(kind==="bn"&&S.bnRes)return bnReceipt(parts[1],parts[2]);
@@ -3200,6 +3271,10 @@ const pctOf=v=>{const m=String(v||"").replace(/−/g,"-").match(/([+-]?\d[\d.]*,
 const eur10=x=>fmtN(Math.abs(x)/100*10000,0)+" €";
 const EXPLAIN=[
   [/^Rendimento annuo \(TIR\)/,v=>["È quanto sono cresciuti in media ogni anno i soldi che hai versato, tenendo conto di quando li hai versati: un euro messo nel 2019 conta più di uno messo il mese scorso.","È il numero da confrontare con un conto deposito o con un'altra persona che investe: è il tuo rendimento, non quello del fondo."]],
+  [/^Prelievo mensile sostenibile/,v=>["È quanto potresti prelevare ogni mese, aumentandolo ogni anno con l'inflazione, senza esaurire i soldi per tutti gli anni scelti, nel livello di sicurezza scelto.","Se prelevi di più, la probabilità che i soldi finiscano prima sale in fretta: guarda la curva sotto."]],
+  [/^Numero FIRE/,v=>["È il capitale che ti serve per coprire la spesa mensile scelta solo con i prelievi dal portafoglio.","Più è lungo il periodo e più vuoi essere sicuro, più alto è il numero. Pensione e altre entrate lo abbassano, le tasse lo alzano."]],
+  [/^Quando arrivi al numero FIRE/,v=>["È tra quanti anni il capitale, con i tuoi risparmi mensili, arriva al numero FIRE, in euro di oggi.","Lo scenario sfavorevole (10 futuri su 100 vanno peggio) è quello da usare per decidere."]],
+  [/^Tasso di prelievo sostenibile/,v=>["È la percentuale del capitale iniziale che puoi prelevare ogni anno (poi aggiornata all'inflazione) senza restare senza soldi.","La regola del 4% viene dai dati americani; il tuo numero viene dai rendimenti del tuo portafoglio."]],
   [/^Rendimento al netto delle tasse/,v=>["È il tuo rendimento annuo se oggi vendessi tutto e pagassi le imposte sul guadagno: 26% in generale, 12,5% sugli ETF di titoli di Stato.","È una stima: non considera il bollo annuo né minusvalenze che potresti avere da altri investimenti. Finché non vendi, le imposte non le paghi."]],
   [/^Rendimento ponderato nel tempo/,v=>["È il rendimento degli strumenti che hai scelto, come se avessi investito tutto all'inizio: toglie l'effetto di quando e quanto hai versato.","Se è molto diverso dal TIR, i tempi dei versamenti hanno contato: versare prima di un rialzo alza il TIR, versare prima di un calo lo abbassa."]],
   [/^(Rendimento annuo composto|CAGR|Rendimento annuo$|Rendimento annuo ·)/,v=>{const x=pctOf(v);return ["È la crescita media all'anno, come se il valore fosse salito della stessa percentuale ogni anno.",x!=null?`Con ${x>=0?"+":""}${fmtN(x,1)}% l'anno, 10.000 € diventano circa ${fmtN(10000*Math.pow(1+x/100,10),0)} € in 10 anni, se il futuro fosse come il passato (e non è detto).`:"Non dice nulla degli alti e bassi lungo la strada: per quelli guarda volatilità e drawdown."];}],

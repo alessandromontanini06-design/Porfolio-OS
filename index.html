@@ -265,6 +265,17 @@
         </form>
         <div class="kpis" id="mcKpis"></div>
         <div class="bento">
+          <div class="card s12 fire" id="fireCard">
+            <div class="head"><div><span class="eyebrow">Indipendenza finanziaria · FIRE</span><h3 style="margin-top:4px">Quando puoi vivere dei tuoi investimenti?</h3></div></div>
+            <form class="fire-form" id="fireForm" autocomplete="off">
+              <label><span class="eyebrow">Spesa mensile da coprire (€)</span><input type="number" min="100" step="100" id="fiSpend" inputmode="decimal"><small>in euro di oggi</small></label>
+              <label><span class="eyebrow">Per quanti anni</span><input type="number" min="5" max="60" step="1" id="fiYears"><small>es. dai 55 ai 85 anni = 30</small></label>
+              <label><span class="eyebrow">Risparmio mensile (€)</span><input type="number" min="0" step="50" id="fiSave" inputmode="decimal"><small>finché non ci arrivi</small></label>
+              <div><span class="eyebrow">Quanto vuoi essere sicuro</span><div class="seg" role="group" aria-label="Probabilità di successo" id="fiTarget"><button type="button" data-fit="0.75">75%</button><button type="button" data-fit="0.9">90%</button><button type="button" data-fit="0.95">95%</button></div><small>dei futuri simulati in cui i soldi bastano</small></div>
+            </form>
+            <div class="fire-k" id="fireKpis"></div>
+            <div class="fire-two"><div><div class="chartbox" id="fireChart"></div></div><div class="fire-txt" id="fireTxt"></div></div>
+          </div>
           <div class="card s12"><div class="head"><h3>Il ventaglio dei futuri</h3><div class="seg" role="group" aria-label="Valori nominali o reali" id="mcReal"><button type="button" data-mcr="0">Nominale</button><button type="button" data-mcr="1">Al netto dell'inflazione</button></div></div><div class="chartbox" id="mcFan"></div><div class="legend" id="mcLegend"></div><p class="caption" id="mcFanCap"></p></div>
           <div class="card s7"><div class="head"><h3>Dove finisci</h3><span class="eyebrow" id="mcDistUnit"></span></div><div class="chartbox" id="mcDist"></div><p class="caption" id="mcDistCap"></p></div>
           <div class="card s5"><div class="head"><h3>Percentili</h3><span class="eyebrow">Clicca un numero per la ricevuta</span></div><div class="tablewrap"><table class="mt mc-t" id="mcTable"></table></div></div>

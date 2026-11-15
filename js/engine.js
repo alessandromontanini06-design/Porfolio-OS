@@ -600,7 +600,8 @@ function buildDataset(an,roles,opts){
   if(!sorted){rows.sort((a,b)=>a.d-b.d);Q.infos.push("Le date non erano in ordine cronologico: le ho ordinate.");}
   const seen=new Set();let dup=0;
   rows=rows.filter(x=>{const k=x.d.getTime();if(seen.has(k)){dup++;return false;}seen.add(k);return true;});
-  const today=opts.today||new Date(),fut=rows.filter(x=>x.d>today);
+  /* «futuro» = dopo il mese in corso: i dati mensili segnano il mese che sta correndo all'ultimo giorno (es. 30/11 già il 15/11), e non è un errore */
+  const now=opts.today||new Date(),today=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,0,23,59,59)),fut=rows.filter(x=>x.d>today);
   if(fut.length){if(opts.dropFuture){rows=rows.filter(x=>x.d<=today);Q.infos.push(`${fut.length} ${fut.length===1?"data futura esclusa":"date future escluse"} (righe di previsione o modello da compilare).`);}
     else anomalies.push({id:"future",type:"future",block:true,n:fut.length,text:`${fut.length} ${fut.length===1?"riga ha una data":"righe hanno date"} nel futuro (dalla ${fmtDate(fut[0].d)}): previsioni, righe da compilare o un errore di data.`});}
   if(dup>rows.length*0.5)Q.warnings.push("Molte date si ripetono: il file potrebbe avere una riga per asset e per data (formato lungo). Questa versione legge un asset per colonna.");
@@ -885,6 +886,32 @@ function monteCarlo(o){
     /* errore standard di una proporzione stimata su n percorsi: √(p(1−p)/n) */
     probGoalSE:goal>0?Math.sqrt(share(v=>v>=goal)*(1-share(v=>v>=goal))/n):NaN,probLossSE:Math.sqrt(share(v=>v<invested)*(1-share(v=>v<invested))/n),depleted:depleted/n,mean:finSorted.reduce((a,b)=>a+b,0)/n,
     mddMedian:quantile(Array.from(mdd).sort((a,b)=>a-b),.5),mddP5:quantile(Array.from(mdd).sort((a,b)=>a-b),.05)};
+}
+/* ===== Indipendenza finanziaria (FIRE): quanto si può prelevare, quanto serve, quando ci si arriva =====
+   Tutto in euro di oggi: i rendimenti storici vengono deflazionati, (1 + r) / (1 + π)^(1/f) − 1, e il prelievo resta costante in termini reali.
+   Il sistema è lineare nel capitale: la probabilità di non esaurirlo dipende solo dal tasso di prelievo (prelievo annuo / capitale iniziale).
+   Quindi basta trovare una volta il tasso sostenibile (SWR) e da lì: prelievo = capitale × SWR / 12, numero FIRE = spesa × 12 / SWR. */
+function fireRealRet(ret,f,infl){const k=Math.pow(1+(+infl||0),1/f);return ret.map(x=>Number.isFinite(x)?(1+x)/k-1:x);}
+function fireSuccess(o,rate){
+  const C=100000,R=monteCarlo({ret:o.ret,f:o.f,years:o.years,initial:C,monthly:-rate*C/12,infl:0,costs:o.costs,method:o.method,n:o.n,block:o.block,seed:o.seed});
+  return R.error?NaN:1-R.depleted;
+}
+function fireRate(o){
+  const ret=fireRealRet(o.ret||[],o.f||12,o.infl),q={...o,ret,f:o.f||12,n:o.n||1000,seed:o.seed==null?7:o.seed},target=o.target||.9;
+  if(ret.filter(Number.isFinite).length<12)return {error:"Servono almeno 12 rendimenti storici per simulare."};
+  /* ricerca per bisezione del tasso più alto con successo ≥ obiettivo (il successo scende al crescere del tasso) */
+  let lo=.001,hi=.2;if(fireSuccess(q,hi)>=target)return {swr:hi,capped:true,target,curve:[]};
+  for(let k=0;k<16;k++){const mid=(lo+hi)/2;if(fireSuccess(q,mid)>=target)lo=mid;else hi=mid;}
+  const rates=[.02,.025,.03,.035,.04,.045,.05,.055,.06,.07,.08];
+  const curve=rates.map(r=>({rate:r,success:fireSuccess(q,r)}));
+  return {swr:lo,target,curve,at4:fireSuccess(q,.04),years:q.years,n:q.n};
+}
+/* anni per arrivare al numero FIRE, in euro di oggi: primo anno in cui il percentile scelto del capitale reale supera l'obiettivo */
+function fireWhen(o){
+  const R=monteCarlo({ret:o.ret,f:o.f||12,years:Math.min(60,o.maxYears||50),initial:o.initial,monthly:o.monthly,infl:o.infl,costs:o.costs,method:o.method,n:o.n||1000,block:o.block,seed:o.seed==null?11:o.seed});
+  if(R.error)return R;
+  const at=pi=>{const y=R.fan.findIndex(r=>r.real[pi]>=o.goal);return y<0?null:y;};
+  return {median:at(3),bad:at(1),good:at(5),fan:R.fan,maxYears:R.years};
 }
 /* ===== Stress test: crisi storiche sui dati reali e shock ipotetici ===== */
 /* Finestre dal massimo al minimo dell'azionario globale (date indicative). m = mesi inclusi per dati mensili o più radi. */
@@ -1218,6 +1245,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
