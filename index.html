@@ -55,10 +55,11 @@
             <p class="kick">Per chi investe da solo e per i consulenti finanziari</p>
             <h1 id="heroTitle">I tuoi <em>investimenti</em> finalmente chiari.</h1>
             <p class="lead">Carica l'Excel o l'estratto del broker, così com'è. Portfolio OS riconosce acquisti e vendite, scarica i prezzi di mercato di ogni ETF e risponde alle domande che contano: quanto si è guadagnato davvero, quanto si rischia, dove sono i soldi e quando si potrà smettere di lavorare.</p>
-            <p class="fine">Il file resta sul tuo computer. Ogni numero si può aprire e verificare.</p>
+            <p class="fine">Il file viene letto nel tuo browser e non lo salviamo su nessun server. Se serve l'IA per capirlo le mandiamo solo un estratto, e puoi spegnerla. <a href="/privacy.html">Come trattiamo i tuoi dati</a></p>
             <span class="v2-hidden" id="flowLabel"></span>
           </div>
           <div class="start">
+            <div class="sv-list" id="svList" hidden></div>
             <div class="opt primary drop" id="drop" role="button" tabindex="0" aria-label="Carica il tuo Excel">
               <label for="file" style="cursor:pointer;flex:1"><b>Carica il tuo Excel</b><small>anche l'export di Fineco, Degiro, Directa, Trade Republic… oppure trascinalo qui</small>
                 <span class="src">In uso: <b id="dsName">—</b><span id="dsChip"></span></span><span class="err" id="fileErr" hidden></span></label>
@@ -194,6 +195,7 @@
       </div>
       <div id="lab" hidden style="display:flex;flex-direction:column;gap:16px">
         <nav class="lab-idx" id="labIdx" aria-label="Schede del laboratorio"></nav>
+        <div class="sv-offer" id="svOffer" hidden></div>
         <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip hist"><i></i>Dato storico</span><span class="caption">Clicca qualsiasi numero per vedere formula, dati e ipotesi.</span><button type="button" class="btn sm lime" id="reportBtn" style="margin-left:auto">Scarica il report PDF</button></div>
         <div class="card real" id="realCard" hidden></div>
         <div class="kpis" id="kpis"></div>
@@ -504,6 +506,23 @@
   <div id="receipt" style="display:flex;flex-direction:column;gap:18px"></div>
 </aside>
 
+<div class="rp-dlg" id="rpDlg" hidden role="dialog" aria-modal="true" aria-labelledby="rpDlgT">
+  <form class="rp-box" id="rpForm" autocomplete="off">
+    <div class="rp-dh"><h3 id="rpDlgT">Prepara il report</h3><button type="button" class="btn sm" id="rpClose">Chiudi</button></div>
+    <div class="seg" role="group" aria-label="Per chi è il report" id="rpWho"><button type="button" data-rpw="me" aria-pressed="true">Per me</button><button type="button" data-rpw="client" aria-pressed="false">Per un cliente</button></div>
+    <div id="rpClient" hidden>
+      <p class="rp-hint">Il report porterà il tuo nome e il tuo logo al posto di Portfolio OS. Studio, contatti e logo restano salvati in questo browser per la prossima volta; nome del cliente e note no.</p>
+      <label><span>Studio o consulente</span><input type="text" id="rpStudio" maxlength="80" placeholder="es. Studio Rossi Consulenza Finanziaria"></label>
+      <label><span>Contatti</span><input type="text" id="rpContact" maxlength="120" placeholder="email, telefono o sito"></label>
+      <div class="rp-logo"><span>Logo</span><div><img id="rpLogoPrev" alt="" hidden><label class="btn sm" for="rpLogo">Scegli un'immagine</label><input type="file" id="rpLogo" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden><button type="button" class="linkbtn" id="rpLogoDel" hidden>togli</button></div></div>
+      <label><span>Cliente</span><input type="text" id="rpCliente" maxlength="80" placeholder="nome del cliente (facoltativo)"></label>
+      <label><span>Le tue note per il cliente</span><textarea id="rpNote" rows="4" maxlength="2000" placeholder="Considerazioni, prossimi passi, cosa avete deciso…"></textarea></label>
+      <label class="rp-chk" id="rpPropWrap"><input type="checkbox" id="rpProp" checked> Aggiungi la proposta: confronto tra il portafoglio attuale (A) e quello proposto (B)</label>
+      <p class="rp-hint" id="rpPropHint" hidden>Per aggiungere la proposta, prepara prima il confronto nella scheda «Confronta allocazioni» del laboratorio: A = portafoglio attuale, B = la tua proposta.</p>
+    </div>
+    <div class="rp-df"><button type="submit" class="btn lime">Crea il PDF</button><span class="rp-hint">Si apre la finestra di stampa: scegli «Salva come PDF».</span></div>
+  </form>
+</div>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>

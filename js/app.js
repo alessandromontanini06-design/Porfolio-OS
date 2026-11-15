@@ -93,6 +93,7 @@ function onEnter(name){
   if(name==="scan"&&!S.scanPlayed)setTimeout(playScan,HAS_G?450:0);
   if(name==="risk")renderRisk();
   if(name==="sim")renderSim();
+  if(name==="home")svHome();
   if(name==="fire")renderFI();
   if(name==="stress")renderStress();
   if(name==="opt")renderOpt();
@@ -1608,6 +1609,65 @@ function hideLab(){
   disposeNet();S.lab=null;
   $("#lab").hidden=true;$("#labEmpty").hidden=false;$("#navLab").classList.add("off");$("#navRisk").classList.add("off");$("#navSim").classList.add("off");$("#navFire").classList.add("off");$("#navStress").classList.add("off");$("#navOpt").classList.add("off");$("#navBench").classList.add("off");S.risk=null;S.mc=null;S.stress=null;S.opt=null;S.optW=null;
 }
+/* ---------- Analisi salvate su questo computer (IndexedDB) ----------
+   Solo se l'utente lo chiede: dopo il laboratorio si propone di salvare; i dati restano in questo browser, nessun server.
+   Si salvano i fogli del file come sono stati letti, il nome, le scelte dell'utente (pesi, dati FIRE). Riaprendo, il file
+   viene riletto come se fosse caricato di nuovo (la mappa confermata è già in memoria) e il laboratorio si ricostruisce. */
+const SV={db:null};
+function svDB(){if(SV.db)return SV.db;SV.db=new Promise((ok,ko)=>{try{const r=indexedDB.open("portfolio-os",1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains("analisi"))r.result.createObjectStore("analisi",{keyPath:"id"});};r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error);}catch(e){ko(e);}});SV.db.catch(()=>{SV.db=null;});return SV.db;}
+async function svTx(mode,fn){const db=await svDB();return new Promise((ok,ko)=>{const t=db.transaction("analisi",mode),req=fn(t.objectStore("analisi"));t.oncomplete=()=>ok(req&&req.result);t.onerror=()=>ko(t.error);t.onabort=()=>ko(t.error);});}
+const svList=()=>svTx("readonly",st=>st.getAll()).then(a=>(a||[]).sort((x,y)=>y.savedAt-x.savedAt)).catch(()=>[]);
+const svGet=id=>svTx("readonly",st=>st.get(id)).catch(()=>null);
+const svPref=()=>{try{return localStorage.getItem("pos-save");}catch{return null;}}; // "1" salva sempre, "0" mai, null chiedi
+const svCanSave=()=>S.source&&S.fileSheets&&S.fileSheets.length&&!isExample()&&!isSim()&&!(S.source.builder);
+const svId=()=>"a-"+String(S.fp||S.source.name).replace(/[^a-z0-9]/gi,"").slice(0,60)+"-"+String(S.source.name).length;
+async function svSave(){
+  if(!svCanSave())return false;
+  const ds=S.ds,f=ds&&ds.freq?ds.freq.f:12,name=String(S.source.name).replace(/ · ricostruito$/,"");
+  const rec={id:svId(),name,savedAt:Date.now(),sheets:S.fileSheets.map(x=>({name:x.name,aoa:x.aoa})),assets:ds&&ds.ok?ds.assets.map(a=>a.name):[],
+    period:ds&&ds.ok?`${fmtDate(ds.dates[0],f)} – ${fmtDate(ds.dates[ds.dates.length-1],f)}`:"",riskW:S.riskW||null,fi:S.fi?S.fi.in:null};
+  try{await svTx("readwrite",st=>st.put(rec));S.svSaved=rec.id;trackOnce("feature","salva",{name:"salva"});return true;}catch{return false;}
+}
+function svOfferRender(){
+  const el=$("#svOffer");if(!el)return;
+  if(!svCanSave()||S.svSaved===svId()&&svPref()!=="1"){el.hidden=!S.svSaved||S.svSaved!==svId();if(!el.hidden)el.innerHTML=`<span class="sv-ok">✓ Analisi salvata su questo computer: la ritrovi nella home. <a href="/privacy.html">Privacy</a></span>`;return;}
+  if(svPref()==="0"){el.hidden=true;return;}
+  if(svPref()==="1"){svSave().then(ok=>{el.hidden=!ok;if(ok)el.innerHTML=`<span class="sv-ok">✓ Salvata su questo computer: la ritrovi nella home. <button type="button" class="linkbtn" data-sv="never">Non salvare più</button></span>`;});return;}
+  el.hidden=false;
+  el.innerHTML=`<div><b>Vuoi ritrovare questa analisi la prossima volta?</b><span>La salvo solo in questo browser, su questo computer: non va su nessun server e puoi cancellarla quando vuoi.</span></div>
+    <label class="sv-al"><input type="checkbox" id="svAlways"> salva sempre</label><button type="button" class="btn sm lime" data-sv="yes">Salva</button><button type="button" class="btn sm" data-sv="no">No, grazie</button>`;
+}
+async function svHome(){
+  const el=$("#svList");if(!el)return;const L=await svList();
+  if(!L.length){el.hidden=true;el.innerHTML="";return;}
+  el.hidden=false;
+  el.innerHTML=`<div class="sv-h"><b>Riprendi da dove eri</b><button type="button" class="linkbtn" data-sv="clear">cancella tutto</button></div>`+L.slice(0,4).map(r=>`<div class="sv-it"><button type="button" class="sv-open" data-svo="${esc(r.id)}"><b>${esc(r.name)}</b><small>${r.assets.length?`${r.assets.length} strumenti · `:""}${esc(r.period||"")} · salvata il ${new Date(r.savedAt).toLocaleDateString("it-IT",{day:"numeric",month:"short"})}</small></button><button type="button" class="sv-x" data-svd="${esc(r.id)}" aria-label="Cancella ${esc(r.name)}">×</button></div>`).join("");
+}
+async function svOpen(id){
+  const r=await svGet(id);if(!r)return svHome();
+  trackOnce("feature","riprendi",{name:"riprendi"});
+  if(isSim())spaceSwitch("real",{stay:true});
+  S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;
+  load(r.sheets,{name:r.name,size:0,kind:"file"},true);
+  go("scan",{force:true});
+  /* la mappa è già confermata in memoria: appena il file è pronto (anche dopo i prezzi di mercato) si costruisce il laboratorio */
+  const tick=()=>{const R=S.svResume;if(!R||R.id!==id)return;if(Date.now()-R.t0>150000){S.svResume=null;return;}
+    const busy=(S.und&&/loading|rebuilding/.test(S.und.status||""))||(S.recipe&&S.recipe.status==="loading");
+    const b=$("#confirmBtn");if(!busy&&b&&!b.disabled&&S.ds&&S.ds.ok){if(!R.ready){R.ready=Date.now();}else if(Date.now()-R.ready>1200){S.svResume=null;if(R.riskW)S.riskW=R.riskW;if(R.fi){S.fi={in:{...fiDefaults(),...R.fi,cap:fiDefaults().cap}};}b.click();return;}}else R.ready=0;
+    setTimeout(tick,400);};
+  setTimeout(tick,600);
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-sv],[data-svo],[data-svd]");if(!b)return;
+  if(b.dataset.svo){svOpen(b.dataset.svo);return;}
+  if(b.dataset.svd){await svTx("readwrite",st=>st.delete(b.dataset.svd)).catch(()=>{});if(S.svSaved===b.dataset.svd)S.svSaved=null;svHome();return;}
+  const a=b.dataset.sv;
+  if(a==="yes"){const al=$("#svAlways");if(al&&al.checked){try{localStorage.setItem("pos-save","1");}catch{}}const ok=await svSave();const el=$("#svOffer");el.innerHTML=ok?`<span class="sv-ok">✓ Salvata su questo computer: la ritrovi nella home.</span>`:`<span class="sv-ok">Non riesco a salvare in questo browser (forse è in navigazione privata).</span>`;svHome();}
+  if(a==="no"){const al=$("#svAlways");if(al&&al.checked){try{localStorage.setItem("pos-save","0");}catch{}}$("#svOffer").hidden=true;}
+  if(a==="never"){try{localStorage.setItem("pos-save","0");}catch{}$("#svOffer").hidden=true;}
+  if(a==="clear"){if(confirm("Cancellare tutte le analisi salvate su questo computer?")){await svTx("readwrite",st=>st.clear()).catch(()=>{});S.svSaved=null;svHome();}}
+});
+window.__saved={list:svList,open:svOpen,clear:()=>svTx("readwrite",st=>st.clear())}; // per i test
 function showLab(instant,stay){
   setTimeout(renderLabs,0);
   const ds=S.ds,f=ds.freq.f;
@@ -1618,6 +1678,7 @@ function showLab(instant,stay){
   renderLab();reveal($("#lab"));renderLook();loadEtfInfo();
   if(!S.macro)fetchMacro().then(()=>{if(S.macro)S.macro.key=ym(ds.dates[0])+ym(ds.dates[ds.dates.length-1]);});
   if(!HAS_G){countAll();drawChart(false);if(S.corrView==="net")buildNet();S.labFx.done=true;}
+  setTimeout(svOfferRender,50);
   if(!stay)go("lab",{force:true});
 }
 function countAll(){
@@ -3437,7 +3498,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeReceipt();});
 
 /* ---------- Report del portafoglio: una pagina stampabile (o salvabile in PDF) con i numeri già calcolati ----------
    Nessun numero nuovo: tutto viene dal motore, come nelle sezioni del sito. Le considerazioni sono frasi costruite sui risultati, non dall'IA. */
-function buildReport(){
+function buildReport(o={}){
   if(!S.lab||!S.ds||!S.ds.ok)return null;
   if(!S.risk)renderRisk();
   const ds=S.ds,f=ds.freq.f,R=S.risk,PR=R.PR,PS=R.PS,RC=R.RC,w=R.w,real=S.real&&S.real.pp?S.real:null,bn=S.bnRes&&S.bnRes.bs&&!S.bnRes.bs.error?S.bnRes:null;
@@ -3457,8 +3518,9 @@ function buildReport(){
   if(cr.length){const wc=cr.reduce((a,b)=>b.mdd<a.mdd?b:a);tips.push(`Delle crisi presenti nei dati, la più dura per questo portafoglio è stata ${wc.name} (${fmtPct(wc.mdd,1)}).`);}
   if(idx.length===1)tips.push("Il portafoglio ha un solo strumento: la diversificazione dipende tutta da quel fondo.");
   const html=`<div class="rp">
-  <header class="rp-h"><div><b class="rp-brand">Portfolio OS</b><span>Report del portafoglio</span></div><div class="rp-meta">${esc(S.source&&S.source.name||"")}<br>${today}</div></header>
-  <h1>Il tuo portafoglio in una pagina</h1>
+  ${o.studio?`<header class="rp-h rp-pro"><div class="rp-who">${o.logo?`<img src="${o.logo}" alt="" class="rp-logo-img">`:""}<div><b class="rp-studio">${esc(o.studio)}</b>${o.contact?`<span>${esc(o.contact)}</span>`:""}</div></div><div class="rp-meta">${o.cliente?`Per <b>${esc(o.cliente)}</b><br>`:""}${today}</div></header>`
+    :`<header class="rp-h"><div><b class="rp-brand">Portfolio OS</b><span>Report del portafoglio</span></div><div class="rp-meta">${esc(S.source&&S.source.name||"")}<br>${today}</div></header>`}
+  <h1>${o.cliente?`Il portafoglio di ${esc(o.cliente)}`:o.studio?"Analisi del portafoglio":"Il tuo portafoglio in una pagina"}</h1>
   <p class="rp-sub">${ds.assets.length} strumenti · dati ${ds.freq.adj} da ${fmtDate(ds.dates[0],f)} a ${fmtDate(ds.dates[ds.dates.length-1],f)} · pesi: ${esc(R.wLabel)}</p>
   ${real?`<h2>Il tuo rendimento</h2><table class="rp-t">${row("Rendimento annuo (TIR)",fmtPct(real.pp.xirr,1,true),"tiene conto di quando hai versato")}${row("Al netto delle tasse",fmtPct(real.taxes.xirr,1,true),`imposte stimate ${fmtEur(real.taxes.tax)} se vendessi oggi`)}${row("Valore stimato oggi",fmtEur(real.pp.value),"")}${row("Versato",fmtEur(real.pp.invested),"")}${row("Guadagno",(real.pp.gain>=0?"+":"−")+fmtEur(Math.abs(real.pp.gain)),fmtPct(real.pp.gainPct,1,true)+" sul versato")}${real.bm?row(`Stessi versamenti in ${real.bm.label}`,fmtEur(real.bm.value),`TIR ${fmtPct(real.bm.xirr,1,true)}`):""}</table>${svg("#realChart")}`:""}
   <h2>Allocazione e rischio per strumento</h2>
@@ -3469,19 +3531,71 @@ function buildReport(){
   ${svg("#riskDD")}
   ${bn?`<h2>Confronto con ${esc(bn.src.label)}</h2><table class="rp-t">${row("Rendimento annuo in più",fmtPct(bn.bs.active,1,true),`${fmtPct(bn.bs.cagrP,1,true)} contro ${fmtPct(bn.bs.cagrB,1,true)}`)}${row("Beta",fmtN(bn.bs.beta),"1 = si muove come l'indice")}${row("Tracking error",fmtPct(bn.bs.te,1),"quanto ti discosti dall'indice")}${row("Information ratio",fmtN(bn.bs.ir),"extra-rendimento per unità di scostamento")}</table>`:`<p class="rp-note">Per includere il confronto con un indice, apri una volta la sezione Benchmark e rigenera il report.</p>`}
   ${cr.length?`<h2>Nelle crisi presenti nei dati</h2><table class="rp-t">${cr.map(c=>row(c.name,fmtPct(c.mdd,1),"perdita massima del portafoglio")).join("")}</table>`:""}
+  ${o.prop?reportProposal():""}
+  ${o.note?`<h2>Note del consulente</h2><div class="rp-note-box">${esc(o.note).replace(/\n/g,"<br>")}</div>`:""}
   <h2>Considerazioni</h2><ul class="rp-tips">${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
-  <footer class="rp-f">Analisi dei dati storici del file, calcolata in modo deterministico da Portfolio OS: i rendimenti passati non garantiscono quelli futuri. Non è un consiglio di investimento. Le imposte sono una stima (26%, 12,5% sui titoli di Stato) e non includono il bollo.</footer>
+  <footer class="rp-f">${o.studio?`Preparato da ${esc(o.studio)} con Portfolio OS. `:""}Analisi dei dati storici del file, calcolata in modo deterministico da Portfolio OS: i rendimenti passati non garantiscono quelli futuri. Non è un consiglio di investimento. Le imposte sono una stima (26%, 12,5% sui titoli di Stato) e non includono il bollo.</footer>
   </div>`;
   return html;
 }
-function printReport(){
-  const h=buildReport();if(!h)return;trackOnce("feature","report",{name:"report"});
+/* pagina «La proposta»: A (attuale) contro B (proposta) e, se c'è, C, sugli stessi mesi, dal confronto allocazioni */
+function cmpReady(){return !!(S.cmp&&S.cmp.ports&&S.cmp.ports.filter(p=>p.w&&p.w.some(x=>x>0)).length>=2);}
+function reportProposal(){
+  if(!cmpReady())return "";
+  const R=cmpCalc(),ds=S.ds,f=ds.freq.f,ok=R.res.filter(r=>!r.empty);if(ok.length<2)return "";
+  const lab=i=>["Attuale (A)","Proposta (B)","Alternativa (C)"][i]||R.res[i].name,wTxt=r=>ds.assets.map((a,i)=>r.wn[i]>0.0005?`${esc(a.name)} ${fmtPct(r.wn[i],0)}`:null).filter(Boolean).join(" · ");
+  const row=(l,g,fm)=>`<tr><td>${l}</td>${R.res.map(r=>`<td class="n">${r.empty?"—":fm(g(r))}</td>`).join("")}</tr>`;
+  const crIds=[...new Set(ok.flatMap(r=>r.cr.map(c=>c.id)))];
+  const a=ok[0],b=ok[1],d=(x,y)=>x-y;
+  const tips=[];
+  if(Number.isFinite(b.st.vol)&&Number.isFinite(a.st.vol))tips.push(`La proposta ${b.st.vol<a.st.vol?"oscilla meno":"oscilla di più"}: volatilità ${fmtPct(b.st.vol,1)} contro ${fmtPct(a.st.vol,1)}.`);
+  if(Number.isFinite(b.st.mdd)&&Number.isFinite(a.st.mdd))tips.push(`Nel periodo peggiore avrebbe perso ${fmtPct(Math.abs(b.st.mdd),1)} invece di ${fmtPct(Math.abs(a.st.mdd),1)}.`);
+  if(Number.isFinite(b.st.cagr)&&Number.isFinite(a.st.cagr))tips.push(`Rendimento annuo storico ${fmtPct(b.st.cagr,1,true)} contro ${fmtPct(a.st.cagr,1,true)} (${d(b.st.cagr,a.st.cagr)>=0?"+":""}${fmtN(d(b.st.cagr,a.st.cagr)*100,1)} punti).`);
+  return `<h2>La proposta</h2>
+    <p class="rp-sub">Stessi ${unitN(R.ks.length,f)} di dati per tutti i portafogli, ribilanciati ogni periodo ai pesi indicati.</p>
+    <table class="rp-t rp-wide"><thead><tr><th></th>${R.res.map((r,i)=>`<th class="n">${lab(i)}</th>`).join("")}</tr></thead><tbody>
+    <tr><td>Composizione</td>${R.res.map(r=>`<td class="d">${r.empty?"—":wTxt(r)}</td>`).join("")}</tr>
+    ${row("Rendimento annuo",r=>r.st.cagr,x=>fmtPct(x,1,true))}${row("Volatilità",r=>r.st.vol,x=>fmtPct(x,1))}${row("Sharpe",r=>r.sharpe,x=>fmtN(x))}
+    ${row("Calo massimo",r=>r.st.mdd,x=>fmtPct(x,1))}${row("VaR 95% (perdita in un mese brutto)",r=>-r.rk.var95,x=>fmtPct(x,1))}
+    ${crIds.map(id=>{const nm=(ok.flatMap(r=>r.cr).find(c=>c.id===id)||{}).name||id;return row(`Crisi: ${esc(nm)}`,r=>{const c=r.cr.find(x=>x.id===id);return c?c.mdd:NaN;},x=>Number.isFinite(x)?fmtPct(x,1):"—");}).join("")}
+    </tbody></table>
+    ${svgOf("#cmpChart")}
+    <p class="rp-leg">${R.res.map((r,i)=>r.empty?"":`<span><i style="background:${i===0?"#161616":["","var(--c2)","var(--c3)"][i]}"></i>${lab(i)}</span>`).join("")} · crescita di 100 € sugli stessi mesi</p>
+    <ul class="rp-tips">${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`;
+}
+function svgOf(id){const e=document.querySelector(id+" svg");if(!e)return "";const c=e.cloneNode(true);c.querySelectorAll(".cz-o").forEach(n=>n.remove());c.removeAttribute("width");c.setAttribute("style","width:100%;height:auto");return c.outerHTML;}
+const RP_KEY="pos-brand-v1";
+function rpBrand(){try{return JSON.parse(localStorage.getItem(RP_KEY)||"{}")||{};}catch{return {};}}
+function openReportDlg(){
+  const B=rpBrand(),d=$("#rpDlg");d.hidden=false;document.body.classList.add("rp-on");
+  $("#rpStudio").value=B.studio||"";$("#rpContact").value=B.contact||"";$("#rpCliente").value="";$("#rpNote").value="";
+  const prev=$("#rpLogoPrev");if(B.logo){prev.src=B.logo;prev.hidden=false;$("#rpLogoDel").hidden=false;}else{prev.hidden=true;$("#rpLogoDel").hidden=true;}
+  rpWho(B.who||"me");
+  const ok=cmpReady();$("#rpPropWrap").hidden=!ok;$("#rpPropHint").hidden=ok;
+  setTimeout(()=>d.querySelector("[aria-pressed=true]").focus(),50);
+}
+function rpWho(w){document.querySelectorAll("#rpWho [data-rpw]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.rpw===w)));$("#rpClient").hidden=w!=="client";$("#rpDlg").dataset.who=w;}
+function closeReportDlg(){$("#rpDlg").hidden=true;document.body.classList.remove("rp-on");}
+document.addEventListener("click",e=>{const w=e.target.closest("[data-rpw]");if(w)rpWho(w.dataset.rpw);if(e.target.id==="rpClose"||e.target.id==="rpDlg")closeReportDlg();
+  if(e.target.id==="rpLogoDel"){const B=rpBrand();delete B.logo;try{localStorage.setItem(RP_KEY,JSON.stringify(B));}catch{}$("#rpLogoPrev").hidden=true;e.target.hidden=true;}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#rpDlg").hidden)closeReportDlg();});
+document.addEventListener("change",e=>{if(e.target.id!=="rpLogo"||!e.target.files[0])return;const fl=e.target.files[0];
+  if(fl.size>600000){alert("Il logo è troppo grande: usa un'immagine sotto i 600 KB.");return;}
+  const rd=new FileReader();rd.onload=()=>{const B=rpBrand();B.logo=rd.result;try{localStorage.setItem(RP_KEY,JSON.stringify(B));}catch{alert("Non riesco a salvare il logo in questo browser.");}$("#rpLogoPrev").src=rd.result;$("#rpLogoPrev").hidden=false;$("#rpLogoDel").hidden=false;};rd.readAsDataURL(fl);});
+document.addEventListener("submit",e=>{if(e.target.id!=="rpForm")return;e.preventDefault();
+  const who=$("#rpDlg").dataset.who||"me",B=rpBrand();let o={};
+  if(who==="client"){B.studio=$("#rpStudio").value.trim();B.contact=$("#rpContact").value.trim();B.who="client";try{localStorage.setItem(RP_KEY,JSON.stringify(B));}catch{}
+    o={studio:B.studio||"Il tuo consulente",contact:B.contact,logo:B.logo||null,cliente:$("#rpCliente").value.trim(),note:$("#rpNote").value.trim(),prop:cmpReady()&&$("#rpProp").checked};trackOnce("feature","report_cliente",{name:"report_cliente"});}
+  else{B.who="me";try{localStorage.setItem(RP_KEY,JSON.stringify(B));}catch{}}
+  closeReportDlg();printReport(o);});
+function printReport(o={}){
+  const h=buildReport(o);if(!h)return;trackOnce("feature","report",{name:"report"});
   let el=$("#report");if(!el){el=document.createElement("section");el.id="report";el.setAttribute("aria-hidden","true");document.body.appendChild(el);}
   el.innerHTML=h;const old=document.title;document.title=`Portfolio OS · report · ${(S.source&&S.source.name||"portafoglio").replace(/\.(xlsx?|csv|ods)$/i,"")}`;
   setTimeout(()=>{window.print();document.title=old;},80);
 }
-document.addEventListener("click",e=>{if(e.target.closest("#reportBtn"))printReport();});
-window.__report=()=>buildReport(); // per i test
+document.addEventListener("click",e=>{if(e.target.closest("#reportBtn"))openReportDlg();});
+window.__report=o=>buildReport(o||{}); // per i test
 
 /* ---------- Home: terminale con dati ufficiali BCE e mappa dei laboratori ---------- */
 const LABS=[
@@ -3590,7 +3704,7 @@ load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},fal
 loadExample(false);
 if(!CALM)morphInit();
 renderLabs();if(!$("#mkt")||!$("#mkt").classList.contains("v2-hidden"))loadMarket();
-quantaScene("home");
+quantaScene("home");svHome();
 requestAnimationFrame(movePill);
 if(!HAS_G)heroIntro();
 renderPager("home");
