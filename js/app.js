@@ -516,36 +516,63 @@ function txSnapshot(T,sym){
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
-async function handleFile(file){
+/* da file a fogli (array di righe); null se il formato non è supportato */
+async function readSheets(file){
+  const ext=(file.name.split(".").pop()||"").toLowerCase();let sheets;
+  if(ext==="csv"||ext==="txt"){
+    const buf=await file.arrayBuffer();let text=new TextDecoder("utf-8").decode(buf);
+    if(text.includes(String.fromCharCode(0xFFFD)))text=new TextDecoder("windows-1252").decode(buf);
+    sheets=[{name:file.name.replace(/\.[^.]+$/,""),aoa:P.parseCSV(text)}];
+  }else if(["xlsx","xls","xlsm","ods"].includes(ext)){
+    if(!window.XLSX)throw new Error("noxlsx");
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
+    sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
+  }else return null;
+  return sheets;
+}
+async function handleFile(file,more){
   if(!file)return;
+  /* più file insieme: sono più conti dello stesso patrimonio */
+  if(more&&more.length>1)return addAccounts([...more],true);
   if(file.size>15*1024*1024){showError("Il file supera i 15 MB. Riduci il periodo o il numero di colonne e riprova.");return;}
   const ext=(file.name.split(".").pop()||"").toLowerCase();
   try{
-    let sheets;
-    if(ext==="csv"||ext==="txt"){
-      const buf=await file.arrayBuffer();let text=new TextDecoder("utf-8").decode(buf);
-      if(text.includes(String.fromCharCode(0xFFFD)))text=new TextDecoder("windows-1252").decode(buf);
-      sheets=[{name:file.name.replace(/\.[^.]+$/,""),aoa:P.parseCSV(text)}];
-    }else if(["xlsx","xls","xlsm","ods"].includes(ext)){
-      if(!window.XLSX)throw new Error("noxlsx");
-      const buf=await file.arrayBuffer();
-      const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
-      sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
-    }else{showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
+    let sheets=await readSheets(file);
+    if(!sheets){showError(`Il formato .${ext} non è supportato. Usa .xlsx, .xls, .ods o .csv.`);return;}
     if(!sheets.some(s=>s.aoa.length)){showError("Il file è vuoto.");return;}
     if(isSim())spaceSwitch("real",{fresh:true,stay:true});
     track("start",{how:"file"});TR.t0=Date.now();
     sheets=P.normalizeExports(sheets); // export di broker a più sezioni (es. Interactive Brokers) → foglio di movimenti
+    S.conti=[{name:file.name.replace(/\.(xlsx|xlsm|xls|ods|csv|txt)$/i,""),sheets}];
     load(sheets,{name:file.name,size:file.size,kind:"file"},true);
   }catch(e){track("import_fail",{kind:"file",why:e.message==="noxlsx"?"lettore excel non caricato":"file illeggibile"});showError(e.message==="noxlsx"?"Il lettore Excel non si è caricato. Ricarica la pagina oppure salva il file come CSV.":"Non riesco a leggere il file. Se è protetto da password o danneggiato, salvalo di nuovo come .xlsx o .csv.");}
 }
 const drop=$("#drop");
 ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");void 0;}));
 ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");void 0;}));
-drop.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0]));
+drop.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0],e.dataTransfer.files));
 window.addEventListener("dragover",e=>{if([...(e.dataTransfer?e.dataTransfer.types:[])].includes("Files"))void 0;});
 window.addEventListener("dragleave",e=>{if(!e.relatedTarget)void 0;});
-$("#file").addEventListener("change",e=>{handleFile(e.target.files[0]);e.target.value="";});
+$("#file").addEventListener("change",e=>{handleFile(e.target.files[0],[...e.target.files]);e.target.value="";});
+/* ---------- Più conti: banca, broker, conto del coniuge → un solo patrimonio ----------
+   I movimenti di ogni file vengono riscritti in un formato comune e uniti in un foglio con la colonna «Conto». */
+async function addAccounts(files,fresh){
+  const base=fresh||!S.conti||!S.conti.length?[]:S.conti.slice(),add=[];
+  for(const f of files){try{const sh=await readSheets(f);if(sh&&sh.some(x=>x.aoa.length))add.push({name:f.name.replace(/\.(xlsx|xlsm|xls|ods|csv|txt)$/i,""),sheets:P.normalizeExports(sh)});else{showError(`«${f.name}»: formato non supportato o file vuoto.`);return;}}catch(e){showError(`Non riesco a leggere «${f.name}».`);return;}}
+  /* stesso nome due volte (due «Movimenti titoli»): si distinguono con un numero */
+  const all=[...base,...add];all.forEach((c,i)=>{const same=all.filter(x=>x.name===c.name);if(same.length>1)c.name=`${c.name} (${same.indexOf(c)+1})`;});
+  const M=P.mergeAccounts(all);
+  if(M.error){showError(`Per unire più conti servono elenchi di movimenti (acquisti, vendite, cedole). Non riesco a leggerli in: ${M.error.map(esc).join(", ")}. Puoi aprire quel file da solo.`);return;}
+  S.conti=all;trackOnce("feature","piu_conti",{name:"piu_conti"});
+  if(isSim())spaceSwitch("real",{fresh:true,stay:true});
+  load(M.sheets,{name:`${all.length} conti · ${all.map(c=>c.name).join(" + ")}`.slice(0,120),size:0,kind:"file"},true);
+}
+document.addEventListener("click",e=>{if(e.target.closest("#addAccBtn"))$("#fileMore").click();});
+document.addEventListener("change",e=>{if(e.target.id!=="fileMore"||!e.target.files.length)return;const fs=[...e.target.files];e.target.value="";
+  /* il conto già aperto entra solo se è un file caricato (non l'esempio né una prova) */
+  if(!S.conti||!S.conti.length||isExample()||isSim()){showError("Prima carica il file del primo conto, poi aggiungi gli altri.");return;}
+  addAccounts(fs,false);});
 /* portafoglio di esempio: un vero Excel (movimenti dal 2019, 7 ETF con ISIN) letto come un file caricato dall'utente */
 const EXAMPLE={url:"esempio/Portfolio_OS_esempio.xlsx",name:"Portfolio_OS_esempio.xlsx"};
 const isExample=()=>!!(S.source&&(S.source.example||(S.source.kind==="rebuilt"&&S.rb&&S.rb.origSource&&S.rb.origSource.example)));
@@ -1791,7 +1818,7 @@ async function svOpen(id){
   const r=await svGet(id);if(!r)return svHome();
   trackOnce("feature","riprendi",{name:"riprendi"});closeArchive();
   if(isSim())spaceSwitch("real",{stay:true});
-  S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=r.snap||null;
+  S.conti=[{name:r.name,sheets:r.sheets}];S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=r.snap||null;
   load(r.sheets,{name:r.file||r.name,size:0,kind:"file"},true);
   go("scan",{force:true});
   /* la mappa è già confermata in memoria: appena il file è pronto (anche dopo i prezzi di mercato) si costruisce il laboratorio */
@@ -3357,9 +3384,13 @@ function accountCalc(R){
   if(R&&R.pp){const pos=(S.portfolio&&S.portfolio.positions)||[],key=v=>String(v||"").trim().toLowerCase();
     const akas=ds.assets.map(a=>{const c=S.rb&&S.rb.cols.find(x=>x.name===a.name),q=pos.find(x=>(x.ticker||x.nome)===a.name);return new Set([a.name,c&&c.nome,c&&c.sym,q&&q.isin,q&&q.nome,q&&q.ticker].filter(Boolean).map(key));});
     valueOf=x=>{const i=akas.findIndex(s=>s.has(key(x.isin))||s.has(key(x.titolo))||(x.tk&&s.has(key(x.tk))));const b=i>=0?R.pp.byAsset[i]:null;return b&&b.value>0?{v:b.value,how:"prezzi di mercato"}:null;};}
+  /* valore di oggi = quote × ultimo prezzo di mercato in euro della serie scaricata: non dipende da tagli del periodo o esclusioni dalle analisi */
+  const pos=(S.portfolio&&S.portfolio.positions)||[],lastPx=c=>{const k=[...c.map.keys()].sort().pop();return k?c.map.get(k).v:null;};
+  const mkt=x=>{if(!S.rb)return null;const q=pos.find(p=>(x.isin&&p.isin===x.isin)||String(p.nome||"").toLowerCase()===String(x.nome||x.titolo||"").toLowerCase());
+    const c=q&&S.rb.cols.find(c=>c.name===(q.ticker||q.nome)||c.sym===q.simbolo);const v=c?lastPx(c):null;return v>0?{v:x.q*v,how:"prezzi di mercato"}:null;};
   /* un prezzo scritto a mano vale solo per i titoli senza prezzi di mercato */
   const own=pxPrefs(),mk=valueOf;
-  valueOf=x=>{const m=mk?mk(x):null;if(m)return m;const u=own[pxKey(x)];return u&&u.p>0?{v:x.q*u.p/(x.per100?100:1),how:"prezzo inserito",px:u.p,at:u.at}:null;};
+  valueOf=x=>{const m=mkt(x)||(mk?mk(x):null);if(m)return m;const u=own[pxKey(x)];return u&&u.p>0?{v:x.q*u.p/(x.per100?100:1),how:"prezzo inserito",px:u.p,at:u.at}:null;};
   try{return P.accountFromSheets(S.fileSheets,valueOf,today);}catch(e){return null;}
 }
 document.addEventListener("change",e=>{const k=e.target.dataset&&e.target.dataset.axp;if(!k)return;const v=parseFloat(String(e.target.value).replace(",","."));const o=pxPrefs();if(v>0)o[k]={p:v,at:Date.now()};else delete o[k];try{localStorage.setItem(PX_KEY,JSON.stringify(o));}catch{}trackOnce("feature","prezzo_manuale",{name:"prezzo_manuale"});renderReal();renderCost();});
@@ -3378,6 +3409,11 @@ function accountHTML(AC){
   AC.prior.forEach(x=>notes.push(`<b>${esc(x.nome||x.titolo)}</b>: ${x.sold>0?`venduto per ${fmtEur(x.sold)}`:"movimentato"}, ma comprato prima dell'inizio del file, quindi il costo d'acquisto non c'è e resta fuori dal rendimento. Per averlo, carica il file o l'estratto dall'apertura del conto.`));
   if(AC.items.some(x=>x.how==="ultimo prezzo pagato"))notes.push("Per i titoli senza prezzi di mercato il valore di oggi è stimato con l'ultimo prezzo pagato.");
   const open=AC.items.filter(x=>x.stato==="aperto").length,closed=AC.items.filter(x=>x.stato==="chiuso").length;
+  /* più conti: il valore di oggi di un titolo presente in due conti si divide in proporzione alle quote */
+  let perConto="";
+  if(S.conti&&S.conti.length>1){const byK=new Map(AC.items.map(x=>[x.isin||String(x.nome||x.titolo).toLowerCase(),x]));
+    const rowsC=S.conti.map(c=>{let A=null;try{A=P.accountFromSheets(c.sheets,x=>{const g=byK.get(x.isin||String(x.nome||x.titolo).toLowerCase());return g&&g.q>0&&g.value>0?{v:g.value*x.q/g.q,how:g.how}:null;},today);}catch{}return {c,A};}).filter(x=>x.A);
+    if(rowsC.length>1)perConto=`<h4 class="ac-h">Conto per conto</h4><div class="tablewrap"><table class="mt"><thead><tr><th>Conto</th><th>Comprato</th><th>Incassato</th><th>Valore oggi</th><th>Guadagno</th><th>Rendimento (TIR)</th></tr></thead><tbody>${rowsC.map(({c,A})=>`<tr><td><b>${esc(c.name)}</b><small>${A.items.length} titoli</small></td><td class="mono">${fmtEur(A.tot.bought)}</td><td class="mono">${fmtEur(A.tot.sold+A.tot.income)}</td><td class="mono">${fmtEur(A.tot.open)}</td><td class="mono ${A.tot.gain>=0?"up":"dn"}">${eur(A.tot.gain)}</td><td class="mono">${fmtPct(A.tot.xirr,1,true)}</td></tr>`).join("")}</tbody></table></div>`;}
   return `<div class="ac"><div class="head"><div><span class="eyebrow">Dai movimenti del file · ${AC.items.length} titoli: ${open} in portafoglio, ${closed} venduti${AC.prior.length?`, ${AC.prior.length} comprati prima del file`:""}</span><h3 style="margin-top:4px">Il tuo conto, tutto insieme</h3></div><span class="chip hist"><i></i>vendite comprese</span></div>
     <div class="ac-k">
       <div class="k"><span>Rendimento annuo del conto (TIR)</span><b>${fmtPct(T.xirr,1,true)}</b><small>acquisti, vendite, dividendi e valore di oggi</small></div>
@@ -3386,6 +3422,7 @@ function accountHTML(AC){
       <div class="k"><span>Incassato</span><b>${fmtEur(T.sold+T.income)}</b><small>vendite ${fmtEur(T.sold)} · dividendi e cedole ${fmtEur(T.income)}</small></div>
       <div class="k"><span>Ancora investito</span><b>${fmtEur(T.open)}</b><small>valore di oggi dei titoli in portafoglio</small></div>
     </div>
+    ${perConto}
     <div class="tablewrap"><table class="mt ac-t"><thead><tr><th>Titolo</th><th>Stato</th><th>Comprato</th><th>Incassato</th><th>Valore oggi</th><th>Guadagno</th><th>Rendimento</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${notes.length?`<ul class="ac-notes">${notes.map(n=>`<li>${n}</li>`).join("")}</ul>`:""}
     <p class="caption">Guadagno = incassato + valore di oggi − comprato. Per i titoli tenuti meno di 6 mesi il rendimento è il guadagno in percentuale, non annuo (su poche settimane l'annuo sarebbe fuorviante). Imposte, bollo e commissioni non abbinate a un titolo non sono incluse.</p></div>`;

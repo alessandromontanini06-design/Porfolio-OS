@@ -347,7 +347,7 @@ function txPositions(sheets,m){
   /* numeri ambigui come «4,123»: se il foglio scrive altrove la virgola come decimale («48,50», «1.624,00») e mai il punto, vale 4,123 */
   const cells=aoa.slice(h+1,h+400).flat().filter(v=>typeof v==="string").map(v=>v.trim());
   const commaDec=cells.some(v=>/^-?(\d{1,3}(\.\d{3})+|\d+),\d{1,2}$/.test(v))&&!cells.some(v=>/^-?\d+\.\d{1,2}$/.test(v));
-  const P=new Map();let n=0;const num=(row,c)=>{if(c<0)return null;const v=row[c];if(commaDec&&typeof v==="string"&&/^-?\d{1,3},\d{3}$/.test(v.trim()))return parseFloat(v.trim().replace(",","."));const p=parseNum(v);return p?p.n:null;};
+  const P=new Map(),rowsOut=[];let n=0;const num=(row,c)=>{if(c<0)return null;const v=row[c];if(commaDec&&typeof v==="string"&&/^-?\d{1,3},\d{3}$/.test(v.trim()))return parseFloat(v.trim().replace(",","."));const p=parseNum(v);return p?p.n:null;};
   /* colonne di contorno lette dall'intestazione: nome leggibile e ticker, per mostrare «EUNL» e non l'ISIN */
   const hd=(aoa[h]||[]).map(v=>lc(v)),fc=re=>hd.findIndex((x,i)=>i!==cT&&re.test(x));
   /* «Descrizione» nelle banche italiane spesso è il tipo di operazione («Compravendita titoli», «Accredito cedole», «Rimborso titoli»):
@@ -361,7 +361,8 @@ function txPositions(sheets,m){
     const d=cD>=0?parseDate(row[cD],true):null,amt=num(row,cA);let px=num(row,cP),q=num(row,cQ);
     const opS=cO>=0?lc(row[cO]):"",op=[opS,cOpX>=0?lc(row[cOpX]):""].filter(Boolean).join(" ");
     /* dividendi e cedole incassati: non cambiano le quote, ma contano nel rendimento del conto */
-    if(/divid|cedol|coupon/.test(op)&&amt!=null){const k=/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isinCell)?isinCell:t,it=P.get(k)||txItem(t,isinCell,null,null);it.income+=Math.abs(amt);if(d)it.flows.push({t:d,v:Math.abs(amt)});P.set(k,it);continue;}
+    if(/divid|cedol|coupon/.test(op)&&amt!=null){const k=/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isinCell)?isinCell:t,it=P.get(k)||txItem(t,isinCell,null,null);it.income+=Math.abs(amt);if(d)it.flows.push({t:d,v:Math.abs(amt)});P.set(k,it);
+      rowsOut.push([d,/cedol|coupon/.test(op)?"Cedola":"Dividendo",(cN>=0?String(row[cN]??"").trim():"")||t,/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isinCell)?isinCell:"",null,null,Math.abs(amt)]);continue;}
     if(q==null&&amt!=null&&px)q=Math.abs(amt)/px;if(q==null)continue;
     if(px==null&&amt!=null&&q)px=Math.abs(amt/q);
     /* dividendi, cedole, commissioni e imposte non cambiano le quote possedute */
@@ -374,9 +375,10 @@ function txPositions(sheets,m){
     if(px>0&&amt!=null&&q){const a=Math.abs(amt),e1=Math.abs(a-Math.abs(q)*px),e100=Math.abs(a-Math.abs(q)*px/100);if(e100<e1&&e100<=a*.05)it.per100=true;}
     if(px>0&&(!it.lastD||!d||d>=it.lastD)){it.last=px;it.lastD=d;}
     it.inv+=amt!=null?(qty<0?-1:1)*Math.abs(amt):px?qty*px:0;P.set(key,it);n++;
+    rowsOut.push([d,qty<0?"Vendita":"Acquisto",it.nome||t,/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:"",Math.abs(qty),px,amt!=null?(qty<0?1:-1)*Math.abs(amt):null]);
   }
   const positions=[...P.values()].filter(x=>x.q>1e-9).map(x=>({titolo:x.titolo,nome:x.nome||null,tk:x.tk||null,isin:x.isin,quantita:x.q,prezzo:x.last,per100:!!x.per100,valore:x.last?x.q*x.last/(x.per100?100:1):null,investito:x.inv,operazioni:x.n,data:x.lastD}));
-  return {errors:n?[]:["Nessun movimento leggibile."],positions,n,chiuse:[...P.values()].filter(x=>x.q<=1e-9).length,items:[...P.values()]};
+  return {errors:n?[]:["Nessun movimento leggibile."],positions,n,chiuse:[...P.values()].filter(x=>x.q<=1e-9).length,items:[...P.values()],rows:rowsOut};
 }
 function txItem(t,isin,nome,tk){const ok=/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin||"")?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null;
   return {titolo:t,nome:nome||null,tk:tk||null,isin:ok,q:0,last:null,lastD:null,inv:0,n:0,bought:0,sold:0,income:0,flows:[],minQ:0,firstD:null};}
@@ -385,6 +387,22 @@ function txItem(t,isin,nome,tk){const ok=/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin||""
    per quelli ancora aperti serve il valore di oggi (dai prezzi di mercato se ci sono, altrimenti l'ultimo prezzo pagato, dichiarato).
    Titoli venduti senza acquisti nel periodo del file (comprati prima): il costo non c'è, restano fuori dal calcolo e si segnalano.
    Cambi di nome (stessa quantità comprata con un nome e venduta con un altro): si uniscono. */
+/* ===== Più conti insieme =====
+   Ogni file (banca, broker, conto del coniuge) viene letto con la stessa lettura dei movimenti e riscritto in un formato comune;
+   poi i movimenti di tutti i conti finiscono in un solo foglio con la colonna «Conto». Lo stesso titolo in due conti (stesso ISIN) diventa una posizione sola.
+   Restituisce null se un file non è un elenco di movimenti (i riepiloghi di posizioni si uniscono con mergePositions). */
+function movementRows(sheets){
+  const L=localRecipe(sheets);if(!L||!L.recipe.movimenti)return null;
+  const T=txPositions(sheets,L.recipe.movimenti);if(!T.rows||!T.rows.length)return null;
+  return T.rows;
+}
+function mergeAccounts(files){
+  const H=["Data","Operazione","Titolo","ISIN","Quantità","Prezzo","Importo","Conto"],out=[],bad=[];
+  files.forEach(f=>{const rows=movementRows(f.sheets);if(!rows){bad.push(f.name);return;}rows.forEach(r=>out.push([...r,f.name]));});
+  if(bad.length||!out.length)return {error:bad.length?bad:["nessun movimento"]};
+  out.sort((a,b)=>(a[0]?a[0].getTime():0)-(b[0]?b[0].getTime():0));
+  return {sheets:[{name:"★ Movimenti · tutti i conti",aoa:[H,...out]}],n:out.length,conti:files.map(f=>f.name)};
+}
 function accountReturn(items,valueOf,today){
   const its=items.map(x=>({...x,flows:x.flows.slice()})),key=x=>String(x.nome||x.titolo||"").toLowerCase().replace(/[^a-z]/g,"").slice(0,4);
   const renamed=[];
@@ -1366,6 +1384,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={accountReturn,accountFromSheets,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={mergeAccounts,movementRows,accountReturn,accountFromSheets,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

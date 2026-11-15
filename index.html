@@ -64,7 +64,7 @@
               <label for="file" style="cursor:pointer;flex:1"><b>Carica il tuo Excel</b><small>il tuo foglio, l'export del broker o i movimenti titoli della banca (Excel o CSV) · oppure trascinalo qui</small>
                 <span class="src">In uso: <b id="dsName">—</b><span id="dsChip"></span></span><span class="err" id="fileErr" hidden></span></label>
               <em aria-hidden="true">→</em>
-              <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" hidden>
+              <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" multiple hidden>
             </div>
             <button type="button" class="opt" id="builderBtn"><span><b>Non ho un file</b><small>crea un portafoglio scegliendo ETF e pesi</small></span><em aria-hidden="true">→</em></button>
             <button type="button" class="opt" id="sampleBtn"><span><b>Fammi vedere un esempio</b><small>7 ETF, 355 movimenti dal 2019</small></span><em aria-hidden="true">→</em></button>
@@ -91,6 +91,7 @@
               <li><b>Mostra quanto costano i suoi fondi</b>, in euro e in vent'anni, contro strumenti a basso costo.</li>
               <li><b>Dimostra la tua proposta</b> sugli stessi mesi e nelle stesse crisi, con le operazioni da fare e le imposte stimate.</li>
               <li><b>Presentala a tutto schermo</b> al primo incontro, poi consegna il report col nome del tuo studio.</li>
+              <li><b>Tutto il patrimonio insieme</b>: banca, broker, conto cointestato, con BTP, fondi, cedole e titoli venduti.</li>
               <li><b>Alla revisione successiva</b> vedi cosa è cambiato: versamenti, mercati, pesi.</li>
             </ul>
             <p class="aud-trust">Il file del cliente resta nel tuo browser: nessun account, nessun server per i dati, nessun prodotto da vendere.</p>
@@ -200,7 +201,7 @@
         <nav class="lab-idx" id="labIdx" aria-label="Schede del laboratorio"></nav>
         <div class="sv-offer" id="svOffer" hidden></div>
         <div class="card co" id="chgCard" hidden></div>
-        <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip hist"><i></i>Dato storico</span><span class="caption">Clicca qualsiasi numero per vedere formula, dati e ipotesi.</span><button type="button" class="btn sm" id="presentBtn" style="margin-left:auto">Presenta al cliente</button><button type="button" class="btn sm lime" id="reportBtn">Scarica il report PDF</button></div>
+        <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span class="chip hist"><i></i>Dato storico</span><span class="caption">Clicca qualsiasi numero per vedere formula, dati e ipotesi.</span><button type="button" class="btn sm" id="addAccBtn" style="margin-left:auto" title="Unisci l'estratto di un altro conto: banca, broker, conto cointestato">+ Aggiungi un conto</button><input type="file" id="fileMore" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" multiple hidden><button type="button" class="btn sm" id="presentBtn">Presenta al cliente</button><button type="button" class="btn sm lime" id="reportBtn">Scarica il report PDF</button></div>
         <div class="card real" id="realCard" hidden></div>
         <div class="card co" id="costCard" hidden></div>
         <div class="kpis" id="kpis"></div>

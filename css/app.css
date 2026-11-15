@@ -878,3 +878,5 @@ body.pz-on{overflow:hidden}body.pz-on .dock,body.pz-on .orb-btn,body.pz-on .orb-
 .aud-trust{font-size:.86rem;color:var(--muted);margin:2px 0 14px;padding-left:12px;border-left:3px solid var(--lime)}
 .aud-card.pro .aud-trust{color:rgba(255,255,255,.72)}
 .ac-px{display:flex;justify-content:flex-end;gap:6px;margin-top:6px;font-size:.72rem;color:var(--muted)}.ac-px input{width:84px}
+.ac-h{margin:16px 0 6px;font-family:var(--f-display);font-size:1rem;letter-spacing:-.01em}
+.ac-t td:first-child{min-width:220px;max-width:380px;white-space:normal}.ac-t td:first-child small{display:block;white-space:normal}
