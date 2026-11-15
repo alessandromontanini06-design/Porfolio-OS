@@ -42,7 +42,7 @@
 
 <header class="topbar">
   <button type="button" class="brand" data-go="home" aria-label="Portfolio OS, torna alla home"><span class="mk" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M2 13.5 6.5 8l3.5 3 6-7.5" stroke="#130A24" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>PORTFOLIO OS</button>
-  <div class="status"><span class="space-sw" id="spaceSw" role="tablist" aria-label="Spazio di lavoro" hidden><button type="button" data-space="real">Il mio portafoglio</button><button type="button" data-space="sim">Prove e confronti</button></span><span class="chip live"><i></i>Calcoli nel browser</span><span class="chip" id="sceneChip">Home</span></div>
+  <div class="status"><button type="button" class="arch-btn" id="archBtn" aria-label="Apri l'archivio dei portafogli salvati"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 5.5h14v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11Zm-1-3h16v3H2zM8 9.5h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg><span>Archivio</span><b id="archN" hidden></b></button><span class="space-sw" id="spaceSw" role="tablist" aria-label="Spazio di lavoro" hidden><button type="button" data-space="real" title="Il mio portafoglio">Mio</button><button type="button" data-space="sim" title="Prove e confronti">Prove</button></span><span class="chip live"><i></i>Calcoli nel browser</span><span class="chip" id="sceneChip">Home</span></div>
 </header>
 
 <main class="stage">
@@ -506,6 +506,17 @@
   <div id="receipt" style="display:flex;flex-direction:column;gap:18px"></div>
 </aside>
 
+<section class="bdpage arch" id="archive" role="dialog" aria-modal="true" aria-label="Archivio dei portafogli" aria-hidden="true">
+  <div class="bd-top"><button type="button" class="btn sm" id="closeArchive">← Indietro</button><span class="bd-crumb">Portfolio OS <i>/</i> Archivio</span></div>
+  <div class="ar-wrap">
+    <header class="ar-hd"><div><span class="eyebrow">Salvato solo in questo browser</span><h2>Il tuo <em>archivio</em></h2><p id="arSub"></p></div>
+      <div class="ar-io"><button type="button" class="btn sm" id="arExport">Esporta l'archivio</button><label class="btn sm" for="arImport">Importa</label><input type="file" id="arImport" accept="application/json,.json" hidden><button type="button" class="btn sm lime" id="arNew">+ Nuovo portafoglio</button></div></header>
+    <div class="ar-tools"><input type="search" id="arQ" placeholder="Cerca per cliente, file o strumento" aria-label="Cerca nell'archivio"><div class="seg" role="group" aria-label="Filtro" id="arF"><button type="button" data-arf="all" aria-pressed="true">Tutti</button><button type="button" data-arf="due" aria-pressed="false">Da rivedere</button></div>
+      <label class="ar-sort"><span>Ordina per</span><select id="arSort"><option value="rev">ultima revisione</option><option value="name">nome</option><option value="value">valore</option></select></label></div>
+    <div class="ar-list" id="arList"></div>
+    <p class="ar-foot">L'archivio resta in questo browser, su questo computer: non va su nessun server. Per non perderlo (cambio di computer, pulizia del browser) usa <b>Esporta l'archivio</b> ogni tanto e conserva il file. <a href="/privacy.html">Privacy</a></p>
+  </div>
+</section>
 <div class="rp-dlg" id="rpDlg" hidden role="dialog" aria-modal="true" aria-labelledby="rpDlgT">
   <form class="rp-box" id="rpForm" autocomplete="off">
     <div class="rp-dh"><h3 id="rpDlgT">Prepara il report</h3><button type="button" class="btn sm" id="rpClose">Chiudi</button></div>
