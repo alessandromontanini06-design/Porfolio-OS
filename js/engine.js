@@ -344,10 +344,13 @@ function txPositions(sheets,m){
   const aoa=(sheets.find(s=>s.name===m.foglio)||{}).aoa;if(!aoa)return {errors:[`Il foglio «${m.foglio}» non esiste.`],positions:[],n:0};
   const h=(m.rigaIntestazione||1)-1,cD=colIdx(m.colonnaData),cT=colIdx(m.colonnaTitolo),cI=colIdx(m.colonnaIsin),cQ=colIdx(m.colonnaQuantita),cP=colIdx(m.colonnaPrezzo),cA=colIdx(m.colonnaImporto),cO=colIdx(m.colonnaOperazione);
   if(cT<0)return {errors:["Manca la colonna del titolo."],positions:[],n:0};
-  const P=new Map();let n=0;const num=(row,c)=>{if(c<0)return null;const p=parseNum(row[c]);return p?p.n:null;};
+  /* numeri ambigui come «4,123»: se il foglio scrive altrove la virgola come decimale («48,50», «1.624,00») e mai il punto, vale 4,123 */
+  const cells=aoa.slice(h+1,h+400).flat().filter(v=>typeof v==="string").map(v=>v.trim());
+  const commaDec=cells.some(v=>/^-?(\d{1,3}(\.\d{3})+|\d+),\d{1,2}$/.test(v))&&!cells.some(v=>/^-?\d+\.\d{1,2}$/.test(v));
+  const P=new Map();let n=0;const num=(row,c)=>{if(c<0)return null;const v=row[c];if(commaDec&&typeof v==="string"&&/^-?\d{1,3},\d{3}$/.test(v.trim()))return parseFloat(v.trim().replace(",","."));const p=parseNum(v);return p?p.n:null;};
   /* colonne di contorno lette dall'intestazione: nome leggibile e ticker, per mostrare «EUNL» e non l'ISIN */
   const hd=(aoa[h]||[]).map(v=>lc(v)),fc=re=>hd.findIndex((x,i)=>i!==cT&&re.test(x));
-  const cN0=fc(/^(titolo|strumento|prodotto|nome|name|security|etf)\b/),cN=cN0>=0?cN0:fc(/^descrizione\b/),cK=fc(/^(ticker|simbolo|symbol|codice di borsa)\b/),cI2=cI>=0?cI:fc(/^isin\b/);
+  const cN0=fc(/^(titolo|strumento|prodotto|nome|name|security|etf)\b/),cN=cN0>=0?cN0:fc(/^descrizione\b/),cK=fc(/^(ticker|simbolo|symbol|codice di borsa|codice titolo|codice)$/),cI2=cI>=0?cI:fc(/^isin\b/);
   for(let r=h+1;r<aoa.length;r++){
     const row=aoa[r]||[],t=String(row[cT]??"").trim();if(!t)continue;
     const d=cD>=0?parseDate(row[cD],true):null,px=num(row,cP),amt=num(row,cA);let q=num(row,cQ);
@@ -357,7 +360,8 @@ function txPositions(sheets,m){
     if(/divid|cedol|coupon|commission|bollo|impost|tass[ae]|\bfee|\btax/.test(op))continue;
     const sell=/^(v|s)$/.test(op)||/(^|[^a-z])(vend|sell|sale|cession|uscit|rimbors|short)/.test(op),buy=/^(a|b)$/.test(op)||/acq|buy|purch|sottoscr|entrat|savings plan|piano di accumulo|(^|[^a-z])compr(?!avend)/.test(op);
     const qty=sell?-Math.abs(q):buy?Math.abs(q):q;
-    const isin=cI2>=0?String(row[cI2]??"").trim().toUpperCase():"",key=/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:t,it=P.get(key)||{titolo:t,nome:cN>=0?String(row[cN]??"").trim()||null:null,tk:cK>=0?String(row[cK]??"").trim().toUpperCase()||null:null,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
+    /* l'ISIN può stare nella colonna dell'ISIN o, in alcune banche, in «Codice titolo» */
+    const kv=cK>=0?String(row[cK]??"").trim().toUpperCase():"",isin=cI2>=0?String(row[cI2]??"").trim().toUpperCase():/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(kv)?kv:"",key=/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:t,it=P.get(key)||{titolo:t,nome:cN>=0?String(row[cN]??"").trim()||null:null,tk:kv&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(kv)?kv:null,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t)?t:null,q:0,last:null,lastD:null,inv:0,n:0};it.q+=qty;it.n++;
     if(px>0&&(!it.lastD||!d||d>=it.lastD)){it.last=px;it.lastD=d;}
     it.inv+=amt!=null?(qty<0?-1:1)*Math.abs(amt):px?qty*px:0;P.set(key,it);n++;
   }
@@ -405,13 +409,13 @@ const SYN=[
   ["volume",/^(volume|vol\.?|volumi|umsatz|volumen)$/i],
   ["nav",/\bnav\b|valore quota|net asset value/i],
   ["isin",/^(isin|codice isin|isin code)$/i],
-  ["ticker",/^(ticker|simbolo|symbol|codice|code|tkr)$/i],
-  ["name",/^(titolo|strumento|nome|descrizione|prodotto|asset|security|instrument|name|description|wertpapier|titre)$/i],
-  ["qty",/quantit|^qty$|^q\.?t[aà]\.?$|^shares$|^units$|^pezzi$|^quote$|^st[uü]ck|^n\.?\s*azioni|^nominale$/i],
-  ["price",/^(prezzo|price|kurs|cours|precio|prezzo unitario|prezzo medio|unit price|pmc|quotazione|koers|corso|t\.? ?price|trade price|prezzo per quota|price per share|prezzo \(€\)|prezzo eseguito)$/i],
+  ["ticker",/^(ticker|simbolo|symbol|codice|code|tkr|codice titolo)$/i],
+  ["name",/^(titolo|strumento|nome|descrizione|prodotto|asset|security|instrument|name|description|wertpapier|titre|strumento finanziario|nome titolo|descrizione titolo|denominazione|denominazione titolo|fondo|comparto|titolo\/fondo)$/i],
+  ["qty",/quantit|^qty$|^q\.?t[aà]\.?$|^shares$|^units$|^pezzi$|^quote$|^st[uü]ck|^n\.?\s*azioni|^nominale$|^valore nominale$|^numero (di )?quote$|^n\.?\s*quote$/i],
+  ["price",/^(prezzo|price|kurs|cours|precio|prezzo unitario|prezzo medio|unit price|pmc|quotazione|koers|corso|t\.? ?price|trade price|prezzo per quota|price per share|prezzo \(€\)|prezzo eseguito|prezzo di esecuzione|prezzo €|corso secco)$/i],
   ["amount",/importo|controvalore|^amount$|ammontare|totale operazione|betrag|montant|^valore operazione$|net amount|^totale$/i],
   ["fee",/commission|^fees?$|spese|^costi$|tasse|^tax(es)?$|bollo/i],
-  ["side",/^(tipo|operazione|segno|side|type|buy\/sell|acquisto\/vendita|movimento|tipo operazione|transaction type|action)$/i],
+  ["side",/^(tipo|operazione|segno|side|type|buy\/sell|acquisto\/vendita|movimento|tipo operazione|transaction type|action|tipo movimento|causale|segno operazione|descrizione operazione)$/i],
   ["ccy",/^(valuta|currency|ccy|divisa|w[aä]hrung|devise|moneda)$/i],
   ["value",/^(valore|value|controvalore attuale|valore di mercato|market value|valore €|valore eur|marktwert)/i],
   ["weight",/^(peso|weight|allocazione|allocation|% portafoglio|% del portafoglio|peso attuale|peso %)/i],
@@ -436,7 +440,8 @@ function pacSheet(sh){
   let h=-1,col=null;
   for(let r=0;r<Math.min(A.length,40)&&h<0;r++){
     const hd=A[r].map(lc);if(hd.filter(Boolean).length<3)continue;
-    if(hd.some(x=>/^(titolo|strumento|prodotto|nome|name|security|instrument|isin|ticker|simbolo|symbol)$/.test(x)))return null; // c'è già la colonna del titolo: è un elenco normale
+    /* c'è già una colonna che dice quale titolo è (anche «Codice ISIN», «Descrizione titolo», «Fondo»): è un elenco normale, non un PAC per foglio */
+    if(hd.some(x=>/\bisin\b|titolo|strumento|prodotto|^nome\b|^name$|security|instrument|ticker|simbolo|symbol|^fondo\b|denominazione/.test(x)))return null;
     const f=(rx,skip)=>hd.findIndex(x=>x&&rx.test(x)&&!(skip&&PAC_RX.skip.test(x)));
     const c={d:f(PAC_RX.date),q:f(PAC_RX.qty,true),a:f(PAC_RX.amt,true),p:f(PAC_RX.px,true)};
     if(c.d>=0&&(c.q>=0||c.a>=0)&&(c.p>=0||(c.q>=0&&c.a>=0))&&new Set([c.q,c.a,c.p].filter(i=>i>=0)).size===[c.q,c.a,c.p].filter(i=>i>=0).length){h=r;col=c;}
@@ -535,7 +540,7 @@ function localRecipe(sheets){
       if(blocks.length>=2){R.serieInColonna.push(...blocks);parts.push({kind:"affiancate",foglio:sh.name,conf:"media",d:`«${sh.name}»: ${blocks.length} tabelle affiancate con date diverse, unite per data`});continue;}
     }
     /* 4) movimenti: data + titolo/ISIN + (quantità e prezzo, oppure importo) */
-    const cNm=hdr.findIndex(x=>/^(titolo|strumento|prodotto|security|instrument|nome|name|wertpapier|titre)(\b|$)/i.test(x)),cT=[cNm,find("name"),find("ticker"),find("isin")].find(i=>i>=0),cQ=find("qty"),cP=find("price")>=0?find("price"):find("close"),cA=find("amount"),cSg=hdr.findIndex(x=>/^segno$/i.test(x)),cS=cSg>=0?cSg:find("side");
+    const cNm=hdr.findIndex(x=>/^(titolo|strumento|prodotto|security|instrument|nome|name|wertpapier|titre)(\b|$)/i.test(x)),cT=[cNm,find("name"),find("ticker"),find("isin")].find(i=>i>=0),cQ=find("qty"),cP=find("price")>=0?find("price"):find("close")>=0?find("close"):find("nav"),cA=find("amount"),cSg=hdr.findIndex(x=>/^segno$/i.test(x)),cS=cSg>=0?cSg:find("side");
     if(dateCols.length>=1&&cT!=null&&cT>=0&&((cQ>=0&&cP>=0)||(cA>=0&&cQ>=0))&&!R.movimenti){
       R.movimenti={foglio:sh.name,rigaIntestazione:h+1,colonnaData:colLetter(dateCols[0]),colonnaTitolo:colLetter(cT),colonnaIsin:find("isin")>=0?colLetter(find("isin")):null,colonnaQuantita:cQ>=0?colLetter(cQ):null,colonnaPrezzo:cP>=0?colLetter(cP):null,colonnaImporto:cA>=0?colLetter(cA):null,colonnaOperazione:cS>=0?colLetter(cS):null,valuta:null};
       const cc=find("ccy");if(cc>=0){const vals=new Set(aoa.slice(h+1).map(r=>String(r[cc]??"").trim().toUpperCase()).filter(Boolean));if(vals.size===1)R.movimenti.valuta=[...vals][0];}
