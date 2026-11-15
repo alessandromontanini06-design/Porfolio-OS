@@ -286,26 +286,37 @@
         <div><button type="button" class="btn lime" data-go="map">Vai alla mappa</button></div>
       </div>
       <div id="fiBox" hidden style="display:flex;flex-direction:column;gap:16px">
-        <div class="fi-hero" id="fiHero"></div>
-        <form class="card fi-form" id="fiForm" autocomplete="off">
-          <div class="fi-group"><span class="fi-gl">Tu</span>
-            <label><span>Età oggi</span><input type="number" min="18" max="80" step="1" id="fiAge" inputmode="numeric"></label>
-            <label><span>I soldi devono durare fino a</span><input type="number" min="60" max="105" step="1" id="fiEnd" inputmode="numeric"><small>anni di età</small></label></div>
-          <div class="fi-group"><span class="fi-gl">Soldi</span>
-            <label><span>Capitale investito oggi (€)</span><input type="number" min="0" step="1000" id="fiCap" inputmode="decimal"></label>
-            <label><span>Risparmi ogni mese (€)</span><input type="number" min="0" step="50" id="fiSave" inputmode="decimal"><small>finché lavori</small></label>
-            <label><span>Spesa mensile da coprire (€)</span><input type="number" min="100" step="100" id="fiSpend" inputmode="decimal"><small>in euro di oggi</small></label></div>
-          <div class="fi-group"><span class="fi-gl">Pensione</span>
-            <label><span>Pensione mensile (€)</span><input type="number" min="0" step="100" id="fiPen" inputmode="decimal"><small>netta, in euro di oggi · 0 se non vuoi contarla</small></label>
-            <label><span>Da che età</span><input type="number" min="55" max="75" step="1" id="fiPenAge" inputmode="numeric"></label></div>
-          <div class="fi-group"><span class="fi-gl">Sicurezza</span>
-            <div class="fi-seg"><div class="seg" role="group" aria-label="Probabilità di successo" id="fiTarget"><button type="button" data-fit="0.75">75%</button><button type="button" data-fit="0.9">90%</button><button type="button" data-fit="0.95">95%</button></div><small>dei futuri simulati in cui i soldi bastano fino alla fine</small></div></div>
-        </form>
-        <div class="kpis" id="fiKpis"></div>
+        <div class="fi-wrap">
+          <form class="card fi-panel" id="fiForm" autocomplete="off">
+            <div class="fi-mini" id="fiMini" aria-live="polite"></div>
+            <h3>I tuoi numeri</h3>
+            <div class="fi-gl">Tu</div>
+            <div class="fi-sl"><label for="fiAgeN"><span>Età oggi</span><span class="fi-val"><input type="number" id="fiAgeN" min="18" max="75" step="1" inputmode="decimal" data-fi="fiAge">anni</span></label><input type="range" id="fiAge" min="18" max="75" step="1" data-fi="fiAge" aria-label="Età oggi"></div>
+            <div class="fi-sl"><label for="fiEndN"><span>I soldi devono durare fino a</span><span class="fi-val"><input type="number" id="fiEndN" min="70" max="105" step="1" inputmode="decimal" data-fi="fiEnd">anni</span></label><input type="range" id="fiEnd" min="70" max="105" step="1" data-fi="fiEnd" aria-label="I soldi devono durare fino a"></div>
+            <div class="fi-gl">Soldi</div>
+            <div class="fi-sl"><label for="fiCapN"><span>Capitale investito oggi</span><span class="fi-val"><input type="number" id="fiCapN" min="0" step="1000" inputmode="decimal" data-fi="fiCap">€</span></label><small>dal tuo portafoglio</small></div>
+            <div class="fi-sl"><label for="fiSaveN"><span>Risparmi ogni mese</span><span class="fi-val"><input type="number" id="fiSaveN" min="0" max="5000" step="50" inputmode="decimal" data-fi="fiSave">€</span></label><input type="range" id="fiSave" min="0" max="5000" step="50" data-fi="fiSave" aria-label="Risparmi ogni mese"></div>
+            <div class="fi-sl"><label for="fiSpendN"><span>Spesa mensile da coprire</span><span class="fi-val"><input type="number" id="fiSpendN" min="500" max="10000" step="100" inputmode="decimal" data-fi="fiSpend">€</span></label><input type="range" id="fiSpend" min="500" max="10000" step="100" data-fi="fiSpend" aria-label="Spesa mensile da coprire"></div>
+            <div class="fi-gl">Pensione <small>netta, in euro di oggi</small></div>
+            <div class="fi-sl"><label for="fiPenN"><span>Pensione mensile</span><span class="fi-val"><input type="number" id="fiPenN" min="0" max="4000" step="50" inputmode="decimal" data-fi="fiPen">€</span></label><input type="range" id="fiPen" min="0" max="4000" step="50" data-fi="fiPen" aria-label="Pensione mensile"></div>
+            <div class="fi-sl"><label for="fiPenAgeN"><span>Da che età</span><span class="fi-val"><input type="number" id="fiPenAgeN" min="57" max="72" step="1" inputmode="decimal" data-fi="fiPenAge">anni</span></label><input type="range" id="fiPenAge" min="57" max="72" step="1" data-fi="fiPenAge" aria-label="Da che età"></div>
+            <div class="fi-gl">Sicurezza</div>
+            <div class="seg" role="group" aria-label="Probabilità che i soldi bastino" id="fiTarget"><button type="button" data-fit="0.75">75%</button><button type="button" data-fit="0.9">90%</button><button type="button" data-fit="0.95">95%</button></div>
+            <small>dei futuri simulati in cui i soldi bastano fino alla fine</small>
+          </form>
+          <div class="fi-main">
+            <div class="fi-hero" id="fiHero"></div>
+            <div class="kpis fi-k" id="fiKpis"></div>
+            <div class="card fi-goal" id="fiGoal">
+              <div class="fi-goal-h"><h3>Vuoi smettere prima?</h3><div class="fi-sl"><label for="fiGoalAgeN"><span>Voglio smettere a</span><span class="fi-val"><input type="number" id="fiGoalAgeN" min="30" max="80" step="1" inputmode="decimal" data-fi="fiGoalAge">anni</span></label><input type="range" id="fiGoalAge" min="30" max="80" step="1" data-fi="fiGoalAge" aria-label="Voglio smettere a"></div></div>
+              <div class="fi-goal-r" id="fiGoalRes"></div>
+            </div>
+          </div>
+        </div>
         <div class="bento">
           <div class="card s12"><div class="head"><h3>La tua vita finanziaria</h3><span class="eyebrow">capitale in euro di oggi, per età</span></div><div class="chartbox" id="fiLife"></div><div class="legend" id="fiLifeLeg"></div><p class="caption" id="fiLifeCap"></p></div>
           <div class="card s7"><div class="head"><h3>Cosa ti avvicina di più</h3><span class="eyebrow">età in cui puoi smettere</span></div><div class="fi-levers" id="fiLevers"></div></div>
-          <div class="card s5"><div class="head"><h3>I tipi di FIRE</h3><span class="eyebrow">stessi dati, scelte diverse</span></div><div class="fi-vars" id="fiVars"></div></div>
+          <div class="card s5"><div class="head"><h3>I tipi di FIRE</h3><span class="eyebrow">stessi futuri, scelte diverse</span></div><div class="fi-vars" id="fiVars"></div></div>
           <div class="card s12"><div class="head"><h3>La regola del 4% sul tuo portafoglio</h3><span class="eyebrow">prelievo annuo e probabilità che basti</span></div><div class="fi-two"><div class="chartbox" id="fiCurve"></div><div class="fi-txt" id="fiCurveTxt"></div></div></div>
           <div class="card s12"><div class="head"><h3>Ipotesi e limiti</h3><span class="eyebrow">leggili prima dei numeri</span></div><ul class="mc-notes" id="fiNotes"></ul></div>
         </div>

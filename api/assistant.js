@@ -25,6 +25,7 @@ const TOOLS = [
     eta_fine: { type: "number", description: "Fino a che età devono durare i soldi. Predefinito 90." },
     pensione: { type: "number", description: "Pensione mensile netta in euro di oggi." },
     eta_pensione: { type: "number", description: "Età da cui arriva la pensione. Predefinito 67." },
+    eta_obiettivo: { type: "number", description: "Se l'utente vuole smettere a un'età precisa: quanto deve risparmiare al mese per riuscirci." },
     pesi: PESI } } },
   { name: "monte_carlo", description: "Simula migliaia di futuri del portafoglio ricampionando i rendimenti storici del file: capitale finale per percentili (nominale e al netto dell'inflazione), probabilità di raggiungere un obiettivo, probabilità di perdita, capitale esaurito con i prelievi. Usalo per domande su obiettivi, piani di accumulo, prelievi o orizzonti futuri. I parametri omessi prendono i valori impostati nell'app.", parameters: { type: "object", properties: {
     anni: { type: "number", description: "Orizzonte in anni (1-60)." },

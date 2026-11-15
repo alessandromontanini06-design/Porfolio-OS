@@ -907,41 +907,80 @@ function fireRate(o){
   return {swr:lo,target,curve,at4:fireSuccess(q,.04),years:q.years,n:q.n};
 }
 /* Tutta la vita, mese per mese e in euro di oggi: si risparmia fino all'età di stop, poi si preleva la spesa
-   (meno la pensione, dall'età in cui arriva) fino all'età finale. Stessi numeri casuali per ogni età provata
-   (common random numbers): le età si confrontano a parità di fortuna, e il successo cresce con l'età di stop. */
-function fireLife(o){
-  const f=12,hist=fireRealRet(o.ret||[],f,o.infl).filter(Number.isFinite),m=hist.length;if(m<12)return {error:"Servono almeno 12 rendimenti storici per simulare."};
-  const age=Math.round(o.age),end=Math.round(o.endAge),R=Math.round(o.retireAge),n=o.n||600,months=(end-age)*f;
-  const feeF=Math.pow(1-Math.max(0,Math.min(.2,+o.costs||0)),1/f),spend=+o.spend||0,pen=+o.pension||0,penAge=o.pensionAge||200,save=+o.save||0,initial=Math.max(0,+o.initial||0);
-  const side=+o.side||0,sideEnd=o.sideUntil||penAge; // reddito part-time dopo lo stop (Barista FIRE), fino a sideUntil
-  const method=["boot","block","normal"].includes(o.method)?o.method:"boot",block=Math.max(2,Math.min(m,o.block||12)),rnd=makeRng(o.seed==null?21:o.seed);
-  const mean=hist.reduce((a,x)=>a+x,0)/m,sd=Math.sqrt(hist.reduce((a,x)=>a+(x-mean)**2,0)/Math.max(1,m-1));
+   (meno pensione e reddito part-time) fino all'età finale.
+   I futuri (rendimenti mensili reali ricampionati) si generano una volta e si riusano per ogni domanda: stesse "fortune"
+   per ogni età e ogni scelta, quindi i confronti sono puliti e il calcolo è veloce. */
+const FIRE_CACHE=[];
+function firePaths(o){
+  const f=12,n=o.n||600,months=Math.round((o.endAge-o.age)*f),method=["boot","block","normal"].includes(o.method)?o.method:"boot",seed=o.seed==null?21:o.seed;
+  const hit=FIRE_CACHE.find(c=>c.ret===o.ret&&c.n===n&&c.months>=months&&c.method===method&&c.seed===seed&&c.infl===(+o.infl||0)&&c.block===(o.block||12));
+  if(hit)return hit;
+  const hist=fireRealRet(o.ret||[],f,o.infl).filter(Number.isFinite),m=hist.length;if(m<12)return {error:"Servono almeno 12 rendimenti storici per simulare."};
+  const rnd=makeRng(seed),block=Math.max(2,Math.min(m,o.block||12)),mean=hist.reduce((a,x)=>a+x,0)/m,sd=Math.sqrt(hist.reduce((a,x)=>a+(x-mean)**2,0)/Math.max(1,m-1));
   const gauss=()=>{let u=0;while(u===0)u=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rnd());};
-  const Y=end-age+1,cap=o.keepPaths?new Float64Array(n*Y):null;let ok=0;const atR=new Float64Array(n),depAge=[];
-  for(let s=0;s<n;s++){
-    let W=initial,pos=0,dead=false;if(cap)cap[s*Y]=W;
-    for(let t=1;t<=months;t++){
-      let r;if(method==="normal")r=Math.max(-.99,mean+sd*gauss());else if(method==="block"){if((t-1)%block===0)pos=Math.floor(rnd()*m);else pos=(pos+1)%m;r=hist[pos];}else r=hist[Math.floor(rnd()*m)];
-      const a=age+(t-1)/f;
-      if(!dead){W=W*(1+r)*feeF;if(a<R)W+=save;else{W-=Math.max(0,spend-(a>=penAge?pen:0)-(a<sideEnd?side:0));if(W<=0){W=0;dead=true;depAge.push(Math.floor(a));}}}
-      if(t===(R-age)*f)atR[s]=W;
-      if(cap&&t%f===0)cap[s*Y+t/f]=W;
-    }
-    if(R<=age)atR[s]=initial;if(!dead)ok++;
-  }
-  const out={success:ok/n,n,retireAge:R,capAtRetire:quantile(Array.from(atR).sort((a,b)=>a-b),.5),capAtRetireBad:quantile(Array.from(atR).sort((a,b)=>a-b),.1)};
-  if(depAge.length)out.depMedianAge=quantile(depAge.sort((a,b)=>a-b),.5);
-  if(cap){out.fan=[];for(let y=0;y<Y;y++){const col=[];for(let s=0;s<n;s++)col.push(cap[s*Y+y]);col.sort((a,b)=>a-b);out.fan.push({age:age+y,p10:quantile(col,.1),p25:quantile(col,.25),p50:quantile(col,.5),p75:quantile(col,.75),p90:quantile(col,.9)});}}
-  return out;
+  const M=Math.max(months,12*80),R=new Float64Array(n*M);
+  for(let s=0;s<n;s++){let pos=0;for(let t=0;t<M;t++){let r;if(method==="normal")r=Math.max(-.99,mean+sd*gauss());else if(method==="block"){if(t%block===0)pos=Math.floor(rnd()*m);else pos=(pos+1)%m;r=hist[pos];}else r=hist[Math.floor(rnd()*m)];R[s*M+t]=1+r;}}
+  const c={ret:o.ret,n,months:M,method,seed,infl:+o.infl||0,block:o.block||12,R};FIRE_CACHE.unshift(c);FIRE_CACHE.length=Math.min(FIRE_CACHE.length,4);return c;
 }
-/* età più bassa in cui si può smettere con successo ≥ obiettivo (ricerca binaria: il successo cresce con l'età) */
+/* un percorso: capitale mese per mese con stop all'età R; restituisce true se i soldi bastano fino alla fine */
+function fireRun(P,s,o,Rage,out){
+  const f=12,M=P.months,base=s*M,age=o.age,months=Math.round((o.endAge-age)*f),stop=Math.round((Rage-age)*f);
+  const fee=Math.pow(1-Math.max(0,Math.min(.2,+o.costs||0)),1/f),save=+o.save||0,spend=+o.spend||0,pen=+o.pension||0,penAge=o.pensionAge||200,side=+o.side||0,sideEnd=o.sideUntil||penAge;
+  let W=Math.max(0,+o.initial||0);
+  for(let t=0;t<months;t++){
+    W=W*P.R[base+t]*fee;const a=age+t/f;
+    if(t<stop)W+=save;else{W-=Math.max(0,spend-(a>=penAge?pen:0)-(a<sideEnd?side:0));if(W<=0){if(out)out.dead=a;return false;}}
+    if(out){if(t===stop-1)out.atR=W;if(out.cap&&(t+1)%f===0)out.cap[(t+1)/f]=W;}
+  }
+  if(out&&stop<=0)out.atR=Math.max(0,+o.initial||0);
+  return true;
+}
+function fireLife(o){
+  const P=firePaths(o);if(P.error)return P;
+  const n=P.n,age=Math.round(o.age),end=Math.round(o.endAge),R=Math.round(o.retireAge),Y=end-age+1;
+  let ok=0;const atR=[],dep=[],caps=o.keepPaths?[]:null;
+  for(let s=0;s<n;s++){const out={cap:o.keepPaths?new Float64Array(Y):null};if(out.cap)out.cap[0]=Math.max(0,+o.initial||0);
+    if(fireRun(P,s,o,R,out))ok++;else dep.push(Math.floor(out.dead));atR.push(out.atR!=null?out.atR:0);if(caps)caps.push(out.cap);}
+  const sorted=atR.slice().sort((a,b)=>a-b),res={success:ok/n,n,retireAge:R,capAtRetire:quantile(sorted,.5),capAtRetireBad:quantile(sorted,.1)};
+  if(dep.length)res.depMedianAge=quantile(dep.sort((a,b)=>a-b),.5);
+  if(caps){res.fan=[];for(let y=0;y<Y;y++){const col=caps.map(c=>c[y]).sort((a,b)=>a-b);res.fan.push({age:age+y,p10:quantile(col,.1),p25:quantile(col,.25),p50:quantile(col,.5),p75:quantile(col,.75),p90:quantile(col,.9)});}}
+  return res;
+}
+/* età FIRE: per ogni futuro l'età di stop più bassa che regge (il successo cresce con l'età, quindi ricerca binaria per percorso);
+   l'età FIRE con sicurezza p è il quantile p di queste età. Si ottiene anche la distribuzione: «in 1 futuro su 4 già a 52». */
 function fireAge(o){
-  const target=o.target||.9,age=Math.round(o.age),last=Math.round(o.endAge)-1,run=R=>fireLife({...o,retireAge:R});
-  const first=run(age);if(first.error)return first;
-  if(first.success>=target)return {age:age,already:true,res:first,target};
-  const top=run(last);if(top.success<target)return {age:null,res:top,target};
-  let lo=age,hi=last;while(hi-lo>1){const mid=(lo+hi)>>1;if(run(mid).success>=target)hi=mid;else lo=mid;}
-  return {age:hi,res:run(hi),target};
+  const P=firePaths(o);if(P.error)return P;
+  const target=o.target||.9,age=Math.round(o.age),last=Math.round(o.endAge)-1,n=P.n,ages=new Float64Array(n);
+  for(let s=0;s<n;s++){
+    if(fireRun(P,s,o,age)){ages[s]=age;continue;}
+    if(!fireRun(P,s,o,last)){ages[s]=Infinity;continue;}
+    let lo=age,hi=last;while(hi-lo>1){const mid=(lo+hi)>>1;if(fireRun(P,s,o,mid))hi=mid;else lo=mid;}ages[s]=hi;
+  }
+  const sorted=Array.from(ages).sort((a,b)=>a-b),k=Math.ceil(target*n)-1,A=sorted[Math.max(0,k)];
+  const share=x=>sorted.filter(v=>v<=x).length/n,q=p=>sorted[Math.max(0,Math.ceil(p*n)-1)];
+  const fin=v=>Number.isFinite(v)?v:null;
+  const res={target,n,dist:{p25:fin(q(.25)),p50:fin(q(.5)),p75:fin(q(.75))}};
+  if(!Number.isFinite(A))return {...res,age:null,res:{success:share(last),n}};
+  return {...res,age:A,already:A<=age,res:{success:share(A),n}};
+}
+/* tasso di prelievo sostenibile sugli stessi futuri (veloce): capitale 1, prelievo annuo r costante in euro di oggi per «years» anni */
+function fireSwr(o){
+  const years=Math.max(1,Math.round(o.years||30)),P=firePaths({...o,age:0,endAge:years});if(P.error)return P;
+  const target=o.target||.9,months=years*12,fee=Math.pow(1-Math.max(0,Math.min(.2,+o.costs||0)),1/12),n=P.n,M=P.months;
+  const succ=r=>{const w=r/12;let ok=0;for(let s=0;s<n;s++){let W=1,dead=false;const b=s*M;for(let t=0;t<months;t++){W=W*P.R[b+t]*fee-w;if(W<=0){dead=true;break;}}if(!dead)ok++;}return ok/n;};
+  let lo=.001,hi=.2;if(succ(hi)>=target)return {swr:hi,capped:true,target,years,curve:[],at4:1,n};
+  for(let k=0;k<18;k++){const mid=(lo+hi)/2;if(succ(mid)>=target)lo=mid;else hi=mid;}
+  const curve=[.02,.025,.03,.035,.04,.045,.05,.055,.06,.07,.08].map(r=>({rate:r,success:succ(r)}));
+  return {swr:lo,target,years,curve,at4:succ(.04),n};
+}
+/* quanto risparmiare al mese per poter smettere all'età scelta con la sicurezza scelta (ricerca per bisezione sul risparmio) */
+function fireSaveFor(o){
+  const P=firePaths(o);if(P.error)return P;
+  const R=Math.round(o.retireAge),target=o.target||.9,succ=sv=>{let ok=0;const q={...o,save:sv};for(let s=0;s<P.n;s++)if(fireRun(P,s,q,R))ok++;return ok/P.n;};
+  if(succ(0)>=target)return {save:0,enough:true};
+  let hi=Math.max(500,(+o.spend||0)*2);for(let k=0;k<8&&succ(hi)<target;k++)hi*=2;if(succ(hi)<target)return {save:null};
+  let lo=0;for(let k=0;k<22;k++){const mid=(lo+hi)/2;if(succ(mid)>=target)hi=mid;else lo=mid;}
+  return {save:Math.ceil(hi/10)*10};
 }
 /* anni per arrivare al numero FIRE, in euro di oggi: primo anno in cui il percentile scelto del capitale reale supera l'obiettivo */
 function fireWhen(o){
@@ -1282,6 +1321,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={fireLife,fireAge,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
