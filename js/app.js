@@ -512,7 +512,7 @@ function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
     spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
-    posizioni:T.positions.map(p=>({nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.tk&&!ISIN_RX.test(p.tk)?p.tk:p.titolo,"",T.valuta)||""),alt:!p.isin&&p.tk&&/^[A-Z0-9]{2,6}$/.test(String(p.tk).toUpperCase())&&!CRYPTO[String(p.tk).toUpperCase()]?[".LON",".DEX",".AMS",".MIL",".PAR",".SWX"].map(x=>String(p.tk).toUpperCase()+x):[],valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
+    posizioni:T.positions.map(p=>({prezzo:p.prezzo,per100:!!p.per100,quantita:p.quantita,nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.tk&&!ISIN_RX.test(p.tk)?p.tk:p.titolo,"",T.valuta)||""),alt:!p.isin&&p.tk&&/^[A-Z0-9]{2,6}$/.test(String(p.tk).toUpperCase())&&!CRYPTO[String(p.tk).toUpperCase()]?[".LON",".DEX",".AMS",".MIL",".PAR",".SWX"].map(x=>String(p.tk).toUpperCase()+x):[],valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -1203,7 +1203,7 @@ async function rebuildFromPrices(o={}){
       series.push(got);
     }
     /* senza ticker nel file l'etichetta era il nome lungo del fondo: si usa il ticker di borsa della quotazione trovata (IWDA.AMS → IWDA) */
-    const used=new Set(pos.map(p=>p.ticker));pos.forEach((p,i)=>{if(!p.labelIsName||series[i].error)return;const t=String(p.simbolo||"").split(".")[0];if(t&&!used.has(t)){used.add(t);p.ticker=t;}});
+    const used=new Set(pos.map(p=>p.ticker));pos.forEach((p,i)=>{if(!p.labelIsName||series[i].error)return;const t=String(p.simbolo||"").split(".")[0];/* i fondi comuni su Yahoo hanno codici tipo 0P0000ABTK: resta il nome del fondo */if(t&&!/^0P[0-9A-Z]{8}$/.test(t)&&!used.has(t)){used.add(t);p.ticker=t;}});
     S.isinLog=isinLog;S.noSym=noSym;
     const ok=[],bad=[];
     series.forEach((s,i)=>{(s.error?bad:ok).push({p:pos[i],s});});
@@ -1279,7 +1279,7 @@ function computeChecks(A,ds){
   /* portafoglio ricostruito a cui mancano strumenti: niente risultati parziali in silenzio */
   if(S.portfolio&&S.portfolio.missing&&S.portfolio.missing.length&&S.source&&S.source.kind==="rebuilt"){
     const M=S.portfolio.missing,tot=(S.lastUnd&&S.lastUnd.posizioni||[]).reduce((q,p)=>q+(p.valore||0),0),mv=M.reduce((q,m)=>q+(((S.lastUnd&&S.lastUnd.posizioni)||[]).find(p=>p.nome===m.nome)||{}).valore||0,0);
-    out.push({id:"partial",block:true,title:`Mancano ${M.length} ${M.length===1?"strumento":"strumenti"}${tot&&mv?` (${fmtPct(mv/tot,0)} del valore)`:""}`,text:M.map(m=>`${m.nome}${m.simbolo?` (${m.simbolo})`:""}: ${m.err}`).join(" · ")+" Senza di loro pesi, rischio e frontiera descrivono solo una parte del portafoglio.",acts:[["retry","Riprova a scaricarli"],["ok","Procedi senza (pesi ricalcolati sul resto)"]]});
+    out.push({id:"partial",block:true,title:`${M.length===1?"Manca":"Mancano"} ${M.length} ${M.length===1?"strumento":"strumenti"}${tot&&mv?` (${fmtPct(mv/tot,0)} del valore)`:""}`,text:M.map(m=>`${m.nome}${m.simbolo?` (${m.simbolo})`:""}: ${m.err}`).join(" · ")+" Senza di loro pesi, rischio e frontiera descrivono solo una parte del portafoglio.",acts:[["retry","Riprova a scaricarli"],["ok","Procedi senza (pesi ricalcolati sul resto)"]]});
   }
   /* prezzi che si fermano troppo presto (risposta incompleta della fonte o cambio BCE mancante): valore e rendimento «di oggi» sarebbero di mesi fa */
   if(S.rb&&S.source&&S.source.kind==="rebuilt"){const now=new Date(),lim=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`,mAgo=k=>{const [y,m]=k.split("-").map(Number);return (now.getFullYear()-y)*12+now.getMonth()+1-m;};
@@ -1432,6 +1432,26 @@ function wideSnapshot(W,sym){sym=sym||new Map();
     scartati:[...by].sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${fmtN(Math.round(v))} €: ${why[k]||"non quotato"}`)};
 }
 
+/* ---------- BTP e obbligazioni: cedola e scadenza dal nome («BTP 3,35% 01MZ35», «BTP-1GN29 1,5%»), rendimento a scadenza dal prezzo ---------- */
+const BMON={GE:0,FB:1,MZ:2,AP:3,MG:4,GN:5,LG:6,AG:7,ST:8,OT:9,NV:10,DC:11};
+function bondInfo(name){const t=String(name||"").toUpperCase(),c=t.match(/(\d{1,2}(?:[.,]\d{1,3})?)\s?%/),m=t.match(/(\d{2})(GE|FB|MZ|AP|MG|GN|LG|AG|ST|OT|NV|DC)(\d{2})\b/)||t.match(/\b(\d{2})[\/.](\d{2})[\/.](\d{2,4})\b/);
+  if(!m||!/\b(BTP|BOT|CCT|CTZ|BUND|OAT|BOND|BONOS|OBBL|GOVT|TREASURY|T-NOTE|EMTN|FRN)\b|%/.test(t))return null;
+  const mat=BMON[m[2]]!=null?new Date(Date.UTC(2000+ +m[3],BMON[m[2]],+m[1])):new Date(Date.UTC(m[3].length===2?2000+ +m[3]:+m[3],+m[2]-1,+m[1]));
+  return isNaN(mat)?null:{cpn:c?parseFloat(c[1].replace(",","."))/100:null,mat};}
+function bondYtm(px,cpn,mat,today){const yrs=(mat-today)/(365.25*864e5);if(!(px>0)||!(yrs>0)||cpn==null)return NaN;
+  const n=Math.max(1,Math.ceil(yrs*2)),f=yrs*2-(n-1),pv=y=>{let s=0;for(let k=0;k<n;k++)s+=cpn/2*100/Math.pow(1+y/2,f+k);return s+100/Math.pow(1+y/2,f+n-1);};
+  let a=-.5,b=1;for(let i=0;i<80;i++){const m=(a+b)/2;if(pv(m)>px)a=m;else b=m;}return (a+b)/2;}
+const isBondPos=p=>!!bondInfo(p.nome||p.titolo)||/^IT000[45]/.test(p.isin||"")||!!p.per100;
+function bondsHTML(){
+  const u=S.lastUnd||S.und,pf=S.portfolio;if(!u||!u.posizioni||!pf)return "";
+  const miss=new Set((pf.missing||[]).map(m=>m.nome)),now=new Date();
+  const B=u.posizioni.filter(p=>miss.has(p.nome)&&isBondPos(p));if(!B.length)return "";
+  const rows=B.map(p=>{const b=bondInfo(p.nome)||{},px=p.per100?p.prezzo:null,y=px&&b.mat>now?bondYtm(px,b.cpn,b.mat,now):NaN;
+    return `<tr><td><span class="an">${esc(p.nome)}</span>${p.isin?`<span class="cl">${esc(p.isin)}</span>`:""}</td><td class="mono">${p.valore?fmtEur(p.valore):"—"}</td><td class="mono">${b.cpn!=null?fmtPct(b.cpn,2):"—"}</td><td class="mono">${b.mat?b.mat.toLocaleDateString("it-IT",{timeZone:"UTC"}):"—"}</td><td class="mono">${Number.isFinite(y)?fmtPct(y,2):"—"}${px?`<span class="cl">al prezzo ${fmtN(px,2)}</span>`:""}</td></tr>`;}).join("");
+  const tot=B.reduce((a,p)=>a+(p.valore||0),0);
+  return `<h4 class="look-h">Obbligazioni e titoli di Stato</h4><div class="tablewrap"><table class="mt"><thead><tr><th>Titolo</th><th>Valore</th><th>Cedola</th><th>Scadenza</th><th>Rendimento a scadenza</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="caption">${tot?`${fmtEur(tot)} in obbligazioni. `:""}Le fonti gratuite non pubblicano lo storico dei prezzi di BTP e obbligazioni, quindi restano fuori da rischio, crisi e frontiera (che usano i prezzi mese per mese); i pesi qui sopra sono calcolati sul resto del portafoglio. Cedola e scadenza sono lette dal nome del titolo; il rendimento a scadenza è lordo, al prezzo dell'ultimo movimento (su 100 di nominale).</p>`;
+}
 /* ---------- Il tuo portafoglio: pesi dal file, ribilanciamento ---------- */
 function pfWeights(kind){
   const pf=S.portfolio,ds=S.ds;if(!pf||!ds||!ds.ok)return null;
@@ -1693,7 +1713,7 @@ function renderPortfolio(){
   const reb=rebalanceHTML(pf);
   card.innerHTML=`<div class="head"><h3>Il tuo portafoglio</h3><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn sm" id="variantBtn">Prova una variante</button><span class="chip hist"><i></i>pesi dal file «${esc(pf.from)}»</span></div></div>
     <div class="tablewrap"><table class="mt"><thead><tr><th>Portafoglio</th><th>Rend. annuo</th><th>Rend. reale</th><th>Volatilità</th><th>Sharpe</th><th>Max drawdown</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="caption">Ipotesi: portafoglio ribilanciato ogni mese ai pesi indicati, sullo storico di ${ds.nObs} mesi. ${S.rb?"Prezzi di mercato convertiti in euro con il cambio BCE di fine mese.":"Valori come nel file."}${pf.missing.length?` Esclusi perché senza prezzi: ${pf.missing.map(m=>esc(m.nome)).join(", ")}.`:""}</p>${reb}`;
+    <p class="caption">Ipotesi: portafoglio ribilanciato ogni mese ai pesi indicati, sullo storico di ${ds.nObs} mesi. ${S.rb?"Prezzi di mercato convertiti in euro con il cambio BCE di fine mese.":"Valori come nel file."}${pf.missing.length?` Esclusi perché senza prezzi: ${pf.missing.map(m=>esc(m.nome)).join(", ")}.`:""}</p>${bondsHTML()}${reb}`;
 }
 
 /* ---------- Quanto costa il portafoglio: TER di ogni strumento (justETF per gli ETF, dal KID per i fondi), altri costi, confronto con strumenti a basso costo ----------
