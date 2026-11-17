@@ -709,7 +709,41 @@ function brokerMoves(sh,onlySpecific){
   return out&&out.aoa.slice(1).some(r=>r[1]!=="Dividendo")?out:null;
 }
 
+/* ===== Tabelle di quotazioni affiancate (esercizi e analisi fatte a mano) =====
+   Più blocchi «Date | Open | High | Low | Close | Volume | Adj Close» nello stesso foglio, ognuno con il nome del titolo sopra
+   («Eni SpA (ENI.MI) -Milan») e spesso statistiche in mezzo (rendimento atteso, varianza): da ogni blocco si prende la chiusura
+   rettificata e tutto diventa un solo foglio di prezzi, una colonna per titolo, unite per data. */
+function sideBySideQuotes(sh){
+  const A=(sh.aoa||[]).map(r=>Array.isArray(r)?r:[]),lo=v=>String(v??"").trim().toLowerCase();
+  let hr=-1,starts=[];
+  for(let r=0;r<Math.min(A.length,40)&&hr<0;r++){const row=A[r].map(lo),st=[];row.forEach((v,c)=>{if(/^(date|data)$/.test(v)&&row.slice(c+1,c+9).some(x=>/^(adj\.? ?close\*?|close|chiusura)/.test(x)))st.push(c);});if(st.length>=2){hr=r;starts=st;}}
+  if(hr<0)return null;
+  const H=A[hr].map(lo),series=[];
+  /* date in formato americano (mese/giorno/anno, «12/1/16»): si capisce da quale parte cambia di mese in mese */
+  const mdy=c=>{const v=A.slice(hr+1,hr+40).map(r=>r[c]).filter(x=>typeof x==="string"&&/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(x.trim()));if(v.length<6)return false;const a=v.map(x=>+x.split("/")[0]),b=v.map(x=>+x.split("/")[1]);return new Set(b).size<=4&&new Set(a).size>4;};
+  const dOf=(x,us)=>{if(x instanceof Date)return new Date(Date.UTC(x.getFullYear(),x.getMonth(),x.getDate()));const t=String(x??"").trim(),m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);if(m&&us){const y=+m[3]<100?2000+ +m[3]:+m[3];return new Date(Date.UTC(y,+m[1]-1,+m[2]));}return parseDate(x,true);};
+  starts.forEach((c0,i)=>{const end=i+1<starts.length?starts[i+1]:H.length;
+    let pc=-1;for(let c=c0+1;c<end;c++)if(/^adj\.? ?close/.test(H[c])){pc=c;break;}
+    if(pc<0)for(let c=c0+1;c<end;c++)if(/^(close|chiusura)$/.test(H[c])){pc=c;break;}
+    if(pc<0)return;
+    /* nome: prima un testo con il ticker tra parentesi («Eni SpA (ENI.MI) -Milan»), poi un testo nella prima colonna del blocco, poi qualsiasi testo che non sia una statistica */
+    const txt=(r,c)=>{const x=A[r][c];return typeof x==="string"?x.trim():"";},bad=t=>!t||parseNum(t)||parseDate(t,false)||/:\s*$|atteso|varianz|deviaz|frequenz|media|campion|^da$|^a$|mensile|settimanal|giornalier/i.test(t)||t.length<3;
+    let name=null;
+    for(let r=hr-1;r>=0&&!name;r--)for(let c=c0;c<end&&!name;c++){const t=txt(r,c);if(/\([A-Z0-9.\-]{1,12}\)/.test(t)&&!bad(t))name=t;}
+    for(let r=hr-1;r>=0&&!name;r--){const t=txt(r,c0);if(!bad(t))name=t;}
+    for(let r=hr-1;r>=0&&!name;r--)for(let c=c0;c<end&&!name;c++){const t=txt(r,c);if(!bad(t))name=t;}
+    name=String(name||`Titolo ${i+1}`).replace(/\s*[-–]\s*(milan|milano|nasdaq|nyse|xetra|london|paris)\s*$/i,"").trim();
+    const us=mdy(c0),pts=[];
+    for(let r=hr+1;r<A.length;r++){const x=A[r][pc],d=dOf(A[r][c0],us),v=typeof x==="number"?{n:x}:parseNum(x);if(d&&v&&v.n>0)pts.push([d,v.n]);}
+    if(pts.length>=6)series.push({name,pts});});
+  if(series.length<2)return null;
+  const keys=[...new Set(series.flatMap(s=>s.pts.map(p=>p[0].getTime())))].sort((a,b)=>a-b);
+  const maps=series.map(s=>new Map(s.pts.map(p=>[p[0].getTime(),p[1]])));
+  return {name:`★ Prezzi · ${sh.name}`,aoa:[["Data",...series.map(s=>s.name)],...keys.map(k=>[new Date(k),...maps.map(m=>m.has(k)?m.get(k):null)])]};
+}
 function normalizeExports(sheets){
+  /* tabelle di quotazioni affiancate: un foglio di prezzi pulito, messo per primo */
+  {const q=(sheets||[]).map(sh=>{try{return sideBySideQuotes(sh);}catch(e){return null;}});if(q.some(Boolean))return [...q.filter(Boolean),...(sheets||[]).filter((sh,i)=>!q[i])];}
   /* formati dedicati (XTB, Degiro, Saxo, eToro, cripto): prima di tutto, così nessun altro riconoscitore li legge a metà */
   const spec=(sheets||[]).map(sh=>{let bm=null;try{bm=brokerMoves(sh,true);}catch(e){}return bm;});
   if(spec.some(Boolean))return (sheets||[]).flatMap((sh,i)=>spec[i]?[spec[i],sh]:[sh]);
@@ -1571,6 +1605,6 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+export const POS={sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

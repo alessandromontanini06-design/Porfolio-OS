@@ -403,7 +403,9 @@ function load(sheets,source,fromUser,opts={}){
   S.sheets=all.map(x=>{const A=P.analyzeSheet(x.name,x.aoa);A.virtual=!!x.virtual;A.fromAI=!!(x.virtual&&opts.recipe&&!opts.memory);A.ccyArr=x.ccy||null;return A;});
   /* ruoli indicati dalla ricetta (IA, modello salvato o riconoscitori locali) */
   all.forEach((sh,i)=>{if(sh.roles)S.sheets[i].cols.forEach(c=>{const r=sh.roles[c.idx];if(r){c.suggest=r;c.conf="alta";c.reason=r==="date"?(opts.recipe?"Colonna data indicata dalla ricetta di lettura":"Colonna data riconosciuta"):(opts.recipe&&!opts.memory?"Serie indicata dall'IA dopo aver letto il file":opts.memory?"Serie del modello che hai già confermato":"Serie riconosciuta dalla struttura del file");}});});
-  S.sheetIdx=virt.length?0:S.sheets.reduce((b,x,i)=>x.score>S.sheets[b].score?i:b,0);
+  /* un foglio di prezzi ricostruito dalle quotazioni affiancate («★ Prezzi · …») ha la precedenza sui fogli originali */
+  const qIdx=all.findIndex(x=>/^★ Prezzi · /.test(x.name));
+  S.sheetIdx=virt.length?0:qIdx>=0?qIdx:S.sheets.reduce((b,x,i)=>x.score>S.sheets[b].score?i:b,0);
   /* file ricostruito: ogni colonna dice da dove vengono i suoi prezzi */
   if(source.kind==="rebuilt"&&S.rb)S.sheets.forEach(A=>A.cols.forEach(c=>{const m=S.rb.cols.find(x=>x.name===c.name);if(m&&c.suggest==="price"){const k=[...m.map.keys()].sort();c.conf="alta";c.reason=`Prezzo di mercato di ${m.sym} (${m.src}${m.info?", "+m.info.split(" · ")[0]:""}), ${m.adj?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}${m.cur&&m.cur!=="EUR"?`, convertito da ${m.cur==="GBX"?"pence":m.cur} in euro con il cambio BCE`:", in euro"}, ${k.length} mesi dal ${k[0]}`;}}));
   /* nei tracker la liquidità cambia con versamenti e spese, non con il mercato: fuori dalle analisi salvo scelta diversa */
