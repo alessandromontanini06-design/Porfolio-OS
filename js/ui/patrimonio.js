@@ -12,6 +12,7 @@ const dIt = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : "�
 const sEur = v => !Number.isFinite(v) ? "—" : Math.abs(v) < 0.5 ? fmtEur(0) : (v > 0 ? "+" : "") + fmtEur(v);
 const sPct = v => !Number.isFinite(v) ? "—" : Math.abs(v) < 0.0005 ? fmtPct(0, 1) : fmtPct(v, 1, true);
 const cls = v => v > 0 ? "up" : v < 0 ? "dn" : "";
+const clsE = v => Math.abs(v) < 0.5 ? "" : cls(v), clsP = v => Math.abs(v) < 0.0005 ? "" : cls(v);
 /* numeri scritti all'italiana: «200.000» = duecentomila, «12,50» = dodici e cinquanta, «1.234,5» e anche «1.5» (decimale) */
 const num = v => { const t = String(v ?? "").trim().replace(/\s|€|'/g, ""); if (!t || !/^-?[\d.,]+$/.test(t)) return NaN;
   if (t.includes(",")) return parseFloat(t.replace(/\./g, "").replace(",", "."));
@@ -80,11 +81,11 @@ const lastPx = j => { if (!j || !j.points) return NaN; const r = (j.recent && j.
 function pmMsg(t, k) { const el = $("#pmMsg"); if (!el) return; el.textContent = t || ""; el.className = "caption" + (k ? " " + k : ""); }
 function pmKpis(R) {
   const T = R.totale, ses = pmSession(R);
-  const sesTxt = ses ? `${ses.d === pmToday() ? "Oggi" : dayName(ses.d)}, rispetto a ${dayName(ses.d0)}: <b class="${cls(ses.euro)}">${sEur(ses.euro)}</b> · <span class="${cls(ses.pct)}">${sPct(ses.pct)}</span>` : PM.loading ? "Aggiorno i prezzi di oggi…" : "Variazione di giornata non disponibile";
+  const sesTxt = ses ? `${ses.d === pmToday() ? "Oggi" : dayName(ses.d)}, rispetto a ${dayName(ses.d0)}: <b class="${clsE(ses.euro)}">${sEur(ses.euro)}</b> · <span class="${clsP(ses.pct)}">${sPct(ses.pct)}</span>` : PM.loading ? "Aggiorno i prezzi di oggi…" : "Variazione di giornata non disponibile";
   const tirTxt = T.anni >= 1 ? "rendimento annuo dei tuoi soldi" : "su meno di un anno: indicativo";
   return `<div class="pm-k pm-main"><span>Patrimonio oggi</span><b>${fmtEur(T.valore)}</b><small>${sesTxt}</small></div>
-    <div class="pm-k"><span>Guadagno</span><b class="${cls(T.guadagno)}">${sEur(T.guadagno)}</b><small>${sPct(T.guadagnoPct)} su ${fmtEur(T.versato)} versati</small></div>
-    <div class="pm-k"><span>Rendimento (TIR)</span><b class="${cls(T.tir)}">${sPct(T.tir)}</b><small>${tirTxt} · dal ${dIt(R.dal)}</small></div>
+    <div class="pm-k"><span>Guadagno</span><b class="${clsE(T.guadagno)}">${sEur(T.guadagno)}</b><small>${sPct(T.guadagnoPct)} su ${fmtEur(T.versato)} versati</small></div>
+    <div class="pm-k"><span>Rendimento (TIR)</span><b class="${clsP(T.tir)}">${sPct(T.tir)}</b><small>${tirTxt} · dal ${dIt(R.dal)}</small></div>
     <div class="pm-k"><span>Dividendi e cedole</span><b>${fmtEur(T.proventi)}</b><small>spese e tasse: ${fmtEur(T.spese)}</small></div>`;
 }
 function pmChart(R) {
@@ -108,7 +109,7 @@ function pmPosTable(R) {
       <td class="num">${p.aperta ? fmtN(p.qta, p.qta % 1 ? 3 : 0) : "—"}</td>
       <td class="num">${p.aperta && Number.isFinite(p.prezzo) ? fmtN(p.prezzo, 2) + ccy : "—"}<small>${p.aperta && p.prezzoData ? src(p) : ""}</small></td>
       <td class="num"><b>${fmtEur(p.valore)}</b><small>${p.aperta ? fmtPct(p.peso, 1) : ""}</small></td>
-      <td class="num"><span class="${cls(g)}">${sEur(g)}</span><small class="${cls(gp)}">${sPct(gp)}</small></td>
+      <td class="num"><span class="${clsE(g)}">${sEur(g)}</span><small class="${clsP(gp)}">${sPct(gp)}</small></td>
       <td class="num">${s.manuale && p.aperta ? `<button type="button" class="btn sm" data-pmval="${esc(p.id)}">Aggiorna stima</button>` : ""}</td></tr>`; };
   const manuali = rows.some(p => p.aperta && db.strumenti[p.id].manuale), err = Object.entries(PM.px).filter(([, j]) => j && j.error).map(([id, j]) => `${db.strumenti[id] ? db.strumenti[id].nome : id}: ${j.error}`);
   return `<div class="tablewrap"><table class="mt pm-pos"><thead><tr><th>Strumento</th><th class="num">Quote</th><th class="num">Prezzo</th><th class="num">Valore · peso</th><th class="num">Guadagno</th><th></th></tr></thead><tbody>${rows.map(tr).join("")}</tbody></table></div>
