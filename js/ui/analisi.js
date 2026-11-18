@@ -210,6 +210,42 @@ function simInputs(){
 function fillSimForm(){
   const I=S.mcIn;$("#mcInit").value=I.init;$("#mcMonthly").value=I.monthly;$("#mcYears").value=I.years;$("#mcGoal").value=I.goal;$("#mcInfl").value=I.infl;$("#mcCosts").value=I.costs;$("#mcInflSrc").textContent=I.inflSrc;$("#mcRate").value=I.rate!=null?I.rate:"";
 }
+/* ---------- più obiettivi nel tempo (casa, studi, pensione): probabilità di ciascuno sugli stessi futuri simulati ----------
+   Importi in euro di oggi, anno = tra quanti anni. Salvati nel browser (pos-obiettivi-v1). */
+const OB_KEY="pos-obiettivi-v1";
+function obLoad(){try{const a=JSON.parse(localStorage.getItem(OB_KEY)||"[]");return Array.isArray(a)?a.filter(g=>g&&typeof g==="object").slice(0,8):[];}catch{return [];}}
+function obSave(){try{localStorage.setItem(OB_KEY,JSON.stringify(S.mcOb));}catch{}}
+const obValid=g=>+g.importo>0&&Math.round(+g.anno)>=1;
+const OB_ESEMPI=[["Casa",40000,5],["Studi dei figli",30000,12],["Auto",20000,3]];
+function obRow(g,i,R){const out=R&&R.obiettivi?R.obiettivi.find(x=>x.id===i):null;
+  return `<div class="mcg-row" data-mcg="${i}"><input class="mcg-n" value="${esc(g.nome||"")}" placeholder="Obiettivo ${i+1}" maxlength="40" aria-label="Nome dell'obiettivo ${i+1}">
+    <label class="mcg-a"><span>Importo</span><input type="number" inputmode="decimal" min="0" step="1000" value="${+g.importo||""}" aria-label="Importo dell'obiettivo ${i+1} in euro di oggi"><i>€</i></label>
+    <label class="mcg-y"><span>Tra</span><input type="number" min="1" max="60" step="1" value="${+g.anno||""}" aria-label="Tra quanti anni"><i>anni</i></label>
+    <div class="mcg-p">${obOut(g,out,R)}</div><button type="button" class="mcg-x" data-mcgdel="${i}" aria-label="Togli l'obiettivo ${i+1}">×</button></div>`;}
+function obOut(g,out,R){
+  if(!obValid(g))return `<small class="mcg-hint">scrivi importo e anni</small>`;
+  if(R&&Math.round(+g.anno)>R.years)return `<small class="mcg-hint">oltre i ${R.years} anni simulati: allunga gli anni qui sopra</small>`;
+  if(!out)return `<small class="mcg-hint">…</small>`;
+  const c=out.prob>=.8?"good":out.prob>=.5?"warn":"bad";
+  return `<b class="${c}">${fmtPct(out.prob,0)}</b><span class="mcg-bar"><i class="${c}" style="width:${Math.round(out.prob*100)}%"></i></span><small>${out.prob>=.995?"raggiunto in quasi tutti i futuri":out.mancaMediano>0?`quando non basta, mancano circa ${fmtEur(out.mancaMediano)} di oggi`:""}</small>`;}
+function renderGoals(R,full){
+  const el=$("#mcGoals");if(!el)return;const L=S.mcOb||[];
+  const rows=el.querySelectorAll(".mcg-row");
+  if(!full&&rows.length===L.length&&L.length){rows.forEach((r,i)=>{const g=L[i],out=R&&R.obiettivi?R.obiettivi.find(x=>x.id===i):null;r.querySelector(".mcg-p").innerHTML=obOut(g,out,R);});
+    const t=el.querySelector(".mcg-all");if(t)t.innerHTML=obAll(R);return;}
+  const infl=S.mcIn?S.mcIn.infl:2;
+  el.innerHTML=`<div class="head"><h3>Obiettivi nel tempo</h3><span class="eyebrow">in euro di oggi · stessi futuri del ventaglio</span></div>
+    ${L.length?`<div class="mcg-list">${L.map((g,i)=>obRow(g,i,R)).join("")}</div>`:`<p class="mcg-empty">Casa tra 5 anni, studi dei figli tra 12, un'auto: aggiungi gli obiettivi e per ognuno vedi la probabilità di raggiungerlo, uno dopo l'altro.</p>`}
+    <div class="mcg-foot">${L.length<8?`<button type="button" class="btn sm" data-mcgadd="1">+ Aggiungi un obiettivo</button>`:""}${L.length?"":OB_ESEMPI.map(([n,a,y],k)=>`<button type="button" class="chipbtn ghost" data-mcgex="${k}">${esc(n)} · ${fmtEur(a)} tra ${y} anni</button>`).join("")}<span class="mcg-all">${obAll(R)}</span></div>
+    ${L.length?`<p class="caption">Gli importi crescono ogni anno con l'inflazione (${fmtN(infl,1)}%). Quando arriva l'anno, se il patrimonio basta l'importo esce e l'obiettivo è raggiunto; se non basta, l'obiettivo è mancato e i soldi restano investiti. Gli obiettivi più vicini hanno la precedenza. Con gli obiettivi, il ventaglio e la mediana qui sopra sono il patrimonio che resta dopo i prelievi.</p>`:""}`;}
+function obAll(R){return R&&R.obiettivi&&R.obiettivi.length>1&&Number.isFinite(R.probTutti)?`Tutti insieme: <b>${fmtPct(R.probTutti,0)}</b>`:"";}
+let obT=null;
+function obFromDom(){const el=$("#mcGoals");if(!el)return;S.mcOb=[...el.querySelectorAll(".mcg-row")].map(r=>({nome:r.querySelector(".mcg-n").value.trim().slice(0,40),importo:parseFloat(r.querySelector(".mcg-a input").value)||0,anno:Math.round(parseFloat(r.querySelector(".mcg-y input").value))||0}));obSave();}
+document.addEventListener("input",e=>{if(!e.target.closest("#mcGoals"))return;clearTimeout(obT);obT=setTimeout(()=>{obFromDom();renderSim();},320);});
+document.addEventListener("click",e=>{const el=e.target.closest("#mcGoals");if(!el)return;
+  if(e.target.closest("[data-mcgadd]")){obFromDom();S.mcOb.push({nome:"",importo:0,anno:Math.min(5,S.mcIn?S.mcIn.years:5)});obSave();renderGoals(S.mc,true);const ins=el.querySelectorAll(".mcg-n");if(ins.length)ins[ins.length-1].focus();return;}
+  const x=e.target.closest("[data-mcgex]");if(x){const [n,a,y]=OB_ESEMPI[+x.dataset.mcgex];S.mcOb.push({nome:n,importo:a,anno:y});obSave();renderSim();renderGoals(S.mc,true);return;}
+  const d=e.target.closest("[data-mcgdel]");if(d){obFromDom();S.mcOb.splice(+d.dataset.mcgdel,1);obSave();renderSim();renderGoals(S.mc,true);}});
 function runSim(){
   const ds=S.ds,f=ds.freq.f,I=S.mcIn,{w,label}=riskWeights(),pa=pfAsset(w,"Portafoglio"),steps=I.years*f;
   const n=Math.max(200,Math.min(I.n,Math.floor(8e6/steps)));
@@ -218,7 +254,8 @@ function runSim(){
   const fin=pa.ret.filter(Number.isFinite),gH=fin.length?Math.exp(fin.reduce((a,x)=>a+Math.log(1+x),0)/fin.length):1,histAnn=Math.pow(gH,f)-1;
   let ret=pa.ret;if(I.rate!=null&&fin.length){const k=Math.pow(1+I.rate/100,1/f)/gH;ret=pa.ret.map(x=>Number.isFinite(x)?(1+x)*k-1:x);}
   $("#mcRateSrc").textContent=I.rate!=null?`storico: ${fmtPct(histAnn,1,true)} l'anno · uso il tuo ${fmtPct(I.rate/100,1,true)}`:`uso lo storico: ${fmtPct(histAnn,1,true)} l'anno (${fin.length} ${ds.freq.adj==="mensili"?"mesi":"periodi"})`;
-  const R=P.monteCarlo({ret,f,years:I.years,initial:I.init,monthly:I.monthly,goal:I.goal,infl:I.infl/100,costs:I.costs/100,method:I.method,n,block:f,seed:20260101});
+  if(!S.mcOb)S.mcOb=obLoad();
+  const R=P.monteCarlo({ret,f,years:I.years,initial:I.init,monthly:I.monthly,goal:I.goal,infl:I.infl/100,costs:I.costs/100,method:I.method,n,block:f,seed:20260101,obiettivi:S.mcOb.map((g,i)=>({...g,nome:g.nome||`Obiettivo ${i+1}`,id:i})).filter(obValid)});
   R.wLabel=label;R.w=w;R.nAsked=I.n;R.histAnn=histAnn;R.rate=I.rate;R.nHist=fin.length;R.histFrom=pa.ret.findIndex(Number.isFinite);
   S.mc=R;return R;
 }
@@ -394,7 +431,7 @@ function renderSim(){
     k3,
     ["Scenario sfavorevole",btn("p-0",fmtEur(pf[0])),"5 percorsi su 100 finiscono più in basso"]
   ].map(k=>`<div class="kpi"><span class="eyebrow">${k[0]}</span>${k[1]}<span class="sub">${k[2]}</span></div>`).join("");
-  drawFan(R,real);drawDist(R,real);renderMcTable(R);renderMcNotes(R);
+  drawFan(R,real);drawDist(R,real);renderMcTable(R);renderMcNotes(R);renderGoals(R);
   if(current==="sim")Morph.shape("sim");
 }
 function drawFan(R,real){

@@ -1170,11 +1170,14 @@ function monteCarlo(o){
   const method=["boot","block","normal"].includes(o.method)?o.method:"boot",block=Math.max(2,Math.min(m,Math.round(o.block||f)));
   const initial=Math.max(0,+o.initial||0),perStep=(+o.monthly||0)*12/f,feeF=Math.pow(1-Math.max(0,Math.min(.2,+o.costs||0)),1/f);
   const infl=Number.isFinite(+o.infl)?+o.infl:0,goal=+o.goal||0,rnd=makeRng(o.seed==null?1:o.seed);
+  /* più obiettivi nel tempo (euro di oggi): all'anno giusto si preleva l'importo rivalutato, se c'è; altrimenti l'obiettivo è mancato */
+  const OB=(Array.isArray(o.obiettivi)?o.obiettivi:[]).map((g,i)=>({i,id:g.id!=null?g.id:i,nome:String(g.nome||`Obiettivo ${i+1}`).slice(0,60),importo:+g.importo,anno:Math.round(+g.anno)})).filter(g=>g.importo>0&&g.anno>=1&&g.anno<=years).sort((a,b)=>a.anno-b.anno||a.i-b.i);
+  const obOk=new Float64Array(OB.length),obAll={n:0},obShort=OB.map(()=>[]);
   const mean=hist.reduce((s,x)=>s+x,0)/m,sd=Math.sqrt(hist.reduce((s,x)=>s+(x-mean)**2,0)/Math.max(1,m-1));
   const gauss=()=>{let u=0;while(u===0)u=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rnd());};
   const Y=years+1,cp=new Float64Array(n*Y),fin=new Float64Array(n),mdd=new Float64Array(n);let depleted=0;
   for(let s=0;s<n;s++){
-    let W=initial,idx=1,peak=1,dd=0,pos=0,dead=false;cp[s*Y]=W;
+    let W=initial,idx=1,peak=1,dd=0,pos=0,dead=false,allOk=true;cp[s*Y]=W;
     for(let t=1;t<=steps;t++){
       let r;
       if(method==="normal")r=Math.max(-.99,mean+sd*gauss());
@@ -1182,9 +1185,9 @@ function monteCarlo(o){
       else r=hist[Math.floor(rnd()*m)];
       idx*=1+r;if(idx>peak)peak=idx;const d=idx/peak-1;if(d<dd)dd=d;
       if(!dead){W=W*(1+r)*feeF+perStep;if(W<=0&&perStep<0){W=0;dead=true;}}
-      if(t%f===0)cp[s*Y+t/f]=W;
+      if(t%f===0){const y=t/f;for(let k=0;k<OB.length;k++){if(OB[k].anno!==y)continue;const need=OB[k].importo*Math.pow(1+infl,y);if(W>=need){W-=need;obOk[k]++;}else{allOk=false;obShort[k].push((need-W)/Math.pow(1+infl,y));}}cp[s*Y+y]=W;}
     }
-    fin[s]=W;mdd[s]=dd;if(dead)depleted++;
+    fin[s]=W;mdd[s]=dd;if(dead)depleted++;if(OB.length&&allOk)obAll.n++;
   }
   const defl=y=>Math.pow(1+infl,y),pct=(arr)=>{const a=Array.from(arr).sort((x,y)=>x-y);return MC_PCT.map(p=>quantile(a,p));};
   const fan=[];for(let y=0;y<Y;y++){const col=new Float64Array(n);for(let s=0;s<n;s++)col[s]=cp[s*Y+y];const p=pct(col);fan.push({y,nom:p,real:p.map(v=>v/defl(y)),invested:initial+perStep*f*y});}
@@ -1193,6 +1196,7 @@ function monteCarlo(o){
   return {method,block,n,years,steps,f,initial,perStep,monthly:+o.monthly||0,infl,costs:+o.costs||0,seed:o.seed==null?1:o.seed,hist:{m,mean,sd},
     pcts:MC_PCT,fan,final:finSorted,finalReal:finReal,invested,
     pFinal:pct(fin),pFinalReal:pct(fin).map(v=>v/defl(years)),
+    obiettivi:OB.map((g,k)=>{const sh=obShort[k].sort((a,b)=>a-b);return {id:g.id,nome:g.nome,importo:g.importo,anno:g.anno,prob:obOk[k]/n,mancaMediano:sh.length?quantile(sh,.5):0};}),probTutti:OB.length?obAll.n/n:NaN,
     probGoal:goal>0?share(v=>v>=goal):NaN,probGoalReal:goal>0?finReal.filter(v=>v>=goal).length/n:NaN,goal,
     probLoss:share(v=>v<invested),
     /* errore standard di una proporzione stimata su n percorsi: √(p(1−p)/n) */
