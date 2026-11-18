@@ -7,7 +7,7 @@ import { PZ } from "./report.js";
 import { detectTx } from "./rendimento.js";
 import { pfAsset } from "./portafoglio.js";
 import { buildNet, drawChart, fetchMacro, labIndex, loadEtfInfo, renderLab, renderLook, ym } from "./laboratorio.js";
-import { fiDefaults, fmtEur, netClear, riskWeights } from "./analisi.js";
+import { fiDefaults, fmtEur, netClear, obLoad, riskWeights } from "./analisi.js";
 import { renderLabs } from "./home.js";
 
 /* ---------- Archivio dei portafogli (IndexedDB, solo in questo browser) ----------
@@ -51,7 +51,7 @@ async function svSave(name){
   if(!lastH||now-lastH.at>864e5||Math.abs((lastH.value||0)-(snap.value||0))>1)hist.push(snap);else hist[hist.length-1]=snap;
   const rec={...(old||{}),id:old?old.id:svNewId(),name:(name||old&&old.name||svFileName()).slice(0,80),file:svFileName(),note:old?old.note:"",
     createdAt:old?old.createdAt:now,savedAt:now,reviewedAt:now,sheets:S.fileSheets.map(x=>({name:x.name,aoa:x.aoa})),
-    assets:ds.assets.map(a=>a.name),period:`${fmtDate(ds.dates[0],f)} – ${fmtDate(ds.dates[ds.dates.length-1],f)}`,riskW:S.riskW||null,fi:S.fi?S.fi.in:null,snap,history:hist.slice(-60),fast:svFast()||(old&&old.fast)||null};
+    assets:ds.assets.map(a=>a.name),period:`${fmtDate(ds.dates[0],f)} – ${fmtDate(ds.dates[ds.dates.length-1],f)}`,riskW:S.riskW||null,fi:S.fi?S.fi.in:null,ob:S.mcOb?S.mcOb.slice(0,8):(old&&old.ob)||null,snap,history:hist.slice(-60),fast:svFast()||(old&&old.fast)||null};
   try{await svPut(rec);S.svSaved=rec.id;trackOnce("feature","salva",{name:"salva"});svBadge();return rec;}catch{return null;}
 }
 async function svOfferRender(){
@@ -83,13 +83,16 @@ function svBusy(on,txt){let el=$("#svBusy");if(!el){el=document.createElement("d
 /* modifiche fatte nel laboratorio (proposta A/B, note della presentazione): si tengono nel portafoglio dell'archivio aperto */
 let svKeepT=null;
 function svKeep(){if(!S.svSaved)return;clearTimeout(svKeepT);svKeepT=setTimeout(()=>{const cmp=S.cmp?JSON.parse(JSON.stringify(S.cmp)):null,pz={client:PZ.client||"",next:PZ.next||""};svPatch(S.svSaved,r=>{if(r.fast){r.fast.cmp=cmp;r.fast.pz=pz;}}).catch(()=>{});},700);}
+/* obiettivi del cliente: stanno nel suo portafoglio dell'archivio (quelli salvati prima di questa funzione: gli obiettivi del browser) */
+function svKeepOb(){if(!S.svSaved)return false;const ob=(S.mcOb||[]).slice(0,8);svPatch(S.svSaved,r=>{r.ob=ob;}).catch(()=>{});return true;}
+const svOb=r=>Array.isArray(r.ob)?r.ob.slice(0,8):obLoad();
 function svOpenFast(r){
   const F=r.fast;
   S.svResume=null;S.svSaved=r.id;S.svPrev=r.snap||null;S.conti=[{name:r.name,sheets:r.sheets}];
   S.fileSheets=r.sheets;S.tx=detectTx(r.sheets);
   S.rb={...F.rb,cols:F.rb.cols.map(c=>({...c,map:new Map(c.map),proxy:c.proxy?new Map(c.proxy):null})),fxm:Object.fromEntries(Object.entries(F.rb.fxm||{}).map(([k,v])=>[k,new Map(v)]))};
   S.youngRes={...(F.youngRes||{})};S.lastUnd=F.lastUnd||null;
-  if(r.riskW)S.riskW=r.riskW;if(r.fi)S.fi={in:{...fiDefaults(),...r.fi,cap:fiDefaults().cap}};
+  if(r.riskW)S.riskW=r.riskW;if(r.fi)S.fi={in:{...fiDefaults(),...r.fi,cap:fiDefaults().cap}};S.mcOb=svOb(r);
   if(F.pz){PZ.client=F.pz.client||"";PZ.next=F.pz.next||"";}
   S.fastOpen={at:F.at,id:r.id};
   load([F.sheet],{name:`${r.file||r.name} · ricostruito`,size:0,kind:"rebuilt"},false);
@@ -105,14 +108,14 @@ async function svOpen(id,opts={}){
     try{svOpenFast(r);return;}catch(e){S.fastOpen=null;/* dati rapidi non utilizzabili: si va col percorso completo */}}
   trackOnce("feature","riprendi",{name:"riprendi"});closeArchive();
   if(isSim())spaceSwitch("real",{stay:true});
-  S.fastOpen=null;S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=opts.keepPrev?S.svPrev:(r.snap||null);
+  S.fastOpen=null;S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi,ob:svOb(r)};S.svSaved=id;S.svPrev=opts.keepPrev?S.svPrev:(r.snap||null);
   /* niente analisi del file né mappa a vista: un riquadro d'attesa, i passi li rifà il sito da solo, poi direttamente i Risultati */
   svBusy(true,opts.full?`Aggiorno i prezzi di «${r.name}»…`:`Apro «${r.name}»…`);
   load(r.sheets,{name:r.file||r.name,size:0,kind:"file"},true);
   /* la mappa è già confermata in memoria: appena il file è pronto (anche dopo i prezzi di mercato) si costruisce il laboratorio */
   const tick=()=>{const R=S.svResume;if(!R||R.id!==id)return;if(Date.now()-R.t0>150000){S.svResume=null;svBusy(false);go("map",{force:true});return;}
     const busy=(S.und&&/loading|rebuilding/.test(S.und.status||""))||(S.recipe&&S.recipe.status==="loading");
-    const b=$("#confirmBtn");if(!busy&&b&&!b.disabled&&S.ds&&S.ds.ok){if(!R.ready){R.ready=Date.now();}else if(Date.now()-R.ready>1200){S.svResume=null;if(R.riskW)S.riskW=R.riskW;if(R.fi){S.fi={in:{...fiDefaults(),...R.fi,cap:fiDefaults().cap}};}S.svSaved=id;showLab(true);go("lab",{force:true});svBusy(false);return;}}else R.ready=0;
+    const b=$("#confirmBtn");if(!busy&&b&&!b.disabled&&S.ds&&S.ds.ok){if(!R.ready){R.ready=Date.now();}else if(Date.now()-R.ready>1200){S.svResume=null;S.mcOb=R.ob;if(R.riskW)S.riskW=R.riskW;if(R.fi){S.fi={in:{...fiDefaults(),...R.fi,cap:fiDefaults().cap}};}S.svSaved=id;showLab(true);go("lab",{force:true});svBusy(false);return;}}else R.ready=0;
     setTimeout(tick,400);};
   setTimeout(tick,600);
 }
@@ -299,4 +302,4 @@ function countAll(){
   });
 }
 
-export { AR, arAgo, arDetail, arDue, arExcel, arExport, arImport, arNoteT, chgCalc, closeArchive, countAll, openArchive, renderArchive, renderChange, showLab, SV, svBadge, svCanSave, svDB, svFast, svFileName, svFix, svGet, svHome, svKeep, svList, svNewId, svOfferRender, svOpen, svOpenFast, svPatch, svPref, svPut, svRank, svSave, svSnap, svTx };
+export { AR, arAgo, arDetail, arDue, arExcel, arExport, arImport, arNoteT, chgCalc, closeArchive, countAll, openArchive, renderArchive, renderChange, showLab, SV, svBadge, svCanSave, svDB, svFast, svFileName, svFix, svGet, svHome, svKeep, svList, svNewId, svOfferRender, svOpen, svOpenFast, svPatch, svPref, svPut, svRank, svSave, svSnap, svTx, svKeepOb };

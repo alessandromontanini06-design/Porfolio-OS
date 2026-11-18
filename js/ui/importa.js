@@ -13,7 +13,8 @@ import { btpEtichetta, btpNota, btpPrezzi, btpSym, isBtpSym } from "./btp.js";
 function load(sheets,source,fromUser,opts={}){
   const isFile=source.kind==="file";
   /* un file nuovo caricato dall'utente non è il portafoglio dell'archivio aperto prima: niente sovrascritture */
-  if(isFile&&fromUser&&!opts.recipe&&!opts.forceAuto&&!S.svResume){S.svSaved=null;S.svPrev=null;}
+  /* file nuovo: non è più il portafoglio dell'archivio; gli obiettivi tornano quelli del browser */
+  if(isFile&&fromUser&&!opts.recipe&&!opts.forceAuto&&!S.svResume){S.svSaved=null;S.svPrev=null;S.mcOb=null;}
   if(isFile)S.fastOpen=null;
   if(isFile){S.rb=null;S.youngRes={};}
   if(isFile&&!opts.recipe&&!opts.forceAuto){S.fileSheets=sheets;S.recipe=null;S.conflict=null;S.agree=false;S.fp=P.structureFingerprint(sheets);S.tpl=tplGet(S.fp);}

@@ -4,7 +4,7 @@ import { $, P, REDUCE, S, color, esc, fmtDate, fmtN, fmtPct } from "./core.js";
 import { Morph, current } from "./scene.js";
 import { an, trackOnce } from "./importa.js";
 import { pfAsset, pfWeights } from "./portafoglio.js";
-import { AR } from "./archivio.js";
+import { AR, svKeepOb } from "./archivio.js";
 import { macroFor, niceTicks } from "./laboratorio.js";
 import { rebuildHint, renderReal } from "./rendimento.js";
 import { chatContext, md } from "./quanta.js";
@@ -216,7 +216,8 @@ function fillSimForm(){
    Importi in euro di oggi, anno = tra quanti anni. Salvati nel browser (pos-obiettivi-v1). */
 const OB_KEY="pos-obiettivi-v1";
 function obLoad(){try{const a=JSON.parse(localStorage.getItem(OB_KEY)||"[]");return Array.isArray(a)?a.filter(g=>g&&typeof g==="object").slice(0,8):[];}catch{return [];}}
-function obSave(){try{localStorage.setItem(OB_KEY,JSON.stringify(S.mcOb));}catch{}}
+/* con un portafoglio dell'archivio aperto gli obiettivi sono del cliente e si salvano lì; altrimenti nel browser */
+function obSave(){if(svKeepOb())return;try{localStorage.setItem(OB_KEY,JSON.stringify(S.mcOb));}catch{}}
 const obValid=g=>+g.importo>0&&Math.round(+g.anno)>=1;
 const OB_ESEMPI=[["Casa",40000,5],["Studi dei figli",30000,12],["Auto",20000,3]];
 function obRow(g,i,R){const out=R&&R.obiettivi?R.obiettivi.find(x=>x.id===i):null;
@@ -1082,4 +1083,4 @@ document.addEventListener("click",e=>{
 $("#bnSym").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#bnSymGo").click();}});
 $("#bnCol").addEventListener("change",e=>{if(!S.bn)return;S.bn.col=e.target.value===""?null:+e.target.value;if(S.bn.col!=null)S.bn.sym="";renderBench();});
 
-export { simGoals, BENCHES, FI_F, FI_K, FI_KEY, MC_M, NETC, OP_L, PER, SWANS, SW_L, UNIT, benchCardLine, benchCrisisDetail, bnCovers, bnLoad, bnReceipt, bnSource, crisisSeries, ddWhyBox, drawBnGrow, drawBnRoll, drawContrib, drawCrisisCompare, drawCrisisPath, drawDist, drawFan, drawFrontier, drawHist, drawUnderwater, ensureBnCr, fiAgeTxt, fiBase, fiCompute, fiCurve, fiDefaults, fiFill, fiGoal, fiHero, fiKpis, fiLevers, fiLifeChart, fiNotes, fiRaf, fiReceipt, fiSet, fiT, fiVars, fiYearOf, fillSimForm, fmtEur, fmtK, getJSON, mcReceipt, netClear, netGet, netPut, opBase, opEval, opReceipt, opSolve, opT, placeLabels, quantileArr, renderBench, renderBnCrises, renderBnNotes, renderBnTable, renderCrisisDetail, renderDecomp, renderFI, renderMcNotes, renderMcTable, renderOpCmp, renderOpNotes, renderOpWeights, renderOpt, renderRisk, renderRiskPro, renderRiskTable, renderShock, renderSim, renderStNotes, renderStress, renderSwans, riskReceipt, riskWeights, runSim, shockValues, simDefaults, simInputs, simT, stPer, stReceipt, star, stressList, swanClass, unitN, wOpts, yr };
+export { obLoad, simGoals, BENCHES, FI_F, FI_K, FI_KEY, MC_M, NETC, OP_L, PER, SWANS, SW_L, UNIT, benchCardLine, benchCrisisDetail, bnCovers, bnLoad, bnReceipt, bnSource, crisisSeries, ddWhyBox, drawBnGrow, drawBnRoll, drawContrib, drawCrisisCompare, drawCrisisPath, drawDist, drawFan, drawFrontier, drawHist, drawUnderwater, ensureBnCr, fiAgeTxt, fiBase, fiCompute, fiCurve, fiDefaults, fiFill, fiGoal, fiHero, fiKpis, fiLevers, fiLifeChart, fiNotes, fiRaf, fiReceipt, fiSet, fiT, fiVars, fiYearOf, fillSimForm, fmtEur, fmtK, getJSON, mcReceipt, netClear, netGet, netPut, opBase, opEval, opReceipt, opSolve, opT, placeLabels, quantileArr, renderBench, renderBnCrises, renderBnNotes, renderBnTable, renderCrisisDetail, renderDecomp, renderFI, renderMcNotes, renderMcTable, renderOpCmp, renderOpNotes, renderOpWeights, renderOpt, renderRisk, renderRiskPro, renderRiskTable, renderShock, renderSim, renderStNotes, renderStress, renderSwans, riskReceipt, riskWeights, runSim, shockValues, simDefaults, simInputs, simT, stPer, stReceipt, star, stressList, swanClass, unitN, wOpts, yr };
