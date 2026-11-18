@@ -65,17 +65,21 @@ async function svHome(){
   el.hidden=false;
   el.innerHTML=`<div class="sv-h"><b>Riprendi da dove eri</b><button type="button" class="linkbtn" data-ar="open">Apri l'archivio${L.length>3?` (${L.length})`:""}</button></div>`+L.slice(0,3).map(r=>`<div class="sv-it"><button type="button" class="sv-open" data-svo="${esc(r.id)}"><b>${esc(r.name)}</b><small>${r.assets.length} strumenti${r.snap&&r.snap.value?` · ${fmtEur(r.snap.value)}`:""} · rivisto il ${new Date(r.reviewedAt).toLocaleDateString("it-IT",{day:"numeric",month:"short"})}</small></button><button type="button" class="sv-x" data-svd="${esc(r.id)}" aria-label="Elimina ${esc(r.name)}">×</button></div>`).join("");
 }
+/* riquadro d'attesa mentre un portafoglio dell'archivio si riapre */
+function svBusy(on,txt){let el=$("#svBusy");if(!el){el=document.createElement("div");el.id="svBusy";el.setAttribute("role","status");el.setAttribute("aria-live","polite");document.body.appendChild(el);}
+  if(on)el.innerHTML=`<div><i></i><b>${esc(txt||"")}</b><span>Aggiorno i prezzi di oggi e preparo i risultati.</span></div>`;el.hidden=!on;document.body.classList.toggle("sv-busy",!!on);}
 async function svOpen(id){
   const r=await svGet(id);if(!r)return svHome();
   trackOnce("feature","riprendi",{name:"riprendi"});closeArchive();
   if(isSim())spaceSwitch("real",{stay:true});
   S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=r.snap||null;
+  /* niente analisi del file né mappa a vista: un riquadro d'attesa, i passi li rifà il sito da solo, poi direttamente i Risultati */
+  svBusy(true,`Apro «${r.name}»…`);
   load(r.sheets,{name:r.file||r.name,size:0,kind:"file"},true);
-  go("scan",{force:true});
   /* la mappa è già confermata in memoria: appena il file è pronto (anche dopo i prezzi di mercato) si costruisce il laboratorio */
-  const tick=()=>{const R=S.svResume;if(!R||R.id!==id)return;if(Date.now()-R.t0>150000){S.svResume=null;return;}
+  const tick=()=>{const R=S.svResume;if(!R||R.id!==id)return;if(Date.now()-R.t0>150000){S.svResume=null;svBusy(false);go("map",{force:true});return;}
     const busy=(S.und&&/loading|rebuilding/.test(S.und.status||""))||(S.recipe&&S.recipe.status==="loading");
-    const b=$("#confirmBtn");if(!busy&&b&&!b.disabled&&S.ds&&S.ds.ok){if(!R.ready){R.ready=Date.now();}else if(Date.now()-R.ready>1200){S.svResume=null;if(R.riskW)S.riskW=R.riskW;if(R.fi){S.fi={in:{...fiDefaults(),...R.fi,cap:fiDefaults().cap}};}S.svSaved=id;b.click();return;}}else R.ready=0;
+    const b=$("#confirmBtn");if(!busy&&b&&!b.disabled&&S.ds&&S.ds.ok){if(!R.ready){R.ready=Date.now();}else if(Date.now()-R.ready>1200){S.svResume=null;if(R.riskW)S.riskW=R.riskW;if(R.fi){S.fi={in:{...fiDefaults(),...R.fi,cap:fiDefaults().cap}};}S.svSaved=id;showLab(true);go("lab",{force:true});svBusy(false);return;}}else R.ready=0;
     setTimeout(tick,400);};
   setTimeout(tick,600);
 }

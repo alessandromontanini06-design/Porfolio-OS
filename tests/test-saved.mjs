@@ -50,8 +50,12 @@ try {
   L = await p.evaluate(() => window.__saved.list().then(a => a.map(r => ({ name: r.name, note: r.note }))));
   t("nome e note modificati si salvano da soli", L.some(r => r.name === "Mario Bianchi (PAC)" && /pensione a 60/.test(r.note)), JSON.stringify(L));
   /* riapertura dalla pagina dell'archivio */
+  /* si registra quale sezione si vede in ogni momento: con il riquadro d'attesa sopra, le sezioni intermedie non si vedono */
+  await p.evaluate(() => { window.__seen = []; new MutationObserver(() => { const b = document.getElementById("svBusy"); window.__seen.push([document.body.dataset.scene, !!(b && !b.hidden)]); }).observe(document.body, { attributes: true, attributeFilter: ["data-scene"] }); });
   await p.evaluate(() => [...document.querySelectorAll("#arList .ar-row")].find(r => /Laura/.test(r.innerText)).querySelector("[data-svo]").click());
-  await p.waitForFunction(() => !document.getElementById("lab").hidden && document.getElementById("archive").getAttribute("aria-hidden") === "true", { timeout: 150000 }).catch(() => {}); await wait(3000);
+  await p.waitForFunction(() => !document.getElementById("lab").hidden && document.getElementById("archive").getAttribute("aria-hidden") === "true" && document.body.dataset.scene === "lab", { timeout: 150000 }).catch(() => {}); await wait(3000);
+  const seen = await p.evaluate(() => window.__seen), busyEnd = await p.evaluate(() => { const b = document.getElementById("svBusy"); return !!(b && !b.hidden); });
+  t("«Apri» porta direttamente ai Risultati: analisi del file e mappa mai a vista", seen.every(([sc, busy]) => sc === "lab" || busy) && !busyEnd && await p.evaluate(() => document.body.dataset.scene) === "lab", JSON.stringify(seen));
   t("riaprendo, il laboratorio si ricostruisce e la revisione si aggiorna", await p.evaluate(() => /è nell'archivio|Aperto dall'archivio/.test(document.getElementById("svOffer").innerText) && /92 transazioni/.test(document.getElementById("realCard").innerText)));
   L = await p.evaluate(() => window.__saved.list().then(a => a.length));
   t("riaprire non crea copie", L === 2, L);

@@ -789,6 +789,14 @@ body.rp-on{overflow:hidden}
 @media (max-width:520px){.pm-beni label{grid-template-columns:20px minmax(0,1fr) auto}.pm-beni select{grid-column:2/4}}
 .pm-io .pm-danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
 .pm-io .pm-danger:hover{background:color-mix(in srgb,var(--bad) 8%,transparent);border-color:var(--bad)}
+/* ---- Apertura dall'archivio: riquadro d'attesa ---- */
+#svBusy{position:fixed;inset:0;z-index:400;background:color-mix(in srgb,var(--bg,#fff) 94%,transparent);display:grid;place-items:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#svBusy[hidden]{display:none}
+#svBusy>div{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:24px}
+#svBusy i{width:42px;height:42px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--lime);animation:svspin .8s linear infinite;margin-bottom:6px}
+#svBusy b{font-family:var(--f-display);font-size:1.4rem;letter-spacing:-.02em}#svBusy span{color:var(--muted);font-size:.9rem}
+@keyframes svspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#svBusy i{animation-duration:2.4s}}
 
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
