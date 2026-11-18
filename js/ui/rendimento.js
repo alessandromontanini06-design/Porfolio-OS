@@ -25,7 +25,7 @@ function detectTx(sheets){
       if(!Number.isFinite(amt)&&cU>=0&&cP>=0){const u=P.parseNum(row[cU]),p=P.parseNum(row[cP]);if(u&&p)amt=u.n*p.n;}
       if(!Number.isFinite(amt)||amt===0)continue;
       const qn=cU>=0?P.parseNum(row[cU]):null,sell=/^(v|s)$/i.test(ty)||/(^|[^a-z])(vend|sell|riscatt|prelie|rimbors)|divid|cedol|coupon/i.test(ty)||(!ty&&!!qn&&qn.n<0);/* dividendi e cedole incassati escono dal portafoglio come un prelievo */
-      rows.push({d,ticker:tk,alias:alias.map(c=>String(row[c]==null?"":row[c]).trim()).filter(Boolean),type:ty,amount:sell?-Math.abs(amt):Math.abs(amt)});}
+      rows.push({d,ticker:tk,alias:alias.map(c=>String(row[c]==null?"":row[c]).trim()).filter(Boolean),type:ty,amount:sell?-Math.abs(amt):Math.abs(amt),qty:qn&&Number.isFinite(qn.n)&&qn.n!==0?Math.abs(qn.n):null});}
     if(rows.length>=2&&(!best||rows.length>best.rows.length))best={sheet:s.name,rows,cols:{data:hd[cD],strumento:hd[cT],importo:cA>=0?hd[cA]:`${hd[cU]} × ${hd[cP]}`,tipo:cY>=0?hd[cY]:null}};
   });
   return best;

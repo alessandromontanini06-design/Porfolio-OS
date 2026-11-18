@@ -42,7 +42,23 @@
 
 <header class="topbar">
   <button type="button" class="brand" data-go="home" aria-label="Portfolio OS, torna alla home"><span class="mk" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M2 13.5 6.5 8l3.5 3 6-7.5" stroke="#130A24" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>PORTFOLIO OS</button>
-  <div class="status"><button type="button" class="arch-btn" id="archBtn" aria-label="Apri l'archivio dei portafogli salvati"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 5.5h14v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11Zm-1-3h16v3H2zM8 9.5h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg><span>Archivio</span><b id="archN" hidden></b></button><span class="space-sw" id="spaceSw" role="tablist" aria-label="Spazio di lavoro" hidden><button type="button" data-space="real" title="Il mio portafoglio">Mio</button><button type="button" data-space="sim" title="Prove e confronti">Prove</button></span><span class="chip live"><i></i>Calcoli nel browser</span><span class="chip" id="sceneChip">Home</span></div>
+  <div class="status">
+    <span class="space-sw" id="spaceSw" role="tablist" aria-label="Spazio di lavoro" hidden><button type="button" data-space="real" title="Il mio portafoglio">Mio</button><button type="button" data-space="sim" title="Prove e confronti">Prove</button></span><span class="chip live"><i></i>Calcoli nel browser</span><span class="chip" id="sceneChip">Home</span>
+    <div class="mnu" id="mnu">
+      <button type="button" class="mnu-btn" id="mnuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="mnuPop"><span class="mnu-lbl" id="mnuLbl">Menu</span><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="mnu-pop" id="mnuPop" hidden>
+        <div class="mnu-dash" id="mnuDash"></div>
+        <div class="mnu-list" role="menu" aria-label="Menu">
+          <button type="button" class="mnu-it" role="menuitem" data-go="patrimonio"><b>Il mio patrimonio</b><small>valore, guadagno, posizioni</small></button>
+          <button type="button" class="mnu-it" role="menuitem" id="mnuAdd"><b>Aggiungi un'operazione</b><small>acquisto, vendita, dividendo, casa</small></button>
+          <button type="button" class="mnu-it" role="menuitem" id="mnuFile"><b>Carica un file</b><small>Excel o export della banca e del broker</small></button>
+          <button type="button" class="mnu-it" role="menuitem" id="archBtn" aria-label="Apri l'archivio dei portafogli salvati"><b>Archivio <i class="mnu-n" id="archN" hidden></i></b><small>le analisi salvate, i clienti, le revisioni</small></button>
+          <button type="button" class="mnu-it" role="menuitem" id="mnuCopy"><b>Copia di sicurezza</b><small>scarica il patrimonio in un file</small></button>
+          <a class="mnu-it" role="menuitem" href="/privacy.html"><b>Privacy e impostazioni</b><small>cosa resta in questo browser</small></a>
+        </div>
+      </div>
+    </div>
+  </div>
 </header>
 
 <main class="stage">
@@ -60,7 +76,7 @@
           </div>
           <div class="start">
             <div class="sv-list" id="svList" hidden></div>
-            <button type="button" class="opt pm-open" id="pmBtn"><span><b id="pmBtnT">Crea il tuo patrimonio</b><small id="pmBtnS">aggiungi ciò che possiedi: lo ritrovi qui ogni giorno, aggiornato</small></span><em aria-hidden="true">→</em></button>
+            <button type="button" class="opt pm-open" id="pmBtn" data-go="patrimonio"><span><b id="pmBtnT">Crea il tuo patrimonio</b><small id="pmBtnS">aggiungi ciò che possiedi: lo ritrovi qui ogni giorno, aggiornato</small></span><em aria-hidden="true">→</em></button>
             <div class="opt primary drop" id="drop" role="button" tabindex="0" aria-label="Carica il tuo Excel">
               <label for="file" style="cursor:pointer;flex:1"><b>Carica il tuo Excel</b><small>il tuo foglio, l'export del broker o i movimenti titoli della banca (Excel o CSV) · oppure trascinalo qui</small>
                 <span class="src">In uso: <b id="dsName">—</b><span id="dsChip"></span></span><span class="err" id="fileErr" hidden></span></label>
@@ -131,6 +147,46 @@
     </div>
   </section>
 
+  <!-- PATRIMONIO -->
+  <section class="scene" data-scene="patrimonio" id="scene-patrimonio" aria-label="Patrimonio" hidden>
+    <div class="inner">
+      <div class="scene-title"><div><span class="idx">Patrimonio</span><h2>Il mio <em>patrimonio</em></h2></div><p id="pmAsOf">Salvato solo in questo browser</p></div>
+      <div class="pm-top">
+        <div class="pm-ringcol">
+          <div class="seg pm-group" role="group" aria-label="Raggruppa il grafico" id="pmGroup"><button type="button" data-pmg="strumenti" aria-pressed="true">Per strumento</button><button type="button" data-pmg="classi" aria-pressed="false">Per categoria</button></div>
+          <div class="pm-ringbox" id="pmRing"></div>
+        </div>
+        <div class="pm-side"><div class="pm-kpis" id="pmKpis"></div><ul class="pm-legend" id="pmLegend"></ul></div>
+      </div>
+      <div class="pm-actions" id="pmActions">
+        <button type="button" class="pm-act" data-pmgo="add"><b>Aggiungi</b><small>acquisto, vendita, dividendo, casa</small></button>
+        <button type="button" class="pm-act" id="pmFile"><b>Importa da un file</b><small>l'Excel o l'export del broker</small></button>
+        <button type="button" class="pm-act lime" id="pmLab"><b>Analizza nel laboratorio</b><small>rischio, crisi, simulazioni, frontiera</small></button>
+        <button type="button" class="pm-act" id="pmExport"><b>Scarica una copia</b><small>per non perderlo</small></button>
+      </div>
+      <p class="caption" id="pmTopMsg" role="status"></p>
+      <div class="pm-chart" id="pmChart"></div>
+      <section class="bd-step"><div class="bd-sh"><h3>Le tue posizioni</h3></div><div id="pmPos"></div></section>
+      <section class="bd-step" id="pmAdd"><div class="bd-sh"><h3>Aggiungi</h3><small>un acquisto, una vendita, un dividendo o un bene senza quotazione</small></div>
+        <div class="seg pm-tipo" role="group" aria-label="Tipo di operazione" id="pmTipo">
+          <button type="button" data-pmt="acquisto" aria-pressed="true">Acquisto</button><button type="button" data-pmt="vendita" aria-pressed="false">Vendita</button><button type="button" data-pmt="dividendo" aria-pressed="false">Dividendo o cedola</button><button type="button" data-pmt="bene" aria-pressed="false">Casa, polizza, altro</button></div>
+        <form class="pm-form" id="pmForm" autocomplete="off"></form>
+        <p class="caption" id="pmMsg" role="status"></p></section>
+      <section class="bd-step"><div class="bd-sh"><h3>Storico delle operazioni</h3><small>niente si cancella: un'operazione sbagliata si annulla</small></div><div id="pmOps"></div></section>
+      <footer class="pm-foot"><p>Il patrimonio è salvato <b>solo in questo browser</b>, su questo dispositivo: non va su nessun server. Scarica ogni tanto una copia per non perderlo. I prezzi sono di fine giornata (Yahoo Finance), indicativi, non in tempo reale. Non è un consiglio di investimento.</p>
+        <div class="pm-io"><label class="btn sm" for="pmImport">Ripristina da una copia</label><input type="file" id="pmImport" accept="application/json,.json" hidden></div></footer>
+    </div>
+  </section>
+
+  <!-- STRUMENTI -->
+  <section class="scene" data-scene="strumenti" id="scene-strumenti" aria-label="Strumenti" hidden>
+    <div class="inner">
+      <div class="scene-title"><div><span class="idx">Strumenti</span><h2>Gli <em>strumenti</em></h2></div><p id="toolsSrc">Le analisi del portafoglio che hai nel laboratorio.</p></div>
+      <div class="tools-lock" id="toolsLock" hidden></div>
+      <div class="tools-grid" id="toolsGrid"></div>
+    </div>
+  </section>
+
   <!-- SCANSIONE -->
   <section class="scene" data-scene="scan" id="scene-scan" aria-label="Scansione" hidden>
     <div class="inner">
@@ -191,6 +247,7 @@
   <section class="scene" data-scene="lab" id="scene-lab" aria-label="Laboratorio" hidden>
     <div class="inner">
       <div class="scene-title"><div><span class="idx">Laboratorio</span><h2>Il tuo <em>laboratorio</em></h2></div><p id="labSource">Conferma la mappa dei dati per costruirlo.</p></div>
+      <div class="pm-offer" id="pmOffer" hidden></div>
       <div class="tile s12 empty" id="labEmpty">
         <span class="eyebrow">Ancora vuoto</span>
         <div class="big">Prima conferma la mappa</div>
@@ -453,15 +510,18 @@
 <nav class="dock" id="dock" aria-label="Sezioni">
   <span class="pillbg" id="pillbg" aria-hidden="true"></span>
   <button type="button" data-go="home" aria-current="true" data-l="Home"><span class="n">01</span><span class="lbl">Home</span></button>
-  <button type="button" data-go="scan" data-l="Scansione"><span class="n">02</span><span class="lbl">Scansione</span></button>
-  <button type="button" data-go="map" data-l="Mappa"><span class="n">03</span><span class="lbl">Mappa</span></button>
-  <button type="button" data-go="lab" id="navLab" class="off" data-l="Laboratorio"><span class="n">04</span><span class="lbl">Laboratorio</span></button>
-  <button type="button" data-go="risk" id="navRisk" class="off" data-l="Rischio"><span class="n">05</span><span class="lbl">Rischio</span></button>
-  <button type="button" data-go="sim" id="navSim" class="off" data-l="Simulazioni"><span class="n">06</span><span class="lbl">Simulazioni</span></button>
-  <button type="button" data-go="fire" id="navFire" class="off" data-l="Indipendenza"><span class="n">07</span><span class="lbl">Indipendenza</span></button>
-  <button type="button" data-go="stress" id="navStress" class="off" data-l="Stress test"><span class="n">07</span><span class="lbl">Stress test</span></button>
-  <button type="button" data-go="opt" id="navOpt" class="off" data-l="Frontiera"><span class="n">08</span><span class="lbl">Frontiera</span></button>
-  <button type="button" data-go="bench" id="navBench" class="off" data-l="Benchmark"><span class="n">09</span><span class="lbl">Benchmark</span></button>
+  <button type="button" data-nav="lab" id="navMainLab" data-l="Laboratorio"><span class="n">02</span><span class="lbl">Laboratorio</span></button>
+  <button type="button" data-go="patrimonio" id="navPm" data-l="Patrimonio"><span class="n">03</span><span class="lbl">Patrimonio</span></button>
+  <button type="button" data-nav="strumenti" id="navTools" data-l="Strumenti"><span class="n">04</span><span class="lbl">Strumenti</span></button>
+  <button type="button" class="dk-old" data-go="scan" data-l="Scansione"><span class="n">03</span><span class="lbl">Scansione</span></button>
+  <button type="button" class="dk-old" data-go="map" data-l="Mappa"><span class="n">04</span><span class="lbl">Mappa</span></button>
+  <button type="button" class="dk-old off" data-go="lab" id="navLab" data-l="Laboratorio"><span class="n">05</span><span class="lbl">Laboratorio</span></button>
+  <button type="button" class="dk-old off" data-go="risk" id="navRisk" data-l="Rischio"><span class="n">06</span><span class="lbl">Rischio</span></button>
+  <button type="button" class="dk-old off" data-go="sim" id="navSim" data-l="Simulazioni"><span class="n">07</span><span class="lbl">Simulazioni</span></button>
+  <button type="button" class="dk-old off" data-go="fire" id="navFire" data-l="Indipendenza"><span class="n">08</span><span class="lbl">Indipendenza</span></button>
+  <button type="button" class="dk-old off" data-go="stress" id="navStress" data-l="Stress test"><span class="n">09</span><span class="lbl">Stress test</span></button>
+  <button type="button" class="dk-old off" data-go="opt" id="navOpt" data-l="Frontiera"><span class="n">10</span><span class="lbl">Frontiera</span></button>
+  <button type="button" class="dk-old off" data-go="bench" id="navBench" data-l="Benchmark"><span class="n">11</span><span class="lbl">Benchmark</span></button>
 </nav>
 
 <div class="wipe" id="wipe" aria-hidden="true"><span class="eyebrow" style="color:rgba(19,10,36,.7)">Costruzione in corso</span><h2>Labora&shy;torio</h2><ul id="wipeStats"></ul></div>
@@ -506,24 +566,6 @@
     </aside>
   </div>
   <datalist id="bdList"></datalist>
-</section>
-<section class="bdpage pm" id="patrimonio" role="dialog" aria-modal="true" aria-label="Il mio patrimonio" aria-hidden="true">
-  <div class="bd-top"><button type="button" class="btn sm" id="pmClose">← Home</button><span class="bd-crumb">Portfolio OS <i>/</i> Il mio patrimonio</span></div>
-  <div class="pm-wrap">
-    <header class="pm-hd"><span class="eyebrow" id="pmAsOf">Salvato solo in questo browser</span><h2>Il mio <em>patrimonio</em></h2></header>
-    <div class="pm-kpis" id="pmKpis"></div>
-    <div class="pm-chart" id="pmChart"></div>
-    <section class="bd-step"><div class="bd-sh"><h3>Le tue posizioni</h3><div class="bd-tools"><button type="button" class="btn sm lime" id="pmLab">Analizza nel laboratorio →</button></div></div>
-      <div id="pmPos"></div></section>
-    <section class="bd-step" id="pmAdd"><div class="bd-sh"><h3>Aggiungi</h3><small>un acquisto, una vendita, un dividendo o un bene senza quotazione</small></div>
-      <div class="seg pm-tipo" role="group" aria-label="Tipo di operazione" id="pmTipo">
-        <button type="button" data-pmt="acquisto" aria-pressed="true">Acquisto</button><button type="button" data-pmt="vendita" aria-pressed="false">Vendita</button><button type="button" data-pmt="dividendo" aria-pressed="false">Dividendo o cedola</button><button type="button" data-pmt="bene" aria-pressed="false">Casa, polizza, altro</button></div>
-      <form class="pm-form" id="pmForm" autocomplete="off"></form>
-      <p class="caption" id="pmMsg" role="status"></p></section>
-    <section class="bd-step"><div class="bd-sh"><h3>Storico delle operazioni</h3><small>niente si cancella: un'operazione sbagliata si annulla</small></div><div id="pmOps"></div></section>
-    <footer class="pm-foot"><p>Il patrimonio è salvato <b>solo in questo browser</b>, su questo dispositivo: non va su nessun server. Scarica ogni tanto una copia per non perderlo. I prezzi sono di fine giornata (Yahoo Finance), indicativi, non in tempo reale. Non è un consiglio di investimento.</p>
-      <div class="pm-io"><button type="button" class="btn sm" id="pmExport">Scarica una copia</button><label class="btn sm" for="pmImport">Ripristina da una copia</label><input type="file" id="pmImport" accept="application/json,.json" hidden></div></footer>
-  </div>
 </section>
 <aside class="drawer" id="drawer" aria-label="Ricevuta del calcolo" aria-hidden="true">
   <button type="button" class="btn sm x" id="closeDrawer">Chiudi</button>

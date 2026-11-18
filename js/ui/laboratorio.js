@@ -7,6 +7,7 @@ import { costCalc, renderCompare, renderCost, renderPortfolio, renderProfileCard
 import { fmtEur, getJSON, renderOpt, renderRisk } from "./analisi.js";
 import { drawReal, renderReal } from "./rendimento.js";
 import { openReceipt } from "./report.js";
+import { pmOfferRender } from "./patrimonio.js";
 
 /* ---------- Dati macro ufficiali (BCE, FRED facoltativo) tramite /api/rates ---------- */
 const ym=d=>`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;
@@ -162,6 +163,7 @@ document.getElementById("scene-lab")?.addEventListener("scroll",()=>{if(!S.labId
 document.addEventListener("click",e=>{const b=e.target.closest("[data-gv]");if(!b)return;S.growView=b.dataset.gv;drawChart(false);});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-li]");if(!b||!S.labIdx)return;const v=S.labIdx[+b.dataset.li];if(v)v.card.scrollIntoView({behavior:REDUCE?"auto":"smooth",block:"start"});});
 function renderLab(){
+  pmOfferRender();/* «metti questo portafoglio nel tuo patrimonio» */
   const ds=S.ds,L=S.lab,f=ds.freq.f;
   const starts=ds.assets.map(a=>({n:a.name,k:Math.max(0,a.first-1)})),late=starts.filter(s=>s.k>Math.min(...starts.map(x=>x.k))+1),gc=$("#growthNote");
   if(gc)gc.textContent=late.length?`Le linee partono quando inizia lo storico di ciascuno strumento: ${starts.map(s=>`${s.n} da ${fmtDate(ds.dates[s.k],f)}`).join(", ")}. Per confrontarle sullo stesso periodo usa le sezioni Rischio e Frontiera, che lavorano sui mesi comuni.`:"";

@@ -1,9 +1,12 @@
-/* Portfolio OS · interfaccia · Il mio patrimonio: il portafoglio che vive nel browser.
+/* Portfolio OS · interfaccia · Il mio patrimonio: una sezione del sito, il portafoglio che vive nel browser.
    Si salvano solo strumenti e operazioni (localStorage «pos-patrimonio-v1»); tutto il resto lo calcola il motore (POS.ledger).
-   Le operazioni non si cancellano: un errore si annulla con un'operazione nuova, così lo storico resta affidabile. */
-import { $, P, esc, fmtN, fmtPct } from "./core.js";
+   Le operazioni non si cancellano: un errore si annulla con un'operazione nuova, così lo storico resta affidabile.
+   Si riempie a mano oppure da un file caricato (movimenti o posizioni), e porta al laboratorio con un clic. */
+import { $, P, S, esc, fmtN, fmtPct } from "./core.js";
 import { getJSON, fmtEur } from "./analisi.js";
-import { BD, POPULAR, bdGo, guessSymbol, trackOnce } from "./importa.js";
+import { BD, POPULAR, bdGo, guessSymbol, isExample, trackOnce } from "./importa.js";
+import { go, current } from "./scene.js";
+import { txMatch } from "./rendimento.js";
 
 const PM_KEY = "pos-patrimonio-v1";
 const pmToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -20,9 +23,11 @@ const num = v => { const t = String(v ?? "").trim().replace(/\s|€|'/g, ""); if
   return parseFloat(t); };
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const TIPO_L = { acquisto: "Acquisto", vendita: "Vendita", dividendo: "Dividendo", cedola: "Cedola", valutazione: "Nuova stima", commissione: "Commissione", tassa: "Tassa", frazionamento: "Frazionamento" };
+/* colori dell'anello: quelli del sito, distinti tra loro anche per chi vede male rosso e verde */
+const RING = ["#C9F24A", "#8F3BFF", "#2E6FD1", "#D4572E", "#C99A00", "#1D9A8A", "#E0569B", "#161616", "#8A8F98"];
 
 function pmLoad() { try { const x = JSON.parse(localStorage.getItem(PM_KEY) || "null"); if (x && x.v === 1 && x.strumenti && Array.isArray(x.operazioni)) return x; } catch {} return null; }
-const PM = { db: pmLoad(), px: {}, fx: {}, tipo: "acquisto", R: null, res: null, loading: false, beneId: "" };
+const PM = { db: pmLoad(), px: {}, fx: {}, tipo: "acquisto", R: null, res: null, loading: false, beneId: "", group: "strumenti", sel: null, pending: false };
 const pmHas = () => !!(PM.db && PM.db.operazioni.some(o => o.tipo !== "annulla"));
 function pmSave() {
   PM.db.aggiornato = new Date().toISOString();
@@ -31,14 +36,17 @@ function pmSave() {
 }
 const pmDb = () => PM.db ||= { v: 1, strumenti: {}, operazioni: [], creato: new Date().toISOString() };
 
-/* ---------- prezzi e cambi: una volta per apertura, tre strumenti alla volta ---------- */
+/* ---------- prezzi e cambi: una volta per visita, tre strumenti alla volta ---------- */
 async function pmPrices(force) {
   const db = pmDb(), ids = Object.keys(db.strumenti).filter(id => db.strumenti[id].simbolo && (force || !PM.px[id]));
   const q = ids.slice();
   await Promise.all([0, 1, 2].map(async () => { while (q.length) { const id = q.shift(), s = db.strumenti[id];
     const j = await getJSON(`/api/prices?symbol=${encodeURIComponent(s.simbolo)}&v=5`);
     PM.px[id] = j && !j.error && j.points ? j : { error: (j && j.error) || "prezzi non disponibili" }; } }));
-  const need = [...new Set(Object.values(db.strumenti).map(s => s.valuta === "GBX" ? "GBP" : s.valuta).filter(c => c && c !== "EUR"))];
+  await pmFx(force);
+}
+async function pmFx(force) {
+  const need = [...new Set(Object.values(pmDb().strumenti).map(s => s.valuta === "GBX" ? "GBP" : s.valuta).filter(c => c && c !== "EUR"))];
   for (const c of need) if (!PM.fx[c] || force) { const j = await getJSON(`/api/fx?ccy=${c}`); PM.fx[c] = j && j.points ? j.points : []; }
 }
 function pmCalc() {
@@ -76,33 +84,78 @@ async function pmResolve(text) {
   return { id: isinF || sym, nome: nome || (px.info || "").split(" · ")[0] || sym, ticker: pop ? pop[0] : (isin ? null : tk), isin: isinF, simbolo: sym, valuta: px.currency || "EUR", classe: pop ? pop[3] : null, px };
 }
 const lastPx = j => { if (!j || !j.points) return NaN; const r = (j.recent && j.recent.length ? j.recent : j.points); return r[r.length - 1].v; };
+/* categoria per il grafico: quella dell'elenco, altrimenti dal nome; i beni a mano a parte */
+function pmClass(s) {
+  if (s.manuale) return "Casa e altri beni";
+  if (s.classe) return s.classe === "Oro" ? "Oro e materie prime" : s.classe;
+  const n = String(s.nome || "").toLowerCase();
+  if (/bond|obblig|govt|treasury|aggregate|btp|bot|corporate|€ gov|income/.test(n)) return "Obbligazioni";
+  if (/gold|oro|silver|argento|commodit/.test(n)) return "Oro e materie prime";
+  if (/overnight|money market|monetari|liquidit|cash/.test(n)) return "Liquidità";
+  if (/bitcoin|ethereum|crypto|btc|eth/.test(n)) return "Cripto";
+  return "Azioni";
+}
 
-/* ---------- disegno ---------- */
-function pmMsg(t, k) { const el = $("#pmMsg"); if (!el) return; el.textContent = t || ""; el.className = "caption" + (k ? " " + k : ""); }
+/* ---------- grafico ad anello: il totale al centro, una fetta alla volta ---------- */
+function pmSlices(R) {
+  const db = PM.db, open = R.posizioni.filter(p => p.aperta && p.valore > 0), tot = open.reduce((a, p) => a + p.valore, 0);
+  let list;
+  if (PM.group === "classi") { const m = new Map(); open.forEach(p => { const k = pmClass(db.strumenti[p.id]); const x = m.get(k) || { key: "c:" + k, nome: k, valore: 0, guadagno: 0, n: 0 }; x.valore += p.valore; x.guadagno += p.guadagno; x.n++; m.set(k, x); }); list = [...m.values()]; }
+  else list = open.map(p => ({ key: p.id, nome: db.strumenti[p.id].nome, valore: p.valore, guadagno: p.guadagno, n: 1, p }));
+  list.sort((a, b) => b.valore - a.valore);
+  if (list.length > RING.length) { const rest = list.splice(RING.length - 1); list.push({ key: "altro", nome: `Altri ${rest.length}`, valore: rest.reduce((a, x) => a + x.valore, 0), guadagno: rest.reduce((a, x) => a + x.guadagno, 0), n: rest.length }); }
+  list.forEach((x, i) => { x.col = RING[i % RING.length]; x.pct = tot > 0 ? x.valore / tot : 0; });
+  return { list, tot };
+}
+const arc = (cx, cy, r, a0, a1) => { const p = a => [cx + r * Math.sin(a), cy - r * Math.cos(a)], [x0, y0] = p(a0), [x1, y1] = p(a1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`; };
+function pmRing(R) {
+  const { list, tot } = pmSlices(R), cx = 160, cy = 160, r = 124, w = 36, sel = list.find(x => x.key === PM.sel) || null;
+  if (sel === null) PM.sel = null;
+  const gap = list.length > 1 ? 0.012 : 0;
+  let a = 0;
+  const paths = list.map(x => { const span = x.pct * 2 * Math.PI, a0 = a + gap, a1 = a + span - gap; a += span;
+    const on = sel && sel.key === x.key, dim = sel && !on, label = `${x.nome}: ${fmtEur(x.valore)}, ${fmtPct(x.pct, 1)}`;
+    const shape = list.length === 1 ? `<circle cx="${cx}" cy="${cy}" r="${r}"` : `<path d="${arc(cx, cy, r, a0, Math.max(a0 + 0.004, a1))}"`;
+    return `${shape} class="pm-sl${on ? " on" : ""}${dim ? " dim" : ""}" data-pmslice="${esc(x.key)}" stroke="${x.col}" stroke-width="${on ? w + 12 : w}" fill="none" tabindex="0" role="button" aria-pressed="${on}" aria-label="${esc(label)}"/>`; }).join("");
+  const empty = !list.length;
+  const center = empty ? `<span class="pm-c-l">Il tuo patrimonio</span><b class="pm-c-v">0 €</b><span class="pm-c-s">aggiungi il primo investimento</span>`
+    : sel ? `<span class="pm-c-l">${esc(sel.nome)}</span><b class="pm-c-v">${fmtEur(sel.valore)}</b><span class="pm-c-s">${fmtPct(sel.pct, 1)} del patrimonio${Number.isFinite(sel.guadagno) ? ` · <i class="${clsE(sel.guadagno)}">${sEur(sel.guadagno)}</i>` : ""}</span><span class="pm-c-x">tocca di nuovo per il totale</span>`
+    : `<span class="pm-c-l">Patrimonio totale</span><b class="pm-c-v">${fmtEur(tot)}</b><span class="pm-c-s">${list.reduce((s, x) => s + x.n, 0)} ${PM.group === "classi" ? "investimenti in " + list.length + (list.length === 1 ? " categoria" : " categorie") : "investimenti"}</span>`;
+  $("#pmRing").innerHTML = `<svg viewBox="0 0 320 320" role="group" aria-label="Composizione del patrimonio">${empty ? `<circle cx="${cx}" cy="${cy}" r="${r}" stroke="var(--line)" stroke-width="${w}" fill="none"/>` : paths}</svg><div class="pm-center${sel ? " sel" : ""}" data-pmclear>${center}</div>`;
+  $("#pmLegend").innerHTML = list.map(x => `<li><button type="button" data-pmslice="${esc(x.key)}" class="${sel && sel.key === x.key ? "on" : sel ? "dim" : ""}" aria-pressed="${!!(sel && sel.key === x.key)}"><i style="background:${x.col}"></i><span>${esc(x.nome)}</span><b>${fmtEur(x.valore)}</b><em>${fmtPct(x.pct, 1)}</em></button></li>`).join("");
+  document.querySelectorAll("#pmGroup [data-pmg]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pmg === PM.group)));
+}
+
+/* ---------- disegno della sezione ---------- */
+function pmMsg(t, k, where) { const el = $(where || "#pmMsg"); if (!el) return; el.textContent = t || ""; el.className = "caption" + (k ? " " + k : ""); }
 function pmKpis(R) {
   const T = R.totale, ses = pmSession(R);
-  const sesTxt = ses ? `${ses.d === pmToday() ? "Oggi" : dayName(ses.d)}, rispetto a ${dayName(ses.d0)}: <b class="${clsE(ses.euro)}">${sEur(ses.euro)}</b> · <span class="${clsP(ses.pct)}">${sPct(ses.pct)}</span>` : PM.loading ? "Aggiorno i prezzi di oggi…" : "Variazione di giornata non disponibile";
-  const tirTxt = T.anni >= 1 ? "rendimento annuo dei tuoi soldi" : "su meno di un anno: indicativo";
-  return `<div class="pm-k pm-main"><span>Patrimonio oggi</span><b>${fmtEur(T.valore)}</b><small>${sesTxt}</small></div>
+  const sesB = ses ? `<b class="${clsE(ses.euro)}">${sEur(ses.euro)}</b><small><span class="${clsP(ses.pct)}">${sPct(ses.pct)}</span> · ${ses.d === pmToday() ? "oggi" : dayName(ses.d)}, rispetto a ${dayName(ses.d0)}</small>`
+    : `<b>—</b><small>${PM.loading ? "aggiorno i prezzi…" : "nessuna quotazione di giornata"}</small>`;
+  return `<div class="pm-k"><span>Ultima seduta</span>${sesB}</div>
     <div class="pm-k"><span>Guadagno</span><b class="${clsE(T.guadagno)}">${sEur(T.guadagno)}</b><small>${sPct(T.guadagnoPct)} su ${fmtEur(T.versato)} versati</small></div>
-    <div class="pm-k"><span>Rendimento (TIR)</span><b class="${clsP(T.tir)}">${sPct(T.tir)}</b><small>${tirTxt} · dal ${dIt(R.dal)}</small></div>
+    <div class="pm-k"><span>Rendimento (TIR)</span><b class="${clsP(T.tir)}">${sPct(T.tir)}</b><small>${T.anni >= 1 ? "all'anno" : "su meno di un anno: indicativo"} · dal ${dIt(R.dal)}</small></div>
     <div class="pm-k"><span>Dividendi e cedole</span><b>${fmtEur(T.proventi)}</b><small>spese e tasse: ${fmtEur(T.spese)}</small></div>`;
 }
 function pmChart(R) {
   const s = R.serie; if (s.length < 3) return "";
   const step = Math.max(1, Math.ceil(s.length / 360)), pts = s.filter((_, i) => i % step === 0 || i === s.length - 1);
   /* disegnato alla larghezza vera del riquadro: le scritte restano di 11 px anche sul telefono */
-  const box = $("#pmChart"), W = Math.round(Math.min(1200, Math.max(300, ((box && box.clientWidth) || 900) - 34))), H = W < 520 ? 180 : 220, L = 64, Rr = 12, T0 = 10, B = 26, max = Math.max(...pts.map(p => Math.max(p.valore, p.versato)), 1) * 1.05;
-  const x = i => L + i / (pts.length - 1) * (W - L - Rr), y = v => T0 + (1 - Math.max(0, v) / max) * (H - T0 - B);
+  const box = $("#pmChart"), W = Math.round(Math.min(1200, Math.max(300, ((box && box.clientWidth) || 900) - 34))), H = W < 520 ? 180 : 220, L = 64, Rr = 12, T0 = 10, B = 26;
+  const hi = Math.max(...pts.map(p => Math.max(p.valore, p.versato)), 1), lo0 = Math.min(...pts.map(p => Math.min(p.valore, p.versato)));
+  /* l'asse parte da zero solo se i valori ci arrivano vicino: altrimenti le oscillazioni non si vedrebbero */
+  const lo = lo0 > hi * 0.5 ? lo0 * 0.97 : 0, max = hi * 1.03, span = max - lo || 1;
+  const x = i => L + i / (pts.length - 1) * (W - L - Rr), y = v => T0 + (1 - (Math.max(lo, v) - lo) / span) * (H - T0 - B);
   const line = k => pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p[k]).toFixed(1)}`).join("");
-  const ticks = [0, max / 2 / 1.05, max / 1.05].map(v => `<line x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtEur(v)}</text>`).join("");
+  const ticks = [lo, lo + (hi - lo) / 2, hi].map(v => `<line x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtEur(v)}</text>`).join("");
   const xl = [0, Math.floor((pts.length - 1) / 2), pts.length - 1].map((i, k) => `<text x="${x(i)}" y="${H - 6}" text-anchor="${k === 0 ? "start" : k === 2 ? "end" : "middle"}" font-size="11" fill="var(--muted)">${dIt(pts[i].d)}</text>`).join("");
-  return `<p class="pm-leg"><span><i style="background:var(--fg)"></i>Valore</span><span><i style="background:var(--muted)"></i>Soldi versati (netti)</span></p>
+  return `<div class="pm-ch-h"><b>Come è cambiato</b><p class="pm-leg"><span><i style="background:var(--fg)"></i>Valore</span><span><i class="dash"></i>Soldi versati (netti)</span></p></div>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Valore del patrimonio e soldi versati dal ${dIt(R.dal)} a oggi">${ticks}<path d="${line("versato")}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4"/><path d="${line("valore")}" fill="none" stroke="var(--fg)" stroke-width="2"/>${xl}</svg>`;
 }
 function pmPosTable(R) {
   const db = PM.db, rows = R.posizioni;
-  if (!rows.length) return `<p class="pm-empty">Ancora niente. Aggiungi qui sotto il primo acquisto: per esempio <b>VWCE</b>, 20 quote a 100 €.</p>`;
+  if (!rows.length) return `<p class="pm-empty">Ancora niente. Aggiungi qui sotto il primo acquisto (per esempio <b>VWCE</b>, 20 quote a 100 €) oppure <b>importa il file</b> della tua banca o del tuo broker.</p>`;
   const src = p => p.prezzoFonte === "mercato" ? `prezzo al ${dIt(p.prezzoData)}` : db.strumenti[p.id].manuale ? `stima del ${dIt(p.prezzoData)}` : `il tuo prezzo del ${dIt(p.prezzoData)}`;
   const tr = p => { const s = db.strumenti[p.id], g = p.guadagno, gp = p.acquistato > 0 ? g / p.acquistato : NaN, ccy = s.valuta && s.valuta !== "EUR" ? " " + s.valuta : " €";
     return `<tr class="${p.aperta ? "" : "closed"}"><td><b>${esc(s.nome)}</b><small>${esc([s.ticker, s.isin].filter(Boolean).join(" · ") || (s.manuale ? "bene senza quotazione" : s.simbolo || ""))}${p.aperta ? "" : " · chiusa"}</small></td>
@@ -119,15 +172,15 @@ function pmPosTable(R) {
 function pmOpsTable() {
   const db = PM.db, ops = db.operazioni, gone = new Set(ops.filter(o => o.tipo === "annulla").map(o => String(o.rif)));
   const list = ops.filter(o => o.tipo !== "annulla").slice().sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0)).slice(0, 200);
-  if (!list.length) return `<p class="caption">Le operazioni che aggiungi compaiono qui, dalla più recente.</p>`;
+  if (!list.length) return `<p class="caption">Le operazioni che aggiungi o importi compaiono qui, dalla più recente.</p>`;
   const det = o => { const s = db.strumenti[o.strumento] || {}, c = o.valuta || s.valuta || "EUR", u = c === "EUR" ? " €" : " " + c;
-    if (o.tipo === "acquisto" || o.tipo === "vendita") return s.manuale && o.tipo === "acquisto" ? `valore ${fmtN(+o.prezzo, 0)} €` : `${fmtN(+o.quantita, +o.quantita % 1 ? 3 : 0)} × ${fmtN(+o.prezzo, 2)}${u}${+o.spese ? ` · spese ${fmtN(+o.spese, 2)} €` : ""}`;
+    if (o.tipo === "acquisto" || o.tipo === "vendita") return s.manuale && o.tipo === "acquisto" ? `valore ${fmtN(+o.prezzo, 0)} €` : `${fmtN(+o.quantita, +o.quantita % 1 ? 3 : 0)} × ${fmtN(+o.prezzo, 2)}${u}${+o.spese ? ` · spese ${fmtN(+o.spese, 2)} €` : ""}${o.stima ? " · quote stimate" : ""}`;
     if (o.tipo === "valutazione") return `stima ${fmtN(+o.prezzo, 0)} €`;
     if (o.tipo === "dividendo" || o.tipo === "cedola" || o.tipo === "commissione" || o.tipo === "tassa") return `${fmtN(+o.importo, 2)}${u}`;
     if (o.tipo === "frazionamento") return `1 quota → ${fmtN(+o.rapporto, 2)}`; return ""; };
   return `<div class="tablewrap"><table class="mt pm-ops"><thead><tr><th>Data</th><th>Operazione</th><th>Strumento</th><th class="num">Dettaglio</th><th></th></tr></thead><tbody>
-    ${list.map(o => { const g = gone.has(String(o.id)); return `<tr class="${g ? "gone" : ""}"><td>${dIt(o.data)}</td><td>${esc(TIPO_L[o.tipo] || o.tipo)}${g ? " <small>annullata</small>" : ""}</td><td>${esc((db.strumenti[o.strumento] || {}).nome || "—")}</td><td class="num">${det(o)}</td><td class="num">${g ? "" : `<button type="button" class="btn sm" data-pmdel="${esc(o.id)}">Annulla</button>`}</td></tr>`; }).join("")}
-    </tbody></table></div>${ops.length > 200 ? `<p class="caption">Mostro le 200 più recenti.</p>` : ""}`;
+    ${list.map(o => { const g = gone.has(String(o.id)); return `<tr class="${g ? "gone" : ""}"><td>${dIt(o.data)}</td><td>${esc(TIPO_L[o.tipo] || o.tipo)}${g ? " <small>annullata</small>" : o.origine === "file" ? " <small>da file</small>" : ""}</td><td>${esc((db.strumenti[o.strumento] || {}).nome || "—")}</td><td class="num">${det(o)}</td><td class="num">${g ? "" : `<button type="button" class="btn sm" data-pmdel="${esc(o.id)}">Annulla</button>`}</td></tr>`; }).join("")}
+    </tbody></table></div>${list.length >= 200 ? `<p class="caption">Mostro le 200 più recenti.</p>` : ""}`;
 }
 function pmForm() {
   const db = pmDb(), R = PM.R, t = PM.tipo, open = R ? R.posizioni.filter(p => p.aperta && !db.strumenti[p.id].manuale) : [], all = Object.entries(db.strumenti).filter(([, s]) => !s.manuale);
@@ -157,19 +210,23 @@ function pmRenderForm() {
   document.querySelectorAll("#pmTipo [data-pmt]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pmt === PM.tipo)));
 }
 function pmButton() {
+  pmMenu();
   const b = $("#pmBtn"); if (!b) return;
   if (!pmHas()) { b.classList.remove("has"); $("#pmBtnT").textContent = "Crea il tuo patrimonio"; $("#pmBtnS").textContent = "aggiungi ciò che possiedi: lo ritrovi qui ogni giorno, aggiornato"; return; }
   const R = PM.R || pmCalc(), ses = pmSession(R);
   b.classList.add("has"); $("#pmBtnT").textContent = `Il mio patrimonio · ${fmtEur(R.totale.valore)}`;
-  $("#pmBtnS").textContent = ses ? `${ses.d === pmToday() ? "oggi" : dayName(ses.d)} ${sEur(ses.euro)} (${sPct(ses.pct)}) · guadagno ${sEur(R.totale.guadagno)}` : `guadagno ${sEur(R.totale.guadagno)} · apri per aggiornare i prezzi`;
+  $("#pmBtnS").textContent = ses ? `${ses.d === pmToday() ? "oggi" : dayName(ses.d)} ${sEur(ses.euro)} (${sPct(ses.pct)}) · guadagno ${sEur(R.totale.guadagno)}` : `guadagno ${sEur(R.totale.guadagno)}`;
 }
 function pmRender() {
   const R = pmCalc(), has = pmHas();
-  $("#pmAsOf").textContent = PM.loading ? "Aggiorno i prezzi…" : has ? `Aggiornato al ${dIt(pmToday())} · salvato solo in questo browser` : "Salvato solo in questo browser";
-  $("#pmKpis").innerHTML = has ? pmKpis(R) : `<div class="pm-empty" style="grid-column:1/-1"><b>Il tuo patrimonio, sempre qui.</b> Aggiungi quello che possiedi: ETF, azioni, fondi, ma anche casa, polizze e altri beni. Ogni volta che torni trovi il valore aggiornato, quanto hai guadagnato e come è andata l'ultima seduta. Senza Excel e senza account.</div>`;
+  if (!$("#pmKpis")) return;
+  $("#pmAsOf").textContent = PM.loading ? "Aggiorno i prezzi di oggi…" : has ? `Aggiornato al ${dIt(pmToday())} · salvato solo in questo browser` : "Il tuo patrimonio, sempre qui: aggiungi ciò che possiedi o importa un file. Senza account.";
+  pmRing(R);
+  $("#pmKpis").innerHTML = has ? pmKpis(R) : `<div class="pm-empty"><b>Inizia da qui.</b> Aggiungi quello che possiedi: ETF, azioni, fondi, ma anche casa, polizze e altri beni. Oppure importa l'Excel o l'export del broker. Ogni volta che torni trovi il valore aggiornato, quanto hai guadagnato e com'è andata l'ultima seduta.</div>`;
   $("#pmChart").innerHTML = has ? pmChart(R) : ""; $("#pmChart").hidden = !has || R.serie.length < 3;
   $("#pmPos").innerHTML = pmPosTable(R); $("#pmOps").innerHTML = pmOpsTable();
-  $("#pmLab").hidden = !R.posizioni.some(p => p.aperta && !PM.db.strumenti[p.id].manuale);
+  const quoted = R.posizioni.some(p => p.aperta && !PM.db.strumenti[p.id].manuale);
+  $("#pmLab").disabled = !quoted; $("#pmExport").disabled = !has;
   pmButton();
 }
 async function pmRefresh(force) {
@@ -178,17 +235,111 @@ async function pmRefresh(force) {
   try { await pmPrices(force); } finally { PM.loading = false; }
   pmRender();
 }
+/* entrata nella sezione (dal menu, dalla home o all'avvio) */
+function pmEnter() { trackOnce("feature", "patrimonio", { name: "patrimonio" }); pmDb(); if (!$("#pmForm").children.length) pmRenderForm(); pmRefresh(false); }
 
-/* ---------- apertura ---------- */
-function pmOpen() {
-  trackOnce("feature", "patrimonio", { name: "patrimonio" });
-  pmDb(); pmRenderForm(); pmRender();
-  const el = $("#patrimonio"); el.classList.add("open"); el.setAttribute("aria-hidden", "false"); el.scrollTop = 0; document.body.classList.add("bd-on");
+/* ---------- dal file caricato al patrimonio ---------- */
+const keyOf = v => String(v || "").trim().toLowerCase();
+const isoOf = d => d instanceof Date ? d.toISOString().slice(0, 10) : String(d || "").slice(0, 10);
+/* il portafoglio del file è vero (non l'esempio né un portafoglio di prova costruito a mano)? */
+const fileOk = () => !!(S.portfolio && S.portfolio.positions && S.portfolio.positions.some(p => p.simbolo) && S.source && S.source.kind !== "sample" && !isExample() && !S.source.builder && !(S.rb && S.rb.origSource && S.rb.origSource.builder));
+async function pmFromFile() {
+  const pos = S.portfolio.positions.filter(p => p.simbolo), db = pmDb(), fileName = (S.rb && S.rb.origSource && S.rb.origSource.name) || (S.source && S.source.name) || "file";
+  /* 1) strumenti, con la valuta vera di quotazione e i prezzi (servono anche a stimare le quote mancanti) */
+  const ids = pos.map(p => p.isin || p.simbolo);
+  const q = pos.map((p, i) => [p, ids[i]]);
+  await Promise.all([0, 1, 2].map(async () => { while (q.length) { const [p, id] = q.shift();
+    if (!PM.px[id]) { const j = await getJSON(`/api/prices?symbol=${encodeURIComponent(p.simbolo)}&v=5`); PM.px[id] = j && !j.error && j.points ? j : { error: (j && j.error) || "prezzi non disponibili" }; }
+    if (!db.strumenti[id]) db.strumenti[id] = { nome: p.nome || p.ticker || p.simbolo, ticker: p.ticker || null, isin: p.isin || null, simbolo: p.simbolo, valuta: (PM.px[id] && PM.px[id].currency) || p.currency || "EUR", classe: null }; } }));
+  await pmFx(false);
+  const eurPx = (id, day) => { const j = PM.px[id], s = db.strumenti[id]; if (!j || !j.points) return NaN; const st = P.lgSteps(j.points.concat(j.recent || [])), n = Math.round(Date.parse(day + "T00:00:00Z") / 864e5), r = st.at(n) || (st.n ? st.at(st.first) : null); if (!r) return NaN;
+    const c = s.valuta === "GBX" ? "GBP" : s.valuta, k = s.valuta === "GBX" ? 100 : 1; if (!c || c === "EUR") return r[1] / k; const fs = P.lgSteps(PM.fx[c]), f = fs.at(n) || (fs.n ? fs.at(fs.first) : null); return f ? r[1] / k / f[1] : NaN; };
+  /* 2) operazioni: dai movimenti se ci sono, altrimenti la situazione di oggi */
+  const ops = [], seen = new Map(), have = new Set(db.operazioni.filter(o => o.imp).map(o => o.imp));
+  let est = 0, skipped = 0, dup = 0;
+  const add = (o, base) => { const n = (seen.get(base) || 0) + 1; seen.set(base, n); const imp = `${base}#${n}`; if (have.has(imp)) { dup++; return; } ops.push({ id: newId(), ...o, origine: "file", file: fileName, imp }); };
+  const rows = S.tx && S.tx.rows && S.tx.rows.length ? S.tx.rows : null;
+  if (rows) {
+    const akas = pos.map(p => new Set([p.nome, p.ticker, p.isin, p.simbolo, p.simboloHint, ...(p.alt || [])].filter(Boolean).map(keyOf)));
+    const names = pos.map(p => p.ticker || p.nome);
+    for (const x of rows) {
+      let i = -1; for (const v of [x.ticker, ...(x.alias || [])]) { i = akas.findIndex(s => s.has(keyOf(v))); if (i >= 0) break; }
+      if (i < 0) i = txMatch(x.ticker, names); if (i < 0) { skipped++; continue; }
+      const id = ids[i], data = isoOf(x.d), amt = Math.abs(x.amount), base = `${data}|${id}|${Math.round(x.amount * 100)}`;
+      if (x.amount < 0 && /divid|cedol|coupon|interess/i.test(x.type || "")) { add({ data, tipo: "dividendo", strumento: id, importo: amt, valuta: "EUR" }, base); continue; }
+      let qta = x.qty, stima = false; if (!(qta > 0)) { const pe = eurPx(id, data); if (!(pe > 0)) { skipped++; continue; } qta = amt / pe; stima = true; est++; }
+      add({ data, tipo: x.amount > 0 ? "acquisto" : "vendita", strumento: id, quantita: qta, prezzo: amt / qta, valuta: "EUR", ...(stima ? { stima: true } : {}) }, base);
+    }
+  } else {
+    const today = pmToday();
+    pos.forEach((p, i) => { const id = ids[i]; let qta = +p.quantita; const val = +p.valore;
+      if (!(qta > 0)) { const pe = eurPx(id, today); if (!(val > 0) || !(pe > 0)) { skipped++; return; } qta = val / pe; est++; }
+      const prezzo = val > 0 ? val / qta : eurPx(id, today); if (!(prezzo > 0)) { skipped++; return; }
+      add({ data: today, tipo: "acquisto", strumento: id, quantita: qta, prezzo, valuta: "EUR", posizioneDiOggi: true, ...(p.quantita > 0 ? {} : { stima: true }) }, `${today}|${id}|pos`); });
+  }
+  db.operazioni.push(...ops); if (ops.length && !pmSave()) return { error: "salvataggio non riuscito" };
+  return { nuove: ops.length, doppie: dup, scartate: skipped, stimate: est, movimenti: !!rows, file: fileName };
+}
+function pmOfferRender() {
+  const el = $("#pmOffer"); if (!el) return;
+  if (!fileOk()) { el.hidden = true; return; }
+  if (PM.pending) { PM.pending = false; pmImport(); return; }
+  el.hidden = false;
+  /* si ridisegna solo se cambia: il laboratorio chiama questa funzione più volte, e un ridisegno a metà clic farebbe perdere il clic */
+  const html = `<div><b>Tieni questo portafoglio nel tuo patrimonio</b><span>Lo ritrovi ogni giorno aggiornato, senza ricaricare il file${S.tx && S.tx.rows ? `: ${S.tx.rows.length} movimenti` : ""}.</span></div><button type="button" class="btn lime" id="pmOfferBtn">Metti nel mio patrimonio</button>`;
+  if (el.dataset.h !== html || !el.querySelector("#pmOfferBtn")) { el.innerHTML = html; el.dataset.h = html; }
+}
+async function pmImport() {
+  const el = $("#pmOffer"); if (el) { el.hidden = false; el.innerHTML = `<div><b>Metto il portafoglio nel tuo patrimonio…</b><span>scarico i prezzi di ogni strumento</span></div>`; el.dataset.h = ""; }
+  const r = await pmFromFile();
+  if (r.error) { if (el) el.innerHTML = `<div><b>Non ci sono riuscito</b><span>${esc(r.error)}</span></div>`; return; }
+  trackOnce("feature", "patrimonio_da_file", { name: "patrimonio_da_file" });
+  const parts = [r.nuove ? `${r.nuove} ${r.nuove === 1 ? "operazione aggiunta" : "operazioni aggiunte"} da «${r.file}»` : `Niente di nuovo da «${r.file}»`];
+  if (r.doppie) parts.push(`${r.doppie} già presenti, non ripetute`);
+  if (r.stimate) parts.push(`${r.stimate} con le quote stimate dal prezzo di mercato del giorno`);
+  if (r.scartate) parts.push(`${r.scartate} non abbinate a uno strumento`);
+  if (!r.movimenti && r.nuove) parts.push("dal file conosco solo la situazione di oggi: il guadagno parte da adesso");
+  if (el) { el.hidden = false; el.dataset.h = ""; el.innerHTML = `<div><b>✓ È nel tuo patrimonio</b><span>Se il file cambia, ricaricalo e riprendi solo le operazioni nuove: quelle già presenti non vengono ripetute.</span></div><span class="pm-offer-b"><button type="button" class="btn" data-go="patrimonio">Apri il patrimonio</button><button type="button" class="btn" id="pmOfferBtn">Riprendi dal file</button></span>`; }
+  PM.sel = null; go("patrimonio"); pmMsg(parts.join(" · ") + ".", r.nuove ? "ok" : "", "#pmTopMsg");
   pmRefresh(false);
 }
-function pmClose() { const el = $("#patrimonio"); el.classList.remove("open"); el.setAttribute("aria-hidden", "true"); document.body.classList.remove("bd-on"); pmButton(); }
 
-/* ---------- salvataggio delle operazioni ---------- */
+function pmDownload() {
+  if (!pmHas()) return false;
+  const blob = new Blob([JSON.stringify({ ...PM.db, esportato: new Date().toISOString(), app: "Portfolio OS" }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `patrimonio-portfolio-os-${pmToday()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return true;
+}
+/* ---------- menu in alto a destra: con un patrimonio, una piccola dashboard ---------- */
+function pmMenu() {
+  const lbl = $("#mnuLbl"), dash = $("#mnuDash"); if (!lbl || !dash) return;
+  if (!pmHas()) { lbl.textContent = "Menu"; dash.innerHTML = `<button type="button" class="mnu-cta" data-go="patrimonio"><b>Crea il tuo patrimonio</b><small>aggiungi ciò che possiedi: lo ritrovi qui ogni giorno, aggiornato</small></button>`; $("#mnuCopy").hidden = true; return; }
+  const R = PM.R || pmCalc(), T = R.totale, ses = pmSession(R), { list } = pmSlices(R);
+  lbl.innerHTML = `<b>${fmtEur(T.valore)}</b>${ses ? `<i class="${clsP(ses.pct)}">${sPct(ses.pct)}</i>` : ""}`;
+  let a = 0; const ring = list.map(x => { const sp = x.pct * 2 * Math.PI, a0 = a + (list.length > 1 ? 0.02 : 0), a1 = a + sp - (list.length > 1 ? 0.02 : 0); a += sp;
+    return list.length === 1 ? `<circle cx="36" cy="36" r="27" stroke="${x.col}" stroke-width="10" fill="none"/>` : `<path d="${arc(36, 36, 27, a0, Math.max(a0 + 0.01, a1))}" stroke="${x.col}" stroke-width="10" fill="none"/>`; }).join("");
+  dash.innerHTML = `<button type="button" class="mnu-card" data-go="patrimonio" aria-label="Apri il patrimonio: ${esc(fmtEur(T.valore))}"><svg viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">${ring}</svg>
+    <span class="mnu-v"><small>Il mio patrimonio</small><b>${fmtEur(T.valore)}</b><span>${ses ? `<i class="${clsE(ses.euro)}">${sEur(ses.euro)}</i> ${ses.d === pmToday() ? "oggi" : dayName(ses.d)}` : "valori di fine giornata"}</span><span>guadagno <i class="${clsE(T.guadagno)}">${sEur(T.guadagno)}</i> · TIR <i class="${clsP(T.tir)}">${sPct(T.tir)}</i></span></span></button>`;
+  $("#mnuCopy").hidden = false;
+}
+const mnuOpen = on => { const pop = $("#mnuPop"), b = $("#mnuBtn"); if (!pop) return; if (on) pmMenu(); pop.hidden = !on; b.setAttribute("aria-expanded", String(on)); if (on) { const f = pop.querySelector("button,a"); if (f) f.focus({ preventScroll: true }); } };
+$("#mnuBtn").addEventListener("click", e => { e.stopPropagation(); mnuOpen($("#mnuPop").hidden); });
+document.addEventListener("click", e => {
+  const pop = $("#mnuPop"); if (!pop || pop.hidden) return;
+  if (e.target.closest("#mnuAdd")) { mnuOpen(false); go("patrimonio"); setTimeout(() => { $("#pmAdd").scrollIntoView({ behavior: "smooth", block: "start" }); }, 600); return; }
+  if (e.target.closest("#mnuFile")) { mnuOpen(false); $("#file").click(); return; }
+  if (e.target.closest("#mnuCopy")) { mnuOpen(false); pmDownload(); return; }
+  if (e.target.closest(".mnu-it,.mnu-card,.mnu-cta") || !e.target.closest("#mnu")) mnuOpen(false);
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#mnuPop").hidden) { mnuOpen(false); $("#mnuBtn").focus(); } });
+
+/* il patrimonio nel laboratorio: le posizioni quotate, con i loro pesi di oggi (i beni a mano restano fuori) */
+function pmToLab() {
+  const R = PM.R || pmCalc(), open = R.posizioni.filter(p => p.aperta && !PM.db.strumenti[p.id].manuale && p.valore > 0), tot = open.reduce((a, p) => a + p.valore, 0); if (!(tot > 0)) return false;
+  BD.ports = [open.map(p => { const s = PM.db.strumenti[p.id]; return [s.isin || s.ticker || s.simbolo, Math.round(p.valore / tot * 1000) / 10]; })]; BD.cur = 0;
+  $("#bdCap").value = Math.round(tot); bdGo(); return true;
+}
+
+/* ---------- salvataggio delle operazioni a mano ---------- */
 function pmAdd(op) { const db = pmDb(); db.operazioni.push({ id: newId(), ...op }); return pmSave(); }
 async function pmSubmit(f) {
   const v = Object.fromEntries(new FormData(f).entries()), db = pmDb(), data = v.data;
@@ -201,7 +352,7 @@ async function pmSubmit(f) {
     if (!r || r.error) return pmMsg(r ? `Non riconosco lo strumento: ${r.error}.` : "Scrivi lo strumento.", "err");
     if (!db.strumenti[r.id]) db.strumenti[r.id] = { nome: r.nome, ticker: r.ticker || null, isin: r.isin || null, simbolo: r.simbolo, valuta: r.valuta || "EUR", classe: r.classe || null };
     if (r.px && !PM.px[r.id]) PM.px[r.id] = r.px;
-    const ccy = db.strumenti[r.id].valuta; if (ccy && ccy !== "EUR" && !PM.fx[ccy === "GBX" ? "GBP" : ccy]) await pmPrices(false);
+    await pmFx(false);
     if (!pmAdd({ data, tipo: "acquisto", strumento: r.id, quantita: qta, prezzo, spese })) return;
     pmMsg(`Salvato: ${fmtN(qta, qta % 1 ? 3 : 0)} quote di ${db.strumenti[r.id].nome}.`, "ok");
   } else if (PM.tipo === "vendita") {
@@ -225,27 +376,27 @@ async function pmSubmit(f) {
 }
 
 /* ---------- eventi ---------- */
-$("#pmBtn").addEventListener("click", pmOpen);
-$("#pmClose").addEventListener("click", pmClose);
-document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#patrimonio").classList.contains("open")) pmClose(); });
-$("#patrimonio").addEventListener("click", e => {
+const sc = () => $("#scene-patrimonio");
+sc().addEventListener("click", e => {
+  const g = e.target.closest("[data-pmg]"); if (g) { PM.group = g.dataset.pmg; PM.sel = null; pmRing(PM.R || pmCalc()); return; }
+  const sl = e.target.closest("[data-pmslice]"); if (sl) { const k = sl.dataset.pmslice; PM.sel = PM.sel === k ? null : k; pmRing(PM.R || pmCalc()); const n = document.querySelector(`#pmRing [data-pmslice="${CSS.escape(k)}"]`); if (n && e.detail === 0 && sl.closest("#pmRing")) n.focus(); return; }
+  if (e.target.closest("[data-pmclear]") && PM.sel) { PM.sel = null; pmRing(PM.R || pmCalc()); return; }
   const t = e.target.closest("[data-pmt]"); if (t) { PM.tipo = t.dataset.pmt; PM.beneId = ""; pmRenderForm(); pmMsg(""); return; }
+  if (e.target.closest("[data-pmgo=add]")) { $("#pmAdd").scrollIntoView({ behavior: "smooth", block: "start" }); setTimeout(() => { const i = $("#pmForm input,#pmForm select"); if (i) i.focus({ preventScroll: true }); }, 450); return; }
   const vb = e.target.closest("[data-pmval]"); if (vb) { PM.tipo = "bene"; PM.beneId = vb.dataset.pmval; pmRenderForm(); pmMsg(""); $("#pmAdd").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const d = e.target.closest("[data-pmdel]"); if (d) {
     const o = PM.db.operazioni.find(x => String(x.id) === d.dataset.pmdel); if (!o) return;
     const s = PM.db.strumenti[o.strumento] || {};
     if (!confirm(`Annullare ${(TIPO_L[o.tipo] || o.tipo).toLowerCase()} di ${s.nome || "—"} del ${dIt(o.data)}? Resterà nello storico come annullata.`)) return;
     pmAdd({ data: pmToday(), tipo: "annulla", rif: o.id }); pmRenderForm(); pmRender(); return; }
-  if (e.target.id === "pmLab") {
-    const R = PM.R, open = R.posizioni.filter(p => p.aperta && !PM.db.strumenti[p.id].manuale && p.valore > 0), tot = open.reduce((a, p) => a + p.valore, 0); if (!(tot > 0)) return;
-    BD.ports = [open.map(p => { const s = PM.db.strumenti[p.id]; return [s.isin || s.ticker || s.simbolo, Math.round(p.valore / tot * 1000) / 10]; })]; BD.cur = 0;
-    $("#bdCap").value = Math.round(tot); pmClose(); bdGo(); return; }
-  if (e.target.id === "pmExport") {
-    const blob = new Blob([JSON.stringify({ ...PM.db, esportato: new Date().toISOString(), app: "Portfolio OS" }, null, 1)], { type: "application/json" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `patrimonio-portfolio-os-${pmToday()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+  if (e.target.closest("#pmFile")) { PM.pending = true; pmMsg("Scegli il file: dopo la lettura e la mappa, il portafoglio entra da solo nel tuo patrimonio.", "", "#pmTopMsg"); $("#file").click(); return; }
+  if (e.target.closest("#pmLab")) { pmToLab(); return; }
+  if (e.target.closest("#pmExport")) pmDownload();
 });
-$("#patrimonio").addEventListener("submit", e => { if (!e.target.matches || !e.target.matches("#pmForm")) return; e.preventDefault(); const b = e.target.querySelector("[type=submit]"); if (b) b.disabled = true; pmSubmit(e.target).finally(() => { if (b) b.disabled = false; }); });
-$("#patrimonio").addEventListener("change", async e => {
+sc().addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("#pmRing [data-pmslice]")) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+  if (e.key === "Escape" && PM.sel) { PM.sel = null; pmRing(PM.R || pmCalc()); } });
+sc().addEventListener("submit", e => { if (!e.target.matches || !e.target.matches("#pmForm")) return; e.preventDefault(); const b = e.target.querySelector("[type=submit]"); if (b) b.disabled = true; pmSubmit(e.target).finally(() => { if (b) b.disabled = false; }); });
+sc().addEventListener("change", async e => {
   const el = e.target;
   if (el.id === "pmBene") { PM.beneId = el.value; pmRenderForm(); return; }
   if (el.name === "sid" && PM.tipo === "vendita") { const p = PM.R.posizioni.find(x => x.id === el.value), s = PM.db.strumenti[el.value]; if (p) $("#pmHint").textContent = `Possiedi ${fmtN(p.qta, p.qta % 1 ? 3 : 0)} quote`; if (s) $("#pmCcy").textContent = `(${s.valuta || "€"})`; return; }
@@ -265,9 +416,12 @@ $("#pmImport").addEventListener("change", async e => {
   try { const x = JSON.parse(await f.text());
     if (!x || x.v !== 1 || !x.strumenti || !Array.isArray(x.operazioni)) throw new Error("non è una copia del patrimonio di Portfolio OS");
     if (pmHas() && !confirm(`Sostituire il patrimonio di questo browser con la copia (${x.operazioni.length} operazioni)?`)) return;
-    PM.db = { v: 1, strumenti: x.strumenti, operazioni: x.operazioni, creato: x.creato || new Date().toISOString() }; PM.px = {}; PM.fx = {};
-    if (!pmSave()) return; pmMsg(`Ripristinato: ${x.operazioni.length} operazioni.`, "ok"); pmRenderForm(); pmRefresh(true);
-  } catch (err) { pmMsg(`Non riesco a leggere la copia: ${err.message}.`, "err"); }
+    PM.db = { v: 1, strumenti: x.strumenti, operazioni: x.operazioni, creato: x.creato || new Date().toISOString() }; PM.px = {}; PM.fx = {}; PM.sel = null;
+    if (!pmSave()) return; pmMsg(`Ripristinato: ${x.operazioni.length} operazioni.`, "ok", "#pmTopMsg"); pmRenderForm(); pmRefresh(true);
+  } catch (err) { pmMsg(`Non riesco a leggere la copia: ${err.message}.`, "err", "#pmTopMsg"); }
 });
+document.addEventListener("click", e => { if (e.target.closest("#pmOfferBtn")) pmImport(); });
+/* se il grafico è stato disegnato a un'altra larghezza (rotazione del telefono), si ridisegna */
+let pmRz = 0; window.addEventListener("resize", () => { clearTimeout(pmRz); pmRz = setTimeout(() => { if (current === "patrimonio" && PM.R && pmHas()) $("#pmChart").innerHTML = pmChart(PM.R); }, 250); });
 
-export { PM, pmCalc, pmClose, pmHas, pmOpen, pmRender };
+export { PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu };

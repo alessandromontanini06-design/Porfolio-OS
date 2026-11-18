@@ -6,25 +6,61 @@ import { countAll, svHome } from "./archivio.js";
 import { buildNet, drawChart } from "./laboratorio.js";
 import { renderBench, renderFI, renderOpt, renderRisk, renderSim, renderStress } from "./analisi.js";
 import { quantaScene } from "./quanta.js";
+import { pmEnter, pmHas, pmToLab } from "./patrimonio.js";
 
 /* ---------- Scene e dock ---------- */
-const SCENES=["home","scan","map","lab","risk","sim","fire","stress","opt","bench"],SCENE_L={home:"Home",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",fire:"Indipendenza",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
+const SCENES=["home","scan","map","lab","patrimonio","strumenti","risk","sim","fire","stress","opt","bench"],SCENE_L={home:"Home",patrimonio:"Patrimonio",strumenti:"Strumenti",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",fire:"Indipendenza",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
 let current="home";
 /* colore d'accento di ogni sezione (lo stesso del CSS) */
-const ACC={home:"212,255,58",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",fire:"201,242,74",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165"};
+const ACC={home:"212,255,58",patrimonio:"201,242,74",strumenti:"201,242,74",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",fire:"201,242,74",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165"};
 /* la pillola del dock insegue il pulsante attivo con una molla, anche mentre l'etichetta si allarga */
 const pillS={x:0,w:0,on:false,until:0};
 function movePill(){pillS.until=performance.now()+900;if(pillS.on)return;pillS.on=true;
-  const step=()=>{const b=document.querySelector(`.dock button[data-go="${current}"]`),pill=$("#pillbg");if(!b||!pill){pillS.on=false;return;}
+  const step=()=>{const b=navBtn(current),pill=$("#pillbg");if(!b||!pill){pillS.on=false;return;}
     const tx=b.offsetLeft-6,tw=b.offsetWidth,k=REDUCE||!pillS.w?1:.22;pillS.x+=(tx-pillS.x)*k;pillS.w+=(tw-pillS.w)*k;
     pill.style.width=pillS.w.toFixed(1)+"px";pill.style.transform=`translateX(${pillS.x.toFixed(1)}px)`;
     if(performance.now()<pillS.until||Math.abs(tx-pillS.x)>.5||Math.abs(tw-pillS.w)>.5)requestAnimationFrame(step);else pillS.on=false;};
   requestAnimationFrame(step);
-  const d=$("#dock"),b=document.querySelector(`.dock button[data-go="${current}"]`);
+  const d=$("#dock"),b=navBtn(current);
   if(d&&b&&d.scrollWidth>d.clientWidth)setTimeout(()=>d.scrollTo({left:b.offsetLeft-d.clientWidth/2+b.offsetWidth/2,behavior:REDUCE?"auto":"smooth"}),420);
 }
 const avail=n=>{const b=document.querySelector(`.dock [data-go="${n}"]`);return !!b&&!b.disabled&&!b.classList.contains("off");};
 const neighbor=(name,dir)=>{for(let i=SCENES.indexOf(name)+dir;i>=0&&i<SCENES.length;i+=dir)if(avail(SCENES[i]))return SCENES[i];return null;};
+/* il menu ha 4 voci: Home, Laboratorio (analisi del file → mappa → risultati), Patrimonio, Strumenti (le 6 analisi) */
+const GROUP={home:"home",patrimonio:"patrimonio",scan:"lab",map:"lab",lab:"lab",strumenti:"strumenti",risk:"strumenti",sim:"strumenti",fire:"strumenti",stress:"strumenti",opt:"strumenti",bench:"strumenti"};
+const navBtn=n=>document.querySelector(`.dock [data-nav="${GROUP[n]}"]`)||document.querySelector(`.dock button[data-go="${n}"]:not(.dk-old)`);
+/* «Laboratorio» porta al passo a cui sei arrivato: i risultati se ci sono, altrimenti l'analisi del file */
+const labTarget=()=>["lab","map","scan"].includes(current)?current:avail("lab")?"lab":"scan";
+const LOCK=`<svg class="ico-lock" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+const LAB_STEPS=[["scan","Analisi del file"],["map","Mappa"],["lab","Risultati"]];
+const TOOLS=[["risk","Rischio","Quanto puoi perdere in un anno cattivo: VaR, drawdown, chi pesa di più sul rischio."],
+  ["sim","Simulazioni","Migliaia di futuri possibili con Monte Carlo: quanto avrai, con che probabilità."],
+  ["fire","Indipendenza","Quando puoi smettere di lavorare e quanto puoi prelevare ogni mese."],
+  ["stress","Stress test","Come sarebbe andata nel 2008, nel 2020, nel 2022, e con uno shock a scelta."],
+  ["opt","Frontiera","I pesi più efficienti secondo Markowitz, con i limiti che decidi tu."],
+  ["bench","Benchmark","Hai battuto il mercato? Confronto con MSCI World, S&P 500 e altri indici."]];
+/* barra in cima alle sezioni di un gruppo: i passi del laboratorio, oppure gli altri strumenti */
+function renderSubnav(name){
+  const sc=$("#scene-"+name),inner=sc&&sc.querySelector(":scope>.inner");if(!inner)return;
+  let nav=inner.querySelector(":scope>.subnav");const g=GROUP[name];
+  if(g!=="lab"&&!(g==="strumenti"&&name!=="strumenti")){if(nav)nav.remove();return;}
+  if(!nav){nav=document.createElement("nav");nav.className="subnav";inner.prepend(nav);}
+  if(g==="lab"){nav.setAttribute("aria-label","Passi del laboratorio");
+    nav.innerHTML=`<ol class="sn-steps">${LAB_STEPS.map(([k,l],i)=>{const on=k===name,ok=avail(k);return `<li><button type="button" class="sn-step${on?" on":""}${ok?"":" off"}" ${ok?`data-go="${k}"`:"disabled"} aria-current="${on?"step":"false"}"><i>${i+1}</i>${l}${ok?"":LOCK}</button></li>`;}).join("")}</ol>
+      <button type="button" class="sn-link" data-go="patrimonio">Il mio patrimonio →</button>`;}
+  else{nav.setAttribute("aria-label","Strumenti");
+    nav.innerHTML=`<button type="button" class="sn-link back" data-go="strumenti">← Strumenti</button><div class="sn-tools">${TOOLS.map(([k,l])=>`<button type="button" class="sn-tool${k===name?" on":""}" data-go="${k}"${avail(k)?"":" disabled"} aria-current="${k===name?"page":"false"}">${l}</button>`).join("")}</div>`;}
+}
+function renderTools(){
+  const ready=avail("risk"),grid=$("#toolsGrid"),lock=$("#toolsLock");if(!grid)return;
+  const src=S.source&&S.source.name;
+  $("#toolsSrc").textContent=ready?`Analizzano il portafoglio del laboratorio${src?`: «${src}»`:""}.`:"Le analisi lavorano sul portafoglio che hai nel laboratorio.";
+  lock.hidden=ready;
+  if(!ready)lock.innerHTML=`<div><b>Prima serve un portafoglio nel laboratorio</b><span>Caricane uno da un file, oppure usa il tuo patrimonio: in un minuto gli strumenti si sbloccano.</span></div>
+    <span class="tl-b">${pmHas()?`<button type="button" class="btn lime" id="toolsPm">Usa il mio patrimonio</button>`:""}<button type="button" class="btn${pmHas()?"":" lime"}" data-nav="lab">Vai al laboratorio</button></span>`;
+  grid.innerHTML=TOOLS.map(([k,l,d],i)=>`<button type="button" class="tool-card${ready?"":" off"}" ${ready?`data-go="${k}"`:"disabled"} style="--t:${ACC[k]}"><span class="tc-n">${String(i+1).padStart(2,"0")}</span><b>${l}</b><small>${d}</small><em>${ready?"Apri →":LOCK+" Disponibile con un portafoglio nel laboratorio"}</em></button>`).join("");
+}
+document.addEventListener("click",e=>{if(e.target.closest("#toolsPm"))pmToLab();});
 /* gli elementi che entrano in scena uno dopo l'altro: tutto ciò che è visibile, anche dentro i riquadri dei risultati */
 function enterItems(sc){
   const out=[];sc.querySelectorAll(":scope>.inner>*").forEach(el=>{
@@ -42,11 +78,12 @@ function go(name,opts={}){
   trackOnce("scene",name,{name}); // funzione dichiarata più in basso: sicura anche prima che le statistiche siano pronte
   const from=current,prev=$("#scene-"+current),nxt=$("#scene-"+name);current=name;
   document.querySelectorAll(".dock button[data-go]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.go===name)));
+  document.querySelectorAll(".dock button[data-nav]").forEach(b=>b.setAttribute("aria-current",String(b.dataset.nav===GROUP[name])));
   $("#sceneChip").textContent=SCENE_L[name];movePill();Morph.shape(name);
   document.body.dataset.scene=name;if(Morph.tint)Morph.tint(name);
   if(go.tl){go.tl.progress(1).kill();go.tl=null;}
   const change=prev&&prev!==nxt;
-  const show=()=>{if(change){prev.hidden=true;if(HAS_G)G.set(prev,{clearProps:"all"});}nxt.hidden=false;nxt.scrollTop=0;onEnter(name);renderPager(name);};
+  const show=()=>{if(change){prev.hidden=true;if(HAS_G)G.set(prev,{clearProps:"all"});}nxt.hidden=false;nxt.scrollTop=0;renderSubnav(name);onEnter(name);renderPager(name);};
   if(!HAS_G||REDUCE||!change||CALM){show();if(HAS_G&&!REDUCE){const it=enterItems(nxt);G.fromTo(it,{y:CALM?18:60,opacity:0},{y:0,opacity:1,duration:CALM?.6:.9,ease:CALM?"power3.out":"expo.out",stagger:CALM?.04:.05,clearProps:"transform,opacity"});}return;}
   if(Morph.burst)Morph.burst(.9);
   const dir=SCENES.indexOf(name)>=SCENES.indexOf(from)?1:-1,p=xfer.querySelector(".xf-p"),inn=xfer.querySelectorAll(".xf-in>*");
@@ -73,7 +110,7 @@ function renderPager(name){
   const pv=neighbor(name,-1),nx=neighbor(name,1),lockNext=!nx&&SCENES.indexOf(name)<SCENES.length-1?SCENES[SCENES.indexOf(name)+1]:null;
   const card=(n,cls,arrow)=>n?`<button type="button" class="pg ${cls}" data-go="${n}" style="--t:${ACC[n]}"><span>${cls==="nx"?"":arrow+" "}${String(SCENES.indexOf(n)+1).padStart(2,"0")}${cls==="nx"?" "+arrow:""}</span><b>${SCENE_L[n]}</b></button>`:`<span class="pg ${cls} none"></span>`;
   nav.innerHTML=card(pv,"pv","←")+`<div class="pg-dots" aria-hidden="true">${SCENES.map(s=>`<i class="${s===name?"on":avail(s)?"":"off"}" style="--t:${ACC[s]}"></i>`).join("")}</div>`
-    +(nx?card(nx,"nx","→"):lockNext?`<span class="pg nx locked"><span>${String(SCENES.indexOf(lockNext)+1).padStart(2,"0")} 🔒</span><b>${SCENE_L[lockNext]}</b><small>si sblocca costruendo il laboratorio</small></span>`:`<span class="pg nx none"></span>`);
+    +(nx?card(nx,"nx","→"):lockNext?`<span class="pg nx locked"><span>${String(SCENES.indexOf(lockNext)+1).padStart(2,"0")} ${LOCK}</span><b>${SCENE_L[lockNext]}</b><small>si sblocca costruendo il laboratorio</small></span>`:`<span class="pg nx none"></span>`);
 }
 function onEnter(name){
   quantaScene(name);
@@ -81,13 +118,15 @@ function onEnter(name){
   if(name==="risk")renderRisk();
   if(name==="sim")renderSim();
   if(name==="home")svHome();
+  if(name==="patrimonio")pmEnter();
+  if(name==="strumenti")renderTools();
   if(name==="fire")renderFI();
   if(name==="stress")renderStress();
   if(name==="opt")renderOpt();
   if(name==="bench")renderBench();
   if(name==="lab"&&S.lab&&!S.labFx.done){S.labFx.done=true;setTimeout(()=>{if(!S.lab)return;countAll();drawChart(true);if(S.corrView==="net")buildNet();},HAS_G?380:0);}
 }
-document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!b||b.disabled||b.classList.contains("off"))return;go(b.dataset.go);});
+document.addEventListener("click",e=>{const n=e.target.closest("[data-nav]");if(n){go(n.dataset.nav==="lab"?labTarget():"strumenti");return;}const b=e.target.closest("[data-go]");if(!b||b.disabled||b.classList.contains("off"))return;go(b.dataset.go);});
 window.addEventListener("resize",movePill);
 document.addEventListener("keydown",e=>{
   if(e.target.closest&&e.target.closest("input,select,textarea")||$("#drawer").classList.contains("open"))return;
@@ -366,4 +405,4 @@ function renderTicker(){
 }
 function reveal(){}
 
-export { ACC, MORPH_FS, MORPH_VS, Morph, SCENES, SCENE_L, avail, current, enterItems, go, heroIntro, heroMagnet, magnetOn, morphData, morphInit, morphPlace, morphShape, movePill, neighbor, onEnter, pillS, renderPager, renderTicker, reveal, splitChars, xfer };
+export { GROUP, labTarget, renderSubnav, renderTools, ACC, MORPH_FS, MORPH_VS, Morph, SCENES, SCENE_L, avail, current, enterItems, go, heroIntro, heroMagnet, magnetOn, morphData, morphInit, morphPlace, morphShape, movePill, neighbor, onEnter, pillS, renderPager, renderTicker, reveal, splitChars, xfer };
