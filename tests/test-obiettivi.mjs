@@ -32,6 +32,14 @@ const Am = POS.monteCarlo({ ...base, years: 5, ret: hist, n: 2000 }), med5 = Am.
 const Rr = POS.monteCarlo({ ...base, ret: hist, n: 2000, obiettivi: [{ nome: "Casa", importo: med5, anno: 5 }] });
 t("con rendimenti che oscillano, un obiettivo pari alla mediana a 5 anni riesce in circa metà dei futuri", Rr.obiettivi[0].prob > 0.4 && Rr.obiettivi[0].prob < 0.6, Rr.obiettivi[0].prob);
 
+/* quanto versare: 200.000 € tra 10 anni partendo da 100.000 € al 0,5% al mese → servono (200.000 − 181.940) × 0,005 / 0,8194 = 110,2 € al mese, cioè 120 arrotondando a 10 € per eccesso */
+const Vo = { ...base, years: 20, n: 300, obiettivi: [{ id: 0, nome: "Casa", importo: 200000, anno: 10 }] };
+t("quanto versare: 110,20 € al mese servono, arrotondati a 120 €", POS.mcVersamentoPer(Vo, 0, 0.8) === 120, POS.mcVersamentoPer(Vo, 0, 0.8));
+t("se l'obiettivo riesce già, non serve versare di più", POS.mcVersamentoPer({ ...Vo, obiettivi: [{ id: 0, importo: 50000, anno: 10 }] }, 0, 0.8) === 0);
+const Vh = { ...base, ret: hist, years: 15, n: 1000, initial: 20000, monthly: 200, obiettivi: [{ id: 0, importo: 100000, anno: 15 }] }, vh = POS.mcVersamentoPer(Vh, 0, 0.8);
+const Rv = POS.monteCarlo({ ...Vh, monthly: 200 + vh });
+t("con quel versamento in più l'obiettivo riesce almeno 8 volte su 10", vh > 0 && Rv.obiettivi[0].prob >= 0.79, `${vh} € → ${Rv.obiettivi[0].prob}`);
+
 /* ---------- sito ---------- */
 const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env: { ...process.env, PORT: String(PORT) }, stdio: "ignore" });
 await wait(1500);
@@ -69,6 +77,8 @@ t("gli obiettivi restano nel browser", saved.length === 2 && saved[1].nome === "
 /* obiettivo enorme: probabilità rossa */
 await p.evaluate(() => { const r = document.querySelectorAll("#mcGoals .mcg-row")[1], i = r.querySelector(".mcg-a input"); i.value = "5000000"; i.dispatchEvent(new Event("input", { bubbles: true })); }); await wait(1200);
 t("5 milioni tra 12 anni: probabilità bassa, in rosso, con quanto manca", await p.evaluate(() => { const r = document.querySelectorAll("#mcGoals .mcg-row")[1]; return !!r.querySelector(".mcg-p b.bad") && /mancano circa/.test(r.innerText); }));
+await p.waitForFunction(() => /in più al mese/.test(document.querySelectorAll("#mcGoals .mcg-row")[1].innerText), { timeout: 20000 }).catch(() => {});
+t("…e quanto versare in più al mese per arrivarci 8 volte su 10", await p.evaluate(() => /per arrivarci 8 volte su 10: circa [\d.]+ € in più al mese/.test(document.querySelectorAll("#mcGoals .mcg-row")[1].innerText)), await p.evaluate(() => document.querySelectorAll("#mcGoals .mcg-row")[1].innerText));
 await p.evaluate(() => document.getElementById("mcGoals").scrollIntoView({ block: "center" })); await wait(400);
 await p.screenshot({ path: `${OUT}/obiettivi-pc.jpg`, type: "jpeg", quality: 72 });
 await p.evaluate(() => document.querySelectorAll("[data-mcgdel]")[1].click()); await wait(800);

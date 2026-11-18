@@ -227,10 +227,20 @@ function obOut(g,out,R){
   if(R&&Math.round(+g.anno)>R.years)return `<small class="mcg-hint">oltre i ${R.years} anni simulati: allunga gli anni qui sopra</small>`;
   if(!out)return `<small class="mcg-hint">…</small>`;
   const c=out.prob>=.8?"good":out.prob>=.5?"warn":"bad";
-  return `<b class="${c}">${fmtPct(out.prob,0)}</b><span class="mcg-bar"><i class="${c}" style="width:${Math.round(out.prob*100)}%"></i></span><small>${out.prob>=.995?"raggiunto in quasi tutti i futuri":out.mancaMediano>0?`quando non basta, mancano circa ${fmtEur(out.mancaMediano)} di oggi`:""}</small>`;}
+  const nk=obNeedKey(out.id),nv=OB_NEED.get(nk);
+  return `<b class="${c}">${fmtPct(out.prob,0)}</b><span class="mcg-bar"><i class="${c}" style="width:${Math.round(out.prob*100)}%"></i></span><small>${out.prob>=.995?"raggiunto in quasi tutti i futuri":out.mancaMediano>0?`quando non basta, mancano circa ${fmtEur(out.mancaMediano)} di oggi`:""}</small>${out.prob<.8?`<small class="mcg-need" data-need="${out.id}">${obNeedTxt(nv)}</small>`:""}`;}
+/* «quanto versare»: calcolato dopo il disegno, un obiettivo alla volta, e ricordato finché non cambiano i dati */
+const OB_NEED=new Map();let obNeedT=null;
+const obNeedKey=id=>{const o=S.mcOpts;if(!o)return "";return JSON.stringify([o.initial,o.monthly,o.years,o.infl,o.costs,o.method,o.n,o.ret.length,o.ret[0],o.ret[o.ret.length-1],o.obiettivi,id]);};
+const obNeedTxt=v=>v==null?"calcolo quanto versare…":Number.isNaN(v)?"":v<=0?"":`per arrivarci 8 volte su 10: circa ${fmtEur(v)} in più al mese`;
+function obNeeds(){clearTimeout(obNeedT);obNeedT=setTimeout(async()=>{
+  for(const el of [...document.querySelectorAll("#mcGoals [data-need]")]){const id=+el.dataset.need,k=obNeedKey(id);
+    if(!OB_NEED.has(k)){await new Promise(r=>setTimeout(r,0));if(!S.mcOpts)return;OB_NEED.set(k,P.mcVersamentoPer({...S.mcOpts,goal:0},id,.8));}
+    const cur=document.querySelector(`#mcGoals [data-need="${id}"]`);if(cur&&obNeedKey(id)===k)cur.textContent=obNeedTxt(OB_NEED.get(k));}},450);}
 function renderGoals(R,full){
   const el=$("#mcGoals");if(!el)return;const L=S.mcOb||[];
   const rows=el.querySelectorAll(".mcg-row");
+  obNeeds();
   if(!full&&rows.length===L.length&&L.length){rows.forEach((r,i)=>{const g=L[i],out=R&&R.obiettivi?R.obiettivi.find(x=>x.id===i):null;r.querySelector(".mcg-p").innerHTML=obOut(g,out,R);});
     const t=el.querySelector(".mcg-all");if(t)t.innerHTML=obAll(R);return;}
   const infl=S.mcIn?S.mcIn.infl:2;
@@ -255,7 +265,8 @@ function runSim(){
   let ret=pa.ret;if(I.rate!=null&&fin.length){const k=Math.pow(1+I.rate/100,1/f)/gH;ret=pa.ret.map(x=>Number.isFinite(x)?(1+x)*k-1:x);}
   $("#mcRateSrc").textContent=I.rate!=null?`storico: ${fmtPct(histAnn,1,true)} l'anno · uso il tuo ${fmtPct(I.rate/100,1,true)}`:`uso lo storico: ${fmtPct(histAnn,1,true)} l'anno (${fin.length} ${ds.freq.adj==="mensili"?"mesi":"periodi"})`;
   if(!S.mcOb)S.mcOb=obLoad();
-  const R=P.monteCarlo({ret,f,years:I.years,initial:I.init,monthly:I.monthly,goal:I.goal,infl:I.infl/100,costs:I.costs/100,method:I.method,n,block:f,seed:20260101,obiettivi:S.mcOb.map((g,i)=>({...g,nome:g.nome||`Obiettivo ${i+1}`,id:i})).filter(obValid)});
+  const opts={ret,f,years:I.years,initial:I.init,monthly:I.monthly,goal:I.goal,infl:I.infl/100,costs:I.costs/100,method:I.method,n,block:f,seed:20260101,obiettivi:S.mcOb.map((g,i)=>({...g,nome:g.nome||`Obiettivo ${i+1}`,id:i})).filter(obValid)};
+  S.mcOpts=opts;const R=P.monteCarlo(opts);
   R.wLabel=label;R.w=w;R.nAsked=I.n;R.histAnn=histAnn;R.rate=I.rate;R.nHist=fin.length;R.histFrom=pa.ret.findIndex(Number.isFinite);
   S.mc=R;return R;
 }

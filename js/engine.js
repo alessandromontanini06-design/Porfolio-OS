@@ -1163,6 +1163,19 @@ function portfolioReturns(assets,w){
 }
 function makeRng(seed){let s=seed|0;return ()=>{s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 const MC_PCT=[.05,.10,.25,.50,.75,.90,.95];
+/* quanto versare in più al mese perché un obiettivo riesca con la probabilità voluta (di solito 8 volte su 10).
+   Stessi sorteggi a ogni prova (stesso seme): con più versamenti nessun percorso peggiora, quindi la probabilità cresce e basta una bisezione.
+   Si simula solo fino all'anno dell'obiettivo (con gli obiettivi che vengono prima). Risultato in € al mese, arrotondato a 10 € per eccesso. */
+function mcVersamentoPer(o,id,target){
+  target=target||.8;const g=(o.obiettivi||[]).find(x=>x.id===id);if(!g)return NaN;const anno=Math.round(+g.anno);
+  const base={...o,years:Math.max(1,anno),obiettivi:(o.obiettivi||[]).filter(x=>Math.round(+x.anno)<=anno),n:Math.min(+o.n||1000,1000)};
+  const pr=m=>{const R=monteCarlo({...base,monthly:m});const x=R.obiettivi&&R.obiettivi.find(y=>y.id===id);return x?x.prob:0;};
+  const m0=+o.monthly||0;if(pr(m0)>=target)return 0;
+  let lo=m0,hi=m0+Math.max(50,(+g.importo||0)/(12*Math.max(1,anno))),k=0;
+  while(pr(hi)<target&&k<24){lo=hi;hi=m0+(hi-m0)*2;k++;}if(k>=24)return NaN;
+  for(let i=0;i<18;i++){const mid=(lo+hi)/2;if(pr(mid)>=target)hi=mid;else lo=mid;}
+  return Math.ceil((hi-m0)/10)*10;
+}
 function monteCarlo(o){
   const hist=(o.ret||[]).filter(Number.isFinite),m=hist.length,f=o.f||12;
   if(m<12)return {error:"Servono almeno 12 rendimenti storici per simulare."};
@@ -1882,6 +1895,6 @@ const btpSimbolo=b=>`BTP:${+(+b.cedola*100).toFixed(4)}:${String(b.scadenza).sli
 function btpDaSimbolo(s){const m=String(s||"").toUpperCase().match(/^BTP:(\d+(?:\.\d+)?):(\d{4}-\d{2}-\d{2})$/);return m?{cedola:+m[1]/100,scadenza:m[2],freq:2}:null;}
 const btpNome=b=>{const d=btpD(b.scadenza),c=+(+b.cedola*100).toFixed(3);return `BTP ${String(c).replace(".",",")}% ${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;};
 
-export const POS={btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
+export const POS={mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

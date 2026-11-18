@@ -1086,7 +1086,7 @@ body[data-ruolo="priv"] #presentBtn,body[data-ruolo="priv"] [data-rpw="client"],
 .mcg-p b.good{color:var(--good)}.mcg-p b.warn{color:var(--warn)}.mcg-p b.bad{color:var(--bad)}
 .mcg-bar{height:8px;border-radius:99px;background:var(--raise);overflow:hidden}.mcg-bar i{display:block;height:100%;border-radius:99px;background:var(--fg)}
 .mcg-bar i.good{background:var(--good)}.mcg-bar i.warn{background:var(--warn)}.mcg-bar i.bad{background:var(--bad)}
-.mcg-p small{grid-column:1/-1;font-size:.76rem;color:var(--muted)}.mcg-hint{color:var(--faint)!important}
+.mcg-p small{grid-column:1/-1;font-size:.76rem;color:var(--muted)}.mcg-p small.mcg-need{color:var(--fg);font-weight:600}.mcg-p small.mcg-need:empty{display:none}.mcg-hint{color:var(--faint)!important}
 .mcg-x{all:unset;cursor:pointer;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:var(--muted);font-size:1.1rem}.mcg-x:hover{background:var(--raise);color:var(--fg)}.mcg-x:focus-visible{outline:2px solid var(--fg)}
 .mcg-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}.mcg-all{margin-left:auto;font-size:.92rem}.mcg-all b{font-family:var(--f-display);font-weight:800;font-size:1.15rem}
 .mcg-empty{color:var(--muted);max-width:62ch;margin:0}
