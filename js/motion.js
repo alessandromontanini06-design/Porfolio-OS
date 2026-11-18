@@ -24,9 +24,12 @@
   };
   if(ST&&home){
     const sc={scroller:home,start:"top 85%"};
+    /* entrate allo scorrimento solo sul computer: sul telefono a volte restavano a metà e i testi sparivano */
+    if(matchMedia("(min-width:981px)").matches){
     G.from(".aud-card",{y:28,opacity:0,duration:.8,ease:"power3.out",stagger:.12,scrollTrigger:{...sc,trigger:".audience"}});
     /* home nuova: le sezioni entrano quando arrivano in vista */
     [".hm-start-wrap",".hm-day",".hm-index",".hm-end"].forEach(sel=>{const el=document.querySelector(sel);if(el)G.from(el.children,{y:24,opacity:0,duration:.8,ease:"power3.out",stagger:.08,clearProps:"transform,opacity",scrollTrigger:{...sc,trigger:el}});});
+    }
   }
   /* il pulsante principale si avvicina appena al cursore */
   const pb=document.querySelector(".opt.primary");

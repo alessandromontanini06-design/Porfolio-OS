@@ -1023,6 +1023,53 @@ body[data-ruolo="priv"] #presentBtn,body[data-ruolo="priv"] [data-rpw="client"],
 .bd-clist .bd-rh{grid-column:1/-1}
 .bd-cat.searching .bd-cgs{display:none}
 .bd-more{grid-column:1/-1;justify-self:start}
+/* ---------- Costruttore: catalogo a schede e filtri, come in un broker ---------- */
+.bd-tabs2{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 10px}
+.bd-tab{all:unset;cursor:pointer;padding:9px 15px;border-radius:999px;border:1px solid var(--line);font-size:.92rem;font-weight:600;color:var(--fg);background:var(--bg);transition:background .2s,color .2s,border-color .2s}
+.bd-tab:hover{border-color:var(--fg)}.bd-tab.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}.bd-tab:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.bd-filt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px}.bd-filt:empty{display:none}
+.bd-sel{position:relative;display:inline-flex;align-items:center}
+.bd-sel span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.bd-sel select{appearance:none;-webkit-appearance:none;font:inherit;font-size:.9rem;font-weight:600;padding:9px 34px 9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--raise) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23161616' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") right 12px center/12px no-repeat;color:var(--fg);cursor:pointer;max-width:260px}
+.bd-sel.on select{background-color:#C9F24A;border-color:#C9F24A}
+.bd-count{margin:10px 0 8px;font-weight:700;font-size:.95rem}
+.bdpage .bd-clist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;max-height:460px;overflow:auto;overscroll-behavior:contain;padding:2px 4px 2px 0}
+.bd-cat.searching .bdpage .bd-clist,.bd-cat.searching .bd-clist{max-height:300px}
+.bd-it{display:flex;align-items:center;gap:12px;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:9px 4px;cursor:pointer;font:inherit;color:var(--fg);width:100%;border-radius:0}
+.bd-it:hover{background:var(--raise)}.bd-it:focus-visible{outline:2px solid var(--fg);outline-offset:-2px}
+.bd-it i{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-size:.72rem;font-weight:800;letter-spacing:.02em}
+.bd-it span{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.bd-it b{font-size:.93rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bd-it small{font-size:.76rem;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-it em{font-style:normal;font-size:1.15rem;color:var(--muted);width:20px;text-align:center}.bd-it.in{cursor:default}.bd-it.in em{color:var(--good)}
+.bd-moreit{grid-column:1/-1;justify-self:center;margin:8px 0}
+@media (max-width:700px){.bdpage .bd-clist{grid-template-columns:1fr;max-height:420px}}
+
+/* ---------- Patrimonio: grafico come nelle app dei broker ---------- */
+.pm-ch2-h{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.pm-ch2-v{display:flex;flex-direction:column;gap:2px}.pm-ch2-v span{font-size:.82rem;color:var(--muted)}
+.pm-ch2-v b{font-family:var(--f-display);font-weight:800;font-size:1.9rem;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.pm-ch2-v small{font-size:.92rem;font-weight:700;font-variant-numeric:tabular-nums}
+.pm-ch2-p{display:flex;gap:2px;background:var(--raise);border-radius:12px;padding:4px}
+.pm-ch2-p button{all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;font-size:.86rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.pm-ch2-p button[aria-pressed="true"]{background:var(--bg);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.pm-ch2-p button:focus-visible{outline:2px solid var(--fg)}
+.pm-ch2-svg{position:relative;cursor:crosshair;touch-action:pan-y;border-radius:12px}.pm-ch2-svg:focus{outline:none}.pm-ch2-svg:focus-visible{outline:1.5px solid var(--line-2);outline-offset:4px}
+.pm-ch2-svg svg{display:block;width:100%;height:auto}
+.pm-ch2-f{display:flex;justify-content:space-between;gap:12px;margin:6px 0 0;font-size:.76rem;color:var(--faint)}.pm-ch2-f span:nth-child(2){text-align:center;flex:1}
+@media (max-width:620px){.pm-ch2-f span:nth-child(2){display:none}.pm-ch2-v b{font-size:1.6rem}}
+
+/* home sul telefono: il racconto senza telefono fermo (copriva i titoli); la scheda del BTP dentro il terzo passo */
+.hm-btp-m{display:none}
+@media (max-width:980px){
+  .hm-story .hm-stick{display:none}
+  .hm-story .hm-step{min-height:0;padding:30px 0;justify-content:flex-start;border-top:1px solid var(--line);max-width:none}
+  .hm-story .hm-step:first-child{border-top:0}
+  .hm-btp-m{display:flex;flex-direction:column;gap:8px;margin-top:20px;border:1px solid var(--line);border-radius:20px;padding:18px;background:var(--bg);box-shadow:0 24px 50px -30px rgba(20,24,10,.3)}
+  .hm-btp-m dl{display:grid;grid-template-columns:1fr auto;margin:4px 0 0;font-size:.9rem}.hm-btp-m dt,.hm-btp-m dd{margin:0;padding:8px 0;border-bottom:1px solid var(--line)}.hm-btp-m dd{font-weight:700;text-align:right}.hm-btp-m dt{color:var(--muted)}
+}
+/* le pagine non sfumano più i testi in fondo allo schermo: sul telefono sembrava che sparissero */
+.scene{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 40px,#000 calc(100% - 28px),transparent 100%)!important;mask-image:linear-gradient(to bottom,transparent 0,#000 40px,#000 calc(100% - 28px),transparent 100%)!important}
+@media (max-width:980px){.scene{-webkit-mask-image:linear-gradient(to bottom,transparent 0,transparent 96px,#000 112px,#000 100%)!important;mask-image:linear-gradient(to bottom,transparent 0,transparent 96px,#000 112px,#000 100%)!important}}
 
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}

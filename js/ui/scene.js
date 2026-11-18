@@ -177,7 +177,7 @@ function heroMagnet(){
 function heroIntro(){
   if(!HAS_G){return;}
   G.from("#heroTitle .ch",{yPercent:120,rotate:9,duration:1.3,ease:"expo.out",stagger:.024,onComplete:heroMagnet});
-  G.fromTo("#scene-home .bento>*:not(.hero-tile)",{y:80,opacity:0,rotateX:-12,transformPerspective:900},{y:0,opacity:1,rotateX:0,duration:1.1,ease:"expo.out",stagger:.07,delay:.25,clearProps:"transform,opacity"});
+  G.fromTo("#scene-home .bento>*:not(.hero-tile):nth-child(-n+2)",{y:80,opacity:0,rotateX:-12,transformPerspective:900},{y:0,opacity:1,rotateX:0,duration:1.1,ease:"expo.out",stagger:.07,delay:.25,clearProps:"transform,opacity"});
   G.from(".dock",{y:120,duration:1,ease:"expo.out",delay:.5});
   G.from(".topbar",{y:-60,opacity:0,duration:.9,ease:"expo.out",delay:.4});
 }

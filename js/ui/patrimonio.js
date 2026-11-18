@@ -324,21 +324,85 @@ function pmKpis(R) {
     <div class="pm-k"><span>Rendimento (TIR)</span><b class="${clsP(T.tir)}">${sPct(T.tir)}</b><small>${T.anni >= 1 ? "all'anno" : "su meno di un anno: indicativo"} · dal ${dIt(R.dal)}</small></div>
     <div class="pm-k"><span>Dividendi e cedole</span><b>${fmtEur(T.proventi)}</b><small>spese e tasse: ${fmtEur(T.spese)}</small></div>`;
 }
+/* ---------- grafico del patrimonio, come nelle app dei broker ----------
+   una linea sola (il valore, che sale anche quando versi), periodo a scelta, puntini al valore d'inizio periodo,
+   in alto la variazione del periodo: euro guadagnati SENZA i versamenti e rendimento (ponderato nel tempo).
+   Col dito o col mouse sulla linea: data, valore e variazione fino a quel giorno. */
+const PM_PER = [["1S", 7, "nell'ultima settimana"], ["1M", 31, "nell'ultimo mese"], ["6M", 183, "negli ultimi 6 mesi"], ["1A", 366, "nell'ultimo anno"], ["Max", 0, "dall'inizio"]];
+function pmPeriod(R, key) {
+  const s = R.serie, per = PM_PER.find(x => x[0] === key) || PM_PER[4], last = s[s.length - 1];
+  let i0 = 0;
+  if (per[1]) { const from = new Date(Date.parse(last.d) - per[1] * 864e5).toISOString().slice(0, 10); i0 = Math.max(0, s.findIndex(x => x.d >= from) - 1); }
+  /* «Max»: dal primo giorno in cui c'era qualcosa (prima il valore è zero) */
+  if (!per[1]) i0 = Math.max(0, s.findIndex(x => x.valore > 0));
+  return { per, i0, pts: s.slice(i0) };
+}
+function pmPerChange(pts, k) {
+  const a = pts[0], b = pts[k], flows = pts.slice(1, k + 1).reduce((t, x) => t + (x.flusso || 0), 0);
+  return { euro: b.valore - a.valore - flows, pct: (1 + b.twr) / (1 + a.twr) - 1 };
+}
 function pmChart(R) {
   const s = R.serie; if (s.length < 3) return "";
-  const step = Math.max(1, Math.ceil(s.length / 360)), pts = s.filter((_, i) => i % step === 0 || i === s.length - 1);
-  /* disegnato alla larghezza vera del riquadro: le scritte restano di 11 px anche sul telefono */
-  const box = $("#pmChart"), W = Math.round(Math.min(1200, Math.max(300, ((box && box.clientWidth) || 900) - 34))), H = W < 520 ? 180 : 220, L = 64, Rr = 12, T0 = 10, B = 26;
-  const hi = Math.max(...pts.map(p => Math.max(p.valore, p.versato)), 1), lo0 = Math.min(...pts.map(p => Math.min(p.valore, p.versato)));
-  /* l'asse parte da zero solo se i valori ci arrivano vicino: altrimenti le oscillazioni non si vedrebbero */
-  const lo = lo0 > hi * 0.5 ? lo0 * 0.97 : 0, max = hi * 1.03, span = max - lo || 1;
-  const x = i => L + i / (pts.length - 1) * (W - L - Rr), y = v => T0 + (1 - (Math.max(lo, v) - lo) / span) * (H - T0 - B);
-  const line = k => pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p[k]).toFixed(1)}`).join("");
-  const ticks = [lo, lo + (hi - lo) / 2, hi].map(v => `<line x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtEur(v)}</text>`).join("");
-  const xl = [0, Math.floor((pts.length - 1) / 2), pts.length - 1].map((i, k) => `<text x="${x(i)}" y="${H - 6}" text-anchor="${k === 0 ? "start" : k === 2 ? "end" : "middle"}" font-size="11" fill="var(--muted)">${dIt(pts[i].d)}</text>`).join("");
-  return `<div class="pm-ch-h"><b>Come è cambiato</b><p class="pm-leg"><span><i style="background:var(--fg)"></i>Valore</span><span><i class="dash"></i>Soldi versati (netti)</span></p></div>
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Valore del patrimonio e soldi versati dal ${dIt(R.dal)} a oggi">${ticks}<path d="${line("versato")}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4"/><path d="${line("valore")}" fill="none" stroke="var(--fg)" stroke-width="2"/>${xl}</svg>`;
+  const key = PM.chP || "Max", { per, pts: all } = pmPeriod(R, key);
+  if (all.length < 2) return "";
+  /* i prezzi storici sono di fine mese: tra un prezzo e l'altro la linea va dritta (niente gradini);
+     nei giorni dei versamenti resta il salto, con il giorno prima e il giorno stesso */
+  let keep = [0];
+  for (let i = 1; i < all.length; i++) {
+    if (Math.abs(all[i].flusso || 0) > 0.5) { if (keep[keep.length - 1] !== i - 1) keep.push(i - 1); keep.push(i); }
+    else if (Math.abs(all[i].valore - all[i - 1].valore) > 1e-6 || i === all.length - 1) keep.push(i);
+  }
+  if (keep.length < 2) keep = all.map((_, i) => i);
+  const step = Math.max(1, Math.ceil(keep.length / 400)), idx = keep.filter((i, k) => k % step === 0 || k === keep.length - 1 || Math.abs(all[i].flusso || 0) > 0.5 || (keep[k + 1] != null && Math.abs(all[keep[k + 1]].flusso || 0) > 0.5));
+  const box = $("#pmChart"), W = Math.round(Math.min(1200, Math.max(300, ((box && box.clientWidth) || 900) - 34))), H = W < 520 ? 190 : 250, P = 10;
+  const vals = idx.map(i => all[i].valore), hi = Math.max(...vals), lo = Math.min(...vals, all[0].valore), pad = (hi - lo) * 0.08 || hi * 0.02 || 1;
+  const x = k => P + k / (idx.length - 1) * (W - 2 * P), y = v => P + (1 - (v - (lo - pad)) / ((hi + pad) - (lo - pad))) * (H - 2 * P);
+  const d = idx.map((i, k) => `${k ? "L" : "M"}${x(k).toFixed(1)} ${y(all[i].valore).toFixed(1)}`).join("");
+  const ch = pmPerChange(all, all.length - 1), up = ch.euro >= 0, col = up ? "var(--good)" : "var(--bad)";
+  PM.ch = { all, idx, W, H, x, y, per };
+  return `<div class="pm-ch2-h"><div class="pm-ch2-v"><span id="pmChWhen">${per[2][0].toUpperCase() + per[2].slice(1)}</span><b id="pmChVal">${fmtEur(all[all.length - 1].valore)}</b>
+      <small id="pmChDelta" class="${up ? "up" : "dn"}">${up ? "▲" : "▼"} ${sEur(ch.euro)} · ${sPct(ch.pct)}</small></div>
+      <div class="pm-ch2-p" role="group" aria-label="Periodo del grafico">${PM_PER.map(([k]) => `<button type="button" data-pmper="${k}" aria-pressed="${k === key}">${k}</button>`).join("")}</div></div>
+    <div class="pm-ch2-svg"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Valore del patrimonio ${per[2]}: da ${fmtEur(all[0].valore)} a ${fmtEur(all[all.length - 1].valore)}" preserveAspectRatio="none">
+      <defs><linearGradient id="pmChG" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${up ? "#0B7A3E" : "#C2263F"}" stop-opacity=".14"/><stop offset="1" stop-color="${up ? "#0B7A3E" : "#C2263F"}" stop-opacity="0"/></linearGradient></defs>
+      <line x1="${P}" x2="${W - P}" y1="${y(all[0].valore).toFixed(1)}" y2="${y(all[0].valore).toFixed(1)}" stroke="var(--faint)" stroke-width="1.6" stroke-dasharray="1 6" stroke-linecap="round"/>
+      <path d="${d} L${x(idx.length - 1).toFixed(1)} ${H} L${x(0).toFixed(1)} ${H} Z" fill="url(#pmChG)"/>
+      <path d="${d}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <line id="pmChCur" x1="0" x2="0" y1="${P}" y2="${H - P}" stroke="var(--fg)" stroke-width="1" opacity="0"/><circle id="pmChDot" r="5" cx="0" cy="0" fill="${col}" stroke="var(--bg)" stroke-width="2" opacity="0"/>
+    </svg></div>
+    <p class="pm-ch2-f"><span>${dIt(all[0].d)}</span><span>Rendimento ${per[2]} senza contare i soldi versati; la linea sale anche quando investi.</span><span>${dIt(all[all.length - 1].d)}</span></p>`;
 }
+/* scorrimento sulla linea (mouse, dito, frecce della tastiera) */
+function pmChartScrub(ev) {
+  const C = PM.ch, svg = ev.currentTarget.querySelector("svg"); if (!C || !svg) return;
+  const r = svg.getBoundingClientRect(), cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left, k = Math.max(0, Math.min(C.idx.length - 1, Math.round((cx / r.width * C.W - 10) / (C.W - 20) * (C.idx.length - 1))));
+  pmChartAt(k);
+}
+function pmChartAt(k) {
+  const C = PM.ch; if (!C) return; C.k = k;
+  const i = C.idx[k], p = C.all[i], ch = pmPerChange(C.all, i), up = ch.euro >= 0;
+  const cur = $("#pmChCur"), dot = $("#pmChDot");
+  if (cur) { cur.setAttribute("x1", C.x(k)); cur.setAttribute("x2", C.x(k)); cur.setAttribute("opacity", ".35"); }
+  if (dot) { dot.setAttribute("cx", C.x(k)); dot.setAttribute("cy", C.y(p.valore)); dot.setAttribute("opacity", "1"); }
+  $("#pmChWhen").textContent = dIt(p.d); $("#pmChVal").textContent = fmtEur(p.valore);
+  const dl = $("#pmChDelta"); dl.className = up ? "up" : "dn"; dl.textContent = `${up ? "▲" : "▼"} ${sEur(ch.euro)} · ${sPct(ch.pct)}`;
+}
+function pmChartReset() {
+  const C = PM.ch; if (!C) return; C.k = null;
+  ["#pmChCur", "#pmChDot"].forEach(s => { const e = $(s); if (e) e.setAttribute("opacity", "0"); });
+  const ch = pmPerChange(C.all, C.all.length - 1), up = ch.euro >= 0;
+  $("#pmChWhen").textContent = C.per[2][0].toUpperCase() + C.per[2].slice(1); $("#pmChVal").textContent = fmtEur(C.all[C.all.length - 1].valore);
+  const dl = $("#pmChDelta"); dl.className = up ? "up" : "dn"; dl.textContent = `${up ? "▲" : "▼"} ${sEur(ch.euro)} · ${sPct(ch.pct)}`;
+}
+function pmChartBind() {
+  const box = $("#pmChart"), area = box && box.querySelector(".pm-ch2-svg"); if (!area || area.dataset.on) return; area.dataset.on = "1";
+  area.tabIndex = 0; area.setAttribute("aria-label", "Scorri il grafico con le frecce per vedere i valori giorno per giorno");
+  area.addEventListener("pointermove", pmChartScrub); area.addEventListener("pointerdown", pmChartScrub);
+  area.addEventListener("touchmove", e => { pmChartScrub(e); e.preventDefault(); }, { passive: false });
+  area.addEventListener("pointerleave", pmChartReset); area.addEventListener("blur", pmChartReset);
+  area.addEventListener("keydown", e => { const C = PM.ch; if (!C) return; if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); /* le frecce qui scorrono il grafico, non cambiano pagina */ const k = C.k == null ? C.idx.length - 1 : C.k + (e.key === "ArrowRight" ? 1 : -1); pmChartAt(Math.max(0, Math.min(C.idx.length - 1, k))); } if (e.key === "Escape") pmChartReset(); });
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-pmper]"); if (!b || !PM.R) return; PM.chP = b.dataset.pmper; try { localStorage.setItem("pos-pm-periodo", PM.chP); } catch {} $("#pmChart").innerHTML = pmChart(PM.R); pmChartBind(); });
 function pmPosTable(R) {
   const db = PM.db, rows = R.posizioni;
   if (!rows.length) return `<p class="pm-empty">Ancora niente. Aggiungi qui sotto il primo acquisto (per esempio <b>VWCE</b>, 20 quote a 100 €) oppure <b>importa il file</b> della tua banca o del tuo broker.</p>`;
@@ -433,7 +497,7 @@ function pmFiscStrumenti() {
   for (const [id, s] of Object.entries(PM.db.strumenti)) {
     let f = s.fiscale || null;
     if (!f) { const pop = POPULAR.find(p => (s.isin && p[2] === s.isin) || (s.ticker && p[0] === String(s.ticker).toUpperCase()));
-      if (pop) f = /^ETF/.test(pop[4]) || (pop[4] === "Oro e materie prime" && !/\b(ETC|ETN|ETP)\b|physical|xetra-gold/i.test(pop[1])) ? "fondo" : pop[4] === "Cripto" ? "diversi" : null; }
+      if (pop) f = pop[7] === "ETF" ? "fondo" : pop[7] === "ETC" || pop[7] === "ETN" || pop[7] === "Azione" ? "diversi" : pop[7] === "Moneta" ? "cripto" : null; }
     out[id] = f ? { ...s, fiscale: f } : s;
   }
   return out;
@@ -490,7 +554,8 @@ function pmRender() {
   $("#pmAsOf").textContent = PM.loading ? "Aggiorno i prezzi di oggi…" : has ? `Aggiornato al ${dIt(pmToday())} · salvato solo in questo browser` : "Il tuo patrimonio, sempre qui: aggiungi ciò che possiedi o importa un file. Senza account.";
   pmRing(R);
   $("#pmKpis").innerHTML = has ? pmKpis(R) : `<div class="pm-empty"><b>Inizia da qui.</b> Aggiungi quello che possiedi: ETF, azioni, fondi, ma anche casa, polizze e altri beni. Oppure importa l'Excel o l'export del broker. Ogni volta che torni trovi il valore aggiornato, quanto hai guadagnato e com'è andata l'ultima seduta.</div>`;
-  $("#pmChart").innerHTML = has ? pmChart(R) : ""; $("#pmChart").hidden = !has || R.serie.length < 3;
+  if (PM.chP == null) { try { PM.chP = localStorage.getItem("pos-pm-periodo") || "Max"; } catch { PM.chP = "Max"; } }
+  $("#pmChart").innerHTML = has ? pmChart(R) : ""; $("#pmChart").hidden = !has || R.serie.length < 3; pmChartBind();
   $("#pmPos").innerHTML = pmPosTable(R); $("#pmOps").innerHTML = pmOpsTable();
   pacRenderDue(); pacRenderList();
   pmTax(R);
