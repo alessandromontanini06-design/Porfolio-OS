@@ -848,6 +848,15 @@ body.rp-on{overflow:hidden}
 .sh-lim li{font-size:.86rem;line-height:1.45}
 .sh-src{display:block;font-size:.72rem;color:var(--good);margin-top:3px}
 
+/* ---------- Privato o consulente ---------- */
+.ruolo-ask{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--raise);margin-bottom:10px;font-weight:600;font-size:.95rem}
+.ruolo-ask[hidden]{display:none}.ruolo-b{display:flex;gap:6px;flex-wrap:wrap}
+.ruolo-sw{display:flex;align-items:center;gap:4px;padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.ruolo-sw small{flex:1;font-size:.78rem;color:var(--muted)}
+.ruolo-sw button{all:unset;cursor:pointer;font-size:.8rem;padding:5px 9px;border-radius:8px;border:1px solid var(--line)}
+.ruolo-sw button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+body[data-ruolo="priv"] #presentBtn,body[data-ruolo="priv"] [data-rpw="client"],body[data-ruolo="priv"] .aud-card.pro{display:none!important}
+
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
 .scene-title h2 em{color:var(--lime-text)}

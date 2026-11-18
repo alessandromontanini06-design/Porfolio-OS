@@ -13,3 +13,4 @@ tests/files/web/**/_risultati.json
 tests/shots-v2/
 tests/files/shots/
 .claude/
+tests/files/download*/

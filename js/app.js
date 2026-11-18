@@ -9,6 +9,7 @@ import { TOOLS_LOCAL, quantaScene } from "./ui/quanta.js";
 import { loadMarket, renderLabs } from "./ui/home.js";
 import { pmHas, pmRender } from "./ui/patrimonio.js";
 import "./ui/screenshot.js";
+import "./ui/ruolo.js";
 
 /* ---------- Avvio ---------- */
 load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);/* subito qualcosa da mostrare, poi il portafoglio di esempio vero */

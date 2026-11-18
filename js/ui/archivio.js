@@ -162,6 +162,33 @@ function arDetail(r){
     <div class="ar-hist"><b>Storia delle revisioni</b>${H.length?`<div class="tablewrap"><table class="mt"><thead><tr><th>Revisione</th><th>Valore</th><th>Rendimento</th><th>Rischio</th></tr></thead><tbody>${H.map((h,i)=>{const prev=H[i+1];return `<tr><td>${new Date(h.at).toLocaleDateString("it-IT",{day:"numeric",month:"short",year:"numeric"})}<small>dati fino a ${esc(h.last||"—")}</small></td><td>${num(h.value,fmtEur)} ${ch(h,prev,"value",fmtEur)}</td><td>${h.xirr!=null&&Number.isFinite(h.xirr)?fmtPct(h.xirr,1,true)+" TIR":num(h.cagr,x=>fmtPct(x,1,true))}</td><td>${num(h.vol,x=>fmtPct(x,1))}</td></tr>`;}).join("")}</tbody></table></div><p class="caption">Ogni volta che riapri il portafoglio si aggiunge una riga con i numeri di quel giorno.</p>`:`<p class="caption">Nessuna revisione registrata.</p>`}</div>
   </div>`;
 }
+/* esporta in Excel: un file da leggere (e da passare al commercialista o al gestionale), non una copia tecnica.
+   Fogli: Clienti (una riga per portafoglio), Pesi, Revisioni, Leggimi. Per rimettere l'archivio in un altro browser c'è la copia di sicurezza (JSON). */
+async function arExcel(){
+  if(!window.XLSX){alert("Il lettore Excel non si è caricato: ricarica la pagina e riprova.");return;}
+  const L=(await svList()).sort((a,b)=>String(a.name).localeCompare(String(b.name),"it"));if(!L.length)return;
+  const r2=v=>v==null||!isFinite(v)?null:Math.round(v*100)/100,pc=v=>v==null||!isFinite(v)?null:Math.round(v*10000)/10000,day=t=>t?new Date(t):null,now=Date.now();
+  const cli=[["Cliente / portafoglio","File","Valore (€)","Investito (€)","Guadagno (€)","Rendimento annuo (TIR)","Crescita annua storica","Volatilità annua","Perdita massima","Strumenti","Periodo dei dati","Creato il","Ultima revisione","Giorni dall'ultima revisione","Revisioni","Note"]];
+  const pesi=[["Cliente / portafoglio","Strumento","Peso"]],rev=[["Cliente / portafoglio","Data","Valore (€)","Rendimento annuo (TIR)","Volatilità annua","Perdita massima"]];
+  for(const r of L){const s=r.snap||{},gain=s.value!=null&&s.invested!=null?s.value-s.invested:null;
+    cli.push([r.name,r.file||"",r2(s.value),r2(s.invested),r2(gain),pc(s.xirr),pc(s.cagr),pc(s.vol),pc(s.mdd),(r.assets||[]).length,r.period||"",day(r.createdAt),day(r.reviewedAt),r.reviewedAt?Math.floor((now-r.reviewedAt)/864e5):null,(r.history||[]).length,r.note||""]);
+    (s.weights||[]).forEach(([n,w])=>pesi.push([r.name,n,pc(w)]));
+    (r.history||[]).forEach(h=>rev.push([r.name,day(h.at),r2(h.value),pc(h.xirr),pc(h.vol),pc(h.mdd)]));}
+  const leggi=[["Archivio di Portfolio OS"],[`Esportato il ${new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"})} · ${L.length} ${L.length>1?"portafogli":"portafoglio"}`],[],
+    ["Clienti","una riga per portafoglio salvato, con i numeri dell'ultima revisione"],["Pesi","la composizione di ogni portafoglio all'ultima revisione"],["Revisioni","lo storico: una riga per ogni revisione salvata"],[],
+    ["Rendimento annuo (TIR)","calcolato dai movimenti (date e importi dei versamenti); vuoto se il file non ha i movimenti"],["Crescita annua storica","crescita media annua dei prezzi con i pesi attuali"],["Volatilità e perdita massima","dai prezzi storici con i pesi attuali"],[],
+    ["Per rimettere l'archivio in un altro browser usa «Copia di sicurezza» nell'archivio: questo Excel serve da leggere, non da reimportare."],["Strumento di analisi: non è un consiglio di investimento."]];
+  const wb=XLSX.utils.book_new(),sheet=(aoa,cols,fmt)=>{const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true});ws["!cols"]=cols.map(w=>({wch:w}));
+    const rg=XLSX.utils.decode_range(ws["!ref"]);for(let R=1;R<=rg.e.r;R++)for(const [c,z] of Object.entries(fmt)){const cell=ws[XLSX.utils.encode_cell({r:R,c:+c})];if(cell&&cell.t!=="s")cell.z=z;}
+    ws["!autofilter"]={ref:XLSX.utils.encode_range({r:0,c:0},{r:0,c:rg.e.c})};return ws;};
+  const E="#,##0.00 €",P2="0.0%",D="dd/mm/yyyy";
+  XLSX.utils.book_append_sheet(wb,sheet(cli,[28,26,14,14,14,12,12,12,12,10,22,12,14,12,10,40],{2:E,3:E,4:E,5:P2,6:P2,7:P2,8:P2,11:D,12:D}),"Clienti");
+  XLSX.utils.book_append_sheet(wb,sheet(pesi,[28,30,10],{2:P2}),"Pesi");
+  XLSX.utils.book_append_sheet(wb,sheet(rev,[28,12,14,12,12,12],{1:D,2:E,3:P2,4:P2,5:P2}),"Revisioni");
+  const wl=XLSX.utils.aoa_to_sheet(leggi);wl["!cols"]=[{wch:30},{wch:90}];XLSX.utils.book_append_sheet(wb,wl,"Leggimi");
+  XLSX.writeFile(wb,`portfolio-os-archivio-${new Date().toISOString().slice(0,10)}.xlsx`);
+  trackOnce("feature","archivio_excel",{name:"archivio_excel"});
+}
 /* esporta e importa: un file JSON con tutto l'archivio (le date dei fogli tornano date all'importazione) */
 async function arExport(){
   const L=await svList();if(!L.length){alert("L'archivio è vuoto.");return;}
@@ -187,10 +214,10 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("change",e=>{if(e.target.id==="arSort"){AR.sort=e.target.value;renderArchive();}if(e.target.id==="arImport"&&e.target.files[0]){arImport(e.target.files[0]);e.target.value="";}});
 document.addEventListener("click",async e=>{
-  const b=e.target.closest("[data-sv],[data-svo],[data-svd],[data-ar],[data-arx],[data-arf],#archBtn,#closeArchive,#arExport,#arNew,#arNew2");if(!b)return;
+  const b=e.target.closest("[data-sv],[data-svo],[data-svd],[data-ar],[data-arx],[data-arf],#archBtn,#closeArchive,#arExport,#arBackup,#arNew,#arNew2");if(!b)return;
   if(b.id==="archBtn"){openArchive();return;}
   if(b.id==="closeArchive"){closeArchive();return;}
-  if(b.id==="arExport"){arExport();return;}
+  if(b.id==="arExport"){arExcel();return;}if(b.id==="arBackup"){arExport();return;}
   if(b.id==="arNew"||b.id==="arNew2"){closeArchive();go("home",{force:true});setTimeout(()=>$("#file").click(),300);return;}
   if(b.dataset.arf){AR.f=b.dataset.arf;renderArchive();return;}
   if(b.dataset.arx){AR.open=AR.open===b.dataset.arx?null:b.dataset.arx;renderArchive();return;}
@@ -227,4 +254,4 @@ function countAll(){
   });
 }
 
-export { AR, SV, arAgo, arDetail, arDue, arExport, arImport, arNoteT, chgCalc, closeArchive, countAll, openArchive, renderArchive, renderChange, showLab, svBadge, svCanSave, svDB, svFileName, svFix, svGet, svHome, svList, svNewId, svOfferRender, svOpen, svPatch, svPref, svPut, svRank, svSave, svSnap, svTx };
+export { AR, SV, arAgo, arDetail, arDue, arExcel, arExport, arImport, arNoteT, chgCalc, closeArchive, countAll, openArchive, renderArchive, renderChange, showLab, svBadge, svCanSave, svDB, svFileName, svFix, svGet, svHome, svList, svNewId, svOfferRender, svOpen, svPatch, svPref, svPut, svRank, svSave, svSnap, svTx };
