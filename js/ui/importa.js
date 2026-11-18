@@ -393,8 +393,8 @@ function bdCatRender(have){
   if(!q){rl.innerHTML="";}
   else{const inCat=new Set(bdAll().map(x=>String(x.code).toUpperCase())),R=BDREM.res.filter(r=>!inCat.has(String(r.simbolo).toUpperCase())&&!inCat.has(String(r.simbolo).toUpperCase().split(".")[0]));
     rl.innerHTML=`<p class="bd-rh">Da tutte le borse${BDREM.busy?" · cerco…":""}</p>`+(R.length?`<div class="bd-rgrid">${R.map((r,i)=>{const on=have.has(String(r.simbolo).toUpperCase());return `<button type="button" class="bd-ri${on?" in":""}" data-bdr="${i}"${on?' aria-disabled="true"':""}><span><b>${esc(r.nome)}</b><small>${esc(r.tipo)} · ${esc(r.borsa)} · ${esc(String(r.simbolo).replace(/\.US$/,""))}</small></span><em aria-hidden="true">${on?"✓":"+"}</em></button>`;}).join("")}</div>`
-      :BDREM.busy?"":isinQ?`<button type="button" class="bd-ri" data-bdisin="${esc(BDCAT.q.trim().toUpperCase())}"><span><b>Aggiungi l'ISIN ${esc(BDCAT.q.trim().toUpperCase())}</b><small>lo verifico su OpenFIGI e cerco la quotazione</small></span><em aria-hidden="true">+</em></button>`
-      :`<p class="caption">${esc(BDREM.err||"Nessun titolo trovato con questo nome. Prova con il ticker o l'ISIN.")}</p>`);
+      :BDREM.busy?"":isinQ&&!all.length?`<button type="button" class="bd-ri" data-bdisin="${esc(BDCAT.q.trim().toUpperCase())}"><span><b>Aggiungi l'ISIN ${esc(BDCAT.q.trim().toUpperCase())}</b><small>lo verifico su OpenFIGI e cerco la quotazione</small></span><em aria-hidden="true">+</em></button>`
+      :isinQ&&all.length?"":`<p class="caption">${esc(BDREM.err||"Nessun titolo trovato con questo nome. Prova con il ticker o l'ISIN.")}</p>`);
     BDREM.view=R;}
 }
 function bdAddSym(code,meta){
