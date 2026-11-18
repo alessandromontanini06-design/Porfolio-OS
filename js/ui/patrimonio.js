@@ -360,6 +360,22 @@ function pmDownload() {
   const blob = new Blob([JSON.stringify({ ...PM.db, esportato: new Date().toISOString(), app: "Portfolio OS" }, null, 1)], { type: "application/json" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `patrimonio-portfolio-os-${pmToday()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return true;
 }
+/* ricominciare da zero: prima una copia di sicurezza scaricata, poi si cancella (si può rimettere con «Ripristina da una copia») */
+function pmReset() {
+  if (!pmHas()) { pmMsg("Il patrimonio è già vuoto.", "", "#pmTopMsg"); return; }
+  const n = PM.db.operazioni.filter(o => o.tipo !== "annulla").length;
+  if (!confirm(`Cancellare tutto il patrimonio salvato in questo browser (${n} operazioni)?
+
+Prima scarico una copia di sicurezza: se cambi idea la rimetti con «Ripristina da una copia».`)) return;
+  pmDownload();
+  try { localStorage.removeItem(PM_KEY); } catch {}
+  PM.db = null; PM.R = null; PM.px = {}; PM.fx = {}; PM.sel = null; PM.beniFile = []; PM.tipo = "acquisto"; PM.beneId = "";
+  const bn = $("#pmBeni"); if (bn) bn.hidden = true;
+  pmDb(); pmRenderForm(); pmRender();
+  $("#scene-patrimonio").scrollTo({ top: 0, behavior: "smooth" });
+  pmMsg("Patrimonio cancellato. La copia di sicurezza è nei tuoi download.", "ok", "#pmTopMsg");
+}
+
 /* ---------- menu in alto a destra: con un patrimonio, una piccola dashboard ---------- */
 function pmMenu() {
   const lbl = $("#mnuLbl"), dash = $("#mnuDash"); if (!lbl || !dash) return;
@@ -443,6 +459,7 @@ sc().addEventListener("click", e => {
   if (e.target.closest("#pmFile")) { PM.pending = true; pmMsg("Scegli il file: dopo la lettura e la mappa, il portafoglio entra da solo nel tuo patrimonio.", "", "#pmTopMsg"); $("#file").click(); return; }
   if (e.target.closest("#pmLab")) { pmToLab(); return; }
   if (e.target.closest("#pmExport")) pmDownload();
+  if (e.target.closest("#pmReset")) pmReset();
 });
 sc().addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("#pmRing [data-pmslice]")) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
   if (e.key === "Escape" && PM.sel) { PM.sel = null; pmRing(PM.R || pmCalc()); } });
@@ -476,4 +493,4 @@ document.addEventListener("click", e => { if (e.target.closest("#pmBeniOk")) pmB
 /* se il grafico è stato disegnato a un'altra larghezza (rotazione del telefono), si ridisegna */
 let pmRz = 0; window.addEventListener("resize", () => { clearTimeout(pmRz); pmRz = setTimeout(() => { if (current === "patrimonio" && PM.R && pmHas()) $("#pmChart").innerHTML = pmChart(PM.R); }, 250); });
 
-export { PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu, pmFindBeni, beneTipo };
+export { PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu, pmFindBeni, beneTipo, pmReset };

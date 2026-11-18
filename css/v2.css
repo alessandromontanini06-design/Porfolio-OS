@@ -787,6 +787,8 @@ body.rp-on{overflow:hidden}
 .pm-beni b{font-variant-numeric:tabular-nums;text-align:right;min-width:80px}
 .pmb-b{display:flex;gap:8px;flex-wrap:wrap}
 @media (max-width:520px){.pm-beni label{grid-template-columns:20px minmax(0,1fr) auto}.pm-beni select{grid-column:2/4}}
+.pm-io .pm-danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.pm-io .pm-danger:hover{background:color-mix(in srgb,var(--bad) 8%,transparent);border-color:var(--bad)}
 
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}

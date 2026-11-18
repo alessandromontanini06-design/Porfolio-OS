@@ -101,9 +101,17 @@ try {
     return m.pmFindBeni([{ name: "Dashboard", aoa: [[null, "Componente", null, null, "Valore (€)", "% del totale"], [null, "Portafoglio ETF", null, null, 6293.75, 0.68], [null, "Liquidità operativa", null, null, "-", "-"], [null, "Fondo emergenza", null, null, 1419.4, 0.153], [null, "Oro fisico", null, null, 1540, 0.166], [null, "TOTALE", null, null, 9253.15, 1]] },
       { name: "Liquidità & Oro", aoa: [["Saldo liquidità (€)", 1419.4], ["di cui fondo emergenza", 1419.4], ["Grammi", 17.85], ["Oro puro contenuto (g)", 13.39], ["Contanti (€)", "-"], ["Conto deposito Banca X", 5000]] }]).map(b => [b.label, Math.round(b.valore), b.tipo]); });
   t("nel file trova fondo emergenza, oro e conto deposito", JSON.stringify(beni) === JSON.stringify([["Fondo emergenza", 1419, "liquidita"], ["Oro fisico", 1540, "oro"], ["Conto deposito Banca X", 5000, "liquidita"]]), JSON.stringify(beni));
+  console.log("Ricomincia da zero");
+  await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await wait(1500);
+  const cdp = await p.target().createCDPSession(); await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: import.meta.dirname + "/files/download" });
+  await p.$eval("#pmReset", b => b.scrollIntoView({ block: "center" })); await wait(300); await p.click("#pmReset"); await wait(1200);
+  t("«Ricomincia da zero» cancella il patrimonio (dopo la conferma)", await p.evaluate(() => localStorage.getItem("pos-patrimonio-v1") === null) && /aggiungi il primo investimento/.test(await center()));
+  t("…e prima scarica una copia di sicurezza", /copia di sicurezza è nei tuoi download/.test(await p.$eval("#pmTopMsg", e => e.textContent)));
+  t("dopo il reset il menu in alto torna «Menu»", (await p.$eval("#mnuLbl", e => e.innerText)).trim() === "Menu");
   console.log("Telefono");
   await p.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
-  await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await wait(2000);
+  await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await wait(1500);
+  await p.evaluate(() => document.getElementById("navPm").click()); await wait(1200);
   t("telefono: nessuno scorrimento orizzontale", await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 0);
   const rw = await p.$eval("#pmRing", e => e.getBoundingClientRect().width);
   t("telefono: anello ben visibile", rw >= 280 && rw <= 375, rw);
