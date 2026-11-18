@@ -1,5 +1,5 @@
 /* Portfolio OS · motore di calcolo deterministico (nessuna dipendenza dalla pagina).
-   Usato dal browser (js/app.js) e dai test (tools/test-engine.mjs). */
+   Usato dal browser (js/ui/*.js) e dai test (tests/test-engine.mjs). */
 /* ===== MOTORE DETERMINISTICO (nessuna dipendenza dal DOM) ===== */
 "use strict";
 const MONTHS={gen:0,jan:0,feb:1,mar:2,apr:3,mag:4,may:4,giu:5,jun:5,lug:6,jul:6,ago:7,aug:7,set:8,sep:8,ott:9,oct:9,nov:10,dic:11,dec:11};
