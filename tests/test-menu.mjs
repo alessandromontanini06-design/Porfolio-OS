@@ -58,6 +58,12 @@ try {
   await p.click("#navTools"); await wait(900);
   t("telefono: menu e strumenti senza scorrimento orizzontale", await p.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1) && await p.$eval("#dock", d => d.scrollWidth <= d.clientWidth + 1));
   if (SHOTS) await p.screenshot({ path: `${SHOTS}/menu-telefono.jpg`, type: "jpeg", quality: 70 });
+  /* il menu a tendina aperto non dev'essere coperto dalla barra delle sezioni (su tablet sta sotto l'intestazione) */
+  for (const [w, h, n] of [[1194, 834, "tablet"], [1366, 900, "computer"]]) {
+    const q = await b.newPage(); await q.setViewport({ width: w, height: h }); await q.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await q.click("#mnuBtn"); await wait(400);
+    const vis = await q.evaluate(() => { const pop = document.getElementById("mnuPop"), r = pop.getBoundingClientRect(); return [[r.left + 30, r.top + 12], [r.left + r.width / 2, r.top + 30]].every(([x, y]) => { const e = document.elementFromPoint(x, y); return !!(e && pop.contains(e)); }); });
+    t(`${n}: il menu a tendina aperto si vede intero`, vis); await q.close();
+  }
   t("nessun errore JavaScript", !errs.length, errs.join(" | "));
 } catch (e) { t("eccezione", false, e.message); }
 await b.close(); srv.kill();

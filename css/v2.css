@@ -813,6 +813,8 @@ body.rp-on{overflow:hidden}
 .mnu-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-left:2px}
 @media (max-width:760px){.pac-row{grid-template-columns:1fr 1fr}.pac-t{grid-column:1/-1}.pac-b{grid-column:1/-1}}
 .pm-form .wide-c{grid-column:1/-1;margin:0}#pmPac[hidden]{display:none}
+/* tablet e telefono: la barra delle sezioni sta sotto l'intestazione e coprirebbe il menu a tendina aperto */
+@media (max-width:1340px){body.mnu-on .topbar{z-index:60}}
 
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}

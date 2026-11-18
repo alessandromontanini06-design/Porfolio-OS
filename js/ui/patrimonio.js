@@ -465,7 +465,7 @@ function pmMenu() {
   const nd = pacDue().length; if (nd) dash.insertAdjacentHTML("beforeend", `<button type="button" class="mnu-pac" data-go="patrimonio">${nd === 1 ? "È il giorno del tuo PAC: registralo" : `${nd} PAC da registrare`} →</button>`);
   if (nd) lbl.insertAdjacentHTML("beforeend", `<i class="mnu-dot" aria-label="PAC da registrare"></i>`);
 }
-const mnuOpen = on => { const pop = $("#mnuPop"), b = $("#mnuBtn"); if (!pop) return; if (on) pmMenu(); pop.hidden = !on; b.setAttribute("aria-expanded", String(on)); if (on) { const f = pop.querySelector("button,a"); if (f) f.focus({ preventScroll: true }); } };
+const mnuOpen = on => { const pop = $("#mnuPop"), b = $("#mnuBtn"); if (!pop) return; if (on) pmMenu(); pop.hidden = !on; b.setAttribute("aria-expanded", String(on)); document.body.classList.toggle("mnu-on", !!on); if (on) { const f = pop.querySelector("button,a"); if (f) f.focus({ preventScroll: true }); } };
 $("#mnuBtn").addEventListener("click", e => { e.stopPropagation(); mnuOpen($("#mnuPop").hidden); });
 document.addEventListener("click", e => {
   const pop = $("#mnuPop"); if (!pop || pop.hidden) return;
