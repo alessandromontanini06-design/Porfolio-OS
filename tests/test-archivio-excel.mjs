@@ -15,6 +15,7 @@ const rec = (id, name, ago, value, invested, xirr, w, nRev) => ({ id, name, file
 const backup = { formato: "portfolio-os-archivio", versione: 1, esportato: new Date().toISOString(), portafogli: [
   rec("p1", "Cliente Finto Uno", 240, 156194.12, 120000, .134, [["SWDA", .7], ["EIMI", .3]], 3),
   rec("p2", "Cliente Finto Due", 20, 48320.5, 45000, .051, [["VWCE", .6], ["AGGH", .4]], 2)] };
+backup.portafogli[0].ob = [{ nome: "Casa", importo: 50000, anno: 5 }, { nome: "Studi", importo: 30000, anno: 12 }];
 const BK = DL + "/copia-finta.json"; writeFileSync(BK, JSON.stringify(backup));
 const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env: { ...process.env, PORT: String(PORT) }, stdio: "ignore" });
 await wait(1500);
@@ -40,8 +41,9 @@ t("scarica un file .xlsx", !!file, readdirSync(DL).join(","));
 if (file) {
   const b64 = readFileSync(DL + "/" + file).toString("base64");
   const x = await p.evaluate(b64 => { const wb = XLSX.read(b64, { type: "base64", cellDates: true, cellNF: true }), j = n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true });
-    return { fogli: wb.SheetNames, cli: j("Clienti"), pesi: j("Pesi"), rev: j("Revisioni"), fmt: wb.Sheets.Clienti.C2 && wb.Sheets.Clienti.C2.z }; }, b64);
-  t("fogli Clienti, Pesi, Revisioni, Leggimi", x.fogli.join() === "Clienti,Pesi,Revisioni,Leggimi", x.fogli.join());
+    return { fogli: wb.SheetNames, cli: j("Clienti"), pesi: j("Pesi"), rev: j("Revisioni"), obi: wb.Sheets.Obiettivi ? j("Obiettivi") : [], fmt: wb.Sheets.Clienti.C2 && wb.Sheets.Clienti.C2.z }; }, b64);
+  t("fogli Clienti, Pesi, Revisioni, Obiettivi, Leggimi", x.fogli.join() === "Clienti,Pesi,Revisioni,Obiettivi,Leggimi", x.fogli.join());
+  t("Obiettivi: i due del primo cliente, con importo e anno", x.obi.length === 3 && x.obi[1][0] === "Cliente Finto Uno" && x.obi[1][1] === "Casa" && x.obi[1][2] === 50000 && x.obi[1][3] === 5 && x.obi[1][4] === new Date().getFullYear() + 5 && x.obi[2][1] === "Studi", JSON.stringify(x.obi));
   t("Clienti: una riga per cliente, in ordine alfabetico", x.cli.length === 3 && x.cli[1][0] === "Cliente Finto Due" && x.cli[2][0] === "Cliente Finto Uno", JSON.stringify(x.cli.map(r => r[0])));
   const uno = x.cli[2], h = x.cli[0];
   t("valore, investito, guadagno in euro (numeri veri, non testo)", uno[h.indexOf("Valore (€)")] === 156194.12 && uno[h.indexOf("Guadagno (€)")] === 36194.12 && /€/.test(x.fmt || ""), JSON.stringify(uno.slice(0, 6)) + " " + x.fmt);
