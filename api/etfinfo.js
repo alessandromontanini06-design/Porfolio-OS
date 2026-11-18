@@ -62,8 +62,9 @@ export default async function handler(req, res) {
   try {
     const url = `https://www.justetf.com/it/etf-profile.html?isin=${isin}`;
     let r = null, err = null;
-    for (let k = 0; k < 2 && !r; k++) {
-      try { r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", "Accept-Language": "it-IT,it;q=0.9" }, signal: AbortSignal.timeout(25000) }); }
+    // un solo tentativo da 15 secondi: se justETF è fermo, meglio rispondere presto (il browser usa la sua copia di riserva)
+    for (let k = 0; k < 1 && !r; k++) {
+      try { r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", "Accept-Language": "it-IT,it;q=0.9" }, signal: AbortSignal.timeout(15000) }); }
       catch (e) { err = e; }
     }
     if (!r) throw new Error(err && err.name === "TimeoutError" ? "justETF lento" : "justETF non raggiungibile");

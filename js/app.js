@@ -2064,7 +2064,12 @@ async function loadEtfInfo(){
       (j.risultati||[]).forEach(x=>{const p=noIsin[x.indice];if(!p)return;if(x.verificato&&x.isin){p.isin=x.isin;p.isinFound={via:x.via,motivo:x.motivo};}else p.isinMiss=x.isin?`${x.isin} proposto ma scartato: ${x.motivo}`:x.motivo;});
       pf.isinStatus="done";}catch(e){pf.isinStatus="error";pf.isinErr=e instanceof TypeError?"ricerca ISIN non raggiungibile":String(e.message||e);}}
   const list=pf.positions.filter(p=>p.isin&&ISIN_RX.test(p.isin));if(!list.length){pf.etfLoading=false;pf.etfDone=true;renderLook();return;}
-  for(const p of list){const j=await getJSON(`/api/etfinfo?isin=${p.isin}&v=2`);p.etf=j&&!j.error?j:{error:(j&&j.error)||"non disponibile"};renderLook();}
+  /* tre schede alla volta (non una dopo l'altra); ogni scheda letta resta nel browser come copia di riserva:
+     se justETF non risponde si usa l'ultima copia, e la didascalia mostra la data in cui era stata letta */
+  const etfCopy=(isin,j)=>{try{if(j){localStorage.setItem("pos-etf-v1:"+isin,JSON.stringify(j));return j;}const x=localStorage.getItem("pos-etf-v1:"+isin);return x?JSON.parse(x):null;}catch{return null;}};
+  const queue=list.slice();
+  await Promise.all([0,1,2].map(async()=>{while(queue.length){const p=queue.shift();const j=await getJSON(`/api/etfinfo?isin=${p.isin}&v=2`);
+    p.etf=j&&!j.error?etfCopy(p.isin,j):(etfCopy(p.isin)||{error:(j&&j.error)||"non disponibile"});renderLook();}}));
   pf.etfLoading=false;pf.etfDone=true;renderLook();renderReal();/* classi di attivo nel guadagno per strumento */
 }
 const LOOK_TABS=[["geo","Aree e paesi"],["conc","Concentrazione"],["ccy","Valute"],["style","Classi e stile"],["sect","Settori"]];

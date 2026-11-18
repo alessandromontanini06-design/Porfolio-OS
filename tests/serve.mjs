@@ -73,6 +73,7 @@ http.createServer(async (req, res) => {
     let body = ""; req.on("data", c => body += c); await new Promise(r => req.on("end", r));
     const R = wrapRes(res); R.end = () => { res.end(); return R; };
     await (u.pathname === "/api/track" ? track : stats)({ method: req.method, query: Object.fromEntries(u.searchParams), headers: req.headers, body }, R); return; }
+  if (u.pathname === "/api/etfinfo" && process.env.ETF_DOWN) { res.writeHead(502, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Scheda justETF non disponibile (justETF non raggiungibile)." })); return; } // simula justETF fermo
   if (u.pathname === "/api/etfinfo") { await etfinfo({ method: req.method, query: Object.fromEntries(u.searchParams), headers: req.headers }, wrapRes(res)); return; }
   if (u.pathname === "/api/isin") { await isin({ method: req.method, query: Object.fromEntries(u.searchParams), headers: req.headers }, wrapRes(res)); return; }
   if (u.pathname === "/api/fx") { await fx({ method: req.method, query: Object.fromEntries(u.searchParams), headers: req.headers }, wrapRes(res)); return; }

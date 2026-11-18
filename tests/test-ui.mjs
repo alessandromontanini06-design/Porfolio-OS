@@ -29,7 +29,7 @@ try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1366, height: 900 });
   page.on("pageerror", e => errors.push("pagina: " + e.message));
-  page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.text()); });
+  page.on("console", m => { if (m.type() === "error" && !/\/api\/etfinfo/.test((m.location() || {}).url || "")) errors.push("console: " + m.text()); });
   // richieste interrotte (pagina chiusa o cambiata mentre la BCE risponde lenta) non sono errori del sito
   page.on("requestfailed", r => { if (!/fonts\.g|cdnjs/.test(r.url()) && !/ERR_ABORTED/.test((r.failure() || {}).errorText || "")) errors.push("rete: " + r.url() + " " + ((r.failure() || {}).errorText || "")); });
 
