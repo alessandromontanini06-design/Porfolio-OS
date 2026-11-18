@@ -151,6 +151,7 @@
   <section class="scene" data-scene="patrimonio" id="scene-patrimonio" aria-label="Patrimonio" hidden>
     <div class="inner">
       <div class="scene-title"><div><span class="idx">Patrimonio</span><h2>Il mio <em>patrimonio</em></h2></div><p id="pmAsOf">Salvato solo in questo browser</p></div>
+      <div class="pm-pacdue" id="pmPacDue" hidden></div>
       <div class="pm-top">
         <div class="pm-ringcol">
           <div class="seg pm-group" role="group" aria-label="Raggruppa il grafico" id="pmGroup"><button type="button" data-pmg="strumenti" aria-pressed="true">Per strumento</button><button type="button" data-pmg="classi" aria-pressed="false">Per categoria</button></div>
@@ -168,9 +169,10 @@
       <div class="pm-beni" id="pmBeni" hidden></div>
       <div class="pm-chart" id="pmChart"></div>
       <section class="bd-step"><div class="bd-sh"><h3>Le tue posizioni</h3></div><div id="pmPos"></div></section>
+      <section class="bd-step" id="pmPac" hidden><div class="bd-sh"><h3>Piani di accumulo</h3><small>il giorno del PAC ti ricordo di registrarlo: scrivi solo le quote vere del broker</small></div><div id="pmPacList"></div></section>
       <section class="bd-step" id="pmAdd"><div class="bd-sh"><h3>Aggiungi</h3><small>un acquisto, una vendita, un dividendo o un bene senza quotazione</small></div>
         <div class="seg pm-tipo" role="group" aria-label="Tipo di operazione" id="pmTipo">
-          <button type="button" data-pmt="acquisto" aria-pressed="true">Acquisto</button><button type="button" data-pmt="vendita" aria-pressed="false">Vendita</button><button type="button" data-pmt="dividendo" aria-pressed="false">Dividendo o cedola</button><button type="button" data-pmt="bene" aria-pressed="false">Casa, polizza, altro</button></div>
+          <button type="button" data-pmt="acquisto" aria-pressed="true">Acquisto</button><button type="button" data-pmt="vendita" aria-pressed="false">Vendita</button><button type="button" data-pmt="dividendo" aria-pressed="false">Dividendo o cedola</button><button type="button" data-pmt="bene" aria-pressed="false">Casa, polizza, altro</button><button type="button" data-pmt="pac" aria-pressed="false">Piano di accumulo</button></div>
         <form class="pm-form" id="pmForm" autocomplete="off"></form>
         <p class="caption" id="pmMsg" role="status"></p></section>
       <section class="bd-step"><div class="bd-sh"><h3>Storico delle operazioni</h3><small>niente si cancella: un'operazione sbagliata si annulla</small></div><div id="pmOps"></div></section>

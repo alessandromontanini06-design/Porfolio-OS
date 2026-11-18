@@ -22,6 +22,7 @@ try {
   await p.click("#pmBtn"); await wait(700);
   t("dalla home si entra nella sezione Patrimonio", await onPm());
   t("anello vuoto con l'invito a cominciare", /aggiungi il primo investimento/.test(await center()));
+  t("senza un piano di accumulo la sezione dei PAC non c'è", await p.$eval("#pmPac", e => e.hidden) && await p.$eval("#pmPacDue", e => e.hidden));
   console.log("A mano");
   await fill({ str: "VWCE · Vanguard FTSE All-World (Acc)" });
   await p.waitForFunction(() => !/verifico/.test(document.getElementById("pmHint").textContent) && document.getElementById("pmHint").textContent, { timeout: 30000 });

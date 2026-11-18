@@ -167,11 +167,78 @@ function pmRing(R) {
   const empty = !list.length;
   const center = empty ? `<span class="pm-c-l">Il tuo patrimonio</span><b class="pm-c-v">0 €</b><span class="pm-c-s">aggiungi il primo investimento</span>`
     : sel ? `<span class="pm-c-l">${esc(sel.nome)}</span><b class="pm-c-v">${fmtEur(sel.valore)}</b><span class="pm-c-s">${fmtPct(sel.pct, 1)} del patrimonio${Number.isFinite(sel.guadagno) ? ` · <i class="${clsE(sel.guadagno)}">${sEur(sel.guadagno)}</i>` : ""}</span><span class="pm-c-x">tocca di nuovo per il totale</span>`
-    : `<span class="pm-c-l">Patrimonio totale</span><b class="pm-c-v">${fmtEur(tot)}</b><span class="pm-c-s">${list.reduce((s, x) => s + x.n, 0)} ${PM.group === "classi" ? "investimenti in " + list.length + (list.length === 1 ? " categoria" : " categorie") : "investimenti"}</span>`;
+    : `<span class="pm-c-l">Patrimonio totale</span><b class="pm-c-v">${fmtEur(tot)}</b><span class="pm-c-s">${(n => n + (n === 1 ? " investimento" : " investimenti"))(list.reduce((s, x) => s + x.n, 0))}${PM.group === "classi" ? " in " + list.length + (list.length === 1 ? " categoria" : " categorie") : ""}</span>`;
   $("#pmRing").innerHTML = `<svg viewBox="0 0 320 320" role="group" aria-label="Composizione del patrimonio">${empty ? `<circle cx="${cx}" cy="${cy}" r="${r}" stroke="var(--line)" stroke-width="${w}" fill="none"/>` : paths}</svg><div class="pm-center${sel ? " sel" : ""}" data-pmclear>${center}</div>`;
   $("#pmLegend").innerHTML = list.map(x => `<li><button type="button" data-pmslice="${esc(x.key)}" class="${sel && sel.key === x.key ? "on" : sel ? "dim" : ""}" aria-pressed="${!!(sel && sel.key === x.key)}"><i style="background:${x.col}"></i><span>${esc(x.nome)}</span><b>${fmtEur(x.valore)}</b><em>${fmtPct(x.pct, 1)}</em></button></li>`).join("");
   document.querySelectorAll("#pmGroup [data-pmg]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pmg === PM.group)));
 }
+
+/* ---------- piani di accumulo: il promemoria del giorno del PAC ----------
+   Il piano dice strumento, importo e giorno del mese. Il sito non inventa le quote (spread e orari del broker le cambiano):
+   il giorno del PAC propone il modulo già pronto, l'utente scrive le quote vere e il prezzo si ricava da importo ÷ quote. */
+const ymOf = d => d.slice(0, 7);
+const dayN = s => Math.round(Date.parse(s + "T00:00:00Z") / 864e5);
+function pacDate(ym, giorno) { const [y, m] = ym.split("-").map(Number), last = new Date(Date.UTC(y, m, 0)).getUTCDate(); return `${ym}-${String(Math.min(giorno, last)).padStart(2, "0")}`; }
+const nextYm = ym => { let [y, m] = ym.split("-").map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, "0")}`; };
+/* un acquisto dello stesso strumento vicino al giorno del PAC (da 3 giorni prima a 10 dopo) vuol dire che è già registrato, per esempio dal file del broker */
+function pacFound(db, pl, d) {
+  const gone = new Set(db.operazioni.filter(o => o.tipo === "annulla").map(o => String(o.rif))), n = dayN(d);
+  return db.operazioni.find(o => o.tipo === "acquisto" && o.strumento === pl.strumento && !gone.has(String(o.id)) && dayN(o.data) >= n - 3 && dayN(o.data) <= n + 10);
+}
+function pacDue() {
+  const db = PM.db; if (!db || !db.pac) return [];
+  const today = pmToday(), out = [];
+  for (const pl of db.pac) {
+    if (!db.strumenti[pl.strumento]) continue;
+    for (let ym = ymOf(pl.dal); ym <= ymOf(today); ym = nextYm(ym)) {
+      const d = pacDate(ym, pl.giorno); if (d < pl.dal || d > today) continue;
+      if ((pl.fatti || {})[ym] || pacFound(db, pl, d)) continue;
+      out.push({ pl, ym, d });
+    }
+  }
+  return out.sort((a, b) => a.d < b.d ? -1 : 1).slice(-6);
+}
+function pacNext(pl) { const today = pmToday(); let ym = ymOf(today), d = pacDate(ym, pl.giorno); if (d <= today) { ym = nextYm(ym); d = pacDate(ym, pl.giorno); } return { d, giorni: dayN(d) - dayN(today) }; }
+function pacRenderDue() {
+  const el = $("#pmPacDue"); if (!el) return; const due = pacDue();
+  if (!due.length) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.innerHTML = `<div class="pac-h"><b>${due.length === 1 ? "È il giorno del tuo PAC" : `Hai ${due.length} PAC da registrare`}</b><span>Scrivi le quote che vedi nell'app del broker: il prezzo lo calcolo io da importo ÷ quote.</span></div>` +
+    due.map((x, i) => { const s = PM.db.strumenti[x.pl.strumento]; return `<form class="pac-row" data-pacdue="${i}" autocomplete="off"><div class="pac-t"><b>${esc(s.nome)}</b><small>PAC del ${dIt(x.d)}</small></div>
+      <label>Quote comprate<input name="qta" inputmode="decimal" placeholder="es. 0,2315" required></label>
+      <label>Importo (€)<input name="imp" inputmode="decimal" value="${String(x.pl.importo).replace(".", ",")}" required></label>
+      <label>Spese (€)<input name="spese" inputmode="decimal" placeholder="0"></label>
+      <span class="pac-b"><button type="submit" class="btn lime sm">Registra</button><button type="button" class="btn sm" data-pacskip="${i}">Salta</button></span></form>`; }).join("");
+  PM.due = due;
+}
+function pacRenderList() {
+  const el = $("#pmPacList"); if (!el) return; const db = pmDb(), plans = db.pac || [];
+  const strs = Object.entries(db.strumenti).filter(([id, s]) => !s.manuale && PM.R && PM.R.posizioni.some(p => p.id === id));
+  const rows = plans.filter(pl => db.strumenti[pl.strumento]).map(pl => { const n = pacNext(pl), s = db.strumenti[pl.strumento];
+    return `<tr><td><b>${esc(s.nome)}</b><small>${esc(s.ticker || s.isin || "")}</small></td><td class="num">${fmtN(pl.importo, pl.importo % 1 ? 2 : 0)} €</td><td class="num">giorno ${pl.giorno}</td>
+      <td class="num">${dIt(n.d)}<small>${n.giorni === 0 ? "oggi" : n.giorni === 1 ? "domani" : `tra ${n.giorni} giorni`}</small></td><td class="num"><button type="button" class="btn sm" data-pacdel="${esc(pl.id)}">Togli</button></td></tr>`; }).join("");
+  const tot = plans.filter(pl => db.strumenti[pl.strumento]).reduce((a, pl) => a + pl.importo, 0), sec = $("#pmPac");
+  /* senza un piano la sezione non c'è: il piano si crea dalla scheda «Piano di accumulo» di «Aggiungi» */
+  if (sec) sec.hidden = !rows; if (!rows) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="tablewrap"><table class="mt pm-pac"><thead><tr><th>Strumento</th><th class="num">Importo</th><th class="num">Quando</th><th class="num">Prossimo</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="caption">In tutto ${fmtN(tot, tot % 1 ? 2 : 0)} € al mese.${strs.length ? ` <button type="button" class="linkbtn" data-pacadd>+ Aggiungi un piano</button>` : ""}</p>`;
+}
+function pacSubmitNew(f) {
+  const v = Object.fromEntries(new FormData(f).entries()), imp = num(v.imp), g = Math.round(+v.g);
+  if (!(imp > 0) || !(g >= 1 && g <= 31) || !pmDb().strumenti[v.str]) return pmMsg("Scrivi un importo e un giorno del mese tra 1 e 31.", "err", "#pmTopMsg");
+  const db = pmDb(); db.pac ||= [];
+  /* il primo promemoria arriva dal prossimo giorno del PAC: i mesi passati non si chiedono */
+  db.pac.push({ id: newId(), strumento: v.str, importo: imp, giorno: g, dal: pmToday(), fatti: {} });
+  if (!pmSave()) return; pmMsg(`Piano salvato: ${fmtN(imp, imp % 1 ? 2 : 0)} € il giorno ${g} di ogni mese.`, "ok"); pacRenderList(); pacRenderDue(); pmButton();
+}
+function pacRegister(i, f) {
+  const x = (PM.due || [])[i]; if (!x) return; const v = Object.fromEntries(new FormData(f).entries()), q = num(v.qta), imp = num(v.imp), sp = num(v.spese) || 0;
+  if (!(q > 0) || !(imp > 0)) return pmMsg("Scrivi le quote comprate e l'importo.", "err", "#pmTopMsg");
+  const id = newId(); pmDb().operazioni.push({ id, data: x.d, tipo: "acquisto", strumento: x.pl.strumento, quantita: q, prezzo: imp / q, valuta: "EUR", spese: sp, origine: "pac" });
+  (x.pl.fatti ||= {})[x.ym] = id;
+  if (!pmSave()) return; pmMsg(`PAC registrato: ${fmtN(q, 4)} quote a ${fmtN(imp / q, 2)} €.`, "ok", "#pmTopMsg"); pmRenderForm(); pmRender(); pmRefresh(false);
+}
+function pacSkip(i) { const x = (PM.due || [])[i]; if (!x) return; (x.pl.fatti ||= {})[x.ym] = "saltato"; if (!pmSave()) return; pmMsg(`PAC del ${dIt(x.d)} saltato.`, "", "#pmTopMsg"); pacRenderDue(); pmButton(); }
 
 /* ---------- disegno della sezione ---------- */
 function pmMsg(t, k, where) { const el = $(where || "#pmMsg"); if (!el) return; el.textContent = t || ""; el.className = "caption" + (k ? " " + k : ""); }
@@ -247,6 +314,11 @@ function pmForm() {
       <label>Quote vendute<input name="qta" inputmode="decimal" required></label><label>Prezzo per quota <span id="pmCcy">(${esc(db.strumenti[open[0].id].valuta || "€")})</span><input name="prezzo" inputmode="decimal" required></label>
       ${date}<label>Spese e tasse (€)<input name="spese" inputmode="decimal" placeholder="0"></label><button type="submit" class="btn lime">Salva la vendita</button>`
     : `<p class="caption">Non hai posizioni aperte da vendere.</p>`;
+  if (t === "pac") { const own = Object.entries(db.strumenti).filter(([id, s]) => !s.manuale && R && R.posizioni.some(p => p.id === id && p.aperta));
+    return own.length ? `<label class="wide">Strumento<select name="str">${opt(own)}</select></label>
+      <label>Importo al mese (€)<input name="imp" inputmode="decimal" placeholder="100" required></label><label>Giorno del mese<input name="g" type="number" min="1" max="31" value="1" required></label>
+      <button type="submit" class="btn lime">Salva il piano</button><p class="caption wide-c">Il giorno del PAC ti ricordo di registrarlo, con l'importo già scritto: tu scrivi solo le quote vere del broker.</p>`
+    : `<p class="caption">Aggiungi prima uno strumento con un acquisto: poi puoi impostarne il piano di accumulo.</p>`; }
   if (t === "dividendo") return all.length ? `<label class="wide">Strumento<select name="sid" required>${opt(all)}</select></label>
       <label>Importo netto incassato (€)<input name="importo" inputmode="decimal" required></label>${date}<button type="submit" class="btn lime">Salva il provento</button>`
     : `<p class="caption">Aggiungi prima uno strumento con un acquisto.</p>`;
@@ -265,7 +337,9 @@ function pmButton() {
   if (!pmHas()) { b.classList.remove("has"); $("#pmBtnT").textContent = "Crea il tuo patrimonio"; $("#pmBtnS").textContent = "aggiungi ciò che possiedi: lo ritrovi qui ogni giorno, aggiornato"; return; }
   const R = PM.R || pmCalc(), ses = pmSession(R);
   b.classList.add("has"); $("#pmBtnT").textContent = `Il mio patrimonio · ${fmtEur(R.totale.valore)}`;
+  const nd = pacDue().length;
   $("#pmBtnS").textContent = ses ? `${ses.d === pmToday() ? "oggi" : dayName(ses.d)} ${sEur(ses.euro)} (${sPct(ses.pct)}) · guadagno ${sEur(R.totale.guadagno)}` : `guadagno ${sEur(R.totale.guadagno)}`;
+  if (nd) $("#pmBtnS").textContent = `${nd === 1 ? "un PAC" : nd + " PAC"} da registrare · ` + $("#pmBtnS").textContent;
 }
 function pmRender() {
   const R = pmCalc(), has = pmHas();
@@ -275,6 +349,7 @@ function pmRender() {
   $("#pmKpis").innerHTML = has ? pmKpis(R) : `<div class="pm-empty"><b>Inizia da qui.</b> Aggiungi quello che possiedi: ETF, azioni, fondi, ma anche casa, polizze e altri beni. Oppure importa l'Excel o l'export del broker. Ogni volta che torni trovi il valore aggiornato, quanto hai guadagnato e com'è andata l'ultima seduta.</div>`;
   $("#pmChart").innerHTML = has ? pmChart(R) : ""; $("#pmChart").hidden = !has || R.serie.length < 3;
   $("#pmPos").innerHTML = pmPosTable(R); $("#pmOps").innerHTML = pmOpsTable();
+  pacRenderDue(); pacRenderList();
   const quoted = R.posizioni.some(p => p.aperta && !PM.db.strumenti[p.id].manuale);
   $("#pmLab").disabled = !quoted; $("#pmExport").disabled = !has;
   pmButton();
@@ -387,6 +462,8 @@ function pmMenu() {
   dash.innerHTML = `<button type="button" class="mnu-card" data-go="patrimonio" aria-label="Apri il patrimonio: ${esc(fmtEur(T.valore))}"><svg viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">${ring}</svg>
     <span class="mnu-v"><small>Il mio patrimonio</small><b>${fmtEur(T.valore)}</b><span>${ses ? `<i class="${clsE(ses.euro)}">${sEur(ses.euro)}</i> ${ses.d === pmToday() ? "oggi" : dayName(ses.d)}` : "valori di fine giornata"}</span><span>guadagno <i class="${clsE(T.guadagno)}">${sEur(T.guadagno)}</i> · TIR <i class="${clsP(T.tir)}">${sPct(T.tir)}</i></span></span></button>`;
   $("#mnuCopy").hidden = false;
+  const nd = pacDue().length; if (nd) dash.insertAdjacentHTML("beforeend", `<button type="button" class="mnu-pac" data-go="patrimonio">${nd === 1 ? "È il giorno del tuo PAC: registralo" : `${nd} PAC da registrare`} →</button>`);
+  if (nd) lbl.insertAdjacentHTML("beforeend", `<i class="mnu-dot" aria-label="PAC da registrare"></i>`);
 }
 const mnuOpen = on => { const pop = $("#mnuPop"), b = $("#mnuBtn"); if (!pop) return; if (on) pmMenu(); pop.hidden = !on; b.setAttribute("aria-expanded", String(on)); if (on) { const f = pop.querySelector("button,a"); if (f) f.focus({ preventScroll: true }); } };
 $("#mnuBtn").addEventListener("click", e => { e.stopPropagation(); mnuOpen($("#mnuPop").hidden); });
@@ -410,6 +487,7 @@ function pmToLab() {
 function pmAdd(op) { const db = pmDb(); db.operazioni.push({ id: newId(), ...op }); return pmSave(); }
 async function pmSubmit(f) {
   const v = Object.fromEntries(new FormData(f).entries()), db = pmDb(), data = v.data;
+  if (PM.tipo === "pac") { pacSubmitNew(f); return; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || "") || data > pmToday()) return pmMsg("Scegli una data valida, non nel futuro.", "err");
   if (PM.tipo === "acquisto") {
     const qta = num(v.qta), prezzo = num(v.prezzo), spese = num(v.spese) || 0;
@@ -460,9 +538,13 @@ sc().addEventListener("click", e => {
   if (e.target.closest("#pmLab")) { pmToLab(); return; }
   if (e.target.closest("#pmExport")) pmDownload();
   if (e.target.closest("#pmReset")) pmReset();
+  if (e.target.closest("[data-pacadd]")) { PM.tipo = "pac"; PM.beneId = ""; pmRenderForm(); pmMsg(""); $("#pmAdd").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  const ps = e.target.closest("[data-pacskip]"); if (ps) { pacSkip(+ps.dataset.pacskip); return; }
+  const pd = e.target.closest("[data-pacdel]"); if (pd) { const db = pmDb(), pl = (db.pac || []).find(x => x.id === pd.dataset.pacdel); if (pl && confirm(`Togliere il piano di accumulo di ${(db.strumenti[pl.strumento] || {}).nome || "—"}? Le operazioni già registrate restano.`)) { db.pac = db.pac.filter(x => x !== pl); if (pmSave()) { pacRenderList(); pacRenderDue(); pmButton(); } } return; }
 });
 sc().addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("#pmRing [data-pmslice]")) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
   if (e.key === "Escape" && PM.sel) { PM.sel = null; pmRing(PM.R || pmCalc()); } });
+sc().addEventListener("submit", e => { if (e.target.matches && e.target.matches("[data-pacdue]")) { e.preventDefault(); pacRegister(+e.target.dataset.pacdue, e.target); } });
 sc().addEventListener("submit", e => { if (!e.target.matches || !e.target.matches("#pmForm")) return; e.preventDefault(); const b = e.target.querySelector("[type=submit]"); if (b) b.disabled = true; pmSubmit(e.target).finally(() => { if (b) b.disabled = false; }); });
 sc().addEventListener("change", async e => {
   const el = e.target;
@@ -493,4 +575,4 @@ document.addEventListener("click", e => { if (e.target.closest("#pmBeniOk")) pmB
 /* se il grafico è stato disegnato a un'altra larghezza (rotazione del telefono), si ridisegna */
 let pmRz = 0; window.addEventListener("resize", () => { clearTimeout(pmRz); pmRz = setTimeout(() => { if (current === "patrimonio" && PM.R && pmHas()) $("#pmChart").innerHTML = pmChart(PM.R); }, 250); });
 
-export { PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu, pmFindBeni, beneTipo, pmReset };
+export { PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu, pmFindBeni, beneTipo, pmReset, pacDue, pacNext, pacDate };
