@@ -133,12 +133,17 @@ async function groqCall(body, ms) {
 const claude = has.claude ? new Anthropic({ timeout: 40_000, maxRetries: 0 }) : null;
 const CLAUDE_MODEL = env.CLAUDE_MODEL || "claude-opus-5-5";
 
+/* immagini per Claude: blocchi base64 prima del testo */
+const claudeContent = (text, imgs) => imgs.length ? [...imgs.map(x => ({ type: "image", source: { type: "base64", media_type: x.mime, data: x.data } })), { type: "text", text }] : text;
+
 /* ---------- json(): risposta strutturata con riserve ---------- */
-// task: { name, system, user, schema (zod), order: ["claude","gemini","groq"] }
+// task: { name, system, user, schema (zod), order: ["claude","gemini","groq"], images?: [{ mime, data (base64) }] }
+// Con le immagini si usano solo i fornitori che le leggono (Gemini e Claude), Groq resta fuori.
 export async function json(task) {
-  const order = (task.order || ["claude", "gemini", "groq"]).filter(p => has[p]);
+  const imgs = Array.isArray(task.images) ? task.images : [];
+  const order = (task.order || ["claude", "gemini", "groq"]).filter(p => has[p] && !(imgs.length && p === "groq"));
   if (!order.length) throw new ProviderError("nessuno", "Nessuna chiave IA configurata sul server.", false);
-  const ck = keyOf({ n: task.name, s: task.system, u: task.user });
+  const ck = keyOf({ n: task.name, s: task.system, u: task.user, i: imgs.map(x => keyOf(x.data)) });
   const hit = cacheGet(ck); if (hit) return { ...hit, cached: true };
   const schemaText = JSON.stringify(z.toJSONSchema(task.schema));
   const started = Date.now(), BUDGET = 50_000, errors = [];
@@ -156,7 +161,7 @@ export async function json(task) {
 
 Rispondi SOLO con un oggetto JSON valido (niente testo prima o dopo, niente blocchi di codice) che rispetta questo schema:
 ${schemaText}`,
-          messages: [{ role: "user", content: task.user }]
+          messages: [{ role: "user", content: claudeContent(task.user, imgs) }]
         }, { timeout: ms });
         const txt = (r.content || []).filter(b => b.type === "text").map(b => b.text).join("").trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
         const i = txt.indexOf("{"), j = txt.lastIndexOf("}");
@@ -165,14 +170,14 @@ ${schemaText}`,
         const r = await claude.messages.parse({
           model: CLAUDE_MODEL, max_tokens: task.maxTokens || 4000, system: task.system,
           output_config: { effort: "low", format: zodOutputFormat(task.schema) },
-          messages: [{ role: "user", content: task.user }]
+          messages: [{ role: "user", content: claudeContent(task.user, imgs) }]
         }, { timeout: ms });
         if (r.stop_reason === "refusal") throw new ProviderError("claude", "richiesta rifiutata", true);
         raw = r.parsed_output; model = CLAUDE_MODEL;
       } else if (p === "gemini") {
         const { j, model: m } = await geminiCall({
           systemInstruction: { parts: [{ text: `${task.system}\n\nRispondi SOLO con un oggetto JSON valido che rispetta questo schema:\n${schemaText}` }] },
-          contents: [{ role: "user", parts: [{ text: task.user }] }],
+          contents: [{ role: "user", parts: [...imgs.map(x => ({ inline_data: { mime_type: x.mime, data: x.data } })), { text: task.user }] }],
           generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
         }, ms);
         raw = JSON.parse((j.candidates?.[0]?.content?.parts || []).map(x => x.text || "").join("") || "null"); model = m;

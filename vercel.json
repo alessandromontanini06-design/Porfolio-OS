@@ -1,5 +1,6 @@
 {
   "functions": {
-    "api/fix.js": { "maxDuration": 60 }
+    "api/fix.js": { "maxDuration": 60 },
+    "api/screenshot.js": { "maxDuration": 60 }
   }
 }

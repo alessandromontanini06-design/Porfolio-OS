@@ -83,6 +83,7 @@
               <em aria-hidden="true">→</em>
               <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.txt" hidden>
             </div>
+            <button type="button" class="opt" id="shotBtn"><span><b>Carica uno screenshot</b><small>una o più foto dell'app della banca o del broker: l'IA legge titoli e quantità, tu controlli</small></span><em aria-hidden="true">→</em></button>
             <button type="button" class="opt" id="builderBtn"><span><b>Non ho un file</b><small>crea un portafoglio scegliendo ETF e pesi</small></span><em aria-hidden="true">→</em></button>
             <button type="button" class="opt" id="sampleBtn"><span><b>Fammi vedere un esempio</b><small>7 ETF, 355 movimenti dal 2019</small></span><em aria-hidden="true">→</em></button>
           </div>
@@ -541,6 +542,35 @@
   <button type="button" class="btn sm x" id="closeProfile">Chiudi</button>
   <div id="prBody" class="pr-body"></div>
 </aside>
+<section class="bdpage" id="shotPage" role="dialog" aria-modal="true" aria-label="Carica uno screenshot del portafoglio" aria-hidden="true">
+  <div class="bd-top"><button type="button" class="btn sm" id="shotClose">← Indietro</button><span class="bd-crumb">Portfolio OS <i>/</i> Da uno screenshot</span></div>
+  <div class="bd-wrap sh-wrap">
+    <div class="bd-main">
+      <header class="bd-hd"><span class="eyebrow">Dal telefono</span><h2>Il portafoglio da uno <em>screenshot</em></h2>
+        <p>Fai lo screenshot della pagina del portafoglio nell'app della banca o del broker (Trade Republic, Fineco, Directa, Scalable…). Se è lungo, fanne più di uno: le posizioni ripetute le conto una volta sola.</p></header>
+      <section class="bd-step"><div class="bd-sh"><h3>1 · Le immagini</h3><small>fino a 8 · JPG, PNG o WEBP</small></div>
+        <label class="sh-drop" id="shDrop" for="shFile" tabindex="0"><b>Scegli gli screenshot</b><small>oppure trascinali qui</small></label>
+        <input type="file" id="shFile" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        <div class="sh-thumbs" id="shThumbs"></div></section>
+      <section class="bd-step"><div class="bd-sh"><h3>2 · Il permesso</h3></div>
+        <div class="sh-consent"><p>Per leggerle, <b>le immagini vengono mandate all'IA</b> (Google Gemini, o Claude di Anthropic se Gemini non risponde). Non le salviamo. Prima di inviarle puoi coprire nome, numero di conto e tutto quello che non serve: bastano nomi dei titoli, quantità e valori.</p>
+          <label class="sh-ok"><input type="checkbox" id="shAgree"> <span>Ho capito: invia le immagini all'IA per leggerle</span></label></div>
+        <button type="button" class="btn lime" id="shRead" disabled>Leggi gli screenshot</button> <span class="caption" id="shStatus" role="status"></span></section>
+      <section class="bd-step" id="shStep3" hidden><div class="bd-sh"><h3>3 · Controlla</h3><small>correggi quello che l'IA ha letto male</small></div>
+        <div class="sh-warn" id="shWarn"></div>
+        <div class="sh-table"><table><thead><tr><th>Titolo</th><th>ISIN</th><th>Ticker</th><th>Quantità</th><th>Valore (€)</th><th></th></tr></thead><tbody id="shRows"></tbody></table></div>
+        <button type="button" class="btn sm" id="shAdd">+ Aggiungi una riga</button>
+        <p class="caption">Servono il nome (o l'ISIN, o il ticker) e la quantità oppure il valore. L'ISIN aiuta a trovare la quotazione giusta: se manca, lo cerco io dal nome.</p></section>
+    </div>
+    <aside class="bd-side" aria-label="Riepilogo dello screenshot">
+      <h3>Riepilogo</h3>
+      <div class="sh-sum" id="shSum"><p class="caption">Ancora nessuna posizione letta.</p></div>
+      <ul class="bd-checks sh-lim"><li class="warn">Solo la situazione di oggi: senza i movimenti non posso calcolare il rendimento annuo (TIR).</li><li class="ok">Le posizioni confermate passano dal laboratorio come un file: prezzi di mercato, rischio, crisi, simulazioni.</li></ul>
+      <div class="bd-foot"><button type="button" class="btn lime" id="shGo" disabled>Analizza queste posizioni →</button></div>
+      <p class="caption bd-fine">Solo un'analisi dei dati storici: non è un consiglio di investimento.</p>
+    </aside>
+  </div>
+</section>
 <section class="bdpage" id="builder" role="dialog" aria-modal="true" aria-label="Crea il tuo portafoglio" aria-hidden="true">
   <div class="bd-top"><button type="button" class="btn sm" id="closeBuilder">← Indietro</button><span class="bd-crumb">Portfolio OS <i>/</i> Crea il tuo portafoglio</span></div>
   <div class="bd-wrap">
@@ -555,7 +585,7 @@
         <div class="bd-rows" id="bdRows"></div>
         <button type="button" class="btn sm" id="bdAdd">+ Aggiungi strumento</button>
         <p class="caption" id="bdNote">Scrivi un ticker (VWCE) o un ISIN (IE00BK5BQT80), oppure scegli dall'elenco. Gli ISIN sono verificati su OpenFIGI prima di scaricare i prezzi.</p></section>
-      <section class="bd-step"><div class="bd-sh"><h3>Catalogo</h3><small>ETF molto diffusi in Europa · clicca per aggiungere</small></div><div class="bd-cat" id="bdCat"></div></section>
+      <section class="bd-step"><div class="bd-sh"><h3>Catalogo</h3><small>ETF, azioni, obbligazioni, oro e cripto · clicca per aggiungere</small></div><div class="bd-cat" id="bdCat"></div></section>
     </div>
     <aside class="bd-side" aria-label="Riepilogo del portafoglio">
       <h3>Riepilogo <span id="bdWhich"></span></h3>

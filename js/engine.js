@@ -675,8 +675,26 @@ function brokerMoves(sh,onlySpecific){
     const cD=col("date"),cK=low.indexOf("transaction kind"),cC=low.indexOf("currency"),cQ=low.indexOf("amount"),cTC=low.indexOf("to currency"),cTQ=low.indexOf("to amount"),cN=low.indexOf("native amount"),cNC=low.indexOf("native currency");
     const rows=body.map(r=>{const k=S(r,cK),d=bkDate(get(r,cD)),n=Math.abs(N(r,cN)||0);
       if(/^(crypto_purchase|viban_purchase|recurring_buy_order)$/.test(k)){const tk=(k==="viban_purchase"?S(r,cTC):S(r,cC)).toUpperCase(),q=Math.abs((k==="viban_purchase"?N(r,cTQ):N(r,cQ))||0);return q?[d,"Acquisto",tk,"",tk,q,n/q,n,S(r,cNC)||"EUR"]:null;}
-      if(/^crypto_viban_exchange$/.test(k)){const tk=S(r,cC).toUpperCase(),q=Math.abs(N(r,cQ)||0);return q?[d,"Vendita",tk,"",tk,q,n/q,n,S(r,cNC)||"EUR"]:null;}return null;});
+      if(/^crypto_viban_exchange$/.test(k)){const tk=S(r,cC).toUpperCase(),q=Math.abs(N(r,cQ)||0);return q?[d,"Vendita",tk,"",tk,q,n/q,n,S(r,cNC)||"EUR"]:null;}
+      /* scambio tra due cripto: vendita della prima e acquisto della seconda, allo stesso controvalore */
+      if(/^crypto_exchange$/.test(k)){const a=S(r,cC).toUpperCase(),qa=Math.abs(N(r,cQ)||0),t=S(r,cTC).toUpperCase(),qt=Math.abs(N(r,cTQ)||0),c=S(r,cNC)||"EUR";const o=[];if(qa)o.push([d,"Vendita",a,"",a,qa,n/qa,n,c]);if(t&&qt)o.push([d,"Acquisto",t,"",t,qt,n/qt,n,c]);return o.length?o:null;}
+      /* trasferimenti tra i conti di Crypto.com e blocchi per lo staking: non cambiano cosa possiedi */
+      if(/transfer$|dpos_(lock|unlock)|^lockup_(lock|unlock)$/.test(k))return null;
+      /* depositi da altri wallet, interessi, premi, cashback, conversioni di saldo: entrano (o escono) al controvalore indicato */
+      const tk=S(r,cC).toUpperCase(),q=N(r,cQ)||0;
+      if(tk&&q&&/^(crypto_deposit|crypto_withdrawal|crypto_wallet_swap_(credited|debited)|card_top_up|mco_stake_reward|referral_card_cashback|.*(interest|reward|cashback|bonus).*)$/.test(k))return [d,q>0?"Acquisto":"Vendita",tk,"",tk,Math.abs(q),n/Math.abs(q),n,S(r,cNC)||"EUR"];
+      return null;}).flatMap(x=>x&&Array.isArray(x[0])?x:[x]);
     const out=bkStd("Crypto.com",rows,"Crypto.com");if(out)return out;}
+  /* --- Finpension (previdenza svizzera, BVG): gli acquisti sono «Portfolio Transaction», con quote positive e flusso di cassa negativo --- */
+  if(has("category")&&has("number of shares")&&has("cash flow")){
+    const cK=low.indexOf("category");
+    if(body.some(r=>/^portfolio transaction$/i.test(S(r,cK)))){
+      const cD=col("date"),cA=low.indexOf("asset name"),cI=low.indexOf("isin"),cQ=low.indexOf("number of shares"),cP=low.indexOf("asset price in chf"),cF=low.indexOf("cash flow");
+      const rows=body.map(r=>{const k=S(r,cK).toLowerCase(),d=bkDate(get(r,cD)),q=N(r,cQ)||0,f=N(r,cF)||0,nm=S(r,cA),isin=S(r,cI);
+        if(/^(portfolio transaction|buy|sell)$/.test(k)&&q&&nm){const sell=k==="sell"||f>0;return [d,sell?"Vendita":"Acquisto",nm,isin,"",Math.abs(q),N(r,cP)||Math.abs(f)/Math.abs(q),Math.abs(f),"CHF"];}
+        if(/dividend/.test(k)&&nm&&f)return [d,"Dividendo",nm,isin,"",0,0,Math.abs(f),"CHF"];
+        return null;});
+      const out=bkStd("Finpension",rows,"Finpension");if(out)return out;}}
   if(onlySpecific)return null;
   /* --- lettura per colonne (tutti gli altri) --- */
   const cD=col("date"),cSd=(()=>{const c=H.map((x,i)=>BK_COLS.side.test(x)?i:-1).filter(i=>i>=0);

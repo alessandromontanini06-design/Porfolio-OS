@@ -60,6 +60,21 @@ http.createServer(async (req, res) => {
     }), 800);
     return;
   }
+  if (u.pathname === "/api/screenshot") {
+    // simulazione locale della lettura degli screenshot: su Vercel le immagini le legge Gemini (o Claude)
+    let body = ""; req.on("data", c => body += c); await new Promise(r => req.on("end", r));
+    let n = 0; try { n = (JSON.parse(body || "{}").immagini || []).length; } catch {}
+    if (!n) { res.statusCode = 400; wrapRes(res).json({ error: "Nessuna immagine valida (JPG, PNG o WEBP)." }); return; }
+    const P = [
+      { nome: "Vanguard FTSE All-World USD Acc", isin: "IE00BK5BQT80", ticker: null, quantita: 42.5, prezzo: 139.81, valore: 5941.93, valuta: "EUR", immagine: 1 },
+      { nome: "iShares Core MSCI EM IMI USD (Acc)", isin: null, ticker: null, quantita: 60, prezzo: 33.12, valore: 1987.2, valuta: "EUR", immagine: 1 },
+      { nome: "Eni", isin: null, ticker: "ENI", quantita: 100, prezzo: 14.62, valore: 1462, valuta: "EUR", immagine: Math.min(2, n) },
+      { nome: "Apple", isin: "US0378331005", ticker: "AAPL", quantita: 5, prezzo: null, valore: 1021.4, valuta: "EUR", immagine: Math.min(2, n) },
+      { nome: "Bitcoin", isin: null, ticker: "BTC", quantita: 0.012, prezzo: null, valore: 1010.5, valuta: "EUR", immagine: n }
+    ];
+    setTimeout(() => wrapRes(res).json({ posizioni: P, avvisi: n > 1 ? ["Simulazione locale: «Eni» compare in due immagini, l'ho contata una volta."] : ["Simulazione locale."], piattaforma: "Trade Republic", immagini: n, fonte: "simulazione" }), 600);
+    return;
+  }
   if (u.pathname === "/api/findisin") {
     // simulazione locale dell'IA + verifica: su Vercel l'IA propone e OpenFIGI verifica
     let body = ""; req.on("data", c => body += c); await new Promise(r => req.on("end", r));
