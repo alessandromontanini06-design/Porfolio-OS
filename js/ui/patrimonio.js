@@ -8,8 +8,9 @@ import { BD, POPULAR, bdGo, guessSymbol, trackOnce } from "./importa.js";
 const PM_KEY = "pos-patrimonio-v1";
 const pmToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const dIt = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : "—";
-const sEur = v => Number.isFinite(v) ? (v > 0 ? "+" : "") + fmtEur(v) : "—";
-const sPct = v => Number.isFinite(v) ? fmtPct(v, 1, true) : "—";
+/* sotto mezzo euro (o 0,05%) è zero: niente «-0 €» */
+const sEur = v => !Number.isFinite(v) ? "—" : Math.abs(v) < 0.5 ? fmtEur(0) : (v > 0 ? "+" : "") + fmtEur(v);
+const sPct = v => !Number.isFinite(v) ? "—" : Math.abs(v) < 0.0005 ? fmtPct(0, 1) : fmtPct(v, 1, true);
 const cls = v => v > 0 ? "up" : v < 0 ? "dn" : "";
 /* numeri scritti all'italiana: «200.000» = duecentomila, «12,50» = dodici e cinquanta, «1.234,5» e anche «1.5» (decimale) */
 const num = v => { const t = String(v ?? "").trim().replace(/\s|€|'/g, ""); if (!t || !/^-?[\d.,]+$/.test(t)) return NaN;
