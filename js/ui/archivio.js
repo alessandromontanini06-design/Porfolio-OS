@@ -9,6 +9,7 @@ import { pfAsset } from "./portafoglio.js";
 import { buildNet, drawChart, fetchMacro, labIndex, loadEtfInfo, renderLab, renderLook, ym } from "./laboratorio.js";
 import { fiDefaults, fmtEur, netClear, obLoad, riskWeights } from "./analisi.js";
 import { renderLabs } from "./home.js";
+import { pmImport, pmOfferRender } from "./patrimonio.js";
 
 /* ---------- Archivio dei portafogli (IndexedDB, solo in questo browser) ----------
    Ogni portafoglio salvato ha un identificativo suo (due clienti con lo stesso estratto del broker non si sovrascrivono),
@@ -100,8 +101,11 @@ function svOpenFast(r){
   /* scelte già fatte all'importazione (strumenti mancanti, storici corti): restano fatte */
   S.res={...(F.res||{})};renderImport(false);
   const b=$("#confirmBtn");if(!S.ds||!S.ds.ok||!b||b.disabled)throw new Error("non pronto");
-  showLab(true);go("lab",{force:true});
+  showLab(true);go("lab",{force:true});svToPm();
 }
+/* «Nel patrimonio» dall'archivio: aperto il portafoglio, si fa quello che farebbe «Metti nel mio patrimonio» nel laboratorio
+   (solo per i file della banca: un portafoglio creato a mano non ha movimenti da portare) */
+function svToPm(){if(!S.svToPm)return;S.svToPm=false;setTimeout(()=>{pmOfferRender();const el=$("#pmOffer");if(el&&!el.hidden&&$("#pmOfferBtn"))pmImport();},400);}
 async function svOpen(id,opts={}){
   const r=await svGet(id);if(!r)return svHome();
   if(r.fast&&r.fast.v===1&&!opts.full){closeArchive();if(isSim())spaceSwitch("real",{stay:true});trackOnce("feature","riprendi",{name:"riprendi"});
@@ -115,7 +119,7 @@ async function svOpen(id,opts={}){
   /* la mappa è già confermata in memoria: appena il file è pronto (anche dopo i prezzi di mercato) si costruisce il laboratorio */
   const tick=()=>{const R=S.svResume;if(!R||R.id!==id)return;if(Date.now()-R.t0>150000){S.svResume=null;svBusy(false);go("map",{force:true});return;}
     const busy=(S.und&&/loading|rebuilding/.test(S.und.status||""))||(S.recipe&&S.recipe.status==="loading");
-    const b=$("#confirmBtn");if(!busy&&b&&!b.disabled&&S.ds&&S.ds.ok){if(!R.ready){R.ready=Date.now();}else if(Date.now()-R.ready>1200){S.svResume=null;S.mcOb=R.ob;if(R.riskW)S.riskW=R.riskW;if(R.fi){S.fi={in:{...fiDefaults(),...R.fi,cap:fiDefaults().cap}};}S.svSaved=id;showLab(true);go("lab",{force:true});svBusy(false);return;}}else R.ready=0;
+    const b=$("#confirmBtn");if(!busy&&b&&!b.disabled&&S.ds&&S.ds.ok){if(!R.ready){R.ready=Date.now();}else if(Date.now()-R.ready>1200){S.svResume=null;S.mcOb=R.ob;if(R.riskW)S.riskW=R.riskW;if(R.fi){S.fi={in:{...fiDefaults(),...R.fi,cap:fiDefaults().cap}};}S.svSaved=id;showLab(true);go("lab",{force:true});svBusy(false);svToPm();return;}}else R.ready=0;
     setTimeout(tick,400);};
   setTimeout(tick,600);
 }
@@ -191,7 +195,7 @@ async function renderArchive(){
         <div class="ar-v"><span class="ar-l">Rendimento</span>${s.xirr!=null&&Number.isFinite(s.xirr)?`${fmtPct(s.xirr,1,true)}<small>TIR</small>`:num(s.cagr,x=>fmtPct(x,1,true)+"<small>l'anno</small>")}</div>
         <div class="ar-v"><span class="ar-l">Rischio</span>${num(s.vol,x=>fmtPct(x,1))}<small>${num(s.mdd,x=>"calo max "+fmtPct(x,0))}</small></div>
         <div class="ar-v"><span class="ar-l">Ultima revisione</span>${new Date(r.reviewedAt).toLocaleDateString("it-IT",{day:"numeric",month:"short",year:"numeric"})}<small>${arAgo(r.reviewedAt)}${arDue(r)?` · <b class="ar-due">da rivedere</b>`:""}</small></div>
-        <div class="ar-act"><button type="button" class="btn sm lime" data-svo="${esc(r.id)}">Apri</button><button type="button" class="btn sm" data-arx="${esc(r.id)}" aria-expanded="${open}">${open?"Chiudi":"Dettagli"}</button></div>
+        <div class="ar-act"><button type="button" class="btn sm lime" data-svo="${esc(r.id)}">Apri</button><button type="button" class="btn sm ar-topm" data-svpm="${esc(r.id)}" title="Apre il portafoglio e mette i suoi movimenti nel tuo patrimonio">Nel patrimonio</button><button type="button" class="btn sm" data-arx="${esc(r.id)}" aria-expanded="${open}">${open?"Chiudi":"Dettagli"}</button></div>
       </div>
       ${open?arDetail(r):""}
     </article>`;}).join("");
@@ -264,7 +268,7 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("change",e=>{if(e.target.id==="arSort"){AR.sort=e.target.value;renderArchive();}if(e.target.id==="arImport"&&e.target.files[0]){arImport(e.target.files[0]);e.target.value="";}});
 document.addEventListener("click",async e=>{
-  const b=e.target.closest("[data-sv],[data-svo],[data-svd],[data-ar],[data-arx],[data-arf],#archBtn,#closeArchive,#arExport,#arBackup,#arNew,#arNew2");if(!b)return;
+  const b=e.target.closest("[data-sv],[data-svo],[data-svpm],[data-svd],[data-ar],[data-arx],[data-arf],#archBtn,#closeArchive,#arExport,#arBackup,#arNew,#arNew2");if(!b)return;
   if(b.id==="archBtn"){openArchive();return;}
   if(b.id==="closeArchive"){closeArchive();return;}
   if(b.id==="arExport"){arExcel();return;}if(b.id==="arBackup"){arExport();return;}
@@ -272,6 +276,7 @@ document.addEventListener("click",async e=>{
   if(b.dataset.arf){AR.f=b.dataset.arf;renderArchive();return;}
   if(b.dataset.arx){AR.open=AR.open===b.dataset.arx?null:b.dataset.arx;renderArchive();return;}
   if(b.dataset.svo){svOpen(b.dataset.svo);return;}
+  if(b.dataset.svpm){S.svToPm=true;svOpen(b.dataset.svpm);return;}
   if(b.dataset.svd){const r=await svGet(b.dataset.svd);if(!r||!confirm(`Eliminare «${r.name}» dall'archivio? Non si può recuperare.`))return;
     await svTx("readwrite",st=>st.delete(b.dataset.svd)).catch(()=>{});if(S.svSaved===b.dataset.svd)S.svSaved=null;svHome();if($("#archive").classList.contains("open"))renderArchive();return;}
   if(b.dataset.ar==="open"){openArchive();return;}

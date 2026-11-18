@@ -1109,6 +1109,9 @@ body[data-ruolo="priv"] #presentBtn,body[data-ruolo="priv"] [data-rpw="client"],
 .pmg-versa input:focus{outline:none;border-color:var(--fg);background:var(--bg)}.pmg-versa+.mcg-all{margin-left:16px}
 @media (max-width:720px){.pmg-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 36px;grid-template-areas:"n n x" "h p p"}.pmg-n{grid-area:n}.pmg-have{grid-area:h}.pmg-p{grid-area:p}.pmg-row .mcg-x{grid-area:x}.pmg-versa{margin-left:0}.pmg-versa+.mcg-all{margin-left:0}}
 
+/* l'archivio di un consulente contiene i clienti: niente «Nel patrimonio» */
+body[data-ruolo="pro"] .ar-topm{display:none}
+
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
 .scene-title h2 em{color:var(--lime-text)}
