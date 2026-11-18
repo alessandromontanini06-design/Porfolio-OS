@@ -511,7 +511,7 @@ function pacSheet(sh){
   for(let r=0;r<Math.min(A.length,40)&&h<0;r++){
     const hd=A[r].map(lc);if(hd.filter(Boolean).length<3)continue;
     /* c'è già una colonna che dice quale titolo è (anche «Codice ISIN», «Descrizione titolo», «Fondo»): è un elenco normale, non un PAC per foglio */
-    if(hd.some(x=>/\bisin\b|titolo|strumento|prodotto|^nome\b|^name$|security|instrument|ticker|simbolo|symbol|^fondo\b|denominazione/.test(x)))return null;
+    if(hd.some(x=>/\bisin\b|titolo|strumento|prodotto|^nome\b|^name$|security|instrument|ticker|simbolo|symbol|^fondo\b|denominazione|^etf\b|^azione\b|^asset$/.test(x)))return null;
     const f=(rx,skip)=>hd.findIndex(x=>x&&rx.test(x)&&!(skip&&PAC_RX.skip.test(x)));
     const c={d:f(PAC_RX.date),q:f(PAC_RX.qty,true),a:f(PAC_RX.amt,true),p:f(PAC_RX.px,true)};
     if(c.d>=0&&(c.q>=0||c.a>=0)&&(c.p>=0||(c.q>=0&&c.a>=0))&&new Set([c.q,c.a,c.p].filter(i=>i>=0)).size===[c.q,c.a,c.p].filter(i=>i>=0).length){h=r;col=c;}
@@ -580,7 +580,7 @@ function bkNum(v,dec){
 }
 /* separatore decimale del foglio: «12,5» e «1.234,56» → virgola; «12.5» e «1,234.56» → punto */
 function bkDec(cells){let c=0,d=0;cells.forEach(v=>{if(typeof v!=="string")return;const t=v.replace(/[^\d.,\-]/g,"");if(/^-?\d{1,3}(\.\d{3})+,\d+$|^-?\d+,\d{1,6}$/.test(t))c++;else if(/^-?\d{1,3}(,\d{3})+\.\d+$|^-?\d+\.\d{1,8}$/.test(t))d++;});return c>d?",":d>c?".":null;}
-const BK_BUY=/\b(buy|bought|purchase|kauf|kaufen|achat|koop|kopen|aankoop|k[öo]p|acquisto|acquisti|compra|compravendita acquisto|sottoscri\w*|market buy|limit buy|stop buy|buy trade|reinvest shares|savings ?plan|sparplan|spaarplan|subscription|einzahlung sparplan)\b/i;
+const BK_BUY=/\b(pac|saveback|round ?up|piano di accumulo|buy|bought|purchase|kauf|kaufen|achat|koop|kopen|aankoop|k[öo]p|acquisto|acquisti|compra|compravendita acquisto|sottoscri\w*|market buy|limit buy|stop buy|buy trade|reinvest shares|savings ?plan|sparplan|spaarplan|subscription|einzahlung sparplan)\b/i;
 const BK_SELL=/\b(sell|sold|sale|verkauf|vente|verkoop|verkopen|s[äa]lj|vendita|vendite|market sell|limit sell|stop sell|sell trade|redemption|rimborso)\b/i;
 const BK_DIV=/(dividend|dividende|utdelning|dividendo|cedol|coupon|distribution|ertrag)/i,BK_NODIV=/(belasting|tax|steuer|imposta|withholding|ritenuta|fee|commission)/i;
 const BK_ISIN=/\b([A-Z]{2}[A-Z0-9]{9}\d)\b/;
@@ -593,10 +593,10 @@ const BK_COLS={
   side:/^(type|typ av transaktion|transaction type|transactietype|type mutatie|action|buy\/sell|buy \/ sell|side|way|transaction|type de transaction|transaction category|operazione|tipo|tipo operazione|segno|event|category|transaktionsart|order type)$/i,
   name:/^(name|naam|asset name|instrument|product|produit|prodotto|security|v[äa]rdepapper\/beskrivning|v[äa]rdepapper|titolo|strumento|holdingname|title|security \/ isin|description|descrizione|omschrijving|opmerking|wertpapier|bezeichnung|nom)$/i,
   isin:/^(isin|isin code|instrument isin|asset id|identifier|codice isin|isin-code)$/i,
-  ticker:/^(ticker|symbol|symbole|instrument symbol|simbolo|asset|code)$/i,
-  qty:/^(quantity|quantit[aàé]|antal|aantal|no\. of shares|asset quantity|units|volume|number of shares|shares|quantity transacted|quantit[àa]|st[üu]ck|anzahl|nominale)$/i,
-  price:/^(price|kurs|koers|prix|unit price|price \/ share|asset price|tradeprice|trade price|price per share|share price|quote price|price at transaction|price per share in account currency|asset price in chf|prezzo|prezzo unitario|kurs \(eur\)|cours)$/i,
-  amount:/^(amount|belopp|bedrag|total|trademoney|net amount|montant de l'op[ée]ration|montant|total amount|subtotal|value|waarde|waarde \(netto\)|transaction amount|total trade value|cash flow|importo|controvalore|betrag|total \(eur\)|total\s*\(.*\))$/i,
+  ticker:/^(ticker|symbol|symbole|instrument symbol|simbolo|asset|code|etf)$/i,
+  qty:/^(quantity|quantit[aàé]|quote|n\.? ?quote|antal|aantal|no\. of shares|asset quantity|units|volume|number of shares|shares|quantity transacted|quantit[àa]|st[üu]ck|anzahl|nominale)$/i,
+  price:/^(price|kurs|koers|prix|unit price|price \/ share|asset price|tradeprice|trade price|price per share|share price|quote price|price at transaction|price per share in account currency|asset price in chf|prezzo|prezzo unitario|prezzo\s*\(.*\)|kurs \(eur\)|cours)$/i,
+  amount:/^(amount|belopp|bedrag|total|trademoney|net amount|montant de l'op[ée]ration|montant|total amount|subtotal|value|waarde|waarde \(netto\)|transaction amount|total trade value|cash flow|importo|importo\s*\(.*\)|controvalore|betrag|total \(eur\)|total\s*\(.*\))$/i,
   ccy:/^(currency|valuta|transaktionsvaluta|currencyprimary|currency \(total\)|devise du prix|transaction currency|asset currency|instrument currency|price currency|valuta koers|account currency|devise du compte|divisa|w[äa]hrung|currency \(price \/ share\))$/i
 };
 function bkStd(name,rows,how){
