@@ -7,6 +7,7 @@ import { loadEtfInfo } from "./ui/laboratorio.js";
 import { realCalc } from "./ui/rendimento.js";
 import { TOOLS_LOCAL, quantaScene } from "./ui/quanta.js";
 import { loadMarket, renderLabs } from "./ui/home.js";
+import { pmHas, pmOpen, pmRender } from "./ui/patrimonio.js";
 
 /* ---------- Avvio ---------- */
 load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);/* subito qualcosa da mostrare, poi il portafoglio di esempio vero */
@@ -17,6 +18,8 @@ quantaScene("home");svHome();
 requestAnimationFrame(movePill);
 if(!HAS_G)heroIntro();
 renderPager("home");
+/* chi ha già un patrimonio lo ritrova subito: si apre da solo, con i prezzi del giorno */
+pmRender();if(pmHas()&&!/[?&]home\b/.test(location.search))pmOpen();
 /* per i test automatici: caricare fogli come se fossero un file e leggere cosa ha capito il sito */
 window.__pos={real:()=>{const R=realCalc();return R?{error:R.error||null,used:R.pp?R.pp.used:null,unmatched:R.pp?R.pp.unmatched.length:null,nTx:S.tx&&S.tx.rows.length,ok:!!(S.ds&&S.ds.ok),lab:!!S.lab}:{none:true,tx:!!S.tx,ds:!!(S.ds&&S.ds.ok)};},tool:(n,a)=>TOOLS_LOCAL[n](a||{}),pf:()=>S.portfolio,loadEtfInfo:()=>loadEtfInfo(),loadSheets:(sheets,name)=>load(sheets,{name:name||"prova.xlsx",size:0,kind:"file"},true),
   state:()=>({recipe:S.recipe?{status:S.recipe.status,tipo:S.recipe.r&&S.recipe.r.tipoFile,raw:S.recipe.r&&{c:S.recipe.r.serieInColonna,m:S.recipe.r.matriciRendimenti,provider:S.recipe.r.provider},errors:S.recipe.errors||[],msg:S.recipe.msg||null}:null,sheet:an()&&an().name,

@@ -95,7 +95,9 @@ async function yahoo(symbol) {
   let cur = String((res.meta && res.meta.currency) || "").trim();
   if (cur === "GBp" || cur === "GBX") cur = "GBX"; else cur = cur.toUpperCase();
   const vol = daily ? { y1: volWindow(clean.pts, 1), y3: volWindow(clean.pts, 3), y5: volWindow(clean.pts, 5), from: "rendimenti giornalieri", removed: clean.removed } : { removed: clean.removed, from: "rendimenti mensili" };
-  return { data: { points, currency: cur || null, adjusted: raw.adjusted, yahoo: ys, vol, name: (res.meta && (res.meta.longName || res.meta.shortName)) || null, exchange: (res.meta && res.meta.fullExchangeName) || null } };
+  // ultime chiusure giornaliere: servono alla variazione dell'ultima seduta nel patrimonio
+  const recent = daily ? clean.pts.slice(-10).map(p => ({ d: p.d, v: +p.v.toFixed(6) })) : null;
+  return { data: { points, recent, currency: cur || null, adjusted: raw.adjusted, yahoo: ys, vol, name: (res.meta && (res.meta.longName || res.meta.shortName)) || null, exchange: (res.meta && res.meta.fullExchangeName) || null } };
 }
 
 async function monthly(symbol, key) {
@@ -103,7 +105,7 @@ async function monthly(symbol, key) {
   if (hit && Date.now() - hit.t < TTL) return hit.v;
   const y = await yahoo(symbol);
   if (y.data) {
-    const v = { symbol, adjusted: y.data.adjusted, points: y.data.points, currency: y.data.currency, currencySource: "Yahoo Finance", info: y.data.name ? `${y.data.name}${y.data.exchange ? " · " + y.data.exchange : ""}` : "", source: "Yahoo Finance", yahoo: y.data.yahoo, vol: y.data.vol };
+    const v = { symbol, adjusted: y.data.adjusted, points: y.data.points, recent: y.data.recent, currency: y.data.currency, currencySource: "Yahoo Finance", info: y.data.name ? `${y.data.name}${y.data.exchange ? " · " + y.data.exchange : ""}` : "", source: "Yahoo Finance", yahoo: y.data.yahoo, vol: y.data.vol };
     if (v.currency) cache.set("m:" + symbol, { t: Date.now(), v });
     return v;
   }
