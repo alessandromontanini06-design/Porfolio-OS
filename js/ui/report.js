@@ -5,7 +5,7 @@ import { trackOnce } from "./importa.js";
 import { CO_Y, cmpCalc, cmpMoves, costCalc } from "./portafoglio.js";
 import { chgCalc, svGet, svKeep } from "./archivio.js";
 import { macroFor, mktVol } from "./laboratorio.js";
-import { PER, bnReceipt, fiReceipt, fmtEur, mcReceipt, opReceipt, renderRisk, riskReceipt, stReceipt, stressList, unitN } from "./analisi.js";
+import { simGoals, PER, bnReceipt, fiReceipt, fmtEur, mcReceipt, opReceipt, renderRisk, riskReceipt, stReceipt, stressList, unitN } from "./analisi.js";
 import { realReceipt } from "./rendimento.js";
 
 /* ---------- Ricevute ---------- */
@@ -158,6 +158,10 @@ function buildReport(o={}){
   ${bn?`<h2>Confronto con ${esc(bn.src.label)}</h2><table class="rp-t">${row("Rendimento annuo in più",fmtPct(bn.bs.active,1,true),`${fmtPct(bn.bs.cagrP,1,true)} contro ${fmtPct(bn.bs.cagrB,1,true)}`)}${row("Beta",fmtN(bn.bs.beta),"1 = si muove come l'indice")}${row("Tracking error",fmtPct(bn.bs.te,1),"quanto ti discosti dall'indice")}${row("Information ratio",fmtN(bn.bs.ir),"extra-rendimento per unità di scostamento")}</table>`:`<p class="rp-note">Per includere il confronto con un indice, apri una volta la sezione Benchmark e rigenera il report.</p>`}
   ${cr.length?`<h2>Nelle crisi presenti nei dati</h2><table class="rp-t">${cr.map(c=>row(c.name,fmtPct(c.mdd,1),"perdita massima del portafoglio")).join("")}</table>`:""}
   ${(()=>{const C=costCalc();if(!C||!C.items.some(x=>x.ter!=null))return "";return `<h2>Quanto costa</h2><table class="rp-t">${row("Costo annuo",fmtPct(C.ter+C.other,2),C.other>0?`TER ${fmtPct(C.ter,2)} + altri costi ${fmtPct(C.other,2)}`:"TER medio ponderato")}${row("Costi quest'anno",fmtEur(C.year),"pagati anche quando il mercato scende")}${row(`In ${CO_Y} anni`,fmtEur(C.d20),"capitale in meno con un rendimento lordo del 5%")}${C.save>100?row(`Con strumenti al ${fmtPct(C.cheap,2)}`,"+"+fmtEur(C.save),`in ${CO_Y} anni`):""}</table>${C.missing.length?`<p class="rp-note">Senza costo noto: ${C.missing.map(x=>esc(x.nome)).join(", ")}.</p>`:""}`;})()}
+  ${(()=>{const G=simGoals();if(!G||!G.R.obiettivi.length)return "";const {R,I,need}=G;
+    return `<h2>Gli obiettivi</h2><table class="rp-t rp-wide"><thead><tr><th>Obiettivo</th><th class="n">Importo (euro di oggi)</th><th class="n">Tra</th><th class="n">Probabilità</th><th>Per arrivarci 8 volte su 10</th></tr></thead><tbody>
+      ${R.obiettivi.map((g,k)=>`<tr><td>${esc(g.nome)}</td><td class="n">${fmtEur(g.importo)}</td><td class="n">${g.anno} ${g.anno===1?"anno":"anni"}</td><td class="n">${fmtPct(g.prob,0)}</td><td>${g.prob>=.8?"già così":Number.isFinite(need[k])&&need[k]>0?`circa ${fmtEur(need[k])} in più al mese`:"—"}</td></tr>`).join("")}</tbody></table>
+      <p class="rp-note">${R.obiettivi.length>1&&Number.isFinite(R.probTutti)?`Tutti insieme: ${fmtPct(R.probTutti,0)}. `:""}Simulazione di ${fmtN(R.n,0).replace(",00","")} futuri sui rendimenti storici del portafoglio, partendo da ${fmtEur(I.init)} con ${fmtEur(I.monthly)} al mese, inflazione ${fmtN(I.infl,1)}% e costi ${fmtN(I.costs,2)}% l'anno. Quando arriva l'anno, se il patrimonio basta l'importo esce; gli obiettivi più vicini hanno la precedenza. Probabilità stimate sul passato, non garanzie.</p>`;})()}
   ${o.prop?reportProposal():""}
   ${o.note?`<h2>Note del consulente</h2><div class="rp-note-box">${esc(o.note).replace(/\n/g,"<br>")}</div>`:""}
   <h2>Considerazioni</h2><ul class="rp-tips">${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>

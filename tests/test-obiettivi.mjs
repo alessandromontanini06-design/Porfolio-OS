@@ -81,8 +81,21 @@ await p.waitForFunction(() => /in più al mese/.test(document.querySelectorAll("
 t("…e quanto versare in più al mese per arrivarci 8 volte su 10", await p.evaluate(() => /per arrivarci 8 volte su 10: circa [\d.]+ € in più al mese/.test(document.querySelectorAll("#mcGoals .mcg-row")[1].innerText)), await p.evaluate(() => document.querySelectorAll("#mcGoals .mcg-row")[1].innerText));
 await p.evaluate(() => document.getElementById("mcGoals").scrollIntoView({ block: "center" })); await wait(400);
 await p.screenshot({ path: `${OUT}/obiettivi-pc.jpg`, type: "jpeg", quality: 72 });
+const rep = await p.evaluate(() => window.__report({}) || "");
+t("report PDF: sezione «Gli obiettivi» con probabilità e quanto versare", /<h2>Gli obiettivi<\/h2>/.test(rep) && /Casa/.test(rep) && /Studi/.test(rep) && /in più al mese/.test(rep) && /Tutti insieme/.test(rep), rep.slice(rep.indexOf("Gli obiettivi"), rep.indexOf("Gli obiettivi") + 400));
 await p.evaluate(() => document.querySelectorAll("[data-mcgdel]")[1].click()); await wait(800);
 t("«×» toglie l'obiettivo", await p.evaluate(() => document.querySelectorAll("#mcGoals .mcg-row").length === 1 && JSON.parse(localStorage.getItem("pos-obiettivi-v1")).length === 1));
+/* report senza aver aperto le simulazioni: una pagina nuova con gli obiettivi salvati */
+const p3 = await b.newPage(); await p3.setViewport({ width: 1366, height: 900 }); p3.on("pageerror", e => errs.push(e.message));
+await p3.goto(`http://localhost:${PORT}/?home`, { waitUntil: "networkidle2" }); await wait(2500);
+await p3.evaluate(() => document.getElementById("sampleBtn").click());
+await p3.waitForFunction(() => /ricostruito/.test(document.getElementById("dsName").innerText) && !document.getElementById("confirmBtn").disabled, { timeout: 150000 });
+await p3.evaluate(() => document.querySelectorAll("select.need").forEach(x => { x.value = "ignore"; x.dispatchEvent(new Event("change", { bubbles: true })); }));
+await p3.evaluate(() => document.getElementById("confirmBtn").click());
+await p3.waitForFunction(() => !document.getElementById("navLab").classList.contains("off"), { timeout: 30000 }); await wait(1500);
+const rep3 = await p3.evaluate(() => window.__report({}) || "");
+t("report senza aprire le simulazioni: gli obiettivi salvati ci sono lo stesso", /<h2>Gli obiettivi<\/h2>/.test(rep3) && /Casa/.test(rep3), rep3.length);
+await p3.close();
 await p.setViewport({ width: 390, height: 844 }); await wait(600);
 await p.evaluate(() => document.getElementById("mcGoals").scrollIntoView({ block: "center" })); await wait(300);
 await p.screenshot({ path: `${OUT}/obiettivi-tel.jpg`, type: "jpeg", quality: 72 });

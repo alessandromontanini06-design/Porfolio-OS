@@ -197,8 +197,10 @@ function riskReceipt(m,who){
 const fmtEur=v=>Number.isFinite(v)?Math.round(v).toLocaleString("it-IT",{useGrouping:"always"})+" €":"—";
 const fmtK=v=>!Number.isFinite(v)?"—":Math.abs(v)>=1e6?fmtN(v/1e6,1)+" mln":Math.abs(v)>=1e4?fmtN(v/1e3,0)+"k":fmtN(v,0);
 const MC_M={boot:"Storico",block:"A blocchi",normal:"Normale"};
+/* capitale di partenza: il valore di oggi ai prezzi di mercato (dal rendimento reale) se c'è, altrimenti la somma delle posizioni del file */
+const pfNow=()=>S.real&&S.real.pp&&S.real.pp.value>0?S.real.pp.value:pfNow();
 function simDefaults(){
-  const mm=macroFor(S.rfSrc),pfv=S.portfolio?S.portfolio.positions.reduce((s,p)=>s+(p.valore||0),0):0,init=pfv>0?Math.round(pfv):10000,monthly=200,years=20;
+  const mm=macroFor(S.rfSrc),pfv=pfNow(),init=pfv>0?Math.round(pfv):10000,monthly=200,years=20;
   return {init,monthly,years,goal:Math.max(1000,Math.round((init+monthly*12*years)*1.5/10000)*10000),infl:mm?+(mm.infl*100).toFixed(2):2,inflSrc:mm?`media ${mm.cpiName}`:"ipotesi: nessun dato macro",costs:.2,method:"boot",n:2000,real:false};
 }
 function simInputs(){
@@ -256,6 +258,13 @@ document.addEventListener("click",e=>{const el=e.target.closest("#mcGoals");if(!
   if(e.target.closest("[data-mcgadd]")){obFromDom();S.mcOb.push({nome:"",importo:0,anno:Math.min(5,S.mcIn?S.mcIn.years:5)});obSave();renderGoals(S.mc,true);const ins=el.querySelectorAll(".mcg-n");if(ins.length)ins[ins.length-1].focus();return;}
   const x=e.target.closest("[data-mcgex]");if(x){const [n,a,y]=OB_ESEMPI[+x.dataset.mcgex];S.mcOb.push({nome:n,importo:a,anno:y});obSave();renderSim();renderGoals(S.mc,true);return;}
   const d=e.target.closest("[data-mcgdel]");if(d){obFromDom();S.mcOb.splice(+d.dataset.mcgdel,1);obSave();renderSim();renderGoals(S.mc,true);}});
+/* per il report: la simulazione con gli obiettivi salvati, anche se la pagina delle simulazioni non è stata aperta */
+function simGoals(){
+  if(!S.ds||!S.ds.ok)return null;if(!S.mcOb)S.mcOb=obLoad();if(!S.mcOb.some(obValid))return null;
+  if(!S.mcIn)S.mcIn=simDefaults();const R=S.mc&&S.mcOpts&&S.mc.obiettivi?S.mc:runSim();if(!R||R.error)return null;
+  const need=(R.obiettivi||[]).map(g=>{if(g.prob>=.8)return 0;const k=obNeedKey(g.id);if(!OB_NEED.has(k))OB_NEED.set(k,P.mcVersamentoPer({...S.mcOpts,goal:0},g.id,.8));return OB_NEED.get(k);});
+  return {R,I:S.mcIn,need};
+}
 function runSim(){
   const ds=S.ds,f=ds.freq.f,I=S.mcIn,{w,label}=riskWeights(),pa=pfAsset(w,"Portafoglio"),steps=I.years*f;
   const n=Math.max(200,Math.min(I.n,Math.floor(8e6/steps)));
@@ -275,7 +284,7 @@ function runSim(){
    Tutta la vita mese per mese, in euro di oggi, sugli stessi futuri ricampionati dai rendimenti del portafoglio (P.firePaths). */
 const FI_KEY="pos-fire-v1",FI_F=["fiAge","fiEnd","fiCap","fiSave","fiSpend","fiPen","fiPenAge","fiGoalAge"],FI_K={fiAge:"age",fiEnd:"end",fiCap:"cap",fiSave:"save",fiSpend:"spend",fiPen:"pen",fiPenAge:"penAge",fiGoalAge:"goal"};
 function fiDefaults(){
-  const pfv=S.portfolio?S.portfolio.positions.reduce((a,p)=>a+(p.valore||0),0):0,I=S.mcIn||simDefaults();
+  const pfv=pfNow(),I=S.mcIn||simDefaults();
   let saved={};try{saved=JSON.parse(localStorage.getItem(FI_KEY)||"{}")||{};}catch{}
   const d={age:35,end:90,save:500,spend:2000,pen:0,penAge:67,target:.9,goal:55,...saved,cap:pfv>0?Math.round(pfv):(I.init||10000)};
   d.goal=Math.max(d.age+1,Math.min(d.end-1,d.goal));return d;
@@ -541,7 +550,7 @@ function renderStress(){
   box.hidden=false;empty.hidden=true;
   if(!S.riskW)S.riskW=S.portfolio?"now":"equal";
   const ds=S.ds,f=ds.freq.f,R=stressList();S.stress=R;ensureBnCr();
-  if(!S.st){const pfv=S.portfolio?S.portfolio.positions.reduce((s,p)=>s+(p.valore||0),0):0;S.st={sel:null,shock:ds.assets.map(()=>""),prop:true,cap:S.mcIn?S.mcIn.init:(pfv>0?Math.round(pfv):10000)};}
+  if(!S.st){const pfv=pfNow();S.st={sel:null,shock:ds.assets.map(()=>""),prop:true,cap:S.mcIn?S.mcIn.init:(pfv>0?Math.round(pfv):10000)};}
   const opts=wOpts();
   $("#stW").innerHTML=opts.map(o=>`<button type="button" data-rw="${o[0]}" aria-pressed="${S.riskW===o[0]}">${o[1]}</button>`).join("");
   const usable=R.list.filter(c=>c.status!=="out"&&c.used);
@@ -1073,4 +1082,4 @@ document.addEventListener("click",e=>{
 $("#bnSym").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#bnSymGo").click();}});
 $("#bnCol").addEventListener("change",e=>{if(!S.bn)return;S.bn.col=e.target.value===""?null:+e.target.value;if(S.bn.col!=null)S.bn.sym="";renderBench();});
 
-export { BENCHES, FI_F, FI_K, FI_KEY, MC_M, NETC, OP_L, PER, SWANS, SW_L, UNIT, benchCardLine, benchCrisisDetail, bnCovers, bnLoad, bnReceipt, bnSource, crisisSeries, ddWhyBox, drawBnGrow, drawBnRoll, drawContrib, drawCrisisCompare, drawCrisisPath, drawDist, drawFan, drawFrontier, drawHist, drawUnderwater, ensureBnCr, fiAgeTxt, fiBase, fiCompute, fiCurve, fiDefaults, fiFill, fiGoal, fiHero, fiKpis, fiLevers, fiLifeChart, fiNotes, fiRaf, fiReceipt, fiSet, fiT, fiVars, fiYearOf, fillSimForm, fmtEur, fmtK, getJSON, mcReceipt, netClear, netGet, netPut, opBase, opEval, opReceipt, opSolve, opT, placeLabels, quantileArr, renderBench, renderBnCrises, renderBnNotes, renderBnTable, renderCrisisDetail, renderDecomp, renderFI, renderMcNotes, renderMcTable, renderOpCmp, renderOpNotes, renderOpWeights, renderOpt, renderRisk, renderRiskPro, renderRiskTable, renderShock, renderSim, renderStNotes, renderStress, renderSwans, riskReceipt, riskWeights, runSim, shockValues, simDefaults, simInputs, simT, stPer, stReceipt, star, stressList, swanClass, unitN, wOpts, yr };
+export { simGoals, BENCHES, FI_F, FI_K, FI_KEY, MC_M, NETC, OP_L, PER, SWANS, SW_L, UNIT, benchCardLine, benchCrisisDetail, bnCovers, bnLoad, bnReceipt, bnSource, crisisSeries, ddWhyBox, drawBnGrow, drawBnRoll, drawContrib, drawCrisisCompare, drawCrisisPath, drawDist, drawFan, drawFrontier, drawHist, drawUnderwater, ensureBnCr, fiAgeTxt, fiBase, fiCompute, fiCurve, fiDefaults, fiFill, fiGoal, fiHero, fiKpis, fiLevers, fiLifeChart, fiNotes, fiRaf, fiReceipt, fiSet, fiT, fiVars, fiYearOf, fillSimForm, fmtEur, fmtK, getJSON, mcReceipt, netClear, netGet, netPut, opBase, opEval, opReceipt, opSolve, opT, placeLabels, quantileArr, renderBench, renderBnCrises, renderBnNotes, renderBnTable, renderCrisisDetail, renderDecomp, renderFI, renderMcNotes, renderMcTable, renderOpCmp, renderOpNotes, renderOpWeights, renderOpt, renderRisk, renderRiskPro, renderRiskTable, renderShock, renderSim, renderStNotes, renderStress, renderSwans, riskReceipt, riskWeights, runSim, shockValues, simDefaults, simInputs, simT, stPer, stReceipt, star, stressList, swanClass, unitN, wOpts, yr };
