@@ -19,6 +19,7 @@ try {
   await p.waitForFunction(() => !document.getElementById("lab").hidden && !document.getElementById("realCard").hidden, { timeout: 60000 }); await wait(2000);
   /* una proposta B, che deve tornare uguale riaprendo */
   await p.evaluate(() => { const i = [...document.querySelectorAll('#cmpCard input.cmp-w[data-cp="1"]')].find(x => x.closest("tr").querySelector(".an").textContent.trim() === "IBGS"); i.value = 40; i.dispatchEvent(new Event("change", { bubbles: true })); }); await wait(500);
+  const val0 = await p.evaluate(() => document.getElementById("realCard").innerText.match(/Valore stimato oggi\s*([\d.]+) €/)?.[1]);
   await p.evaluate(() => document.querySelector('.dock [data-go="home"]').click()); await wait(800);
   await p.evaluate(() => window.__saved.list().then(L => { /* salva di nuovo con la proposta */ }));
   const L = await p.evaluate(() => window.__saved.list().then(a => a.map(r => ({ id: r.id, fast: !!(r.fast && r.fast.v), n: r.fast && r.fast.rb && r.fast.rb.cols.length, cols: r.fast && r.fast.rb.cols.map(c => c.name).join(","), head: r.fast && r.fast.sheet.aoa[0].join(","), assets: r.assets.join(",") }))));
@@ -35,7 +36,7 @@ try {
   ok(!scenes.includes("scan") && !scenes.includes("map"), "nessun passaggio da scansione o mappa: " + [...new Set(scenes)].join(","));
   ok(prices === 0, `nessun prezzo riscaricato (${prices} richieste)`);
   const st = await p.evaluate(() => ({ real: document.getElementById("realCard").innerText.match(/Valore stimato oggi\s*([\d.]+) €/)?.[1], offer: document.getElementById("svOffer").innerText, ibgs: [...document.querySelectorAll('#cmpCard input.cmp-w[data-cp="1"]')].find(x => x.closest("tr").querySelector(".an").textContent.trim() === "IBGS")?.value }));
-  ok(/156\.194/.test(st.real || ""), "stessi numeri: " + st.real);
+  ok(!!val0 && st.real === val0, `stessi numeri prima e dopo la riapertura: ${val0} → ${st.real}`);
   ok(/Aperto dall'archivio/.test(st.offer) && /Aggiorna i prezzi/.test(st.offer), "avviso con «Aggiorna i prezzi»");
   ok(st.ibgs === "40", "la proposta B è tornata com'era (IBGS 40%)");
   const H1 = await p.evaluate(() => window.__saved.list().then(a => a[0].history.length));

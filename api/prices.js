@@ -30,6 +30,7 @@ const Y_SUFFIX = { LON: "L", DEX: "DE", ETR: "DE", FRK: "F", PAR: "PA", AMS: "AS
 function toYahoo(symbol) {
   const m = symbol.match(/^(.+)\.([A-Z]{1,4})$/);
   if (!m) return symbol;
+  if (m[2] === "US") return m[1]; // azioni e fondi americani: Yahoo li vuole senza borsa
   return Y_SUFFIX[m[2]] ? `${m[1]}.${Y_SUFFIX[m[2]]}` : symbol;
 }
 /* errori di un solo punto: il prezzo salta e il punto dopo torna dov'era (tipico dei dati di Yahoo).
@@ -97,7 +98,10 @@ async function yahoo(symbol) {
   const vol = daily ? { y1: volWindow(clean.pts, 1), y3: volWindow(clean.pts, 3), y5: volWindow(clean.pts, 5), from: "rendimenti giornalieri", removed: clean.removed } : { removed: clean.removed, from: "rendimenti mensili" };
   // ultime chiusure giornaliere: servono alla variazione dell'ultima seduta nel patrimonio
   const recent = daily ? clean.pts.slice(-10).map(p => ({ d: p.d, v: +p.v.toFixed(6) })) : null;
-  return { data: { points, recent, currency: cur || null, adjusted: raw.adjusted, yahoo: ys, vol, name: (res.meta && (res.meta.longName || res.meta.shortName)) || null, exchange: (res.meta && res.meta.fullExchangeName) || null } };
+  // dividendi degli ultimi 3 anni (per quota, nella valuta del titolo): servono a stimare i proventi in arrivo nel patrimonio
+  const dv = res.events && res.events.dividends ? Object.values(res.events.dividends) : [], from3 = Date.now() / 1000 - 3 * 365.25 * 86400;
+  const dividendi = dv.filter(x => x && x.date >= from3 && x.amount > 0).sort((a, b) => a.date - b.date).map(x => ({ d: new Date((x.date + ((res.meta && res.meta.gmtoffset) || 0) + 43200) * 1000).toISOString().slice(0, 10), v: +(+x.amount).toFixed(6) }));
+  return { data: { points, recent, dividendi, currency: cur || null, adjusted: raw.adjusted, yahoo: ys, vol, name: (res.meta && (res.meta.longName || res.meta.shortName)) || null, exchange: (res.meta && res.meta.fullExchangeName) || null } };
 }
 
 async function monthly(symbol, key) {
@@ -105,7 +109,7 @@ async function monthly(symbol, key) {
   if (hit && Date.now() - hit.t < TTL) return hit.v;
   const y = await yahoo(symbol);
   if (y.data) {
-    const v = { symbol, adjusted: y.data.adjusted, points: y.data.points, recent: y.data.recent, currency: y.data.currency, currencySource: "Yahoo Finance", info: y.data.name ? `${y.data.name}${y.data.exchange ? " · " + y.data.exchange : ""}` : "", source: "Yahoo Finance", yahoo: y.data.yahoo, vol: y.data.vol };
+    const v = { symbol, adjusted: y.data.adjusted, points: y.data.points, recent: y.data.recent, dividendi: y.data.dividendi, currency: y.data.currency, currencySource: "Yahoo Finance", info: y.data.name ? `${y.data.name}${y.data.exchange ? " · " + y.data.exchange : ""}` : "", source: "Yahoo Finance", yahoo: y.data.yahoo, vol: y.data.vol };
     if (v.currency) cache.set("m:" + symbol, { t: Date.now(), v });
     return v;
   }

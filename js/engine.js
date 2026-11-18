@@ -71,7 +71,17 @@ function cellKind(v){
 /* riga d'intestazione: la prima riga di testo seguita da una riga di dati (numeri o date).
    Primo tentativo severo (almeno metà della riga sotto è numeri/date); se non trova nulla, un secondo più tollerante
    (almeno 3 e il 30%), per gli export dei broker pieni di colonne di testo (ora, borsa, valuta, ID ordine). */
-function detectHeader(aoa){let r=detectHeaderAt(aoa,.5,2);if(r<0)r=detectHeaderAt(aoa,.3,3);if(r<0)r=detectHeaderByNames(aoa);return r;}
+function detectHeader(aoa){let r=detectHeaderAt(aoa,.5,2);if(r<0)r=detectHeaderAt(aoa,.3,3);if(r<0)r=detectHeaderByNames(aoa);else r=headerAbove(aoa,r);return r;}
+/* una riga di dati con molti testi (nome, ticker, ISIN) può sembrare un'intestazione, se la riga sotto ha una cella vuota:
+   se più in alto c'è un'intestazione vera (due nomi di colonna noti, nessun numero) e da lì la tabella continua senza righe vuote, vince quella */
+function headerAbove(aoa,r){
+  for(let r0=0;r0<r;r0++){const row=aoa[r0]||[];
+    if(row.some(v=>cellKind(v)==="n"||cellKind(v)==="d")||row.filter(v=>typeof v==="string"&&headerTag(v)).length<2)continue;
+    if((aoa[r]||[]).filter(v=>typeof v==="string"&&headerTag(v)).length>=2)continue;
+    let ok=true;for(let k=r0+1;k<=r;k++)if((aoa[k]||[]).every(isBlank)){ok=false;break;}
+    if(ok)return r0;}
+  return r;
+}
 /* terzo tentativo: una riga con almeno due nomi di colonna noti (Strumento, ISIN, Valore, Peso…) seguita da una riga con almeno un numero */
 function detectHeaderByNames(aoa){
   for(let r=0;r<Math.min(aoa.length,25);r++){const row=aoa[r]||[];if(row.filter(v=>typeof v==="string"&&headerTag(v)).length<2)continue;
@@ -858,7 +868,7 @@ function localRecipe(sheets){
         if(!code&&!isin&&!ex){const v=cV>=0?parseNum(row[cV]):null;if(nm)sc.push(`${nm}${v?` ${fmtN(v.n,0)} €`:""}: senza ticker né ISIN`);continue;}
         const v=cV>=0?parseNum(row[cV]):null;
         /* codici in stile Reuters delle piattaforme di trading («1BMW.MI», «AMD.O», «NOVC.FRA»): come etichetta il codice senza la borsa */
-        const ric=code.match(/^\d?([A-Z][A-Z0-9]{0,9})\.(MI|O|N|OQ|FRA|DE|F|PA|AS|L|SW|MC|BR|VI|ST|CO|HE|OL|TO|TSX)$/i),lab=ric?ric[1].toUpperCase():code;
+        const ric=code.match(/^\d?([A-Z][A-Z0-9]{0,9})\.(MI|O|N|OQ|FRA|DE|F|PA|AS|L|SW|MC|BR|VI|ST|CO|HE|OL|TO|TSX|US|MIL|DEX|AMS|LON|PAR|SWX|FRK)$/i),lab=ric?ric[1].toUpperCase():code;
         pos.push({nome:nm,ticker:lab||isin,isin:isin||null,simbolo:ex||code||"",valore:v?v.n:null,pesoAttuale:cW>=0?w(row[cW]):null,pesoTarget:cG>=0?w(row[cG]):null});}
       if(pos.length){R.posizioni=pos;R.scartati.push(...sc);parts.push({kind:"posizioni",foglio:sh.name,conf:"media",d:`«${sh.name}»: riepilogo di ${pos.length} posizioni senza storico`});continue;}
     }
@@ -1684,6 +1694,7 @@ function ledger(strumenti,operazioni,prezzi,cambi,opzioni){
   const nEnd=opzioni.al?lgDay(opzioni.al):Math.max(ops[ops.length-1]._n,Number.isFinite(lastPx)?lastPx:-Infinity);
   const P={};const pos=id=>P[id]||=({id,qta:0,costo:0,realizzato:0,proventi:0,spese:0,tasse:0,acquistato:0,venduto:0,ops:0,flussi:[]});
   const flussi=[],serie=[];let k=0,prevV=0,twr=1,versato=0,picco=1,maxDD=0,speseExtra=0;
+  const vendite=[]; /* per il fisco: ogni vendita con il suo guadagno o perdita (costo medio ponderato) */
   for(let n=n0;n<=nEnd;n++){
     let F=0;
     while(k<ops.length&&ops[k]._n===n){const o=ops[k++];const ccy=String(o.valuta||ccyOf(o.strumento)).toUpperCase();
@@ -1695,7 +1706,7 @@ function ledger(strumenti,operazioni,prezzi,cambi,opzioni){
       else if(o.tipo==="vendita"){let q=+o.quantita;if(q>p.qta+1e-9){warn(`Vendita di ${fmtN(q,4)} quote di ${nome(o.strumento)} il ${o.data}, ma ne risultano ${fmtN(p.qta,4)}: venduto solo quello che c'era.`);q=p.qta;}
         if(!(q>0))continue;const lordo=toEur(q*+o.prezzo*k100(o.strumento),ccy,n,o.cambio),sp=Math.abs(+o.spese||0)+Math.abs(+o.tasse||0);
         if(!Number.isFinite(lordo)){warn(`Manca il cambio ${ccy} per la vendita di ${nome(o.strumento)} del ${o.data}.`);continue;}
-        const base=p.qta>0?p.costo*q/p.qta:0,netto=lordo-sp;p.realizzato+=netto-base;p.costo-=base;p.qta-=q;if(p.qta<1e-9){p.qta=0;p.costo=0;}
+        const base=p.qta>0?p.costo*q/p.qta:0,netto=lordo-sp;p.realizzato+=netto-base;vendite.push({d:lgStr(n),id:o.strumento,plus:netto-base,netto,costo:base});p.costo-=base;p.qta-=q;if(p.qta<1e-9){p.qta=0;p.costo=0;}
         p.spese+=Math.abs(+o.spese||0);p.tasse+=Math.abs(+o.tasse||0);p.venduto+=netto;F-=netto;p.flussi.push({t:new Date(n*864e5),v:netto});flussi.push({t:new Date(n*864e5),v:netto});}
       else if(o.tipo==="dividendo"||o.tipo==="cedola"){const a=toEur(+o.importo||0,ccy,n,o.cambio);if(!Number.isFinite(a)){warn(`Manca il cambio ${ccy} per il provento di ${nome(o.strumento)} del ${o.data}.`);continue;}
         p.proventi+=a;F-=a;p.flussi.push({t:new Date(n*864e5),v:a});flussi.push({t:new Date(n*864e5),v:a});}
@@ -1721,12 +1732,71 @@ function ledger(strumenti,operazioni,prezzi,cambi,opzioni){
   const ieri=serie.length>1?serie[serie.length-2]:null,ultimo=serie[serie.length-1];
   const giorno=ieri&&ieri.valore>0?{euro:ultimo.valore-ultimo.flusso-ieri.valore,pct:(ultimo.valore-ultimo.flusso)/ieri.valore-1}:null;
   const anni=(nEnd-n0)/365.25,fl=flussi.concat(V>0?[{t:new Date(oggi*864e5),v:V}]:[]);
-  return {vuoto:false,dal:lgStr(n0),al:lgStr(nEnd),posizioni,serie,avvisi,
+  return {vuoto:false,dal:lgStr(n0),al:lgStr(nEnd),posizioni,serie,avvisi,vendite,
     totale:{valore:V,versato,guadagno:V-versato,guadagnoPct:versato>0?(V-versato)/versato:NaN,
       realizzato:posizioni.reduce((s,p)=>s+p.realizzato,0),latente:posizioni.reduce((s,p)=>s+(p.aperta?p.latente:0),0),
       proventi:posizioni.reduce((s,p)=>s+p.proventi,0),spese:posizioni.reduce((s,p)=>s+p.spese+p.tasse,0)+speseExtra,
       tir:xirr(fl),twr:twr-1,twrAnn:anni>=1?Math.pow(twr,1/anni)-1:NaN,anni,maxDD,giorno}};
 }
-export const POS={sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
+/* ===== Fisco italiano (stima): imposte sulle vendite, zainetto fiscale, imposte se si vendesse oggi, bollo =====
+   Regole principali (persona fisica residente, aggiornate al 2026). Le imposte vere le calcola la banca (regime amministrato) o il commercialista:
+   - ETF e fondi (OICR): i guadagni sono redditi di CAPITALE, 26%, e NON si compensano con le minusvalenze; le loro perdite sono redditi diversi e vanno nello zainetto;
+   - azioni, ETC/ETN, obbligazioni non statali: redditi diversi, 26%, i guadagni si compensano con le minusvalenze;
+   - titoli di Stato italiani ed esteri della white list: 12,5%; nella compensazione contano per il 48,08% (12,5/26);
+   - cripto: redditi diversi, 26% fino al 2025, 33% dal 2026;
+   - minusvalenze: si usano fino al 31 dicembre del quarto anno dopo quello in cui sono nate, le più vecchie per prime;
+   - bollo: 0,2% l'anno sul valore dei prodotti finanziari (anche cripto e titoli di Stato); per i conti correnti 34,20 € se la giacenza media supera 5.000 €. */
+const FISCO_QUOTA_STATO=12.5/26;
+const fiscoRate=(cat,anno)=>cat==="cripto"?(anno>=2026?.33:.26):cat==="statale"?.125:.26;
+const FISCO_CAT_L={fondo:"ETF e fondi",diversi:"Azioni, ETC e altri titoli",statale:"Titoli di Stato",obbligazione:"Obbligazioni",cripto:"Cripto",fuori:"Fuori dal calcolo"};
+function fiscoCat(s){
+  s=s||{};const n=String(s.nome||""),sym=String(s.simbolo||s.ticker||"").toUpperCase(),isin=String(s.isin||"").toUpperCase();
+  if(s.manuale)return "fuori";
+  if(FISCO_CAT_L[s.fiscale])return s.fiscale; /* scelta a mano o dal catalogo */
+  if(s.per100)return s.governativo||/^IT000[0-9]/.test(isin)||/\b(BTP|BOT|CCT|CTZ|BUND|OAT|BONOS|TREASURY)\b/i.test(n)?"statale":"obbligazione";
+  if(/-(EUR|USD)$/.test(sym)||s.classe==="Cripto"||/\b(bitcoin|ethereum|solana|cripto|crypto)\b/i.test(n)&&!/\b(ETN|ETC|ETP)\b/i.test(n))return "cripto";
+  if(/\b(ETC|ETN|ETP)\b|physical (gold|silver|platinum)|xetra-gold|gold bullion|btcetc/i.test(n))return "diversi";
+  if(/\b(ETF|UCITS|SICAV|FUND|FONDO|FONDI|OICR|ISHARES|VANGUARD|XTRACKERS|AMUNDI|SPDR|INVESCO|LYXOR|VANECK|WISDOMTREE|EURIZON|FONDITALIA|ANIMA|PICTET|FIDELITY|BLACKROCK|JPMORGAN|SCHRODER)\b/i.test(n)||/^0P[0-9A-Z]{8}/.test(sym))return "fondo";
+  return "diversi";
+}
+/* R: risultato di ledger; strumenti: come in ledger; opzioni: { oggi:"AAAA-MM-GG" } */
+function fisco(R,strumenti,opzioni){
+  strumenti=strumenti||{};opzioni=opzioni||{};
+  const oggi=String(opzioni.oggi||(R&&R.al)||new Date().toISOString().slice(0,10)),annoOggi=+oggi.slice(0,4);
+  const cat=id=>fiscoCat(strumenti[id]),out={anni:{},zainetto:[],vendite:[],latente:{righe:[],plus:0,minus:0,imposta:0,usaZainetto:0},bollo:{base:0,annuo:0},note:[]};
+  if(!R||R.vuoto)return out;
+  let Z=[];const scaduto=y=>{Z=Z.filter(z=>z.anno+4>=y&&z.residuo>0.005);};
+  /* compensa un guadagno «diverso» (già portato a base 26%) con le minusvalenze più vecchie */
+  const usa=(base,lista)=>{let usato=0;for(const z of lista){if(base<=0)break;const u=Math.min(z.residuo,base);z.residuo-=u;base-=u;usato+=u;}return {base,usato};};
+  const anno=y=>out.anni[y]||=({plus:0,minus:0,compensato:0,imposta:0,fondi:0});
+  for(const v of (R.vendite||[]).slice().sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0)){
+    const c=cat(v.id),y=+v.d.slice(0,4),A=anno(y);if(c==="fuori")continue;scaduto(y);
+    let imposta=0,usato=0;
+    if(v.plus<0){const m=-v.plus*(c==="statale"?FISCO_QUOTA_STATO:1);Z.push({anno:y,origine:v.id,residuo:m,iniziale:m});A.minus+=m;}
+    else if(v.plus>0){
+      if(c==="fondo"){imposta=v.plus*.26;A.fondi+=v.plus;}
+      else{const eq=c==="statale"?v.plus*FISCO_QUOTA_STATO:v.plus,r=usa(eq,Z);usato=r.usato;imposta=c==="statale"?r.base*.26:r.base*fiscoRate(c,y);A.compensato+=usato;}
+      A.plus+=v.plus;A.imposta+=imposta;}
+    out.vendite.push({...v,cat:c,imposta,compensato:usato});
+  }
+  scaduto(annoOggi);
+  out.zainetto=Z.map(z=>({anno:z.anno,origine:z.origine,nome:(strumenti[z.origine]&&strumenti[z.origine].nome)||z.origine,residuo:z.residuo,iniziale:z.iniziale,scadenza:`${z.anno+4}-12-31`}));
+  /* se vendessi tutto oggi: le perdite entrano nello zainetto (si usano subito per i guadagni compensabili), i guadagni dei fondi pagano sempre */
+  const L=out.latente,Zc=Z.map(z=>({...z})),righe=(R.posizioni||[]).filter(p=>p.aperta&&cat(p.id)!=="fuori").map(p=>({id:p.id,nome:p.nome,cat:cat(p.id),valore:p.valore,costo:p.costo,lat:p.valore-p.costo}));
+  righe.filter(r=>r.lat<0).forEach(r=>{const m=-r.lat*(r.cat==="statale"?FISCO_QUOTA_STATO:1);Zc.push({anno:annoOggi,residuo:m});r.imposta=0;L.minus+=-r.lat;});
+  righe.filter(r=>r.lat>=0).sort((a,b)=>b.lat-a.lat).forEach(r=>{
+    if(r.cat==="fondo"){r.imposta=r.lat*.26;r.compensato=0;}
+    else{const eq=r.cat==="statale"?r.lat*FISCO_QUOTA_STATO:r.lat,x=usa(eq,Zc);r.compensato=x.usato;L.usaZainetto+=x.usato;r.imposta=r.cat==="statale"?x.base*.26:x.base*fiscoRate(r.cat,annoOggi);}
+    L.plus+=r.lat;L.imposta+=r.imposta;});
+  L.righe=righe.sort((a,b)=>b.valore-a.valore);L.netto=righe.reduce((a,r)=>a+r.valore,0)-L.imposta;
+  /* bollo: 0,2% del valore dei prodotti finanziari (i beni senza quotazione e la liquidità inserita a mano restano fuori) */
+  out.bollo.base=righe.reduce((a,r)=>a+r.valore,0);out.bollo.annuo=out.bollo.base*.002;
+  out.anno=anno(annoOggi);
+  if(righe.some(r=>r.cat==="fondo"&&/bond|obblig|govt|treasury|aggregate|€ gov/i.test(r.nome)))out.note.push("Per gli ETF obbligazionari l'imposta vera può essere più bassa: la parte investita in titoli di Stato paga il 12,5%.");
+  if(out.zainetto.length&&righe.some(r=>r.cat==="fondo"&&r.lat>0))out.note.push("Le minusvalenze non si possono usare contro i guadagni di ETF e fondi: si recuperano solo con azioni, ETC, obbligazioni e certificati.");
+  return out;
+}
+
+export const POS={fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

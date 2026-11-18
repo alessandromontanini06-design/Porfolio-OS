@@ -22,23 +22,30 @@ await wait(200);
 t("ricerca «oro»: trova l'oro fisico e il cursore resta nella ricerca", await p.evaluate(() => /Physical Gold|Xetra-Gold/.test(document.querySelector(".bd-clist").innerText) && document.activeElement.classList.contains("bd-cq")));
 await p.evaluate(() => { const i = document.querySelector(".bd-cq"); i.value = "US0378331005"; i.dispatchEvent(new Event("input", { bubbles: true })); }); await wait(200);
 t("ricerca per ISIN: Apple", await p.evaluate(() => document.querySelectorAll(".bd-clist .bd-ci").length === 1 && /Apple/.test(document.querySelector(".bd-clist").innerText)));
-await p.evaluate(() => { const i = document.querySelector(".bd-cq"); i.value = "zzzz nessuno"; i.dispatchEvent(new Event("input", { bubbles: true })); }); await wait(200);
-t("ricerca senza risultati: spiega cosa fare", await p.evaluate(() => /Puoi scrivere comunque ticker o ISIN/.test(document.querySelector(".bd-clist").innerText)));
+await p.evaluate(() => { const i = document.querySelector(".bd-cq"); i.value = "qzxqzx"; i.dispatchEvent(new Event("input", { bubbles: true })); }); await wait(200);
+await p.waitForFunction(() => /Nessun titolo trovato/.test(document.querySelector(".bd-rlist").innerText), { timeout: 20000 }).catch(() => {});
+t("ricerca senza risultati: spiega cosa fare", await p.evaluate(() => /Nessun titolo trovato[\s\S]*ticker o l'ISIN/.test(document.querySelector(".bd-rlist").innerText)), await p.evaluate(() => document.querySelector(".bd-rlist").innerText));
 /* portafoglio misto dal catalogo: ETF mondo, Eni, Apple, oro, Bitcoin */
 await p.click("#bdClear"); await wait(150);
 for (const tk of ["VWCE", "ENI", "AAPL", "SGLD", "VBTC"]) {
   await p.evaluate(tk => { const i = document.querySelector(".bd-cq"); i.value = tk; i.dispatchEvent(new Event("input", { bubbles: true })); }, tk); await wait(120);
   await p.evaluate(tk => document.querySelector(`.bd-clist [data-bdc="${tk}"]`).click(), tk); await wait(150);
 }
-for (const [i, w] of [60, 15, 10, 10, 5].entries()) { await p.evaluate((i, w) => { const x = document.querySelectorAll("#bdRows input[data-bdw]")[i]; x.value = String(w); x.dispatchEvent(new Event("change", { bubbles: true })); }, i, w); await wait(120); }
-t("5 strumenti aggiunti dal catalogo, totale 100%", await p.evaluate(() => document.querySelectorAll("#bdRows .bd-row").length === 5 && /^Totale 100%$/.test(document.getElementById("bdSum").textContent.trim())), await p.evaluate(() => document.getElementById("bdSum").textContent));
+/* ricerca su tutte le borse: Toyota a Tokyo, che il catalogo non ha */
+await p.evaluate(() => { const i = document.querySelector(".bd-cq"); i.value = "Toyota"; i.dispatchEvent(new Event("input", { bubbles: true })); });
+const okR = await p.waitForFunction(() => [...document.querySelectorAll(".bd-rlist .bd-ri")].some(b => /7203/.test(b.textContent)), { timeout: 20000 }).then(() => true).catch(() => false);
+t("ricerca «Toyota»: risultati da tutte le borse, c'è Tokyo (7203)", okR, await p.evaluate(() => document.querySelector(".bd-rlist").innerText.slice(0, 200)));
+await p.evaluate(() => [...document.querySelectorAll(".bd-rlist .bd-ri")].find(b => /7203/.test(b.textContent)).click()); await wait(300);
+t("Toyota entra nelle righe con il suo nome", await p.evaluate(() => /Toyota/.test(document.getElementById("bdRows").innerText) && [...document.querySelectorAll("#bdRows input[list]")].some(i => i.value === "7203.T")), await p.evaluate(() => document.getElementById("bdRows").innerText.slice(0, 300)));
+for (const [i, w] of [50, 15, 10, 10, 5, 10].entries()) { await p.evaluate((i, w) => { const x = document.querySelectorAll("#bdRows input[data-bdw]")[i]; x.value = String(w); x.dispatchEvent(new Event("change", { bubbles: true })); }, i, w); await wait(120); }
+t("6 strumenti (5 dal catalogo, 1 dalla ricerca), totale 100%", await p.evaluate(() => document.querySelectorAll("#bdRows .bd-row").length === 6 && /^Totale 100%$/.test(document.getElementById("bdSum").textContent.trim())), await p.evaluate(() => document.getElementById("bdSum").textContent));
 await p.screenshot({ path: `${OUT}/catalogo-1.jpg`, type: "jpeg", quality: 70 });
 await p.click("#bdGo");
-const inLab = await p.waitForFunction(() => document.body.dataset.scene === "lab" && !document.getElementById("lab").hidden, { timeout: 180000 }).then(() => true).catch(() => false);
+const inLab = await p.waitForFunction(() => document.body.dataset.scene === "lab" && !document.getElementById("lab").hidden, { timeout: 240000 }).then(() => true).catch(() => false);
 const st = await p.evaluate(() => window.__pos.state());
 if (process.env.DEBUG) console.log(JSON.stringify(st).slice(0, 3000));
 t("arriva al laboratorio con i prezzi veri", inLab, JSON.stringify(st.checks || st).slice(0, 300));
-t("5 strumenti con prezzi (anche azioni, oro e cripto)", (st.assets || []).length === 5, (st.assets || []).join(","));
+t("6 strumenti con prezzi (anche Tokyo, oro e cripto)", (st.assets || []).length === 6, (st.assets || []).join(","));
 await wait(1500); await p.screenshot({ path: `${OUT}/catalogo-2.jpg`, type: "jpeg", quality: 70 });
 t("nessun errore JavaScript", !errs.length, errs.join(" | "));
 console.log(`\n${pass} superati, ${fail} falliti`);

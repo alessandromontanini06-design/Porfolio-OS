@@ -3,7 +3,7 @@
 import { $, P, S, esc, fmtDate, fmtN, fmtPct } from "./core.js";
 import { current, go } from "./scene.js";
 import { ISIN_RX, bondsHTML, isSim, track, trackOnce } from "./importa.js";
-import { svFileName } from "./archivio.js";
+import { svFileName, svKeep } from "./archivio.js";
 import { disposeNet, labIndex, macroFor, niceTicks } from "./laboratorio.js";
 import { UNIT, fmtEur, renderRisk, unitN } from "./analisi.js";
 import { taxInfo } from "./rendimento.js";
@@ -171,11 +171,12 @@ function drawCompare(R){
   R.res.forEach((r,j)=>{if(r.empty)return;let d="";r.W.forEach((v,i)=>{d+=(i?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1);});g+=`<path d="${d}" fill="none" stroke="${CMP_COL[j]}" stroke-width="${j?2:2.6}" stroke-linejoin="round"><title>${r.name}: 100 € diventano ${fmtN(r.W[r.W.length-1]*100,0)} €</title></path>`;});
   el.innerHTML=`<svg viewBox="0 0 ${VW} ${VH}" role="img" aria-label="Crescita di 100 euro per ogni portafoglio sugli stessi mesi">${g}</svg>`;
 }
-document.addEventListener("change",e=>{const el=e.target;if(!el.matches||!el.matches("input.cmp-w")||!S.cmp)return;trackOnce("feature","confronto",{name:"confronto"});const v=parseFloat(String(el.value).replace(",","."));if(!Number.isFinite(v)||v<0)return;S.cmp.ports[+el.dataset.cp].w[+el.dataset.ci]=v/100;renderCompare();});
+document.addEventListener("change",e=>{const el=e.target;if(!el.matches||!el.matches("input.cmp-w")||!S.cmp)return;trackOnce("feature","confronto",{name:"confronto"});const v=parseFloat(String(el.value).replace(",","."));if(!Number.isFinite(v)||v<0)return;S.cmp.ports[+el.dataset.cp].w[+el.dataset.ci]=v/100;renderCompare();svKeep();});
 document.addEventListener("click",e=>{if(!S.cmp)return;const t=e.target;
   if(t.id==="cmpAdd"&&S.cmp.ports.length<3){const n=S.ds.assets.length;S.cmp.ports.push({name:"ABC"[S.cmp.ports.length],w:S.ds.assets.map(()=>1/n)});renderCompare();}
   else if(t.id==="cmpEq"&&S.cmp.ports[1]){const n=S.ds.assets.length;S.cmp.ports[1].w=S.ds.assets.map(()=>1/n);renderCompare();}
-  else if(t.dataset&&t.dataset.cpx){S.cmp.ports.splice(+t.dataset.cpx,1);S.cmp.ports.forEach((p,i)=>p.name="ABC"[i]);renderCompare();}});
+  else if(t.dataset&&t.dataset.cpx){S.cmp.ports.splice(+t.dataset.cpx,1);S.cmp.ports.forEach((p,i)=>p.name="ABC"[i]);renderCompare();}
+  else return;svKeep();});
 /* ---------- Il tuo profilo: la tua allocazione è coerente con te? ----------
    Non è consulenza: non indica prodotti. Misura la perdita che l'utente regge da come reagisce a crisi vere rivissute
    con il suo capitale, e la confronta con le perdite storiche del suo portafoglio e di versioni più prudenti

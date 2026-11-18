@@ -41,7 +41,7 @@ async function pmPrices(force) {
   const db = pmDb(), ids = Object.keys(db.strumenti).filter(id => db.strumenti[id].simbolo && (force || !PM.px[id]));
   const q = ids.slice();
   await Promise.all([0, 1, 2].map(async () => { while (q.length) { const id = q.shift(), s = db.strumenti[id];
-    const j = await getJSON(`/api/prices?symbol=${encodeURIComponent(s.simbolo)}&v=5`);
+    const j = await getJSON(`/api/prices?symbol=${encodeURIComponent(s.simbolo)}&v=6`);
     PM.px[id] = j && !j.error && j.points ? j : { error: (j && j.error) || "prezzi non disponibili" }; } }));
   await pmFx(force);
 }
@@ -426,6 +426,64 @@ function pmButton() {
   $("#pmBtnS").textContent = ses ? `${ses.d === pmToday() ? "oggi" : dayName(ses.d)} ${sEur(ses.euro)} (${sPct(ses.pct)}) · guadagno ${sEur(R.totale.guadagno)}` : `guadagno ${sEur(R.totale.guadagno)}`;
   if (nd) $("#pmBtnS").textContent = `${nd === 1 ? "un PAC" : nd + " PAC"} da registrare · ` + $("#pmBtnS").textContent;
 }
+/* ---------- Le tue tasse (stima): motore POS.fisco ---------- */
+/* categoria fiscale: scelta a mano > catalogo del sito (sa quali sono ETF) > nome */
+function pmFiscStrumenti() {
+  const out = {};
+  for (const [id, s] of Object.entries(PM.db.strumenti)) {
+    let f = s.fiscale || null;
+    if (!f) { const pop = POPULAR.find(p => (s.isin && p[2] === s.isin) || (s.ticker && p[0] === String(s.ticker).toUpperCase()));
+      if (pop) f = /^ETF/.test(pop[4]) || (pop[4] === "Oro e materie prime" && !/\b(ETC|ETN|ETP)\b|physical|xetra-gold/i.test(pop[1])) ? "fondo" : pop[4] === "Cripto" ? "diversi" : null; }
+    out[id] = f ? { ...s, fiscale: f } : s;
+  }
+  return out;
+}
+function pmTax(R) {
+  const box = $("#pmTaxBox"); if (!box) return;
+  const ST = pmFiscStrumenti(), F = P.fisco(R, ST, { oggi: pmToday() }), L = F.latente, y = +pmToday().slice(0, 4);
+  const show = L.righe.length || F.vendite.length || F.zainetto.length; box.hidden = !show; if (!show) { $("#pmTax").innerHTML = ""; return; }
+  const z = F.zainetto, zTot = z.reduce((a, x) => a + x.residuo, 0), zFirst = z.length ? z.slice().sort((a, b) => a.scadenza < b.scadenza ? -1 : 1)[0] : null, A = F.anni[y];
+  const opt = (id, c) => `<select data-pmfisc="${esc(id)}" aria-label="Categoria fiscale di ${esc(ST[id].nome)}">${["fondo", "diversi", "statale", "obbligazione", "cripto"].map(k => `<option value="${k}"${k === c ? " selected" : ""}>${P.FISCO_CAT_L[k]}</option>`).join("")}</select>`;
+  const rate = r => r.cat === "fondo" ? "26%, senza compensare" : r.cat === "statale" ? "12,5%" : r.cat === "cripto" ? (y >= 2026 ? "33%" : "26%") : "26%";
+  $("#pmTax").innerHTML = `<div class="pm-tax-k">
+      <div><span>Bollo stimato, ${y}</span><b>${fmtEur(F.bollo.annuo)}</b><small>0,2% di ${fmtEur(F.bollo.base)} in titoli</small></div>
+      <div><span>Se vendessi tutto oggi</span><b class="${L.imposta > 0.5 ? "dn" : ""}">${L.imposta > 0.5 ? "−" + fmtEur(L.imposta) : fmtEur(0)}</b><small>di imposte · incasseresti ${fmtEur(L.netto)}</small></div>
+      <div><span>Minusvalenze da recuperare</span><b>${zTot > 0.5 ? fmtEur(zTot) : "nessuna"}</b><small>${zFirst ? `${fmtEur(zFirst.residuo)} scadono il ${dIt(zFirst.scadenza)}` : "lo «zainetto fiscale» è vuoto"}</small></div>
+    </div>
+    ${A && (A.plus > 0 || A.minus > 0) ? `<p class="pm-tax-y">Vendite del ${y}: guadagni ${fmtEur(A.plus)}${A.compensato > 0.5 ? `, di cui ${fmtEur(A.compensato)} compensati con le minusvalenze` : ""}${A.minus > 0.5 ? ` · perdite ${fmtEur(A.minus)} (nello zainetto)` : ""} · imposte stimate <b>${fmtEur(A.imposta)}</b>.</p>` : ""}
+    <details class="pm-tax-d"><summary>Posizione per posizione e come è calcolato</summary>
+      <div class="tablewrap"><table class="mt"><thead><tr><th>Strumento</th><th>Categoria fiscale</th><th class="num">Guadagno se vendi oggi</th><th class="num">Imposta</th></tr></thead><tbody>
+      ${L.righe.map(r => `<tr><td><b>${esc(r.nome)}</b><small>${rate(r)}</small></td><td>${opt(r.id, r.cat)}</td><td class="num ${clsE(r.lat)}">${sEur(r.lat)}${r.compensato > 0.5 ? `<small>${fmtEur(r.compensato)} compensati</small>` : ""}</td><td class="num">${r.imposta > 0.5 ? "−" + fmtEur(r.imposta) : "—"}</td></tr>`).join("")}
+      </tbody></table></div>
+      ${z.length ? `<div class="tablewrap"><table class="mt"><thead><tr><th>Minusvalenza da</th><th class="num">Ancora da usare</th><th class="num">Scade il</th></tr></thead><tbody>${z.map(x => `<tr><td>${esc(x.nome)}<small>${x.anno}</small></td><td class="num">${fmtEur(x.residuo)}</td><td class="num">${dIt(x.scadenza)}</td></tr>`).join("")}</tbody></table></div>` : ""}
+      <ul class="pm-tax-n">
+        <li>ETF e fondi: i guadagni pagano il 26% e non si possono compensare con le minusvalenze. Le loro perdite però vanno nello zainetto.</li>
+        <li>Azioni, ETC e obbligazioni: 26%, e i guadagni si compensano con le minusvalenze, a partire dalle più vecchie. Titoli di Stato: 12,5%. Cripto: ${y >= 2026 ? "33% dal 2026" : "26%"}.</li>
+        <li>Le minusvalenze si usano entro il 31 dicembre del quarto anno dopo quello in cui sono nate.</li>
+        ${F.note.map(n => `<li>${esc(n)}</li>`).join("")}
+        <li>È una stima con il costo medio ponderato. Le imposte vere le trattiene la banca (regime amministrato) o le calcola il commercialista (dichiarativo). Non è una consulenza fiscale.</li>
+      </ul></details>`;
+}
+/* ---------- Proventi in arrivo nei prossimi 12 mesi ----------
+   cedole: certe, da cedola e scadenza del titolo; dividendi: STIMA, ripetendo quelli dei 12 mesi passati (fonte Yahoo Finance) con le quote di oggi. */
+function pmIncome(R) {
+  const box = $("#pmIncBox"); if (!box) return;
+  const db = PM.db, today = pmToday(), to = new Date(Date.parse(today) + 365 * 864e5).toISOString().slice(0, 10), from1 = new Date(Date.parse(today) - 365 * 864e5).toISOString().slice(0, 10), out = [];
+  const fxNow = c => { if (!c || c === "EUR") return 1; const k = c === "GBX" ? 100 : 1, pts = PM.fx[c === "GBX" ? "GBP" : c] || []; const last = pts.length ? +pts[pts.length - 1].v : NaN; return last > 0 ? 1 / (k * last) : NaN; };
+  for (const p of R.posizioni) {
+    const s = db.strumenti[p.id]; if (!s || !p.aperta) continue;
+    if (s.per100) { for (const d of couponDates(s, today, to)) { if (d <= today) continue; const lordo = p.qta * s.cedola / (s.freq || 2), tax = s.governativo ? 0.125 : 0.26; out.push({ d, nome: s.nome, tipo: "Cedola", lordo, netto: lordo * (1 - tax), certo: true }); } continue; }
+    const j = PM.px[p.id], dv = j && Array.isArray(j.dividendi) ? j.dividendi.filter(x => x.d > from1 && x.d <= today) : [];
+    const k = fxNow(String(s.valuta || (j && j.currency) || "EUR").toUpperCase()); if (!dv.length || !(k > 0)) continue;
+    for (const x of dv) { const d = new Date(Date.parse(x.d) + 365 * 864e5).toISOString().slice(0, 10); if (d <= today || d > to) continue; const lordo = p.qta * x.v * k; out.push({ d, nome: s.nome, tipo: "Dividendo", lordo, netto: lordo * 0.74, certo: false }); }
+  }
+  out.sort((a, b) => a.d < b.d ? -1 : 1);
+  box.hidden = !out.length; if (!out.length) { $("#pmInc").innerHTML = ""; return; }
+  const tot = out.reduce((a, x) => a + x.netto, 0), stima = out.some(x => !x.certo), next = out[0];
+  $("#pmInc").innerHTML = `<div class="pm-inc-h"><div><span>Prossimi 12 mesi, netti${stima ? " (stima)" : ""}</span><b>${fmtEur(tot)}</b></div><div><span>Il prossimo</span><b>${dIt(next.d)}</b><small>${esc(next.nome)} · ${fmtN(next.netto, 2)} €</small></div></div>
+    <div class="tablewrap"><table class="mt pm-inc-t"><thead><tr><th>Data</th><th>Strumento</th><th>Tipo</th><th class="num">Lordo</th><th class="num">Netto</th></tr></thead><tbody>${out.slice(0, 24).map(x => `<tr><td>${dIt(x.d)}</td><td>${esc(x.nome)}</td><td>${x.tipo}${x.certo ? "" : "<small>stima</small>"}</td><td class="num">${fmtN(x.lordo, 2)} €</td><td class="num"><b>${fmtN(x.netto, 2)} €</b></td></tr>`).join("")}</tbody></table></div>
+    <p class="caption">${stima ? "I dividendi sono una stima: ripeto quelli degli ultimi 12 mesi (Yahoo Finance) con le quote di oggi; le date sono quelle di stacco, l'accredito arriva qualche giorno dopo. Netto al 26%: per le azioni estere si aggiunge la ritenuta del paese d'origine. " : ""}Le cedole sono calcolate da tasso e scadenza del titolo, nette al ${out.some(x => x.tipo === "Cedola") ? "12,5% per i titoli di Stato e al 26% per le altre obbligazioni" : "26%"}.</p>`;
+}
 function pmRender() {
   const R = pmCalc(), has = pmHas();
   if (!$("#pmKpis")) return;
@@ -435,6 +493,8 @@ function pmRender() {
   $("#pmChart").innerHTML = has ? pmChart(R) : ""; $("#pmChart").hidden = !has || R.serie.length < 3;
   $("#pmPos").innerHTML = pmPosTable(R); $("#pmOps").innerHTML = pmOpsTable();
   pacRenderDue(); pacRenderList();
+  pmTax(R);
+  pmIncome(R);
   const quoted = R.posizioni.some(p => p.aperta && !PM.db.strumenti[p.id].manuale && !PM.db.strumenti[p.id].per100);
   $("#pmLab").disabled = !quoted; $("#pmExport").disabled = !has;
   pmButton();
@@ -460,7 +520,7 @@ async function pmFromFile() {
   const ids = pos.map(p => p.isin || p.simbolo);
   const q = pos.map((p, i) => [p, ids[i]]);
   await Promise.all([0, 1, 2].map(async () => { while (q.length) { const [p, id] = q.shift();
-    if (!PM.px[id]) { const j = await getJSON(`/api/prices?symbol=${encodeURIComponent(p.simbolo)}&v=5`); PM.px[id] = j && !j.error && j.points ? j : { error: (j && j.error) || "prezzi non disponibili" }; }
+    if (!PM.px[id]) { const j = await getJSON(`/api/prices?symbol=${encodeURIComponent(p.simbolo)}&v=6`); PM.px[id] = j && !j.error && j.points ? j : { error: (j && j.error) || "prezzi non disponibili" }; }
     if (!db.strumenti[id]) db.strumenti[id] = { nome: p.nome || p.ticker || p.simbolo, ticker: p.ticker || null, isin: p.isin || null, simbolo: p.simbolo, valuta: (PM.px[id] && PM.px[id].currency) || p.currency || "EUR", classe: null }; } }));
   await pmFx(false);
   const eurPx = (id, day) => { const j = PM.px[id], s = db.strumenti[id]; if (!j || !j.points) return NaN; const st = P.lgSteps(j.points.concat(j.recent || [])), n = Math.round(Date.parse(day + "T00:00:00Z") / 864e5), r = st.at(n) || (st.n ? st.at(st.first) : null); if (!r) return NaN;
@@ -677,6 +737,7 @@ sc().addEventListener("submit", e => { if (e.target.matches && e.target.matches(
   if (e.target.matches && e.target.matches("[data-ceddue]")) { e.preventDefault(); cedRegister(+e.target.dataset.ceddue, e.target); } });
 sc().addEventListener("submit", e => { if (!e.target.matches || !e.target.matches("#pmForm")) return; e.preventDefault(); const b = e.target.querySelector("[type=submit]"); if (b) b.disabled = true; pmSubmit(e.target).finally(() => { if (b) b.disabled = false; }); });
 sc().addEventListener("change", async e => {
+  const fz = e.target.closest("[data-pmfisc]"); if (fz) { const st = PM.db.strumenti[fz.dataset.pmfisc]; if (st) { st.fiscale = fz.value; pmSave(); pmRender(); } return; }
   const el = e.target;
   if (el.id === "pmBene") { PM.beneId = el.value; pmRenderForm(); return; }
   if (el.id === "pmBtpSel") { PM.btpId = el.value; pmRenderForm(); return; }

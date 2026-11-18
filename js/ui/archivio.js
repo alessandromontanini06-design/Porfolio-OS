@@ -2,10 +2,12 @@
    Parte di app.js divisa in moduli: il codice è lo stesso, cambiano solo import ed export. */
 import { $, G, HAS_G, P, REDUCE, S, esc, fmtDate, fmtN, fmtPct } from "./core.js";
 import { current, go, renderPager, reveal } from "./scene.js";
-import { isExample, isSim, load, spaceSwitch, trackOnce } from "./importa.js";
+import { isExample, isSim, load, rbAoa, renderImport, spaceSwitch, trackOnce } from "./importa.js";
+import { PZ } from "./report.js";
+import { detectTx } from "./rendimento.js";
 import { pfAsset } from "./portafoglio.js";
 import { buildNet, drawChart, fetchMacro, labIndex, loadEtfInfo, renderLab, renderLook, ym } from "./laboratorio.js";
-import { fiDefaults, fmtEur, riskWeights } from "./analisi.js";
+import { fiDefaults, fmtEur, netClear, riskWeights } from "./analisi.js";
 import { renderLabs } from "./home.js";
 
 /* ---------- Archivio dei portafogli (IndexedDB, solo in questo browser) ----------
@@ -33,6 +35,15 @@ function svSnap(){
   return {at:Date.now(),value:pp?pp.value:pv>0?pv:null,invested:pp?pp.invested:null,xirr:pp?pp.xirr:null,cagr:st.cagr,vol:st.vol,mdd:st.mdd,last:fmtDate(ds.dates[ds.dates.length-1],f),
     weights:ds.assets.map((a,i)=>[a.name,w[i]]).filter(x=>x[1]>0.0005)};
 }
+/* «apertura rapida»: dati già pronti per il laboratorio, senza riscaricare i prezzi né ripassare da scansione e mappa.
+   Solo array e oggetti semplici (niente Map), così passa anche dalla copia di sicurezza in JSON. */
+function svFast(){
+  if(!S.source||S.source.kind!=="rebuilt"||!S.rb||!S.ds||!S.ds.ok||S.fastOpen)return null;
+  try{return {v:1,at:Date.now(),sheet:{name:"Prezzi mensili",aoa:rbAoa()},
+    rb:{cols:S.rb.cols.map(c=>({...c,map:[...c.map],proxy:c.proxy?[...c.proxy]:null})),fxm:Object.fromEntries(Object.entries(S.rb.fxm||{}).map(([k,m])=>[k,[...(m instanceof Map?m:[])]])),origName:S.rb.origName,origSource:S.rb.origSource?{name:S.rb.origSource.name,kind:S.rb.origSource.kind,size:S.rb.origSource.size||0}:null},
+    youngRes:{...(S.youngRes||{})},res:{...(S.res||{})},portfolio:S.portfolio?JSON.parse(JSON.stringify(S.portfolio)):null,lastUnd:S.lastUnd?JSON.parse(JSON.stringify(S.lastUnd)):null,
+    cmp:S.cmp?JSON.parse(JSON.stringify(S.cmp)):null,pz:{client:PZ.client||"",next:PZ.next||""}};}catch(e){return null;}
+}
 async function svSave(name){
   if(!svCanSave())return null;
   const ds=S.ds,f=ds.freq.f,old=S.svSaved?await svGet(S.svSaved):null,snap=svSnap(),now=Date.now();
@@ -40,13 +51,14 @@ async function svSave(name){
   if(!lastH||now-lastH.at>864e5||Math.abs((lastH.value||0)-(snap.value||0))>1)hist.push(snap);else hist[hist.length-1]=snap;
   const rec={...(old||{}),id:old?old.id:svNewId(),name:(name||old&&old.name||svFileName()).slice(0,80),file:svFileName(),note:old?old.note:"",
     createdAt:old?old.createdAt:now,savedAt:now,reviewedAt:now,sheets:S.fileSheets.map(x=>({name:x.name,aoa:x.aoa})),
-    assets:ds.assets.map(a=>a.name),period:`${fmtDate(ds.dates[0],f)} – ${fmtDate(ds.dates[ds.dates.length-1],f)}`,riskW:S.riskW||null,fi:S.fi?S.fi.in:null,snap,history:hist.slice(-60)};
+    assets:ds.assets.map(a=>a.name),period:`${fmtDate(ds.dates[0],f)} – ${fmtDate(ds.dates[ds.dates.length-1],f)}`,riskW:S.riskW||null,fi:S.fi?S.fi.in:null,snap,history:hist.slice(-60),fast:svFast()||(old&&old.fast)||null};
   try{await svPut(rec);S.svSaved=rec.id;trackOnce("feature","salva",{name:"salva"});svBadge();return rec;}catch{return null;}
 }
 async function svOfferRender(){
   const el=$("#svOffer");if(!el)return;
   renderChange();
   if(!svCanSave()||svPref()==="0"&&!S.svSaved){el.hidden=true;return;}
+  if(S.fastOpen&&S.svSaved){const r=await svGet(S.svSaved);el.hidden=!r;if(r)el.innerHTML=`<span class="sv-ok">Aperto dall'archivio: <b>${esc(r.name)}</b>, con i prezzi del ${new Date(S.fastOpen.at).toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"})}. <button type="button" class="linkbtn" data-sv="refresh">Aggiorna i prezzi</button> · <button type="button" class="linkbtn" data-ar="open">Apri l'archivio</button></span>`;return;}
   /* portafoglio già in archivio: si aggiorna la revisione */
   if(S.svSaved){const r=await svSave();el.hidden=!r;if(r)el.innerHTML=`<span class="sv-ok">✓ <b>${esc(r.name)}</b> è nell'archivio · revisione del ${new Date(r.reviewedAt).toLocaleDateString("it-IT",{day:"numeric",month:"long"})} salvata. <button type="button" class="linkbtn" data-ar="open">Apri l'archivio</button></span>`;return;}
   if(svPref()==="1"){const r=await svSave();el.hidden=!r;if(r)el.innerHTML=`<span class="sv-ok">✓ Salvato nell'archivio come <b>${esc(r.name)}</b>. <button type="button" class="linkbtn" data-ar="rename">Cambia nome</button> · <button type="button" class="linkbtn" data-sv="never">Non salvare più in automatico</button></span>`;return;}
@@ -68,13 +80,34 @@ async function svHome(){
 /* riquadro d'attesa mentre un portafoglio dell'archivio si riapre */
 function svBusy(on,txt){let el=$("#svBusy");if(!el){el=document.createElement("div");el.id="svBusy";el.setAttribute("role","status");el.setAttribute("aria-live","polite");document.body.appendChild(el);}
   if(on)el.innerHTML=`<div><i></i><b>${esc(txt||"")}</b><span>Aggiorno i prezzi di oggi e preparo i risultati.</span></div>`;el.hidden=!on;document.body.classList.toggle("sv-busy",!!on);}
-async function svOpen(id){
+/* modifiche fatte nel laboratorio (proposta A/B, note della presentazione): si tengono nel portafoglio dell'archivio aperto */
+let svKeepT=null;
+function svKeep(){if(!S.svSaved)return;clearTimeout(svKeepT);svKeepT=setTimeout(()=>{const cmp=S.cmp?JSON.parse(JSON.stringify(S.cmp)):null,pz={client:PZ.client||"",next:PZ.next||""};svPatch(S.svSaved,r=>{if(r.fast){r.fast.cmp=cmp;r.fast.pz=pz;}}).catch(()=>{});},700);}
+function svOpenFast(r){
+  const F=r.fast;
+  S.svResume=null;S.svSaved=r.id;S.svPrev=r.snap||null;S.conti=[{name:r.name,sheets:r.sheets}];
+  S.fileSheets=r.sheets;S.tx=detectTx(r.sheets);
+  S.rb={...F.rb,cols:F.rb.cols.map(c=>({...c,map:new Map(c.map),proxy:c.proxy?new Map(c.proxy):null})),fxm:Object.fromEntries(Object.entries(F.rb.fxm||{}).map(([k,v])=>[k,new Map(v)]))};
+  S.youngRes={...(F.youngRes||{})};S.lastUnd=F.lastUnd||null;
+  if(r.riskW)S.riskW=r.riskW;if(r.fi)S.fi={in:{...fiDefaults(),...r.fi,cap:fiDefaults().cap}};
+  if(F.pz){PZ.client=F.pz.client||"";PZ.next=F.pz.next||"";}
+  S.fastOpen={at:F.at,id:r.id};
+  load([F.sheet],{name:`${r.file||r.name} · ricostruito`,size:0,kind:"rebuilt"},false);
+  S.portfolio=F.portfolio;S.cmp=F.cmp||null;
+  /* scelte già fatte all'importazione (strumenti mancanti, storici corti): restano fatte */
+  S.res={...(F.res||{})};renderImport(false);
+  const b=$("#confirmBtn");if(!S.ds||!S.ds.ok||!b||b.disabled)throw new Error("non pronto");
+  showLab(true);go("lab",{force:true});
+}
+async function svOpen(id,opts={}){
   const r=await svGet(id);if(!r)return svHome();
+  if(r.fast&&r.fast.v===1&&!opts.full){closeArchive();if(isSim())spaceSwitch("real",{stay:true});trackOnce("feature","riprendi",{name:"riprendi"});
+    try{svOpenFast(r);return;}catch(e){S.fastOpen=null;/* dati rapidi non utilizzabili: si va col percorso completo */}}
   trackOnce("feature","riprendi",{name:"riprendi"});closeArchive();
   if(isSim())spaceSwitch("real",{stay:true});
-  S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=r.snap||null;
+  S.fastOpen=null;S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi};S.svSaved=id;S.svPrev=opts.keepPrev?S.svPrev:(r.snap||null);
   /* niente analisi del file né mappa a vista: un riquadro d'attesa, i passi li rifà il sito da solo, poi direttamente i Risultati */
-  svBusy(true,`Apro «${r.name}»…`);
+  svBusy(true,opts.full?`Aggiorno i prezzi di «${r.name}»…`:`Apro «${r.name}»…`);
   load(r.sheets,{name:r.file||r.name,size:0,kind:"file"},true);
   /* la mappa è già confermata in memoria: appena il file è pronto (anche dopo i prezzi di mercato) si costruisce il laboratorio */
   const tick=()=>{const R=S.svResume;if(!R||R.id!==id)return;if(Date.now()-R.t0>150000){S.svResume=null;svBusy(false);go("map",{force:true});return;}
@@ -241,6 +274,7 @@ document.addEventListener("click",async e=>{
   if(a==="yes"){const al=$("#svAlways");if(al&&al.checked){try{localStorage.setItem("pos-save","1");}catch{}}const r=await svSave(($("#svName")||{}).value);const el=$("#svOffer");el.innerHTML=r?`<span class="sv-ok">✓ Salvato nell'archivio come <b>${esc(r.name)}</b>. <button type="button" class="linkbtn" data-ar="open">Apri l'archivio</button></span>`:`<span class="sv-ok">Non riesco a salvare in questo browser (forse è in navigazione privata).</span>`;svHome();}
   if(a==="no"){const al=$("#svAlways");if(al&&al.checked){try{localStorage.setItem("pos-save","0");}catch{}}$("#svOffer").hidden=true;}
   if(a==="upd"){const sel=$("#svUpd"),old=sel?await svGet(sel.value):null;if(old){S.svSaved=old.id;S.svPrev=old.snap||null;const r=await svSave();const el=$("#svOffer");el.innerHTML=r?`<span class="sv-ok">✓ <b>${esc(r.name)}</b> aggiornato · revisione di oggi salvata. <button type="button" class="linkbtn" data-ar="open">Apri l'archivio</button></span>`:`<span class="sv-ok">Non riesco a salvare in questo browser.</span>`;renderChange();svHome();setTimeout(labIndex,60);}return;}
+  if(a==="refresh"&&S.svSaved){netClear(/^\/api\/(prices|fx)\b/);svOpen(S.svSaved,{full:true});return;}
   if(a==="never"){try{localStorage.setItem("pos-save","0");}catch{}$("#svOffer").hidden=true;}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#archive")&&$("#archive").classList.contains("open"))closeArchive();});
@@ -265,4 +299,4 @@ function countAll(){
   });
 }
 
-export { AR, SV, arAgo, arDetail, arDue, arExcel, arExport, arImport, arNoteT, chgCalc, closeArchive, countAll, openArchive, renderArchive, renderChange, showLab, svBadge, svCanSave, svDB, svFileName, svFix, svGet, svHome, svList, svNewId, svOfferRender, svOpen, svPatch, svPref, svPut, svRank, svSave, svSnap, svTx };
+export { AR, arAgo, arDetail, arDue, arExcel, arExport, arImport, arNoteT, chgCalc, closeArchive, countAll, openArchive, renderArchive, renderChange, showLab, SV, svBadge, svCanSave, svDB, svFast, svFileName, svFix, svGet, svHome, svKeep, svList, svNewId, svOfferRender, svOpen, svOpenFast, svPatch, svPref, svPut, svRank, svSave, svSnap, svTx };

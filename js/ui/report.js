@@ -3,7 +3,7 @@
 import { $, P, ROLE_SHORT, S, esc, fmtDate, fmtN, fmtPct } from "./core.js";
 import { trackOnce } from "./importa.js";
 import { CO_Y, cmpCalc, cmpMoves, costCalc } from "./portafoglio.js";
-import { chgCalc, svGet } from "./archivio.js";
+import { chgCalc, svGet, svKeep } from "./archivio.js";
 import { macroFor, mktVol } from "./laboratorio.js";
 import { PER, bnReceipt, fiReceipt, fmtEur, mcReceipt, opReceipt, renderRisk, riskReceipt, stReceipt, stressList, unitN } from "./analisi.js";
 import { realReceipt } from "./rendimento.js";
@@ -331,7 +331,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("keydown",e=>{const el=$("#present");if(!el||el.hidden)return;e.stopImmediatePropagation();
   if(e.target.closest&&e.target.closest(".pz-ed")){if(e.key==="Escape")e.target.blur();return;}
   if(e.key==="Escape"){closePresent();}else if(e.key==="ArrowRight"||e.key===" "||e.key==="PageDown"){e.preventDefault();pzShow(PZ.i+1);}else if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();pzShow(PZ.i-1);}else if(e.key==="Home")pzShow(0);else if(e.key==="End")pzShow(PZ.slides.length-1);},true);
-document.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.pz;if(!k)return;PZ[k]=e.target.innerText.trim();});
+document.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.pz;if(!k)return;PZ[k]=e.target.innerText.trim();svKeep();});
 document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement){/* uscita dal tutto schermo con Esc: la presentazione resta aperta finché non si preme Esci */}});
 window.__present={open:openPresent,close:closePresent,show:i=>pzShow(i),slides:()=>PZ.slides.map(s=>s.id)}; // per i test
 

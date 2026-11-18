@@ -1,5 +1,7 @@
 // Funzione server: da ISIN a simbolo di borsa, con OpenFIGI (database pubblico degli identificativi finanziari, senza chiave).
 // GET /api/isin?isin=IE00B4L5Y983,IE00BKM4GZ66   (fino a 10)
+// GET /api/isin?q=enel   ricerca di qualsiasi titolo per nome o ticker (azioni, ETF, fondi, cripto di tutte le borse) su Yahoo Finance.
+//   Sta qui e non in una funzione nuova perché il piano gratuito di Vercel ammette al massimo 12 funzioni.
 // Per ogni ISIN restituisce il simbolo nel formato di Alpha Vantage, preferendo le borse in euro (Amsterdam, Xetra, Parigi), poi Londra e Stati Uniti.
 // controlli copiati da _lib/llm.js per non caricare gli SDK delle IA in questa funzione
 function fromOwnSite(req) {
@@ -36,9 +38,34 @@ async function yahooFund(isin) {
   } catch { return null; }
 }
 
+/* ---------- ricerca per nome o ticker (Yahoo Finance) ----------
+   I simboli tornano nel formato del sito (ENEL.MIL, VWCE.DEX, IWDA.AMS, AAPL.US, BTC-EUR), che /api/prices sa riconvertire per Yahoo. */
+const Y2APP = { L: "LON", DE: "DEX", F: "FRK", PA: "PAR", AS: "AMS", MI: "MIL", SW: "SWX", TO: "TRT", BR: "BRU", LS: "LIS", MC: "MCE", VI: "VIE", HE: "HEL", IR: "DUB" };
+const KIND = { EQUITY: "Azione", ETF: "ETF", MUTUALFUND: "Fondo", CRYPTOCURRENCY: "Cripto" };
+const searchCache = new Map();
+const appSymbol = y => { const t = String(y || "").toUpperCase(); if (/-(EUR|USD|GBP|CHF|USDT)$/.test(t)) return t; const m = t.match(/^(.+)\.([A-Z]{1,3})$/); if (!m) return t + ".US"; return Y2APP[m[2]] ? `${m[1]}.${Y2APP[m[2]]}` : t; };
+async function search(q) {
+  const k = q.toLowerCase(), h = searchCache.get(k); if (h && Date.now() - h.t < 864e5) return h.v;
+  const r = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=20&newsCount=0&listsCount=0&enableFuzzyQuery=true`, { headers: YUA, signal: AbortSignal.timeout(10000) });
+  if (!r.ok) throw new Error(`Yahoo ${r.status}`);
+  const seen = new Set(), v = ((await r.json()).quotes || []).filter(x => x.symbol && KIND[x.quoteType] && x.isYahooFinance !== false)
+    .map(x => ({ simbolo: appSymbol(x.symbol), yahoo: x.symbol, nome: x.longname || x.shortname || x.symbol, tipo: KIND[x.quoteType], borsa: x.exchDisp || x.exchange || "", settore: x.sectorDisp || x.sector || null }))
+    .filter(x => !seen.has(x.simbolo) && seen.add(x.simbolo)).slice(0, 15);
+  if (searchCache.size > 500) searchCache.delete(searchCache.keys().next().value);
+  searchCache.set(k, { t: Date.now(), v }); return v;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") { res.status(405).json({ error: "Usa una richiesta GET." }); return; }
   if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
+  const q = String((req.query && req.query.q) || "").trim().slice(0, 60);
+  if (q) {
+    if (q.length < 2) { res.status(400).json({ error: "Scrivi almeno due lettere." }); return; }
+    if (rateLimited(req, "cerca", 300)) { res.status(429).json({ error: "Troppe ricerche in un'ora: riprova più tardi." }); return; }
+    try { const results = await search(q); res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=86400"); res.status(200).json({ source: "Yahoo Finance", results }); }
+    catch (e) { res.status(502).json({ error: `Ricerca non disponibile (${e.message}).`, results: [] }); }
+    return;
+  }
   if (rateLimited(req, "isin", 60)) { res.status(429).json({ error: "Troppe ricerche in un'ora: riprova più tardi." }); return; }
   const list = [...new Set(String((req.query && req.query.isin) || "").toUpperCase().split(",").map(s => s.trim()).filter(s => ISIN.test(s)))].slice(0, 10);
   if (!list.length) { res.status(400).json({ error: "Nessun ISIN valido." }); return; }

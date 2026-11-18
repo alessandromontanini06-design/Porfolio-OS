@@ -194,6 +194,8 @@
       <div class="pm-beni" id="pmBeni" hidden></div>
       <div class="pm-chart" id="pmChart"></div>
       <section class="bd-step"><div class="bd-sh"><h3>Le tue posizioni</h3></div><div id="pmPos"></div></section>
+      <section class="bd-step pm-taxbox" id="pmTaxBox" hidden><div class="bd-sh"><h3>Le tue tasse</h3><small>stima: le imposte vere le calcola la banca o il commercialista</small></div><div id="pmTax"></div></section>
+      <section class="bd-step" id="pmIncBox" hidden><div class="bd-sh"><h3>Proventi in arrivo</h3><small>cedole e dividendi dei prossimi 12 mesi</small></div><div id="pmInc"></div></section>
       <section class="bd-step" id="pmPac" hidden><div class="bd-sh"><h3>Piani di accumulo</h3><small>il giorno del PAC ti ricordo di registrarlo: scrivi solo le quote vere del broker</small></div><div id="pmPacList"></div></section>
       <section class="bd-step" id="pmAdd"><div class="bd-sh"><h3>Aggiungi</h3><small>un acquisto, una vendita, un dividendo o un bene senza quotazione</small></div>
         <div class="seg pm-tipo" role="group" aria-label="Tipo di operazione" id="pmTipo">
@@ -600,16 +602,16 @@
   <div class="bd-wrap">
     <div class="bd-main">
       <header class="bd-hd"><span class="eyebrow">Senza Excel</span><h2>Costruisci il tuo <em>portafoglio</em></h2>
-        <p>Scegli gli strumenti e quanto pesa ciascuno. Scarico i prezzi di mercato di ogni ETF e analizzo il portafoglio come se fosse il tuo Excel: rendimento, rischio, crisi passate e simulazioni.</p></header>
+        <p>Parti da un modello o cerca qualsiasi titolo: ETF, azioni di tutte le borse, fondi comuni, cripto. Scarico i prezzi di mercato e analizzo il portafoglio come se fosse il tuo Excel: rendimento, rischio, crisi passate e simulazioni.</p></header>
       <div class="bd-tabsrow"><span class="eyebrow">Portafogli</span><div class="bd-presets" id="bdTabs" role="tablist" aria-label="Portafogli da confrontare"></div></div>
       <section class="bd-step"><div class="bd-sh"><h3>Parti da un modello</h3><small>oppure scrivi gli strumenti qui sotto</small></div><div class="bd-models" id="bdPresets"></div></section>
       <section class="bd-step"><div class="bd-sh"><h3>Strumenti e pesi</h3>
         <div class="bd-tools"><button type="button" class="btn sm" id="bdEq">Pesi uguali</button><button type="button" class="btn sm" id="bdNorm">Riporta a 100%</button><button type="button" class="btn sm" id="bdClear">Svuota</button></div></div>
+        <div class="bd-cat" id="bdCat"></div>
         <div class="bd-thead" aria-hidden="true"><span>Strumento</span><span>Classe</span><span>Peso</span><span></span></div>
         <div class="bd-rows" id="bdRows"></div>
         <button type="button" class="btn sm" id="bdAdd">+ Aggiungi strumento</button>
-        <p class="caption" id="bdNote">Scrivi un ticker (VWCE) o un ISIN (IE00BK5BQT80), oppure scegli dall'elenco. Gli ISIN sono verificati su OpenFIGI prima di scaricare i prezzi.</p></section>
-      <section class="bd-step"><div class="bd-sh"><h3>Catalogo</h3><small>ETF, azioni, obbligazioni, oro e cripto · clicca per aggiungere</small></div><div class="bd-cat" id="bdCat"></div></section>
+        <p class="caption" id="bdNote">Cerca qui sopra qualsiasi titolo, oppure scrivi direttamente un ticker (VWCE) o un ISIN (IE00BK5BQT80) in una riga. Gli ISIN sono verificati su OpenFIGI prima di scaricare i prezzi.</p></section>
     </div>
     <aside class="bd-side" aria-label="Riepilogo del portafoglio">
       <h3>Riepilogo <span id="bdWhich"></span></h3>
