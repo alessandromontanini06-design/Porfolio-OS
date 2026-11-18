@@ -23,8 +23,11 @@ try {
   t("salvato: 10.000 € nominali costano 9.850 €", /costo 9\.850 €/.test(await msg()), await msg());
   await wait(800);
   const pos = await p.$eval("#pmPos", e => e.innerText.replace(/\s+/g, " "));
-  t("nelle posizioni: nominale, prezzo su 100, scadenza e rendimento a scadenza", /10\.000 € nominali/.test(pos) && /98,50 su 100/.test(pos) && /scade il 01\/03\/2035/.test(pos) && /rend\. a scadenza \d/.test(pos), pos.slice(0, 300));
-  t("vale 9.850 € (nominale × prezzo / 100)", /9\.850 €/.test(await p.$eval(".pm-center", e => e.innerText)));
+    /* dal 18/11/2026 un BTP a tasso fisso ha il prezzo stimato dalla curva della Banca d'Italia, allineato al prezzo d'acquisto */
+  const pxs = +((pos.match(/([\d.]+,\d{2}) su 100/) || [])[1] || "0").replace(/\./g, "").replace(",", ".");
+  t("nelle posizioni: nominale, prezzo stimato su 100, scadenza e rendimento a scadenza", /10\.000 € nominali/.test(pos) && pxs > 80 && pxs < 110 && /stimato con i tassi/.test(pos) && /scade il 01\/03\/2035/.test(pos) && /rend\. a scadenza \d/.test(pos), pos.slice(0, 300));
+  const vEur = Math.round(10000 * pxs / 100).toLocaleString("it-IT", { useGrouping: "always" }) + " €";
+  t(`vale ${vEur} (nominale × prezzo stimato / 100)`, (await p.$eval(".pm-center", e => e.innerText)).includes(vEur), await p.$eval(".pm-center", e => e.innerText));
   const ced = await p.$$eval("#pmPacDue .pac-row.ced", r => r.map(x => x.innerText.replace(/\s+/g, " ")));
   t("propone le cedole arrivate da quando l'hai comprato", ced.length >= 1 && ced.every(c => /Cedola/.test(c)), JSON.stringify(ced));
   t("importo netto già scritto: 10.000 × 3,35% / 2 − 12,5% = 146,56 €", await p.$eval("#pmPacDue .pac-row.ced [name=imp]", e => e.value) === "146,56");
@@ -40,7 +43,7 @@ try {
   t("«Aggiorna prezzo» a 101: vale 10.100 €", /10\.100 €/.test(await p.$eval(".pm-center", e => e.innerText)), await p.$eval(".pm-center", e => e.innerText));
   await p.click('[data-pmg="classi"]'); await wait(300);
   t("nell'anello per categoria: Obbligazioni", /Obbligazioni/.test(await p.$eval("#pmLegend", e => e.innerText)));
-  t("un BTP non va nel laboratorio (nessuno storico gratuito): il pulsante non è attivo", await p.$eval("#pmLab", e => e.disabled));
+  t("un BTP a tasso fisso va nel laboratorio con il prezzo stimato: il pulsante è attivo", !(await p.$eval("#pmLab", e => e.disabled)));
   /* titolo già scaduto: rimborso a 100 */
   await p.click('[data-pmt="btp"]'); await wait(200);
   await fill({ bnome: "BTP 1% 01AG25", bnom: "5.000", bpx: "97", data: "2024-01-10" });
@@ -67,7 +70,7 @@ try {
   const bt = Object.entries(dbf.strumenti).filter(([, s]) => s.per100).map(([id, s]) => [id, s.nome, s.cedola, s.scadenza]);
   t("i due BTP del file entrano nel patrimonio, con cedola e scadenza", bt.length === 2 && bt.every(x => x[2] > 0 && /^\d{4}-\d{2}-\d{2}$/.test(x[3])), JSON.stringify(bt));
   const posf = await p.$eval("#pmPos", e => e.innerText.replace(/\s+/g, " "));
-  t("BTP 3,35% 01MZ35: 10.000 € nominali al prezzo del file (96,40)", /BTP 3,35% 01MZ35/.test(posf) && /10\.000 € nominali/.test(posf) && /96,40 su 100/.test(posf), posf.slice(0, 400));
+  t("BTP 3,35% 01MZ35: 10.000 € nominali, prezzo stimato allineato al file (acquisto a 96,40)", /BTP 3,35% 01MZ35/.test(posf) && /10\.000 € nominali/.test(posf) && /BTP 3,35% 01MZ35[^]*stimato con i tassi/.test(posf) && dbf.operazioni.some(o => o.tipo === "acquisto" && Math.abs(o.prezzo - 96.4) < 0.01) && !dbf.operazioni.some(o => o.tipo === "valutazione"), posf.slice(0, 400));
   t("le cedole del file sono tra i proventi", dbf.operazioni.filter(o => o.tipo === "cedola").length >= 4, dbf.operazioni.filter(o => o.tipo === "cedola").length);
   t("il BTP già rimborsato resta come posizione chiusa", /chiusa/.test(posf) && /BTP 1,45%/.test(posf));
   t("ENI (azione già venduta) non è scambiata per un'obbligazione", !Object.values(dbf.strumenti).some(x => x.per100 && /ENI/.test(x.nome)) && Object.values(dbf.strumenti).some(x => !x.per100 && /ENI/.test(x.nome)));

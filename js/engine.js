@@ -1797,6 +1797,87 @@ function fisco(R,strumenti,opzioni){
   return out;
 }
 
-export const POS={fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
+/* ---------- BTP a tasso fisso: prezzo STIMATO dalla curva dei rendimenti della Banca d'Italia ----------
+   Le fonti gratuite non pubblicano lo storico dei prezzi dei singoli BTP; la Banca d'Italia pubblica ogni giorno i rendimenti
+   dei BTP benchmark a 3, 5, 10 e 30 anni (serie BMK0200, «Fonte: Banca d'Italia»). Da lì si stima il prezzo di un titolo:
+   curva = {scadenze:[3,5,10,30], mesi:[["AAAA-MM-GG",[r3,r5,r10,r30]],…], giorni:[…], al:"AAAA-MM-GG"} (rendimenti lordi annui in %);
+   titolo = {cedola: frazione annua (0.0335), scadenza: "AAAA-MM-GG", freq: 2}.
+   Prezzo «secco» su 100 = cedole e rimborso futuri scontati al rendimento della curva per la vita residua
+   (interpolazione lineare tra le scadenze; sotto i 3 anni e oltre i 30 il rendimento più vicino), meno il rateo maturato.
+   spread = punti % da aggiungere alla curva perché la stima coincida con un prezzo vero dello stesso giorno: poi resta fisso.
+   Vale solo per i titoli a tasso fisso (BTP, BOT, CTZ): BTP Italia, BTP€i, Valore, Più e CCT hanno cedole che cambiano. */
+const BTP_DAY=864e5,btpD=s=>s instanceof Date?s:new Date(String(s).slice(0,10)+"T00:00:00Z");
+const btpAddM=(D,n)=>{const y=D.getUTCFullYear(),m=D.getUTCMonth()+n,last=new Date(Date.UTC(y,m+1,0)).getUTCDate();return new Date(Date.UTC(y,m,Math.min(D.getUTCDate(),last)));};
+function btpRendimento(sc,ys,t){
+  const P=(sc||[]).map((x,i)=>[x,ys&&ys[i]]).filter(p=>p[1]!=null&&p[1]!==""&&Number.isFinite(+p[1])).map(p=>[p[0],+p[1]]);
+  if(!P.length||!Number.isFinite(t))return NaN;if(t<=P[0][0])return P[0][1];if(t>=P[P.length-1][0])return P[P.length-1][1];
+  for(let i=1;i<P.length;i++)if(t<=P[i][0]){const [a,ya]=P[i-1],[b,yb]=P[i];return ya+(yb-ya)*(t-a)/(b-a);}
+  return NaN;
+}
+/* date delle cedole dopo il giorno d, contate all'indietro dalla scadenza; prev = ultima cedola prima (o uguale a) d */
+function btpFlussi(b,d){const M=btpD(b.scadenza),st=12/(b.freq||2),next=[];let k=0,x=M;if(isNaN(M))return {next,prev:x,M};while(x>d&&k<1000){next.unshift(x);k++;x=btpAddM(M,-st*k);}return {next,prev:x,M};}
+function btpRateo(b,data){const d=btpD(data),{next,prev}=btpFlussi(b,d);if(!next.length)return 0;return (+b.cedola||0)*100/(b.freq||2)*(d-prev)/(next[0]-prev);}
+/* prezzo secco su 100 al rendimento y (% annuo lordo, capitalizzazione semestrale) */
+function btpPrezzo(b,data,y){
+  const d=btpD(data),{next,M}=btpFlussi(b,d);if(!next.length||!Number.isFinite(y))return NaN;
+  const f=b.freq||2,c=(+b.cedola||0)*100/f;let pv=0;
+  for(const x of next)pv+=(c+(x.getTime()===M.getTime()?100:0))/Math.pow(1+y/100/f,(x-d)/BTP_DAY/(365.25/f));
+  return pv-btpRateo(b,d);
+}
+/* rendimento a scadenza (% lordo) dal prezzo secco */
+function btpTir(b,data,px){if(!(px>0))return NaN;let a=-5,z=40;if(!(btpPrezzo(b,data,a)>=px&&btpPrezzo(b,data,z)<=px))return NaN;for(let i=0;i<100;i++){const m=(a+z)/2;if(btpPrezzo(b,data,m)>px)a=m;else z=m;}return (a+z)/2;}
+const btpVita=(b,data)=>(btpD(b.scadenza)-btpD(data))/BTP_DAY/365.25;
+/* curva in vigore in un giorno: l'ultima pubblicata fino a quel giorno (giornaliera se c'è, altrimenti di fine mese) */
+const BTP_PUNTI=new WeakMap();
+function btpCurvaAl(curva,data){
+  if(!curva)return null;
+  let P=BTP_PUNTI.get(curva);if(!P){P=[...new Map([...(curva.mesi||[]),...(curva.giorni||[])].map(x=>[x[0],x[1]])).entries()].sort((a,b)=>a[0]<b[0]?-1:1);BTP_PUNTI.set(curva,P);}
+  const s=String(data).slice(0,10);
+  let lo=0,hi=P.length-1,r=null;while(lo<=hi){const m=(lo+hi)>>1;if(P[m][0]<=s){r=P[m];lo=m+1;}else hi=m-1;}return r;
+}
+function btpStima(b,curva,data,spread){const c=btpCurvaAl(curva,data);if(!c)return NaN;const y=btpRendimento(curva.scadenze,c[1],btpVita(b,data));return btpPrezzo(b,data,y+(+spread||0));}
+/* spread da un prezzo vero: rendimento del titolo a quel prezzo meno il rendimento della curva (stessa data, stessa vita residua) */
+function btpSpread(b,curva,data,px){
+  const c=btpCurvaAl(curva,data);if(!c||!(px>0)||btpD(data)>=btpD(b.scadenza))return NaN;
+  const y=btpTir(b,data,px),y0=btpRendimento(curva.scadenze,c[1],btpVita(b,data)),s=y-y0;
+  return Number.isFinite(s)&&Math.abs(s)<3?s:NaN;
+}
+/* serie mensile: prezzi (secchi, per il valore delle posizioni) e indice con le cedole lorde reinvestite (per rendimenti e rischio,
+   come le chiusure rettificate degli ETF: l'ultimo punto coincide col prezzo). Da 30 anni prima della scadenza (o dall'inizio della curva)
+   fino alla scadenza o a oggi; i mesi dopo l'ultima curva pubblicata usano quella curva (la Banca d'Italia pubblica con qualche settimana di ritardo). */
+function btpSerie(b,curva,opz){
+  opz=opz||{};const spread=+opz.spread||0,oggi=String(opz.oggi||new Date().toISOString()).slice(0,10),M=btpD(b.scadenza);
+  if(isNaN(M)||!curva||!(curva.mesi||[]).length)return {prezzi:[],indice:[],giorni:[],spread};
+  const start=new Date(Date.UTC(M.getUTCFullYear()-30,M.getUTCMonth(),1)).toISOString().slice(0,10),from=[opz.da,start].filter(Boolean).sort().pop();
+  const dates=curva.mesi.map(x=>x[0]).filter(d=>d>=from&&d<=oggi&&btpD(d)<M);
+  if(dates.length){let [y,m]=dates[dates.length-1].slice(0,7).split("-").map(Number);
+    for(let i=0;i<3;i++){m++;if(m>12){m=1;y++;}const end=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10),d=end<oggi?end:oggi;if(d.slice(0,7)>oggi.slice(0,7)||btpD(d)>=M)break;dates.push(d);if(d===oggi)break;}}
+  const prezzi=[],indice=[],f=b.freq||2,c=(+b.cedola||0)*100/f;let I=null,prevDirty=null,prevD=null;
+  for(const d of dates){
+    const clean=btpStima(b,curva,d,spread);if(!Number.isFinite(clean)||clean<=0)continue;
+    const dirty=clean+btpRateo(b,d);
+    if(I==null)I=dirty;else{const D0=btpD(prevD),D1=btpD(d);let n=0;for(let k=0;k<1000;k++){const x=btpAddM(M,-(12/f)*k);if(x<=D0)break;if(x<=D1)n++;}I*=(dirty+c*n)/prevDirty;}
+    prezzi.push({d,v:+clean.toFixed(4)});indice.push({d,v:I});prevDirty=dirty;prevD=d;
+  }
+  const k=prezzi.length?prezzi[prezzi.length-1].v/indice[indice.length-1].v:1;
+  indice.forEach(x=>{x.v=+(x.v*k).toFixed(4);});
+  const giorni=(curva.giorni||[]).filter(x=>x[0]<=oggi&&btpD(x[0])<M).slice(-10).map(([d])=>({d,v:+btpStima(b,curva,d,spread).toFixed(4)})).filter(x=>x.v>0);
+  return {prezzi,indice,giorni,spread,curvaAl:curva.al||null};
+}
+/* tipo di titolo di Stato dal nome (e dall'ISIN): «fisso» si può stimare con la curva; gli altri no */
+function btpTipo(nome,isin){
+  const t=String(nome||"").toUpperCase();
+  if(/\bCCT|FLOAT|\bTV\b|VARIABIL/.test(t))return "variabile";
+  if(/ITALIA|€I|\bBTPEI\b|\bEI\b|INFLA|INDICIZ|\bCPI\b|\bICPI\b|\bIL\b|VALORE|\bVALR\b|\bPI[UÙ]\b|FUTURA|STEP/.test(t))return "indicizzato";
+  if(isin&&!/^IT/.test(isin)&&!/\b(BTP|BOT|CTZ)/.test(t))return "estero";
+  if(/\b(BUND|OAT|BONOS|TREASURY|T-NOTE|GILT|DBR|OBL)\b/.test(t))return "estero";
+  if(/\b(BTPS?|BOTS?|CTZS?|BUONI)\b/.test(t)||/^IT000[0-9]/.test(isin||""))return "fisso";
+  return null;
+}
+const btpSimbolo=b=>`BTP:${+(+b.cedola*100).toFixed(4)}:${String(b.scadenza).slice(0,10)}`;
+function btpDaSimbolo(s){const m=String(s||"").toUpperCase().match(/^BTP:(\d+(?:\.\d+)?):(\d{4}-\d{2}-\d{2})$/);return m?{cedola:+m[1]/100,scadenza:m[2],freq:2}:null;}
+const btpNome=b=>{const d=btpD(b.scadenza),c=+(+b.cedola*100).toFixed(3);return `BTP ${String(c).replace(".",",")}% ${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;};
+
+export const POS={btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

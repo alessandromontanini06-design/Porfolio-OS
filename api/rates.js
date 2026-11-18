@@ -2,6 +2,9 @@
 // - BCE (sempre, nessuna chiave): Euribor 3 mesi e indice dei prezzi HICP dell'area euro.
 // - FRED (facoltativo, chiave gratuita in FRED_API_KEY): T-bill USA a 3 mesi e indice CPI USA.
 // GET /api/rates?from=2010-01&to=2024-12
+// GET /api/rates?serie=btp → curva dei rendimenti dei BTP benchmark (Banca d'Italia, 3-5-10-30 anni): serve a STIMARE i prezzi dei BTP a tasso fisso.
+import { fetchCurva } from "./_lib/bdi.js";
+let btpCache = null;
 
 const ECB = "https://data-api.ecb.europa.eu/service/data";
 const SERIES_ECB = {
@@ -39,6 +42,19 @@ async function fredSeries(s, from, to, key) {
 
 export default async function handler(req, res) {
   if (req.method !== "GET") { res.status(405).json({ error: "Usa una richiesta GET." }); return; }
+  if (String(req.query.serie || "") === "btp") {
+    if (btpCache && Date.now() - btpCache.t < TTL) { res.setHeader("Cache-Control", "s-maxage=21600, stale-while-revalidate=86400"); res.status(200).json(btpCache.data); return; }
+    try {
+      const data = await fetchCurva();
+      btpCache = { t: Date.now(), data };
+      res.setHeader("Cache-Control", "s-maxage=21600, stale-while-revalidate=86400");
+      res.status(200).json(data);
+    } catch (e) {
+      if (btpCache) { res.status(200).json(btpCache.data); return; }
+      res.status(502).json({ error: `Curva dei BTP della Banca d'Italia non disponibile (${e.message}). Riprova tra poco.` });
+    }
+    return;
+  }
   const from = String(req.query.from || ""), to = String(req.query.to || "");
   if (!YM.test(from) || !YM.test(to) || from > to) { res.status(400).json({ error: "Periodo non valido: usa from=AAAA-MM e to=AAAA-MM." }); return; }
 

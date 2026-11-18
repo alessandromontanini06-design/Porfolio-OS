@@ -7,6 +7,7 @@ import { showLab } from "./archivio.js";
 import { fmtEur, getJSON, netClear, netGet, netPut } from "./analisi.js";
 import { detectTx } from "./rendimento.js";
 import { renderChat } from "./quanta.js";
+import { btpEtichetta, btpNota, btpPrezzi, btpSym, isBtpSym } from "./btp.js";
 
 /* ---------- Caricamento ---------- */
 function load(sheets,source,fromUser,opts={}){
@@ -147,7 +148,7 @@ function txSnapshot(T,sym){
   const tot=T.positions.reduce((s,p)=>s+(p.valore||0),0),cur=T.valuta&&T.valuta!=="EUR"?` ${T.valuta}`:" €";
   return {status:"ready",tipo:"riepilogo_portafoglio",foglio:"",
     spiegazione:`Dai ${T.n} movimenti del file risultano ${T.positions.length} posizioni aperte${T.chiuse?` (${T.chiuse} chiuse del tutto)`:""}, valutate all'ultimo prezzo pagato: circa ${fmtN(Math.round(tot))}${cur}. Con lo storico dei prezzi di mercato le analisi usano molti anni di dati, anche se hai iniziato da poco.`,
-    posizioni:T.positions.map(p=>({prezzo:p.prezzo,per100:!!p.per100,quantita:p.quantita,nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.tk&&!ISIN_RX.test(p.tk)?p.tk:p.titolo,"",T.valuta)||""),alt:!p.isin&&p.tk&&/^[A-Z0-9]{2,6}$/.test(String(p.tk).toUpperCase())&&!CRYPTO[String(p.tk).toUpperCase()]?[".LON",".DEX",".AMS",".MIL",".PAR",".SWX"].map(x=>String(p.tk).toUpperCase()+x):[],valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
+    posizioni:T.positions.map(p=>({prezzo:p.prezzo,per100:!!p.per100,data:p.data instanceof Date?p.data.toISOString().slice(0,10):p.data||null,quantita:p.quantita,nome:p.nome&&!ISIN_RX.test(p.nome)?p.nome:p.titolo,ticker:txLabel(p),labelIsName:!(p.tk&&!ISIN_RX.test(p.tk))&&!(p.titolo&&!ISIN_RX.test(p.titolo)&&!/\s/.test(p.titolo)&&p.titolo.length<=12),isin:p.isin||null,simbolo:sym.get(p.titolo.toLowerCase())||(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(p.titolo)?"":guessSymbol(p.tk&&!ISIN_RX.test(p.tk)?p.tk:p.titolo,"",T.valuta)||""),alt:!p.isin&&p.tk&&/^[A-Z0-9]{2,6}$/.test(String(p.tk).toUpperCase())&&!CRYPTO[String(p.tk).toUpperCase()]?[".LON",".DEX",".AMS",".MIL",".PAR",".SWX"].map(x=>String(p.tk).toUpperCase()+x):[],valore:p.valore==null?null:Math.round(p.valore*100)/100,pesoAttuale:tot&&p.valore?p.valore/tot:null,pesoTarget:null})),scartati:[]};
 }
 function initRoles(){S.roles={};S.touched={};S.sheets[S.sheetIdx].cols.forEach(c=>{S.roles[c.idx]=c.suggest;});}
 function showError(msg){const e=$("#fileErr");e.textContent=msg;e.hidden=false;}
@@ -277,17 +278,21 @@ Object.defineProperty(BD,"rows",{get(){return this.ports[this.cur];},set(v){this
 const BDMETA=new Map();
 const metaCls=m=>m.tipo==="Cripto"?"Altro":m.tipo==="Azione"?"Azioni":/bond|obblig|govt|treasury|aggregate|corporate|€ gov|income/i.test(m.nome)?"Obbligazioni":/gold|\boro\b|silver|commodit|precious/i.test(m.nome)?"Oro":/overnight|money market|monetar|liquidit|cash|ultrashort/i.test(m.nome)?"Liquidità":"Azioni";
 function bdFind(v){const t=String(v||"").trim().toUpperCase(),isin=(t.match(/[A-Z]{2}[A-Z0-9]{9}\d/)||[])[0],tk=t.split(/[\s·]+/)[0];
-  const m=BDMETA.get(tk);if(m)return [tk,m.nome,null,metaCls(m),m];
+  const m=BDMETA.get(tk);if(m&&m.btp)return [m.sym,m.nome,m.isin,"Obbligazioni",m];if(m)return [tk,m.nome,null,metaCls(m),m];
   return POPULAR.find(p=>p[2]===isin||p[0]===tk)||(isin?[null,null,isin]:tk?[tk,null,null]:null);}
 /* verifica mentre si scrive: ISIN → quotazioni su OpenFIGI; ticker → si prova a scaricarne i prezzi. Risultato in memoria per la sessione. */
 const BDCHK=new Map();
 function bdState(v){const f=bdFind(v);if(!v||!String(v).trim())return "";if(f&&f[1])return "ok";const c=BDCHK.get(String(v).trim().toUpperCase());return c?c.st:"";}
-function bdHint(v){const t=String(v||"").trim();if(!t)return "";const f=bdFind(t);if(f&&f[1])return esc(f[1])+" · "+esc(f[4]?[f[4].tipo,f[4].borsa,f[0]].filter(Boolean).join(" · "):f[2]);
+function bdHint(v){const t=String(v||"").trim();if(!t)return "";const f=bdFind(t);if(f&&f[1])return esc(f[1])+" · "+esc(f[4]?[f[4].tipo,f[4].borsa,f[4].btp?null:f[0]].filter(Boolean).join(" · "):f[2]);
   const c=BDCHK.get(t.toUpperCase());if(!c){bdCheck(t);return "verifico…";}
-  return c.st==="wait"?"verifico…":c.st==="ok"?"✓ "+esc(c.name||c.sym):"✗ non trovato: prova con l'ISIN (lo trovi su justETF o sul sito dell'emittente)";}
+  return c.st==="wait"?"verifico…":c.st==="ok"?"✓ "+esc(c.name||c.sym):c.why?"✗ "+esc(c.why):"✗ non trovato: prova con l'ISIN (lo trovi su justETF o sul sito dell'emittente)";}
 async function bdCheck(v){const k=String(v).trim().toUpperCase();if(BDCHK.has(k))return;BDCHK.set(k,{st:"wait"});
   try{const isin=(k.match(/^[A-Z]{2}[A-Z0-9]{9}\d$/)||[])[0];
-    if(isin){const j=await getJSON(`/api/isin?isin=${isin}`),r=(j.results||[])[0];BDCHK.set(k,r&&r.simbolo?{st:"ok",name:r.nome||r.simbolo,sym:r.simbolo}:{st:"no"});}
+    if(isin){const j=await getJSON(`/api/isin?isin=${isin}`),r=(j.results||[])[0];
+      if(r&&!r.simbolo&&r.stato){const st=r.stato,sym=st.tipo==="fisso"?btpSym(st.cedola,st.scadenza):null;
+        if(sym){BDMETA.set(k,{nome:st.nome,tipo:"BTP",borsa:"prezzo stimato (Banca d'Italia)",btp:true,sym,isin});BDCHK.set(k,{st:"ok",name:st.nome,sym});}
+        else BDCHK.set(k,{st:"no",why:st.tipo==="fisso"?`${st.nome}: già scaduto`:st.tipo==="estero"?`${st.nome}: titolo di Stato estero, nessuna fonte gratuita dei prezzi`:`${st.nome}: le cedole cambiano nel tempo, il prezzo non si può stimare`});}
+      else BDCHK.set(k,r&&r.simbolo?{st:"ok",name:r.nome||r.simbolo,sym:r.simbolo}:{st:"no"});}
     else{const sym=guessSymbol(k,"ETF",null)||k,j=await getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`);BDCHK.set(k,j&&!j.error&&j.points&&j.points.length?{st:"ok",name:(j.info||"").split(" · ")[0]||sym,sym}:{st:"no"});}
   }catch{BDCHK.set(k,{st:"no"});}
   if($("#builder").classList.contains("open"))bdRender();}
@@ -308,7 +313,7 @@ function bdRender(){
   $("#bdWhich").textContent=BD.ports.length>1?"· portafoglio "+L[BD.cur]:"";
   $("#bdClassBar").innerHTML=s>0?Object.entries(by).map(([c,w])=>`<i style="width:${w/s*100}%;background:${CLS_COL[c]}" title="${c} ${fmtN(w/s*100,0)}%"></i>`).join(""):"";
   $("#bdClassLeg").innerHTML=Object.entries(by).map(([c,w])=>`<span><i style="background:${CLS_COL[c]}"></i>${c==="Altro"?"Altro / da verificare":c} <b>${fmtN(w/s*100,0)}%</b></span>`).join("");
-  $("#bdComp").innerHTML=val.length?val.map(r=>{const f=bdFind(r[0])||[r[0]],w=(+r[1])/(s||1);return `<div class="bd-ci2"><span><b>${esc(f[0]||f[2]||r[0])}</b><small>${esc(f[1]||"")}</small></span><span class="bd-pw"><i style="width:${w*100}%"></i></span><span class="bd-num">${fmtN(w*100,1)}%<small>${fmtN(cap*w,0)} €</small></span></div>`;}).join(""):`<p class="caption">Ancora nessuno strumento.</p>`;
+  $("#bdComp").innerHTML=val.length?val.map(r=>{const f=bdFind(r[0])||[r[0]],w=(+r[1])/(s||1);return `<div class="bd-ci2"><span><b>${esc(f[4]&&f[4].btp?btpEtichetta(f[4].sym):f[0]||f[2]||r[0])}</b><small>${esc(f[4]&&f[4].btp?(f[4].isin||"")+" · prezzo stimato":f[1]||"")}</small></span><span class="bd-pw"><i style="width:${w*100}%"></i></span><span class="bd-num">${fmtN(w*100,1)}%<small>${fmtN(cap*w,0)} €</small></span></div>`;}).join(""):`<p class="caption">Ancora nessuno strumento.</p>`;
   const verified=val.filter(r=>bdState(r[0])==="ok").length,bad=val.filter(r=>bdState(r[0])==="no").length,nc=Object.keys(by).length;
   const checks=[[Math.abs(s-100)<.01,Math.abs(s-100)<.01?"I pesi sommano a 100%":`I pesi sommano a ${fmtN(s,0)}%: li riporto a 100% in proporzione`],
     [ok>0&&verified===ok,bad?`${bad} ${bad>1?"strumenti non trovati":"strumento non trovato"}: prova con l'ISIN`:ok&&verified===ok?`${ok} ${ok>1?"strumenti riconosciuti":"strumento riconosciuto"}`:"Verifico gli strumenti…"],
@@ -324,6 +329,17 @@ const BD_FILT={Azioni:[["set","Settore"],["paese","Paese"]],ETF:[["f1","Area"],[
 const BDCAT={tab:"ETF",f:{},q:"",n:40,allModels:false};
 const normQ=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 let AZIONI=null,azLoading=null;
+/* BTP a tasso fisso in circolazione (elenco ufficiale del MEF, js/data/btp.json): prezzo stimato dalla curva della Banca d'Italia */
+let BTPS=null,btpLoading=null,BTP_AL=null;
+const BTP_FASCIA=a=>a<=3?"Breve (fino a 3 anni)":a<=10?"Media (3-10 anni)":"Lunga (oltre 10 anni)";
+function btpLoad(){if(BTPS||btpLoading)return btpLoading;btpLoading=fetch("/js/data/btp.json").then(r=>r.json()).then(j=>{BTP_AL=j.al||null;const today=new Date().toISOString().slice(0,10);
+  BTPS=(j.righe||[]).filter(x=>x[3]>today).map(([isin,g,em,sc,c])=>{const sym=btpSym(c,sc),nome=`${g} ${String(+(c*100).toFixed(3)).replace(".",",")}% ${sc.slice(8,10)}/${sc.slice(5,7)}/${sc.slice(0,4)}`;return {isin,g,em,sc,c,sym,nome,anni:(Date.parse(sc)-Date.now())/(365.25*864e5)};}).filter(b=>b.sym);
+  if($("#builder").classList.contains("open"))bdCatRender();}).catch(()=>{BTPS=[];});return btpLoading;}
+const btpItem=b=>({code:b.isin,n:b.nome,sub:`${b.isin} · ${b.anni<1?"meno di un anno":fmtN(b.anni,1)+" anni"} alla scadenza · prezzo stimato`,cls:"Obbligazioni",tab:"Obbligazioni",f1:"BTP singoli",f2:BTP_FASCIA(b.anni),area:"Italia",btp:b});
+const btpMeta=b=>({nome:b.nome,tipo:"BTP",borsa:"prezzo stimato (Banca d'Italia)",btp:true,sym:b.sym,isin:b.isin});
+/* un BTP che arriva da fuori (patrimonio): codice della riga = ISIN o simbolo della stima */
+function bdBtpMeta(code,nome,sym,isin){BDMETA.set(String(code).toUpperCase(),{nome,tipo:"BTP",borsa:"prezzo stimato (Banca d'Italia)",btp:true,sym,isin:isin||null});}
+const tabBase=tab=>tab==="Azioni"?(AZIONI||[]).map(azItem):[...POPULAR.filter(p=>p[4]===tab).map(etfItem),...(tab==="Obbligazioni"?(BTPS||[]).map(btpItem):[])];
 function azLoad(){if(AZIONI||azLoading)return azLoading;azLoading=fetch("/js/data/azioni.json").then(r=>r.json()).then(a=>{AZIONI=a.map(x=>({s:x[0],n:x[1],set:x[2],paese:x[3],isin:x[4],idx:x[5]}));if($("#builder").classList.contains("open"))bdCatRender();}).catch(()=>{AZIONI=[];});return azLoading;}
 /* un elemento uniforme per l'elenco: codice da mettere nella riga, nome, riga sotto, settore o classe per il colore */
 /* area delle obbligazioni, dal nome: dove sono gli emittenti (e quindi la valuta) */
@@ -336,11 +352,11 @@ const itemCol=x=>SET_COL[x.set]||TEMA_COL[x.f2]||(x.tab==="Cripto"?"#D4572E":x.t
 const initials=n=>String(n||"?").replace(/^(the|iShares|Vanguard|Xtrackers|Amundi|SPDR|Invesco|VanEck|WisdomTree|L&G)\s+/i,"").split(/[\s.,&-]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 function bdItems(){
   const tab=BDCAT.tab,f=BDCAT.f[tab]||{};
-  let L=tab==="Azioni"?(AZIONI||[]).map(azItem):POPULAR.filter(p=>p[4]===tab).map(etfItem);
+  let L=tabBase(tab);
   for(const [k] of BD_FILT[tab]||[])if(f[k])L=L.filter(x=>x[k]===f[k]);
   return L;
 }
-function bdAll(){return [...POPULAR.filter(p=>p[4]!=="Azioni").map(etfItem),...(AZIONI||[]).map(azItem)];}
+function bdAll(){return [...POPULAR.filter(p=>p[4]!=="Azioni").map(etfItem),...(BTPS||[]).map(btpItem),...(AZIONI||[]).map(azItem)];}
 const BDREM={q:"",res:[],busy:false,err:"",t:null},BDREMC=new Map();
 function bdRemote(q){
   clearTimeout(BDREM.t);q=String(q||"").trim();BDREM.q=q;
@@ -360,7 +376,7 @@ function bdCatRender(have){
   tabs.innerHTML=BD_TABS.map(t=>`<button type="button" class="bd-tab${!q&&t===BDCAT.tab?" on":""}" role="tab" aria-selected="${!q&&t===BDCAT.tab}" data-bdtab="${esc(t)}">${esc(t)}</button>`).join("");
   /* filtri della scheda: le voci si contano sull'elenco con gli altri filtri già scelti */
   const fl=box.querySelector(".bd-filt");
-  if(q){fl.innerHTML="";}else{const tab=BDCAT.tab,f=BDCAT.f[tab]||{},base=tab==="Azioni"?(AZIONI||[]).map(azItem):POPULAR.filter(p=>p[4]===tab).map(etfItem);
+  if(q){fl.innerHTML="";}else{const tab=BDCAT.tab,f=BDCAT.f[tab]||{},base=tabBase(tab);
     fl.innerHTML=(BD_FILT[tab]||[]).map(([k,lab])=>{const other=base.filter(x=>(BD_FILT[tab]||[]).every(([k2])=>k2===k||!f[k2]||x[k2]===f[k2])),cnt={};other.forEach(x=>{if(x[k])cnt[x[k]]=(cnt[x[k]]||0)+1;});
       const opts=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
       return `<label class="bd-sel${f[k]?" on":""}"><span>${lab}</span><select data-bdf="${k}" aria-label="${lab}"><option value="">${lab}: tutti</option>${opts.map(([v,n])=>`<option value="${esc(v)}"${f[k]===v?" selected":""}>${esc(v)} (${n})</option>`).join("")}</select></label>`;}).join("")+
@@ -368,13 +384,13 @@ function bdCatRender(have){
   /* elenco */
   const all=q?bdAll().filter(x=>words.every(w=>normQ(x.n+" "+x.code+" "+x.sub).includes(w))):bdItems();
   const list=all.slice(0,BDCAT.n),cnt=box.querySelector(".bd-count");
-  cnt.textContent=BDCAT.tab==="Azioni"&&!AZIONI&&!q?"Carico le azioni…":`${all.length.toLocaleString("it-IT")} ${all.length===1?"risultato":"risultati"}${q?" nel catalogo":""}`;
+  cnt.textContent=BDCAT.tab==="Azioni"&&!AZIONI&&!q?"Carico le azioni…":`${all.length.toLocaleString("it-IT")} ${all.length===1?"risultato":"risultati"}${q?" nel catalogo":""}${!q&&BDCAT.tab==="Obbligazioni"&&(BDCAT.f.Obbligazioni||{}).f1==="BTP singoli"?` · elenco del MEF${BTP_AL?" al "+BTP_AL.split("-").reverse().join("/"):""}, prezzi stimati dalla curva dei BTP della Banca d'Italia`:""}`;
   const row=x=>{const on=have.has(String(x.code).toUpperCase());return `<button type="button" class="bd-it${on?" in":""}" role="listitem" data-bdc="${esc(x.code)}"${on?' aria-disabled="true"':""}><i style="background:${itemCol(x)}" aria-hidden="true">${esc(initials(x.n))}</i><span><b>${esc(x.n)}</b><small>${esc(x.sub)}</small></span><em aria-hidden="true">${on?"✓":"+"}</em></button>`;};
   box.querySelector(".bd-clist").innerHTML=list.map(row).join("")+(all.length>list.length?`<button type="button" class="btn sm bd-moreit" data-bdmoreit="1">Mostra altri ${Math.min(40,all.length-list.length)} di ${all.length-list.length}</button>`:"")+(q&&!all.length?`<p class="caption">Niente nel catalogo: guarda qui sotto tra tutte le borse.</p>`:"");
   /* da tutte le borse: quello che il catalogo non ha (azioni di altre borse, altri ETF, fondi comuni) */
   const rl=box.querySelector(".bd-rlist"),isinQ=/^[A-Z]{2}[A-Z0-9]{9}\d$/i.test(BDCAT.q.trim());
   if(!q){rl.innerHTML="";}
-  else{const inCat=new Set(bdAll().map(x=>String(x.code).toUpperCase())),R=BDREM.res.filter(r=>!inCat.has(String(r.simbolo).toUpperCase()));
+  else{const inCat=new Set(bdAll().map(x=>String(x.code).toUpperCase())),R=BDREM.res.filter(r=>!inCat.has(String(r.simbolo).toUpperCase())&&!inCat.has(String(r.simbolo).toUpperCase().split(".")[0]));
     rl.innerHTML=`<p class="bd-rh">Da tutte le borse${BDREM.busy?" · cerco…":""}</p>`+(R.length?`<div class="bd-rgrid">${R.map((r,i)=>{const on=have.has(String(r.simbolo).toUpperCase());return `<button type="button" class="bd-ri${on?" in":""}" data-bdr="${i}"${on?' aria-disabled="true"':""}><span><b>${esc(r.nome)}</b><small>${esc(r.tipo)} · ${esc(r.borsa)} · ${esc(String(r.simbolo).replace(/\.US$/,""))}</small></span><em aria-hidden="true">${on?"✓":"+"}</em></button>`;}).join("")}</div>`
       :BDREM.busy?"":isinQ?`<button type="button" class="bd-ri" data-bdisin="${esc(BDCAT.q.trim().toUpperCase())}"><span><b>Aggiungi l'ISIN ${esc(BDCAT.q.trim().toUpperCase())}</b><small>lo verifico su OpenFIGI e cerco la quotazione</small></span><em aria-hidden="true">+</em></button>`
       :`<p class="caption">${esc(BDREM.err||"Nessun titolo trovato con questo nome. Prova con il ticker o l'ISIN.")}</p>`);
@@ -388,13 +404,13 @@ function bdAddSym(code,meta){
 }
 document.addEventListener("click",e=>{const r=e.target.closest("[data-bdr]");if(r&&!r.classList.contains("in")){const x=(BDREM.view||[])[+r.dataset.bdr];if(x)bdAddSym(String(x.simbolo).toUpperCase(),{nome:x.nome,tipo:x.tipo,borsa:x.borsa});return;}
   const z=e.target.closest("[data-bdisin]");if(z)bdAddSym(z.dataset.bdisin,null);});
-document.addEventListener("input",e=>{if(e.target.classList&&e.target.classList.contains("bd-cq")){BDCAT.q=e.target.value;BDCAT.n=40;bdRemote(e.target.value);if(BDCAT.q)azLoad();bdCatRender();}});
+document.addEventListener("input",e=>{if(e.target.classList&&e.target.classList.contains("bd-cq")){BDCAT.q=e.target.value;BDCAT.n=40;bdRemote(e.target.value);if(BDCAT.q){azLoad();btpLoad();}bdCatRender();}});
 document.addEventListener("click",e=>{if(e.target.closest("[data-bdmore]")){BDCAT.allModels=!BDCAT.allModels;bdRender();return;}
-  const t=e.target.closest("[data-bdtab]");if(t){BDCAT.tab=t.dataset.bdtab;BDCAT.q="";BDCAT.n=40;const i=document.querySelector(".bd-cq");if(i)i.value="";if(BDCAT.tab==="Azioni")azLoad();bdCatRender();return;}
+  const t=e.target.closest("[data-bdtab]");if(t){BDCAT.tab=t.dataset.bdtab;BDCAT.q="";BDCAT.n=40;const i=document.querySelector(".bd-cq");if(i)i.value="";if(BDCAT.tab==="Azioni")azLoad();if(BDCAT.tab==="Obbligazioni")btpLoad();bdCatRender();return;}
   if(e.target.closest("[data-bdmoreit]")){BDCAT.n+=40;bdCatRender();return;}
   if(e.target.closest("[data-bdfx]")){BDCAT.f[BDCAT.tab]={};BDCAT.n=40;bdCatRender();return;}
   /* un titolo dell'elenco delle azioni: codice con la borsa, nome e settore restano per la riga */
-  const c=e.target.closest(".bd-it[data-bdc]");if(c&&!c.classList.contains("in")){const code=c.dataset.bdc,az=(AZIONI||[]).find(a=>a.s===code);bdAddSym(String(code).toUpperCase(),az?{nome:az.n,tipo:"Azione",borsa:az.paese,set:az.set}:null);e.stopImmediatePropagation();}});
+  const c=e.target.closest(".bd-it[data-bdc]");if(c&&!c.classList.contains("in")){const code=c.dataset.bdc,az=(AZIONI||[]).find(a=>a.s===code),bt=(BTPS||[]).find(b=>b.isin===code);bdAddSym(String(code).toUpperCase(),bt?btpMeta(bt):az?{nome:az.n,tipo:"Azione",borsa:az.paese,set:az.set}:null);e.stopImmediatePropagation();}});
 document.addEventListener("change",e=>{const s=e.target.closest("[data-bdf]");if(!s)return;(BDCAT.f[BDCAT.tab]||=({}))[s.dataset.bdf]=s.value;BDCAT.n=40;bdCatRender();});
 function openBuilder(){trackOnce("feature","pannello_crea",{name:"pannello_crea"});bdRender();$("#builder").classList.add("open");document.body.classList.add("bd-on");$("#builder").scrollTop=0;$("#builder").setAttribute("aria-hidden","false");setTimeout(()=>{const i=document.querySelector("#bdRows input");if(i)i.focus();},350);}
 function closeBuilder(){$("#builder").classList.remove("open");document.body.classList.remove("bd-on");if(!$("#drawer").classList.contains("open"))$("#scrim").classList.remove("open");$("#builder").setAttribute("aria-hidden","true");}
@@ -425,7 +441,7 @@ function bdGo(){
   const P2=BD.ports.map(rs=>rs.filter(r=>String(r[0]).trim()&&+r[1]>0)),key=r=>{const f=bdFind(r[0])||[r[0]];return f[0]||f[2];};
   const uni=[];P2.forEach(rs=>rs.forEach(r=>{if(!uni.some(u=>key(u)===key(r)))uni.push([r[0],0]);}));
   const rows=uni.map(u=>{const a=P2[0].find(r=>key(r)===key(u));return [u[0],a?+a[1]:0];}),s=rows.reduce((a,r)=>a+(+r[1]),0);if(!rows.length||!(s>0))return;
-  S.cmpPending=P2.length>1?P2.map(rs=>{const t=rs.reduce((a,r)=>a+(+r[1]),0),w={};rs.forEach(r=>{const f=bdFind(r[0])||[r[0]];w[f[0]&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(f[0])?f[0]:(f[1]||f[2]||r[0])]=(+r[1])/t;});return {w};}):null;
+  S.cmpPending=P2.length>1?P2.map(rs=>{const t=rs.reduce((a,r)=>a+(+r[1]),0),w={};rs.forEach(r=>{const f=bdFind(r[0])||[r[0]];w[f[4]&&f[4].btp?btpEtichetta(f[4].sym):f[0]&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(f[0])?f[0]:(f[1]||f[2]||r[0])]=(+r[1])/t;});return {w};}):null;
   const cap=Math.max(100,parseFloat($("#bdCap").value)||10000);
   /* un riepilogo di posizioni come quello di un Excel: lo legge il riconoscitore locale, poi i prezzi di mercato */
   const aoa=[["Strumento","Ticker","ISIN","Valore (€)","Peso"],...rows.map(r=>{const f=bdFind(r[0])||[r[0],null,null],w=(+r[1])/s;return [(f[4]&&f[4].nome)||f[1]||f[0]||f[2],f[0]&&!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(f[0])?f[0]:"",f[2]||"",Math.round(cap*w*100)/100,w];})];
@@ -860,10 +876,28 @@ async function youngDecide(c,act){
 async function resolveIsins(pos){
   const need=pos.filter(p=>!p.simbolo&&(p.isin||ISIN_RX.test(p.ticker||"")));if(!need.length)return [];
   const isins=[...new Set(need.map(p=>p.isin||p.ticker))],found=new Map();
-  for(let i=0;i<isins.length;i+=10){const j=await getJSON(`/api/isin?isin=${isins.slice(i,i+10).join(",")}`);(j.results||[]).forEach(r=>{if(r&&r.simbolo)found.set(r.isin,r);});}
-  need.forEach(p=>{const r=found.get(p.isin||p.ticker);if(r){p.simbolo=r.simbolo;p.alt=r.alternative||[];p.isinFrom=r.nome;}});
-  return need.map(p=>`${p.nome}: ${p.simbolo?`${p.isin||p.ticker} → ${p.simbolo}`:"ISIN non trovato"}`);
+  for(let i=0;i<isins.length;i+=10){const j=await getJSON(`/api/isin?isin=${isins.slice(i,i+10).join(",")}`);(j.results||[]).forEach(r=>{if(r&&(r.simbolo||r.stato))found.set(r.isin,r);});}
+  need.forEach(p=>{const r=found.get(p.isin||p.ticker);if(r&&r.simbolo){p.simbolo=r.simbolo;p.alt=r.alternative||[];p.isinFrom=r.nome;}else if(r&&r.stato)p.stato=r.stato;});
+  return need.map(p=>`${p.nome}: ${p.simbolo?`${p.isin||p.ticker} → ${p.simbolo}`:p.stato?`titolo di Stato ${p.stato.nome}`:"ISIN non trovato"}`);
 }
+/* BTP, BOT e CTZ a tasso fisso senza quotazione di borsa: prezzo stimato dalla curva della Banca d'Italia.
+   Cedola e scadenza da OpenFIGI (con l'ISIN) o dal nome («BTP 3,35% 01MZ35»); il prezzo del file, se c'è con la sua data, allinea la stima. */
+function btpAssign(pos){
+  pos.forEach(p=>{if(p.simbolo&&!isBtpSym(p.simbolo))return;
+    let sym=isBtpSym(p.simbolo)?p.simbolo:null;
+    if(!sym){const st=p.stato,nm=p.nome||p.titolo||p.ticker||"",tipo=st?st.tipo:P.btpTipo(nm,p.isin);if(tipo!=="fisso")return;
+      const bi=st?null:bondInfo(nm);sym=st?btpSym(st.cedola,st.scadenza):bi?btpSym(bi.cpn,bi.mat):null;if(!sym)return;}
+    p.simbolo=sym;p.btp=true;p.per100=true;
+    const px=+p.prezzo,d=p.data?String(p.data).slice(0,10):null;p.ancora=px>40&&px<200&&d&&/^\d{4}-\d{2}-\d{2}$/.test(d)?{prezzo:px,data:d}:null;
+    if(!p.ticker||ISIN_RX.test(p.ticker)||p.labelIsName||bondInfo(p.ticker)||isBtpSym(p.ticker))p.ticker=btpEtichetta(sym);});
+}
+const whyNoSym=p=>{const t=p.stato?p.stato.tipo:P.btpTipo(p.nome||p.ticker||"",p.isin);
+  if(t==="indicizzato")return "titolo di Stato con cedole che cambiano (legate all'inflazione o crescenti): il prezzo non si può stimare dalla curva dei BTP, quindi resta fuori dalle analisi";
+  if(t==="variabile")return "CCT a tasso variabile: il prezzo non si può stimare dalla curva dei BTP, quindi resta fuori dalle analisi";
+  if(t==="estero")return "titolo di Stato estero: le fonti gratuite non pubblicano lo storico dei prezzi, quindi resta fuori dalle analisi";
+  if(t==="fisso")return "titolo di Stato a tasso fisso, ma dal nome non si leggono cedola e scadenza: scrivi l'ISIN, oppure il simbolo BTP:cedola:scadenza (es. BTP:3.35:2035-03-01)";
+  if(isBondPos(p))return "obbligazione: le fonti gratuite non pubblicano lo storico dei prezzi, quindi resta fuori dalle analisi";
+  return "senza simbolo di borsa: scrivilo nella tabella per includerlo";};
 async function rebuildFromPrices(o={}){
   /* o.quiet: ricostruzione in sottofondo (esempio all'apertura), senza cambiare pagina; se nel frattempo arriva un altro file si abbandona */
   const u=S.und,src0=S.source;
@@ -878,13 +912,14 @@ async function rebuildFromPrices(o={}){
     prog("Cerco i simboli di borsa degli ISIN…");
     const isinLog=await resolveIsins(pos);
     pos.forEach(p=>{if(!p.simboloHint)return;if(!p.simbolo)p.simbolo=p.simboloHint;else if(p.simboloHint!==p.simbolo)p.alt=[...(p.alt||[]).filter(x=>x!==p.simboloHint),p.simboloHint];});
+    btpAssign(pos);
     const noSym=pos.filter(p=>!p.simbolo);pos=pos.filter(p=>p.simbolo);
     if(!pos.length)throw new Error("Nessuno strumento ha un simbolo di borsa: scrivilo nella colonna «Simbolo per i prezzi».");
     // Un ETF per richiesta: la rete di Vercel conserva ogni serie 24 ore e la condivide tra tutti i visitatori.
     // Se un simbolo non scarica, si provano le altre quotazioni dello stesso ISIN.
     const series=[];
     /* limite al minuto del piano gratuito di Alpha Vantage: si aspetta e si riprova, fino a 4 volte per simbolo */
-    const fetchSym=async sym=>{const U=`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`,hit=netGet(U);if(hit)return {r:{ok:true,status:200},j:hit};for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
+    const fetchSym=async(sym,pp)=>{if(isBtpSym(sym)){const j=await btpPrezzi(sym,pp&&pp.ancora);return {r:{ok:!j.error,status:j.error?502:200},j};}const U=`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`,hit=netGet(U);if(hit)return {r:{ok:true,status:200},j:hit};for(let k=0;k<5;k++){const r=await fetch(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`,{signal:AbortSignal.timeout(45000)});const j=await r.json().catch(()=>({}));
       if(j.error&&/limite/i.test(j.error)&&k<4){for(let w=20;w>0;w--){prog(`Limite al minuto di Alpha Vantage: riprovo ${sym} tra ${w} s…`);await new Promise(res=>setTimeout(res,1000));}continue;}if(r.ok&&!j.error&&j.points&&j.points.length)netPut(U,j);return {r,j};}};
     for(const [n,p] of pos.entries()){
       let got=null,tried=[];
@@ -892,7 +927,7 @@ async function rebuildFromPrices(o={}){
       const cands=[p.simbolo,...(p.alt||[]).filter(x=>x!==p.simbolo)].filter(Boolean).slice(0,7);
       for(const sym of cands){
         tried.push(sym);prog(`Scarico lo storico di ${p.ticker||p.nome} (${sym}) · ${n+1} di ${pos.length}…`);
-        const {r,j}=await fetchSym(sym);
+        const {r,j}=await fetchSym(sym,p);
         /* meno di 6 mesi di prezzi: si tiene come riserva e si prova la quotazione successiva (stesso titolo su un'altra borsa) */
         if(r.ok&&!j.error&&j.points&&j.points.length&&j.points.length<6&&sym!==cands[cands.length-1]){if(!short||j.points.length>short.j.points.length)short={sym,j};continue;}
         if(r.ok&&!j.error&&j.points&&j.points.length){got=j;if(sym!==p.simbolo){p.simboloOrig=p.simbolo;p.simbolo=sym;}break;}
@@ -903,14 +938,14 @@ async function rebuildFromPrices(o={}){
       /* il simbolo indicato (dal file o dall'IA) non esiste: se c'è l'ISIN, si cercano le sue quotazioni su OpenFIGI e si riprova */
       /* quotazione con meno di 5 anni di storia: lo stesso ISIN su un'altra borsa può averne molta di più (VWCE ad Amsterdam dal 2023, a Francoforte dal 2019) */
       const yrs=j=>{const pts=j&&j.points;return pts&&pts.length>1?(new Date(pts[pts.length-1].d)-new Date(pts[0].d))/(365.25*864e5):0;};
-      if(!got.error&&yrs(got)<5&&p.isin&&ISIN_RX.test(p.isin)){
+      if(!got.error&&!p.btp&&yrs(got)<5&&p.isin&&ISIN_RX.test(p.isin)){
         let alts=(p.alt||[]).filter(x=>!tried.includes(x));
         if(!alts.length){const jj=await getJSON(`/api/isin?isin=${p.isin}`),rr=(jj.results||[])[0];alts=(rr&&rr.simbolo?[rr.simbolo,...(rr.alternative||[])]:[]).filter(x=>!tried.includes(x));}
         for(const s2 of alts.slice(0,3)){tried.push(s2);prog(`${p.ticker||p.nome}: cerco una quotazione con più storia (${s2})…`);
           const {r:r2,j:j2}=await fetchSym(s2);
           if(r2.ok&&!j2.error&&j2.points&&j2.points.length&&yrs(j2)>yrs(got)+1){got=j2;p.simboloOrig=p.simboloOrig||p.simbolo;p.simbolo=s2;}}
       }
-      if(got.error&&!/limite giornaliero/i.test(got.error)&&p.isin&&ISIN_RX.test(p.isin)&&!p.isinTried){p.isinTried=true;
+      if(got.error&&!p.btp&&!/limite giornaliero/i.test(got.error)&&p.isin&&ISIN_RX.test(p.isin)&&!p.isinTried){p.isinTried=true;
         prog(`${tried[tried.length-1]||p.simbolo} non trovato: cerco le quotazioni dell'ISIN ${p.isin}…`);
         const j=await getJSON(`/api/isin?isin=${p.isin}`),r=(j.results||[])[0];
         for(const s2 of (r&&r.simbolo?[r.simbolo,...(r.alternative||[])]:[]).filter(x=>!tried.includes(x)).slice(0,4)){
@@ -922,7 +957,7 @@ async function rebuildFromPrices(o={}){
       series.push(got);
     }
     /* senza ticker nel file l'etichetta era il nome lungo del fondo: si usa il ticker di borsa della quotazione trovata (IWDA.AMS → IWDA) */
-    const used=new Set(pos.map(p=>p.ticker));pos.forEach((p,i)=>{if(!p.labelIsName||series[i].error)return;const t=String(p.simbolo||"").split(".")[0];/* i fondi comuni su Yahoo hanno codici tipo 0P0000ABTK: resta il nome del fondo */if(t&&!/^0P[0-9A-Z]{8}$/.test(t)&&!used.has(t)){used.add(t);p.ticker=t;}});
+    const used=new Set(pos.map(p=>p.ticker));pos.forEach((p,i)=>{if(!p.labelIsName||p.btp||series[i].error)return;const t=String(p.simbolo||"").split(".")[0];/* i fondi comuni su Yahoo hanno codici tipo 0P0000ABTK: resta il nome del fondo */if(t&&!/^0P[0-9A-Z]{8}$/.test(t)&&!used.has(t)){used.add(t);p.ticker=t;}});
     S.isinLog=isinLog;S.noSym=noSym;
     const ok=[],bad=[];
     series.forEach((s,i)=>{(s.error?bad:ok).push({p:pos[i],s});});
@@ -944,10 +979,10 @@ async function rebuildFromPrices(o={}){
     const months={length:aoa.length-1};
     if(S.source!==src0)return;
     const orig=S.source.name.replace(/ · ricostruito$/,""),scartati=u.scartati||[];
-    const pf={monthly:avgMonthly(),from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:/\b(btp|cct|bot|ctz|bund|oat|treasury|titolo di stato|buono)\b/i.test(p.nome||"")||/^IT000[45]/.test(p.isin||"")&&!p.ticker?"titolo di Stato: i prezzi storici di BTP e simili non sono disponibili da fonti gratuite, quindi resta fuori dalle analisi":"senza simbolo di borsa: scrivilo nella tabella per includerlo"}))],base:"EUR"};
+    const pf={monthly:avgMonthly(),from:orig,positions:ok.map(o=>({...o.p,adjusted:o.s.adjusted,currency:o.s.currency||null,vol:o.s.vol||null,yahoo:o.s.yahoo||null,stima:o.s.stima||null,pxStima:o.s.prezzi&&o.s.prezzi.length?o.s.prezzi[o.s.prezzi.length-1]:null})),missing:[...bad.map(b=>({nome:b.p.nome,simbolo:b.p.simbolo,err:b.s.error})),...(S.noSym||[]).map(p=>({nome:p.nome,simbolo:"",err:whyNoSym(p)}))],base:"EUR"};
     load([{name:"Prezzi mensili",aoa}],{name:`${orig.replace(/\.[^.]+$/,"")} · ricostruito`,size:0,kind:"rebuilt"},!o.quiet);
     S.portfolio=pf;S.rbLog=null;
-    S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti":"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
+    S.aiLog=[...(S.isinLog||[]).map(x=>"ISIN cercato su OpenFIGI: "+x),...ok.filter(o=>o.s.stima).map(o=>btpNota(o.s)),...ok.filter(o=>o.p.simboloOrig).map(o=>`${o.p.nome}: ${o.p.simboloOrig} non disponibile, usata la quotazione ${o.p.simbolo}`),`File ricostruito con i prezzi di mercato, non con i valori del tuo Excel (che includono versamenti, vendite e spostamenti di liquidità): ${ok.length} ${ok.length===1?"strumento":"strumenti"}, ${months.length} mesi di prezzi di mercato da ${[...new Set(ok.map(o=>o.s.source||"Alpha Vantage"))].join(" e ")} (${ok.every(o=>o.s.adjusted)?"chiusure rettificate per dividendi e frazionamenti"+(ok.some(o=>o.s.stima)?"; per i BTP indice con le cedole reinvestite":""):"chiusure"}), tutto convertito in euro con il cambio BCE di fine mese.`,
       `Valute di quotazione: ${ok.map(o=>`${o.p.ticker||o.p.nome} ${o.s.currency||"sconosciuta"}`).join(", ")}.`,
       ...(unknown.length?[`Valuta non determinata per ${unknown.join(", ")}: lasciata com'è, verifica il simbolo.`]:[]),
       ...pf.missing.map(m=>`Non scaricato: ${m.nome}${m.simbolo?` (${m.simbolo})`:""}. ${m.err}`),...scartati.map(x=>"Scartato: "+x)];
@@ -1114,7 +1149,7 @@ function posEnrich(list,pos){const k=v=>String(v||"").trim().toUpperCase();
     if(!p.isin&&q.isin)p.isin=q.isin;if(q.nome&&(!p.nome||k(p.nome)===k(p.ticker)))p.nome=q.nome;
     const s=q.simbolo?normSym({simbolo:q.simbolo}):"";if(s)p.simbolo=s;
     if(p.pesoTarget==null&&q.pesoTarget!=null)p.pesoTarget=q.pesoTarget;});}
-function normSym(p){const t=String(p.simbolo||"").trim().toUpperCase();if(!t||/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t))return "";if(/^[A-Z0-9]{2,12}-(EUR|USD|GBP|CHF|USDT)$/.test(t))return t;if(/:/.test(t))return guessSymbol(t,"ETF",null)||"";if(/\./.test(t))return avSymbol(t);if(p.isin)return "";return guessSymbol(t,"ETF",null)||t;}
+function normSym(p){const t=String(p.simbolo||"").trim().toUpperCase();if(!t||/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(t))return "";if(isBtpSym(t))return t;if(/^[A-Z0-9]{2,12}-(EUR|USD|GBP|CHF|USDT)$/.test(t))return t;if(/:/.test(t))return guessSymbol(t,"ETF",null)||"";if(/\./.test(t))return avSymbol(t);if(p.isin)return "";return guessSymbol(t,"ETF",null)||t;}
 function avSymbol(x){const t=String(x||"").trim().toUpperCase();const m=t.match(/^([A-Z0-9\-]+)\.(L|DE|F|PA|AS|SW|MI)$/);if(!m)return t;return m[1]+"."+({L:"LON",DE:"DEX",F:"DEX",PA:"PAR",AS:"AMS",SW:"SWX",MI:"MIL"}[m[2]]);}
 /* cripto principali: Yahoo pubblica il prezzo in euro come BTC-EUR, ETH-EUR… */
 const CRYPTO={BTC:"BTC",BITCOIN:"BTC",XBT:"BTC",ETH:"ETH",ETHEREUM:"ETH",ETHER:"ETH",SOL:"SOL",SOLANA:"SOL",XRP:"XRP",RIPPLE:"XRP",ADA:"ADA",CARDANO:"ADA",DOGE:"DOGE",DOGECOIN:"DOGE",BNB:"BNB",DOT:"DOT",POLKADOT:"DOT",LTC:"LTC",LITECOIN:"LTC",AVAX:"AVAX",LINK:"LINK",/* aggiunte del 19/11/2026, simboli Yahoo verificati con i prezzi */CRO:"CRO",CRONOS:"CRO",USDC:"USDC",USDT:"USDT",TETHER:"USDT",POL:"POL28321",MATIC:"POL28321",POLYGON:"POL28321",ATOM:"ATOM",COSMOS:"ATOM",XLM:"XLM",STELLAR:"XLM",TRX:"TRX",TRON:"TRX",SHIB:"SHIB",UNI:"UNI7083",UNISWAP:"UNI7083",ALGO:"ALGO",ALGORAND:"ALGO",EGLD:"EGLD",MULTIVERSX:"EGLD",BCH:"BCH",ETC:"ETC",XMR:"XMR",MONERO:"XMR",FIL:"FIL",FILECOIN:"FIL",AAVE:"AAVE",HBAR:"HBAR",HEDERA:"HBAR",ICP:"ICP",VET:"VET",VECHAIN:"VET"};
@@ -1167,14 +1202,19 @@ function bondYtm(px,cpn,mat,today){const yrs=(mat-today)/(365.25*864e5);if(!(px>
   let a=-.5,b=1;for(let i=0;i<80;i++){const m=(a+b)/2;if(pv(m)>px)a=m;else b=m;}return (a+b)/2;}
 const isBondPos=p=>!!bondInfo(p.nome||p.titolo)||/^IT000[45]/.test(p.isin||"")||!!p.per100;
 function bondsHTML(){
-  const u=S.lastUnd||S.und,pf=S.portfolio;if(!u||!u.posizioni||!pf)return "";
-  const miss=new Set((pf.missing||[]).map(m=>m.nome)),now=new Date();
-  const B=u.posizioni.filter(p=>miss.has(p.nome)&&isBondPos(p));if(!B.length)return "";
-  const rows=B.map(p=>{const b=bondInfo(p.nome)||{},px=p.per100?p.prezzo:null,y=px&&b.mat>now?bondYtm(px,b.cpn,b.mat,now):NaN;
-    return `<tr><td><span class="an">${esc(p.nome)}</span>${p.isin?`<span class="cl">${esc(p.isin)}</span>`:""}</td><td class="mono">${p.valore?fmtEur(p.valore):"—"}</td><td class="mono">${b.cpn!=null?fmtPct(b.cpn,2):"—"}</td><td class="mono">${b.mat?b.mat.toLocaleDateString("it-IT",{timeZone:"UTC"}):"—"}</td><td class="mono">${Number.isFinite(y)?fmtPct(y,2):"—"}${px?`<span class="cl">al prezzo ${fmtN(px,2)}</span>`:""}</td></tr>`;}).join("");
-  const tot=B.reduce((a,p)=>a+(p.valore||0),0);
-  return `<h4 class="look-h">Obbligazioni e titoli di Stato</h4><div class="tablewrap"><table class="mt"><thead><tr><th>Titolo</th><th>Valore</th><th>Cedola</th><th>Scadenza</th><th>Rendimento a scadenza</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="caption">${tot?`${fmtEur(tot)} in obbligazioni. `:""}Le fonti gratuite non pubblicano lo storico dei prezzi di BTP e obbligazioni, quindi restano fuori da rischio, crisi e frontiera (che usano i prezzi mese per mese); i pesi qui sopra sono calcolati sul resto del portafoglio. Cedola e scadenza sono lette dal nome del titolo; il rendimento a scadenza è lordo, al prezzo dell'ultimo movimento (su 100 di nominale).</p>`;
+  const u=S.lastUnd||S.und,pf=S.portfolio;if(!pf)return "";
+  const miss=new Set((pf.missing||[]).map(m=>m.nome)),now=new Date(),today=now.toISOString().slice(0,10);
+  const E=(pf.positions||[]).filter(p=>p.stima),B=u&&u.posizioni?u.posizioni.filter(p=>miss.has(p.nome)&&isBondPos(p)):[];
+  if(!E.length&&!B.length)return "";
+  const dt=s=>s?new Date(s+"T00:00:00Z").toLocaleDateString("it-IT",{timeZone:"UTC"}):"—";
+  const rowsE=E.map(p=>{const st=p.stima,px=p.pxStima&&p.pxStima.v,b={cedola:st.cedola,scadenza:st.scadenza},y=px?P.btpTir(b,p.pxStima.d||today,px):NaN;
+    return `<tr><td><span class="an">${esc(st.nome)}</span>${p.isin?`<span class="cl">${esc(p.isin)}</span>`:""}</td><td class="mono">${p.valore?fmtEur(p.valore):"—"}</td><td class="mono">${fmtPct(st.cedola,2)}</td><td class="mono">${dt(st.scadenza)}</td>
+      <td class="mono">${px?fmtN(px,2):"—"}<span class="cl">stimato${st.ancora?", allineato al file":""}</span></td><td class="mono">${Number.isFinite(y)?fmtPct(y/100,2):"—"}</td></tr>`;}).join("");
+  const rowsB=B.map(p=>{const b=bondInfo(p.nome)||{},px=p.per100?p.prezzo:null,y=px&&b.mat>now?bondYtm(px,b.cpn,b.mat,now):NaN;
+    return `<tr class="out"><td><span class="an">${esc(p.nome)}</span><span class="cl">${p.isin?esc(p.isin)+" · ":""}fuori dalle analisi</span></td><td class="mono">${p.valore?fmtEur(p.valore):"—"}</td><td class="mono">${b.cpn!=null?fmtPct(b.cpn,2):"—"}</td><td class="mono">${b.mat?b.mat.toLocaleDateString("it-IT",{timeZone:"UTC"}):"—"}</td><td class="mono">${px?fmtN(px,2):"—"}${px?`<span class="cl">ultimo movimento</span>`:""}</td><td class="mono">${Number.isFinite(y)?fmtPct(y,2):"—"}</td></tr>`;}).join("");
+  const totB=B.reduce((a,p)=>a+(p.valore||0),0),al=E.length?E[0].stima.curvaAl:null;
+  return `<h4 class="look-h">Obbligazioni e titoli di Stato</h4><div class="tablewrap"><table class="mt"><thead><tr><th>Titolo</th><th>Valore</th><th>Cedola</th><th>Scadenza</th><th>Prezzo su 100</th><th>Rendimento a scadenza</th></tr></thead><tbody>${rowsE}${rowsB}</tbody></table></div>
+    <p class="caption">${E.length?`I BTP a tasso fisso entrano in rischio, crisi e frontiera con un prezzo <b>stimato</b>: le cedole e il rimborso sono scontati ai rendimenti dei BTP benchmark a 3, 5, 10 e 30 anni pubblicati dalla Banca d'Italia (dati al ${dt(al)}); nei rendimenti le cedole lorde sono reinvestite. Il prezzo vero di ogni titolo si scosta di solito di qualche decimo: se nel file c'è un prezzo con la sua data, la stima si allinea a quello. Fonte: Banca d'Italia. `:""}${B.length?`${totB?fmtEur(totB)+" in obbligazioni restano":"Le obbligazioni qui sopra segnate «fuori dalle analisi» restano"} fuori da rischio, crisi e frontiera: per BTP indicizzati, CCT, titoli esteri e obbligazioni societarie non c'è una fonte gratuita dello storico dei prezzi. `:""}Il rendimento a scadenza è lordo.</p>`;
 }
 
-export { posEnrich, AI_URL, ASSETR, BD, BDCHK, BMON, CLS_COL, CRYPTO, EXAMPLE, ISIN_RX, POPULAR, PRESETS, PRESET_TXT, PROXY, SPACES, SPACE_KEEP, TIPO_L, TPL_KEY, TR, aiAuto, aiPayload, aiSample, an, applyAI, applyUnderstandSeries, avSymbol, avgMonthly, bdCheck, bdCls, bdFind, bdGo, bdHint, bdRender, bdState, blockingOpen, bondInfo, bondYtm, bondsHTML, cellText, closeBuilder, colIndex, colLetter, colLetterUI, colSource, computeChecks, convertCurrency, drop, eurMap, fileStructure, fillTargets, findYoung, fixOpts, guessSymbol, handleFile, importConfidence, importKind, initRoles, isBondPos, isExample, isSim, load, loadExample, maybeAutoRebuild, needCount, normSym, openBuilder, playScan, previewHTML, rbAoa, rebuildBanner, rebuildFromPrices, rebuildRows, recipeOff, renderAI, renderCaps, renderChecks, renderConfirm, renderDeadEnd, renderImport, renderLog, renderMapping, renderQuality, renderScan, renderSheets, renderSummary, renderUnderstand, requestFix, requestRecipe, requestUnderstand, resetAI, resetImportState, resolveIsins, sheetCcy, showError, spaceBar, spaceBlank, spaceSave, spaceSwitch, spark, toastImport, tplAll, tplApply, tplForget, tplGet, tplSave, track, trackFlush, trackOnce, txLabel, txSnapshot, undPayload, undoAI, validateAI, wideSnapshot, youngDecide };
+export { bdBtpMeta, posEnrich, AI_URL, ASSETR, BD, BDCHK, BMON, CLS_COL, CRYPTO, EXAMPLE, ISIN_RX, POPULAR, PRESETS, PRESET_TXT, PROXY, SPACES, SPACE_KEEP, TIPO_L, TPL_KEY, TR, aiAuto, aiPayload, aiSample, an, applyAI, applyUnderstandSeries, avSymbol, avgMonthly, bdCheck, bdCls, bdFind, bdGo, bdHint, bdRender, bdState, blockingOpen, bondInfo, bondYtm, bondsHTML, cellText, closeBuilder, colIndex, colLetter, colLetterUI, colSource, computeChecks, convertCurrency, drop, eurMap, fileStructure, fillTargets, findYoung, fixOpts, guessSymbol, handleFile, importConfidence, importKind, initRoles, isBondPos, isExample, isSim, load, loadExample, maybeAutoRebuild, needCount, normSym, openBuilder, playScan, previewHTML, rbAoa, rebuildBanner, rebuildFromPrices, rebuildRows, recipeOff, renderAI, renderCaps, renderChecks, renderConfirm, renderDeadEnd, renderImport, renderLog, renderMapping, renderQuality, renderScan, renderSheets, renderSummary, renderUnderstand, requestFix, requestRecipe, requestUnderstand, resetAI, resetImportState, resolveIsins, sheetCcy, showError, spaceBar, spaceBlank, spaceSave, spaceSwitch, spark, toastImport, tplAll, tplApply, tplForget, tplGet, tplSave, track, trackFlush, trackOnce, txLabel, txSnapshot, undPayload, undoAI, validateAI, wideSnapshot, youngDecide };

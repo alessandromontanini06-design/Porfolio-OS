@@ -55,6 +55,23 @@ async function search(q) {
   searchCache.set(k, { t: Date.now(), v }); return v;
 }
 
+/* titoli di Stato (OpenFIGI, settore «Govt»): cedola, scadenza e tipo dalla descrizione («BTPS 3 1/4 06/13/27», ticker «… VALR»).
+   «fisso» = BTP, BOT, CTZ italiani a tasso fisso: il sito ne stima il prezzo con la curva della Banca d'Italia; gli altri no. */
+function govtInfo(isin, all) {
+  const d = all.find(x => x.marketSector === "Govt" && x.securityDescription); if (!d) return null;
+  const tok = String(d.securityDescription).trim().split(/\s+/), dm = tok.length && tok[tok.length - 1].match(/^(\d{2})\/(\d{2})\/(\d{2,4})$/);
+  if (!dm) return null;
+  const y = dm[3].length === 2 ? 2000 + +dm[3] : +dm[3], scadenza = `${y}-${dm[1]}-${dm[2]}`;
+  let cpn = 0, num = true;
+  for (const t of tok.slice(1, -1)) { const f = t.match(/^(\d+)\/(\d+)$/); if (f) cpn += +f[1] / +f[2]; else if (/^\d+(\.\d+)?$/.test(t)) cpn += +t; else num = false; }
+  const tk = String(d.ticker || "").trim().split(/\s+/), suf = tk.slice(tk.findIndex(t => /^\d{2}\/\d{2}\/\d{2,4}$/.test(t)) + 1).join(" ");
+  const fam = tok[0].toUpperCase(), it = /^IT/.test(isin);
+  const tipo = !it ? "estero" : !num || /F(LOAT)?\b|EU\b/.test(suf) || /^CCT/.test(fam) ? "variabile" : /^(BTPS|BOTS|CTZS?)$/.test(fam) && (!suf || /^\d+Y$/.test(suf)) ? "fisso" : "indicizzato";
+  const nm = fam === "BTPS" ? "BTP" : fam === "BOTS" ? "BOT" : /^CTZ/.test(fam) ? "CTZ" : /^CCT/.test(fam) ? "CCT" : (d.name || fam);
+  const it2 = n => String(+n.toFixed(3)).replace(".", ",");
+  return { tipo, cedola: num ? +(cpn / 100).toFixed(6) : null, scadenza, nome: `${nm}${num && !/^CCT/.test(fam) ? " " + it2(cpn) + "%" : ""} ${dm[2]}/${dm[1]}/${y}${tipo === "indicizzato" ? (/VALR|PIU/.test(suf) ? " (cedole crescenti)" : " (indicizzato all'inflazione)") : tipo === "variabile" ? " (tasso variabile)" : ""}`, descrizione: d.securityDescription, emittente: d.name || null };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") { res.status(405).json({ error: "Usa una richiesta GET." }); return; }
   if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
@@ -77,17 +94,17 @@ export default async function handler(req, res) {
       if (!r.ok) throw new Error(`OpenFIGI ${r.status}`);
       const j = await r.json();
       todo.forEach((isin, k) => {
-        const rows = ((j[k] && j[k].data) || []).filter(d => d.ticker && d.exchCode in EXCH);
+        const all = (j[k] && j[k].data) || [], rows = all.filter(d => d.ticker && d.exchCode in EXCH), stato = govtInfo(isin, all);
         // azioni e fondi americani o canadesi: prima la borsa di casa; il resto: prima le borse in euro
         // azioni: prima la borsa del paese dell'emittente (Enel → Milano); gli ETF irlandesi o lussemburghesi seguono l'ordine in euro
         const HOME = { US: ["US", "UN", "UW", "UQ", "UA", "UP"], CA: ["US", "UN", "UW", "UQ", "UA", "UP"], IT: ["IM"], DE: ["GY", "GR"], FR: ["FP"], NL: ["NA"], GB: ["LN"], CH: ["SW", "SE"] };
         const home = HOME[isin.slice(0, 2)] || [], rank = c => (home.includes(c) ? -1 : ORDER.indexOf(c));
         rows.sort((a, b) => rank(a.exchCode) - rank(b.exchCode));
         const fmt = d => String(d.ticker).trim().toUpperCase().replace(/\s+/g, "").replace(/\//g, "-") + EXCH[d.exchCode];
-        const v = rows.length ? { isin, simbolo: fmt(rows[0]), ticker: rows[0].ticker, borsa: rows[0].exchCode, nome: rows[0].name || null, alternative: [...new Set(rows.slice(1, 6).map(fmt))] } : { isin, simbolo: null, error: (j[k] && j[k].warning) || "ISIN non trovato" };
+        const v = stato ? { isin, simbolo: null, nome: stato.nome, stato } : rows.length ? { isin, simbolo: fmt(rows[0]), ticker: rows[0].ticker, borsa: rows[0].exchCode, nome: rows[0].name || null, alternative: [...new Set(rows.slice(1, 6).map(fmt))] } : { isin, simbolo: null, error: (j[k] && j[k].warning) || "ISIN non trovato" };
         out.push(v);
       });
-      for (const v of out.filter(o => todo.includes(o.isin) && !o.simbolo)) { const y = await yahooFund(v.isin); if (y) Object.assign(v, y, { error: undefined }); }
+      for (const v of out.filter(o => todo.includes(o.isin) && !o.simbolo && !o.stato)) { const y = await yahooFund(v.isin); if (y) Object.assign(v, y, { error: undefined }); }
       out.filter(o => todo.includes(o.isin)).forEach(v => cache.set(v.isin, { t: Date.now(), v }));
     } catch (e) {
       todo.forEach(isin => out.push({ isin, simbolo: null, error: `Ricerca non disponibile (${e.message}).` }));

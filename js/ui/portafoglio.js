@@ -286,7 +286,7 @@ function costCalc(){
   const tot=pf.positions.reduce((a,p)=>a+(p.valore>0?p.valore:0),0);if(!(tot>0))return null;
   const pr=coPrefs(),own=pr.ter||{},cheap=Number.isFinite(pr.cheap)?pr.cheap:.002,other=Number.isFinite(pr.other)?pr.other:0;
   const items=pf.positions.map(p=>{const k=coKey(p),j=p.etf&&!p.etf.error&&Number.isFinite(p.etf.ter)?p.etf.ter:null,u=Number.isFinite(own[k])?own[k]:null,t=u!=null?u:j,v=p.valore>0?p.valore:0;
-    return {p,k,nome:p.ticker||p.nome||"—",full:p.etf&&!p.etf.error&&p.etf.nome||p.nome||"",isin:p.isin&&ISIN_RX.test(p.isin)?p.isin:null,v,w:v/tot,ter:t,src:u!=null?"tu":j!=null?"justETF":null,etfTer:j,
+    return {p,k,nome:p.ticker||p.nome||"—",full:p.etf&&!p.etf.error&&p.etf.nome||p.nome||"",isin:p.isin&&ISIN_RX.test(p.isin)?p.isin:null,v,w:v/tot,ter:t,src:u!=null?"tu":j!=null?(p.etf.btp?"titolo di Stato":"justETF"):null,etfTer:j,
       y:t!=null?v*t:NaN,d20:t!=null?P.terDrag(v,t,CO_R,CO_Y):NaN,save:t!=null&&t>cheap?P.terDrag(v,t,CO_R,CO_Y)-P.terDrag(v,cheap,CO_R,CO_Y):0};});
   const known=items.filter(x=>x.ter!=null),kv=known.reduce((a,x)=>a+x.v,0);
   const ter=kv>0?known.reduce((a,x)=>a+x.v*x.ter,0)/kv:NaN;
@@ -305,7 +305,7 @@ function renderCost(){
   const lead=!anyCost?`Inserisci il costo annuo di ogni strumento: per gli ETF lo leggo da solo, per i fondi è nel KID alla voce «Costi correnti».`
     :`Il portafoglio costa <b>${pc(C.ter+C.other)}</b> l'anno: circa <b>${eur(C.year)}</b> quest'anno${full?"":` sulla parte con costo noto (${fmtPct(C.coverage,0)})`}. In ${CO_Y} anni, con un rendimento lordo del 5%, sono <b>${eur(C.d20)}</b> di capitale in meno.`;
   const rows=C.items.slice().sort((a,b)=>(b.ter??-1)-(a.ter??-1)).map(x=>{
-    const tag=x.src==="justETF"?`<span class="co-src">justETF</span>`:x.src==="tu"?`<span class="co-src tu">inserito${x.etfTer!=null?` · <button type="button" class="linkbtn" data-cor="${esc(x.k)}">usa justETF ${fmtPct(x.etfTer,2)}</button>`:""}</span>`:`<span class="co-src miss">${C.pending?"cerco…":"manca · dal KID"}</span>`;
+    const tag=x.src==="titolo di Stato"?`<span class="co-src">titolo di Stato: nessun costo di gestione</span>`:x.src==="justETF"?`<span class="co-src">justETF</span>`:x.src==="tu"?`<span class="co-src tu">inserito${x.etfTer!=null?` · <button type="button" class="linkbtn" data-cor="${esc(x.k)}">usa justETF ${fmtPct(x.etfTer,2)}</button>`:""}</span>`:`<span class="co-src miss">${C.pending?"cerco…":"manca · dal KID"}</span>`;
     const hi=x.ter!=null&&x.ter>=.01;
     return `<tr class="${hi?"co-hi":""}"><td><span class="an">${esc(x.nome)}</span><span class="cl">${esc([x.full&&x.full!==x.nome?x.full:"",x.isin||""].filter(Boolean).join(" · "))}</span></td>
       <td class="mono">${eur(x.v)}</td>

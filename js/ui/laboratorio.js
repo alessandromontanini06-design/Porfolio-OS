@@ -8,6 +8,7 @@ import { fmtEur, getJSON, renderOpt, renderRisk } from "./analisi.js";
 import { drawReal, renderReal } from "./rendimento.js";
 import { openReceipt } from "./report.js";
 import { pmOfferRender } from "./patrimonio.js";
+import { btpScheda } from "./btp.js";
 
 /* ---------- Dati macro ufficiali (BCE, FRED facoltativo) tramite /api/rates ---------- */
 const ym=d=>`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;
@@ -67,13 +68,14 @@ async function loadEtfInfo(){
   const pf=S.portfolio;if(!pf||pf.etfLoading||pf.etfDone)return;
   pf.etfLoading=true;renderLook();
   /* strumenti senza ISIN nel file: l'IA lo propone dal ticker e dal nome, il server lo verifica su OpenFIGI; si usano solo quelli verificati */
-  const noIsin=pf.positions.filter(p=>!(p.isin&&ISIN_RX.test(p.isin)));
+  pf.positions.forEach(p=>{if(p.stima&&!p.etf)p.etf=btpScheda(p.stima,p.isin);});
+  const noIsin=pf.positions.filter(p=>!p.stima&&!(p.isin&&ISIN_RX.test(p.isin)));
   if(noIsin.length&&!pf.isinSearched){pf.isinSearched=true;pf.isinStatus="loading";renderLook();
     try{const r=await fetch("/api/findisin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({strumenti:noIsin.map(p=>({nome:p.nome||"",ticker:p.ticker||"",simbolo:p.simbolo||""}))}),signal:AbortSignal.timeout(60000)});
       const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||`Errore ${r.status}`);
       (j.risultati||[]).forEach(x=>{const p=noIsin[x.indice];if(!p)return;if(x.verificato&&x.isin){p.isin=x.isin;p.isinFound={via:x.via,motivo:x.motivo};}else p.isinMiss=x.isin?`${x.isin} proposto ma scartato: ${x.motivo}`:x.motivo;});
       pf.isinStatus="done";}catch(e){pf.isinStatus="error";pf.isinErr=e instanceof TypeError?"ricerca ISIN non raggiungibile":String(e.message||e);}}
-  const list=pf.positions.filter(p=>p.isin&&ISIN_RX.test(p.isin));if(!list.length){pf.etfLoading=false;pf.etfDone=true;renderLook();return;}
+  const list=pf.positions.filter(p=>!p.stima&&p.isin&&ISIN_RX.test(p.isin));if(!list.length){pf.etfLoading=false;pf.etfDone=true;renderLook();return;}
   /* tre schede alla volta (non una dopo l'altra); ogni scheda letta resta nel browser come copia di riserva:
      se justETF non risponde si usa l'ultima copia, e la didascalia mostra la data in cui era stata letta */
   const etfCopy=(isin,j)=>{try{if(j){localStorage.setItem("pos-etf-v1:"+isin,JSON.stringify(j));return j;}const x=localStorage.getItem("pos-etf-v1:"+isin);return x?JSON.parse(x):null;}catch{return null;}};

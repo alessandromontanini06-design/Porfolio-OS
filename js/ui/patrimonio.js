@@ -4,7 +4,8 @@
    Si riempie a mano oppure da un file caricato (movimenti o posizioni), e porta al laboratorio con un clic. */
 import { $, P, S, esc, fmtN, fmtPct } from "./core.js";
 import { getJSON, fmtEur } from "./analisi.js";
-import { BD, POPULAR, bdGo, bondInfo, bondYtm, guessSymbol, isBondPos, isExample, trackOnce } from "./importa.js";
+import { BD, POPULAR, bdBtpMeta, bdGo, bondInfo, bondYtm, guessSymbol, isBondPos, isExample, trackOnce } from "./importa.js";
+import { btpNota, btpPrezzi, btpSym, isBtpSym } from "./btp.js";
 import { go, current } from "./scene.js";
 import { txMatch } from "./rendimento.js";
 
@@ -36,11 +37,20 @@ function pmSave() {
 }
 const pmDb = () => PM.db ||= { v: 1, strumenti: {}, operazioni: [], creato: new Date().toISOString() };
 
+/* BTP, BOT e CTZ a tasso fisso nel patrimonio: simbolo della stima dalla curva della Banca d'Italia (o null) */
+const pmBtpSym = s => s && s.per100 && !s.manuale && s.governativo !== false && P.btpTipo(s.nome, s.isin) === "fisso" && s.cedola != null && s.scadenza ? btpSym(+s.cedola, s.scadenza) : null;
+/* ultimo prezzo vero scritto dall'utente (acquisto, vendita o «Aggiorna prezzo»): la stima si allinea a quello */
+function pmAncora(id) {
+  const gone = new Set(PM.db.operazioni.filter(o => o.tipo === "annulla").map(o => String(o.rif)));
+  const o = PM.db.operazioni.filter(o => o.strumento === id && !gone.has(String(o.id)) && ["acquisto", "vendita", "valutazione"].includes(o.tipo) && +o.prezzo > 0).sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0)).pop();
+  return o ? { prezzo: +o.prezzo, data: o.data } : null;
+}
 /* ---------- prezzi e cambi: una volta per visita, tre strumenti alla volta ---------- */
 async function pmPrices(force) {
-  const db = pmDb(), ids = Object.keys(db.strumenti).filter(id => db.strumenti[id].simbolo && (force || !PM.px[id]));
+  const db = pmDb(), ids = Object.keys(db.strumenti).filter(id => (db.strumenti[id].simbolo || pmBtpSym(db.strumenti[id])) && (force || !PM.px[id]));
   const q = ids.slice();
-  await Promise.all([0, 1, 2].map(async () => { while (q.length) { const id = q.shift(), s = db.strumenti[id];
+  await Promise.all([0, 1, 2].map(async () => { while (q.length) { const id = q.shift(), s = db.strumenti[id], bs = !s.simbolo && pmBtpSym(s);
+    if (bs) { const j = await btpPrezzi(bs, pmAncora(id)); PM.px[id] = j && !j.error ? j : { error: (j && j.error) || "prezzo stimato non disponibile" }; continue; }
     const j = await getJSON(`/api/prices?symbol=${encodeURIComponent(s.simbolo)}&v=6`);
     PM.px[id] = j && !j.error && j.points ? j : { error: (j && j.error) || "prezzi non disponibili" }; } }));
   await pmFx(force);
@@ -51,7 +61,7 @@ async function pmFx(force) {
 }
 function pmCalc() {
   const db = pmDb(), prezzi = {};
-  for (const [id, j] of Object.entries(PM.px)) if (j && j.points) prezzi[id] = j.points.concat(j.recent || []);
+  for (const [id, j] of Object.entries(PM.px)) if (j && j.points) prezzi[id] = (j.prezzi || j.points).concat(j.recent || []);
   PM.R = P.ledger(db.strumenti, db.operazioni, prezzi, PM.fx, { al: pmToday() });
   return PM.R;
 }
@@ -61,7 +71,7 @@ function pmSession(R) {
   let ch = 0, base = 0, d = null, d0 = null, n = 0;
   for (const p of R.posizioni) {
     if (!p.aperta) continue; const j = PM.px[p.id], r = j && j.recent; if (!r || r.length < 2) continue;
-    const a = r[r.length - 2], b = r[r.length - 1], s = PM.db.strumenti[p.id], k = s.valuta === "GBX" ? 100 : 1, c = s.valuta === "GBX" ? "GBP" : (s.valuta || "EUR"), fx = c === "EUR" ? 1 : lastFx(c);
+    const a = r[r.length - 2], b = r[r.length - 1], s = PM.db.strumenti[p.id], k = (s.valuta === "GBX" ? 100 : 1) * (s.per100 ? 100 : 1), c = s.valuta === "GBX" ? "GBP" : (s.valuta || "EUR"), fx = c === "EUR" ? 1 : lastFx(c);
     if (!(fx > 0)) continue; ch += p.qta * (b.v - a.v) / k / fx; base += p.qta * a.v / k / fx; if (!d || b.d > d) { d = b.d; d0 = a.d; } n++;
   }
   return n ? { euro: ch, pct: base > 0 ? ch / base : NaN, d, d0 } : null;
@@ -260,7 +270,9 @@ function btpSubmit(v) {
   const db = pmDb(), data = v.data;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || "") || data > pmToday()) return pmMsg("Scegli una data valida, non nel futuro.", "err");
   if (PM.btpId && db.strumenti[PM.btpId]) { const px = num(v.bpx); if (!(px > 0 && px < 1000)) return pmMsg("Scrivi il prezzo su 100 (per esempio 101,20).", "err");
-    if (!pmAdd({ data, tipo: "valutazione", strumento: PM.btpId, prezzo: px })) return; pmMsg(`Prezzo aggiornato: ${fmtN(px, 2)} su 100.`, "ok"); PM.btpId = ""; pmRenderForm(); pmRender(); return; }
+    if (!pmAdd({ data, tipo: "valutazione", strumento: PM.btpId, prezzo: px })) return; pmMsg(`Prezzo aggiornato: ${fmtN(px, 2)} su 100.`, "ok");
+    /* la stima del BTP si riallinea al prezzo appena scritto */
+    delete PM.px[PM.btpId]; PM.btpId = ""; pmRenderForm(); pmRefresh(false); return; }
   const nome = String(v.bnome || "").trim().slice(0, 80), nom = num(v.bnom), px = num(v.bpx), cpn = num(v.bcpn), spese = num(v.spese) || 0;
   if (!nome) return pmMsg("Scrivi il nome o l'ISIN del titolo.", "err");
   if (!(nom > 0)) return pmMsg("Scrivi il valore nominale, per esempio 10.000.", "err");
@@ -271,7 +283,7 @@ function btpSubmit(v) {
     cedola: Number.isFinite(cpn) ? cpn / 100 : (b && b.cpn != null ? b.cpn : null), scadenza: v.bmat || (b && b.mat ? b.mat.toISOString().slice(0, 10) : null), freq: +v.bfreq || 2 };
   db.strumenti[id].governativo = isGovt(db.strumenti[id]);
   if (!pmAdd({ data, tipo: "acquisto", strumento: id, quantita: nom, prezzo: px, spese })) return;
-  pmMsg(`Salvato: ${fmtEur(nom)} nominali di ${nome} a ${fmtN(px, 2)} (costo ${fmtEur(nom * px / 100 + spese)}).`, "ok"); pmRenderForm(); pmRender();
+  pmMsg(`Salvato: ${fmtEur(nom)} nominali di ${nome} a ${fmtN(px, 2)} (costo ${fmtEur(nom * px / 100 + spese)}).`, "ok"); delete PM.px[id]; pmRenderForm(); pmRefresh(false);
 }
 /* cedole e rimborsi da registrare: date delle cedole a ritroso dalla scadenza, ogni 12/freq mesi */
 function couponDates(s, from, to) {
@@ -406,7 +418,7 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-pmpe
 function pmPosTable(R) {
   const db = PM.db, rows = R.posizioni;
   if (!rows.length) return `<p class="pm-empty">Ancora niente. Aggiungi qui sotto il primo acquisto (per esempio <b>VWCE</b>, 20 quote a 100 €) oppure <b>importa il file</b> della tua banca o del tuo broker.</p>`;
-  const src = p => p.prezzoFonte === "mercato" ? `prezzo al ${dIt(p.prezzoData)}` : db.strumenti[p.id].manuale ? `stima del ${dIt(p.prezzoData)}` : `il tuo prezzo del ${dIt(p.prezzoData)}`;
+  const src = p => p.prezzoFonte === "mercato" && PM.px[p.id] && PM.px[p.id].stima ? `stimato con i tassi del ${dIt(PM.px[p.id].stima.curvaAl)} (Banca d'Italia)` : p.prezzoFonte === "mercato" ? `prezzo al ${dIt(p.prezzoData)}` : db.strumenti[p.id].manuale ? `stima del ${dIt(p.prezzoData)}` : `il tuo prezzo del ${dIt(p.prezzoData)}`;
   const tr = p => { const s = db.strumenti[p.id], g = p.guadagno, gp = p.acquistato > 0 ? g / p.acquistato : NaN, ccy = s.valuta && s.valuta !== "EUR" ? " " + s.valuta : " €";
     return `<tr class="${p.aperta ? "" : "closed"}"><td><b>${esc(s.nome)}</b><small>${esc([s.ticker, s.isin].filter(Boolean).join(" · ") || (s.manuale ? "bene senza quotazione" : s.simbolo || ""))}${p.aperta ? "" : " · chiusa"}</small></td>
       <td class="num">${p.aperta ? (s.per100 ? fmtEur(p.qta) + "<small>nominali</small>" : fmtN(p.qta, p.qta % 1 ? 3 : 0)) : "—"}</td>
@@ -418,19 +430,21 @@ function pmPosTable(R) {
   return `<div class="tablewrap"><table class="mt pm-pos"><thead><tr><th>Strumento</th><th class="num">Quote</th><th class="num">Prezzo</th><th class="num">Valore · peso</th><th class="num">Guadagno</th><th></th></tr></thead><tbody>${rows.map(tr).join("")}</tbody></table></div>
     ${R.avvisi.length ? `<p class="caption">${R.avvisi.map(esc).join(" · ")}</p>` : ""}${err.length ? `<p class="caption">Prezzi non aggiornati: ${err.map(esc).join(" · ")}. Uso l'ultimo prezzo noto.</p>` : ""}
     ${manuali ? `<p class="caption">I beni senza quotazione valgono l'ultima stima che hai inserito e non entrano nelle analisi del laboratorio.</p>` : ""}
-    ${bonds ? `<p class="caption">BTP e obbligazioni: non esiste una fonte gratuita affidabile dei loro prezzi, quindi valgono l'ultimo prezzo che hai scritto (su 100 di nominale). Aggiornalo con «Aggiorna prezzo» guardando il tuo home banking. Non entrano nelle analisi del laboratorio, che hanno bisogno dello storico.</p>` : ""}`;
+    ${bonds ? (() => { const st = rows.filter(p => p.aperta && db.strumenti[p.id].per100 && PM.px[p.id] && PM.px[p.id].stima), al = st.length ? PM.px[st[0].id].stima.curvaAl : null, other = rows.some(p => p.aperta && db.strumenti[p.id].per100 && !(PM.px[p.id] && PM.px[p.id].stima));
+      return `<p class="caption">${st.length ? `BTP a tasso fisso: il prezzo è <b>stimato</b> ogni giorno dai rendimenti dei BTP benchmark pubblicati dalla Banca d'Italia (dati al ${dIt(al)}), allineato all'ultimo prezzo che hai scritto: si muove con i tassi, ma il prezzo vero può scostarsi di qualche decimo. Fonte: Banca d'Italia. ` : ""}${other ? `Le altre obbligazioni (BTP indicizzati, CCT, titoli esteri o societari) valgono l'ultimo prezzo che hai scritto, su 100 di nominale. ` : ""}Con «Aggiorna prezzo» scrivi il prezzo del tuo home banking.</p>`; })() : ""}`;
 }
 function pmOpsTable() {
   const db = PM.db, ops = db.operazioni, gone = new Set(ops.filter(o => o.tipo === "annulla").map(o => String(o.rif)));
   const list = ops.filter(o => o.tipo !== "annulla").slice().sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0)).slice(0, 200);
   if (!list.length) return `<p class="caption">Le operazioni che aggiungi o importi compaiono qui, dalla più recente.</p>`;
   const det = o => { const s = db.strumenti[o.strumento] || {}, c = o.valuta || s.valuta || "EUR", u = c === "EUR" ? " €" : " " + c;
+    if ((o.tipo === "acquisto" || o.tipo === "vendita") && s.per100) return `${fmtN(+o.quantita, 0)} € nominali a ${fmtN(+o.prezzo, 2)}${+o.spese ? ` · spese ${fmtN(+o.spese, 2)} €` : ""}`;
     if (o.tipo === "acquisto" || o.tipo === "vendita") return s.manuale && o.tipo === "acquisto" ? `valore ${fmtN(+o.prezzo, 0)} €` : `${fmtN(+o.quantita, +o.quantita % 1 ? 3 : 0)} × ${fmtN(+o.prezzo, 2)}${u}${+o.spese ? ` · spese ${fmtN(+o.spese, 2)} €` : ""}${o.stima ? " · quote stimate" : ""}`;
-    if (o.tipo === "valutazione") return `stima ${fmtN(+o.prezzo, 0)} €`;
+    if (o.tipo === "valutazione") return s.per100 ? `${fmtN(+o.prezzo, 2)} su 100` : `stima ${fmtN(+o.prezzo, 0)} €`;
     if (o.tipo === "dividendo" || o.tipo === "cedola" || o.tipo === "commissione" || o.tipo === "tassa") return `${fmtN(+o.importo, 2)}${u}`;
     if (o.tipo === "frazionamento") return `1 quota → ${fmtN(+o.rapporto, 2)}`; return ""; };
   return `<div class="tablewrap"><table class="mt pm-ops"><thead><tr><th>Data</th><th>Operazione</th><th>Strumento</th><th class="num">Dettaglio</th><th></th></tr></thead><tbody>
-    ${list.map(o => { const g = gone.has(String(o.id)); return `<tr class="${g ? "gone" : ""}"><td>${dIt(o.data)}</td><td>${esc(TIPO_L[o.tipo] || o.tipo)}${g ? " <small>annullata</small>" : o.origine === "file" ? " <small>da file</small>" : ""}</td><td>${esc((db.strumenti[o.strumento] || {}).nome || "—")}</td><td class="num">${det(o)}</td><td class="num">${g ? "" : `<button type="button" class="btn sm" data-pmdel="${esc(o.id)}">Annulla</button>`}</td></tr>`; }).join("")}
+    ${list.map(o => { const g = gone.has(String(o.id)); return `<tr class="${g ? "gone" : ""}"><td>${dIt(o.data)}</td><td>${esc(o.tipo === "valutazione" && (db.strumenti[o.strumento] || {}).per100 ? "Prezzo aggiornato" : TIPO_L[o.tipo] || o.tipo)}${g ? " <small>annullata</small>" : o.origine === "file" ? " <small>da file</small>" : ""}</td><td>${esc((db.strumenti[o.strumento] || {}).nome || "—")}</td><td class="num">${det(o)}</td><td class="num">${g ? "" : `<button type="button" class="btn sm" data-pmdel="${esc(o.id)}">Annulla</button>`}</td></tr>`; }).join("")}
     </tbody></table></div>${list.length >= 200 ? `<p class="caption">Mostro le 200 più recenti.</p>` : ""}`;
 }
 function pmForm() {
@@ -560,7 +574,7 @@ function pmRender() {
   pacRenderDue(); pacRenderList();
   pmTax(R);
   pmIncome(R);
-  const quoted = R.posizioni.some(p => p.aperta && !PM.db.strumenti[p.id].manuale && !PM.db.strumenti[p.id].per100);
+  const quoted = R.posizioni.some(p => { const s = PM.db.strumenti[p.id]; return p.aperta && !s.manuale && (!s.per100 || pmBtpSym(s)); });
   $("#pmLab").disabled = !quoted; $("#pmExport").disabled = !has;
   pmButton();
 }
@@ -577,10 +591,10 @@ function pmEnter() { trackOnce("feature", "patrimonio", { name: "patrimonio" });
 const keyOf = v => String(v || "").trim().toLowerCase();
 const isoOf = d => d instanceof Date ? d.toISOString().slice(0, 10) : String(d || "").slice(0, 10);
 /* il portafoglio del file è vero (non l'esempio né un portafoglio di prova costruito a mano)? */
-const fileBonds = () => { const u = S.lastUnd || S.und; return u && u.posizioni ? u.posizioni.filter(p => isBondPos(p) && !(S.portfolio && S.portfolio.positions.some(q => q.simbolo && (q.isin && q.isin === p.isin || q.nome === p.nome)))) : []; };
+const fileBonds = () => { const u = S.lastUnd || S.und; return u && u.posizioni ? u.posizioni.filter(p => isBondPos(p) && !(S.portfolio && S.portfolio.positions.some(q => q.simbolo && !isBtpSym(q.simbolo) && (q.isin && q.isin === p.isin || q.nome === p.nome)))) : []; };
 const fileOk = () => !!(S.portfolio && S.portfolio.positions && (S.portfolio.positions.some(p => p.simbolo) || fileBonds().length) && S.source && S.source.kind !== "sample" && !isExample() && !S.source.builder && !(S.rb && S.rb.origSource && S.rb.origSource.builder));
 async function pmFromFile() {
-  const pos = S.portfolio.positions.filter(p => p.simbolo), db = pmDb(), fileName = (S.rb && S.rb.origSource && S.rb.origSource.name) || (S.source && S.source.name) || "file";
+  const pos = S.portfolio.positions.filter(p => p.simbolo && !isBtpSym(p.simbolo)), db = pmDb(), fileName = (S.rb && S.rb.origSource && S.rb.origSource.name) || (S.source && S.source.name) || "file";
   /* 1) strumenti, con la valuta vera di quotazione e i prezzi (servono anche a stimare le quote mancanti) */
   const ids = pos.map(p => p.isin || p.simbolo);
   const q = pos.map((p, i) => [p, ids[i]]);
@@ -634,8 +648,9 @@ async function pmFromFile() {
       else add({ data, tipo: x.amount > 0 ? "acquisto" : "vendita", strumento: id, quantita: x.qty, prezzo: amt / x.qty, valuta: "EUR" }, base); }
   }
   for (const [k, B] of bonds) {
-    const id = B.isin || "b-" + k.replace(/[^a-z0-9]+/g, "-").slice(0, 40), b = bondInfo(B.nome);
-    if (!db.strumenti[id]) db.strumenti[id] = { nome: B.nome, isin: B.isin, valuta: "EUR", per100: true, classe: "Obbligazioni", cedola: b && b.cpn != null ? b.cpn : null, scadenza: b && b.mat ? b.mat.toISOString().slice(0, 10) : null, freq: 2 };
+    /* cedola e scadenza dal nome; se il nome non le dice, dalla stima del laboratorio (OpenFIGI con l'ISIN) */
+    const id = B.isin || "b-" + k.replace(/[^a-z0-9]+/g, "-").slice(0, 40), b = bondInfo(B.nome), est = S.portfolio && (S.portfolio.positions || []).find(q => q.stima && ((B.isin && q.isin === B.isin) || q.nome === B.nome)), es = est && est.stima;
+    if (!db.strumenti[id]) db.strumenti[id] = { nome: B.nome, isin: B.isin, valuta: "EUR", per100: true, classe: "Obbligazioni", cedola: b && b.cpn != null ? b.cpn : es ? es.cedola : null, scadenza: b && b.mat ? b.mat.toISOString().slice(0, 10) : es ? es.scadenza : null, freq: 2 };
     db.strumenti[id].governativo = isGovt(db.strumenti[id]);
     let held = 0;
     if (B.rows.length) {
@@ -650,8 +665,8 @@ async function pmFromFile() {
       const q = +B.pos.quantita, px = B.pos.per100 ? +B.pos.prezzo : (+B.pos.valore > 0 && q > 0 ? B.pos.valore / q * 100 : NaN);
       if (q > 0 && px > 0) { add({ data: today, tipo: "acquisto", strumento: id, quantita: q, prezzo: px, valuta: "EUR", posizioneDiOggi: true }, `${today}|${id}|pos`); held = q; } else skipped++;
     }
-    /* il prezzo di oggi scritto nel file (su 100) */
-    if (B.pos && B.pos.per100 && +B.pos.prezzo > 0 && B.rows.length) add({ data: today, tipo: "valutazione", strumento: id, prezzo: +B.pos.prezzo }, `${today}|${id}|px|${B.pos.prezzo}`);
+    /* il prezzo di oggi scritto nel file (su 100), da un foglio delle posizioni; se è il prezzo dell'ultimo movimento (ha la sua data) c'è già nell'acquisto */
+    if (B.pos && B.pos.per100 && +B.pos.prezzo > 0 && B.rows.length && !B.pos.data) add({ data: today, tipo: "valutazione", strumento: id, prezzo: +B.pos.prezzo }, `${today}|${id}|px|${B.pos.prezzo}`);
   }
   db.operazioni.push(...ops); if (ops.length && !pmSave()) return { error: "salvataggio non riuscito" };
   return { nuove: ops.length, doppie: dup, scartate: skipped, stimate: est, movimenti: !!rows, file: fileName };
@@ -729,8 +744,8 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#mnuPo
 
 /* il patrimonio nel laboratorio: le posizioni quotate, con i loro pesi di oggi (i beni a mano restano fuori) */
 function pmToLab() {
-  const R = PM.R || pmCalc(), open = R.posizioni.filter(p => p.aperta && !PM.db.strumenti[p.id].manuale && !PM.db.strumenti[p.id].per100 && p.valore > 0), tot = open.reduce((a, p) => a + p.valore, 0); if (!(tot > 0)) return false;
-  BD.ports = [open.map(p => { const s = PM.db.strumenti[p.id]; return [s.isin || s.ticker || s.simbolo, Math.round(p.valore / tot * 1000) / 10]; })]; BD.cur = 0;
+  const R = PM.R || pmCalc(), open = R.posizioni.filter(p => { const s = PM.db.strumenti[p.id]; return p.aperta && !s.manuale && (!s.per100 || pmBtpSym(s)) && p.valore > 0; }), tot = open.reduce((a, p) => a + p.valore, 0); if (!(tot > 0)) return false;
+  BD.ports = [open.map(p => { const s = PM.db.strumenti[p.id], bs = s.per100 && pmBtpSym(s), code = s.isin || (bs ? bs : s.ticker || s.simbolo); if (bs) bdBtpMeta(code, s.nome, bs, s.isin); return [code, Math.round(p.valore / tot * 1000) / 10]; })]; BD.cur = 0;
   $("#bdCap").value = Math.round(tot); bdGo(); return true;
 }
 
@@ -786,7 +801,7 @@ sc().addEventListener("click", e => {
     const o = PM.db.operazioni.find(x => String(x.id) === d.dataset.pmdel); if (!o) return;
     const s = PM.db.strumenti[o.strumento] || {};
     if (!confirm(`Annullare ${(TIPO_L[o.tipo] || o.tipo).toLowerCase()} di ${s.nome || "—"} del ${dIt(o.data)}? Resterà nello storico come annullata.`)) return;
-    pmAdd({ data: pmToday(), tipo: "annulla", rif: o.id }); pmRenderForm(); pmRender(); return; }
+    pmAdd({ data: pmToday(), tipo: "annulla", rif: o.id }); if (o.strumento && PM.db.strumenti[o.strumento] && PM.db.strumenti[o.strumento].per100) { delete PM.px[o.strumento]; pmRenderForm(); pmRefresh(false); return; } pmRenderForm(); pmRender(); return; }
   if (e.target.closest("#pmFile")) { PM.pending = true; pmMsg("Scegli il file: dopo la lettura e la mappa, il portafoglio entra da solo nel tuo patrimonio.", "", "#pmTopMsg"); $("#file").click(); return; }
   if (e.target.closest("#pmLab")) { pmToLab(); return; }
   if (e.target.closest("#pmExport")) pmDownload();
