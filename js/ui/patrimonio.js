@@ -86,7 +86,7 @@ async function pmResolve(text) {
 const lastPx = j => { if (!j || !j.points) return NaN; const r = (j.recent && j.recent.length ? j.recent : j.points); return r[r.length - 1].v; };
 /* categoria per il grafico: quella dell'elenco, altrimenti dal nome; i beni a mano a parte */
 function pmClass(s) {
-  if (s.manuale) return "Casa e altri beni";
+  if (s.manuale) return BENE_CLS[s.tipo] || (s.classe && s.classe !== "Altro" ? s.classe : "Casa e altri beni");
   if (s.classe) return s.classe === "Oro" ? "Oro e materie prime" : s.classe;
   const n = String(s.nome || "").toLowerCase();
   if (/bond|obblig|govt|treasury|aggregate|btp|bot|corporate|€ gov|income/.test(n)) return "Obbligazioni";
@@ -94,6 +94,52 @@ function pmClass(s) {
   if (/overnight|money market|monetari|liquidit|cash/.test(n)) return "Liquidità";
   if (/bitcoin|ethereum|crypto|btc|eth/.test(n)) return "Cripto";
   return "Azioni";
+}
+
+/* ---------- beni senza quotazione: tipo e riconoscimento nei file ---------- */
+const BENE_TIPI = [["liquidita", "Liquidità e conti"], ["oro", "Oro e metalli"], ["casa", "Casa e immobili"], ["polizza", "Polizze e pensione"], ["altro", "Altro"]];
+const BENE_CLS = { liquidita: "Liquidità", oro: "Oro e materie prime", casa: "Casa e immobili", polizza: "Polizze e pensione", altro: "Altri beni" };
+function beneTipo(t) {
+  t = String(t || "").toLowerCase();
+  if (/liquidit|saldo|conto|deposit|emergenza|contanti|cash|risparmi|borsa di studio/.test(t)) return "liquidita";
+  if (/\boro\b|oro fisico|argento|gioiell|lingott|metall|platino/.test(t)) return "oro";
+  if (/casa|immobil|appartament|terreno|box auto|villa/.test(t)) return "casa";
+  if (/polizza|tfr|pension|previdenz|assicuraz/.test(t)) return "polizza";
+  return "altro";
+}
+/* righe «etichetta … valore» che sembrano beni (liquidità, oro, casa, polizze): da proporre, mai da aggiungere da soli */
+const BENE_RX = /liquidit|saldo|\bconto\b|conto deposito|deposit|fondo emergenza|contanti|\bcash\b|\boro\b|oro fisico|argento|gioiell|lingott|immobil|\bcasa\b|appartament|terreno|polizza|\btfr\b|fondo pensione|previdenz|borsa di studio|risparm/i;
+const BENE_NO = /di cui|gramm|\(g\)|titolo|quotazione|prezzo|%|tasso|rendiment|interess|totale|portafoglio etf|valore etf|guadagn|versat|mesi|autonomia|data|aggiornament|teoric|grafico|commission|spese|tasse|imposta/i;
+function pmFindBeni(sheets) {
+  const out = [], seen = new Set();
+  for (const sh of sheets || []) for (const row of (sh.aoa || []).slice(0, 400)) {
+    if (!Array.isArray(row)) continue;
+    const li = row.findIndex(v => typeof v === "string" && v.trim().length > 2 && v.length <= 60 && BENE_RX.test(v) && !BENE_NO.test(v)); if (li < 0) continue;
+    let val = NaN; for (let k = li + 1; k < row.length; k++) { const v = row[k]; if (v == null || v === "" || v instanceof Date) continue; if (typeof v === "string" && /%/.test(v)) break; const x = P.parseNum(v); if (x && Number.isFinite(x.n)) { val = x.n; break; } if (typeof v === "string" && /^[-–—]$/.test(v.trim())) break; }
+    if (!(val >= 1)) continue;
+    const label = row[li].trim().replace(/\s*\((€|eur)\)\s*$/i, "").replace(/\s{2,}/g, " "), r = Math.round(val);
+    if (seen.has(r)) continue; seen.add(r);   /* lo stesso importo scritto in due fogli è la stessa cosa */
+    out.push({ label, valore: val, tipo: beneTipo(label), key: `bene|${label.toLowerCase()}|${r}` });
+    if (out.length >= 8) return out;
+  }
+  return out;
+}
+function pmBeniOffer() {
+  const el = $("#pmBeni"); if (!el) return; const db = pmDb(), have = new Set(db.operazioni.filter(o => o.imp).map(o => o.imp));
+  const list = (PM.beniFile || []).filter(b => !have.has(b.key)); if (!list.length) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `<div class="pmb-h"><b>Nel file ci sono anche questi beni</b><span>Spunta quelli da aggiungere al patrimonio: entrano con il valore scritto nel file, e lo aggiorni quando vuoi con «Aggiorna stima».</span></div>
+    <ul>${list.map((b, i) => `<li><label><input type="checkbox" data-pmb="${i}" checked><span>${esc(b.label)}</span><select data-pmbt="${i}" aria-label="Tipo di ${esc(b.label)}">${BENE_TIPI.map(([k, l]) => `<option value="${k}"${k === b.tipo ? " selected" : ""}>${l}</option>`).join("")}</select><b>${fmtEur(b.valore)}</b></label></li>`).join("")}</ul>
+    <div class="pmb-b"><button type="button" class="btn lime" id="pmBeniOk">Aggiungi al patrimonio</button><button type="button" class="btn" id="pmBeniNo">Non ora</button></div>`;
+  PM.beniShown = list;
+}
+function pmBeniAdd() {
+  const db = pmDb(), list = PM.beniShown || [], today = pmToday(); let n = 0;
+  list.forEach((b, i) => { const c = document.querySelector(`#pmBeni [data-pmb="${i}"]`); if (!c || !c.checked) return; const t = (document.querySelector(`#pmBeni [data-pmbt="${i}"]`) || {}).value || b.tipo;
+    const id = "m-" + newId(); db.strumenti[id] = { nome: b.label, valuta: "EUR", classe: BENE_CLS[t], tipo: t, manuale: true };
+    db.operazioni.push({ id: newId(), data: today, tipo: "acquisto", strumento: id, quantita: 1, prezzo: b.valore, origine: "file", imp: b.key }); n++; });
+  if (n && !pmSave()) return; PM.beniFile = []; $("#pmBeni").hidden = true;
+  pmMsg(n ? `Aggiunti ${n} ${n === 1 ? "bene" : "beni"} al patrimonio.` : "Nessun bene aggiunto.", n ? "ok" : "", "#pmTopMsg"); pmRenderForm(); pmRender();
 }
 
 /* ---------- grafico ad anello: il totale al centro, una fetta alla volta ---------- */
@@ -133,8 +179,12 @@ function pmKpis(R) {
   const T = R.totale, ses = pmSession(R);
   const sesB = ses ? `<b class="${clsE(ses.euro)}">${sEur(ses.euro)}</b><small><span class="${clsP(ses.pct)}">${sPct(ses.pct)}</span> · ${ses.d === pmToday() ? "oggi" : dayName(ses.d)}, rispetto a ${dayName(ses.d0)}</small>`
     : `<b>—</b><small>${PM.loading ? "aggiorno i prezzi…" : "nessuna quotazione di giornata"}</small>`;
+  /* con beni a mano (liquidità, oro, casa) la percentuale si calcola sugli investimenti: il fondo emergenza non è «versato» in borsa */
+  const db = PM.db, inv = R.posizioni.filter(p => !db.strumenti[p.id].manuale), man = R.posizioni.some(p => db.strumenti[p.id].manuale);
+  const invIn = inv.reduce((a, p) => a + p.acquistato, 0), invG = inv.reduce((a, p) => a + p.guadagno, 0);
+  const gainTxt = man && invIn > 0 ? `${sPct(invG / invIn)} sugli investimenti (${fmtEur(invIn)} versati)` : `${sPct(T.guadagnoPct)} su ${fmtEur(T.versato)} versati`;
   return `<div class="pm-k"><span>Ultima seduta</span>${sesB}</div>
-    <div class="pm-k"><span>Guadagno</span><b class="${clsE(T.guadagno)}">${sEur(T.guadagno)}</b><small>${sPct(T.guadagnoPct)} su ${fmtEur(T.versato)} versati</small></div>
+    <div class="pm-k"><span>Guadagno</span><b class="${clsE(T.guadagno)}">${sEur(T.guadagno)}</b><small>${gainTxt}</small></div>
     <div class="pm-k"><span>Rendimento (TIR)</span><b class="${clsP(T.tir)}">${sPct(T.tir)}</b><small>${T.anni >= 1 ? "all'anno" : "su meno di un anno: indicativo"} · dal ${dIt(R.dal)}</small></div>
     <div class="pm-k"><span>Dividendi e cedole</span><b>${fmtEur(T.proventi)}</b><small>spese e tasse: ${fmtEur(T.spese)}</small></div>`;
 }
@@ -201,7 +251,7 @@ function pmForm() {
       <label>Importo netto incassato (€)<input name="importo" inputmode="decimal" required></label>${date}<button type="submit" class="btn lime">Salva il provento</button>`
     : `<p class="caption">Aggiungi prima uno strumento con un acquisto.</p>`;
   return `<label class="wide">Bene<select name="bene" id="pmBene"><option value="">Nuovo bene (casa, polizza, oro fisico, partecipazione…)</option>${opt(manual, PM.beneId)}</select></label>
-      ${PM.beneId ? "" : `<label class="wide">Nome<input name="nome" placeholder="Appartamento a Milano" required></label>`}
+      ${PM.beneId ? "" : `<label class="wide">Nome<input name="nome" placeholder="Conto deposito, oro fisico, appartamento…" required></label><label>Tipo<select name="btipo"><option value="">Lo capisco dal nome</option>${BENE_TIPI.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>`}
       <label>${PM.beneId ? "Nuovo valore stimato (€)" : "Valore (€)"}<input name="valore" inputmode="decimal" required></label>${date}
       <button type="submit" class="btn lime">${PM.beneId ? "Salva la nuova stima" : "Aggiungi il bene"}</button>`;
 }
@@ -300,7 +350,8 @@ async function pmImport() {
   if (r.scartate) parts.push(`${r.scartate} non abbinate a uno strumento`);
   if (!r.movimenti && r.nuove) parts.push("dal file conosco solo la situazione di oggi: il guadagno parte da adesso");
   if (el) { el.hidden = false; el.dataset.h = ""; el.innerHTML = `<div><b>✓ È nel tuo patrimonio</b><span>Se il file cambia, ricaricalo e riprendi solo le operazioni nuove: quelle già presenti non vengono ripetute.</span></div><span class="pm-offer-b"><button type="button" class="btn" data-go="patrimonio">Apri il patrimonio</button><button type="button" class="btn" id="pmOfferBtn">Riprendi dal file</button></span>`; }
-  PM.sel = null; go("patrimonio"); pmMsg(parts.join(" · ") + ".", r.nuove ? "ok" : "", "#pmTopMsg");
+  PM.beniFile = pmFindBeni(S.fileSheets || []);
+  PM.sel = null; go("patrimonio"); pmMsg(parts.join(" · ") + ".", r.nuove ? "ok" : "", "#pmTopMsg"); pmBeniOffer();
   pmRefresh(false);
 }
 
@@ -369,7 +420,7 @@ async function pmSubmit(f) {
     const val = num(v.valore); if (!(val > 0)) return pmMsg("Scrivi il valore in euro.", "err");
     if (PM.beneId) { if (!pmAdd({ data, tipo: "valutazione", strumento: PM.beneId, prezzo: val })) return; pmMsg(`Nuova stima salvata: ${fmtEur(val)}.`, "ok"); }
     else { const nome = String(v.nome || "").trim().slice(0, 80); if (!nome) return pmMsg("Dai un nome al bene.", "err");
-      const id = "m-" + newId(); db.strumenti[id] = { nome, valuta: "EUR", classe: "Altro", manuale: true };
+      const t = BENE_CLS[v.btipo] ? v.btipo : beneTipo(nome), id = "m-" + newId(); db.strumenti[id] = { nome, valuta: "EUR", classe: BENE_CLS[t], tipo: t, manuale: true };
       if (!pmAdd({ data, tipo: "acquisto", strumento: id, quantita: 1, prezzo: val })) return; pmMsg(`Aggiunto: ${nome}, ${fmtEur(val)}.`, "ok"); }
   }
   PM.beneId = ""; pmRenderForm(); pmRender(); pmRefresh(false);
@@ -421,7 +472,8 @@ $("#pmImport").addEventListener("change", async e => {
   } catch (err) { pmMsg(`Non riesco a leggere la copia: ${err.message}.`, "err", "#pmTopMsg"); }
 });
 document.addEventListener("click", e => { if (e.target.closest("#pmOfferBtn")) pmImport(); });
+document.addEventListener("click", e => { if (e.target.closest("#pmBeniOk")) pmBeniAdd(); if (e.target.closest("#pmBeniNo")) { PM.beniFile = []; $("#pmBeni").hidden = true; } });
 /* se il grafico è stato disegnato a un'altra larghezza (rotazione del telefono), si ridisegna */
 let pmRz = 0; window.addEventListener("resize", () => { clearTimeout(pmRz); pmRz = setTimeout(() => { if (current === "patrimonio" && PM.R && pmHas()) $("#pmChart").innerHTML = pmChart(PM.R); }, 250); });
 
-export { PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu };
+export { PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu, pmFindBeni, beneTipo };

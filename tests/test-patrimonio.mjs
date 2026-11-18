@@ -51,7 +51,7 @@ try {
   t("anche la legenda seleziona la fetta", await p.$$eval("#pmRing .pm-sl.on", r => r.length) === 1);
   await p.click('[data-pmg="classi"]'); await wait(300);
   const leg = await p.$eval("#pmLegend", e => e.innerText);
-  t("per categoria: Azioni e Casa e altri beni", /Azioni/.test(leg) && /Casa e altri beni/.test(leg), leg.replace(/\n/g, " | "));
+  t("per categoria: Azioni e Casa e immobili (capito dal nome «Appartamento»)", /Azioni/.test(leg) && /Casa e immobili/.test(leg), leg.replace(/\n/g, " | "));
   await p.click('[data-pmg="strumenti"]'); await wait(200);
   console.log("Storico e ritorno");
   await p.$$eval("[data-pmdel]", bs => bs.find(x => /Vendita/.test(x.closest("tr").innerText)).click()); await wait(400);
@@ -96,6 +96,11 @@ try {
   await p.click("#pmLab");
   await p.waitForFunction(() => window.__pos.state().rebuilt && window.__pos.state().portfolio && window.__pos.state().portfolio.length >= 5, { timeout: 150000 });
   t("«Analizza nel laboratorio» porta le posizioni quotate (senza la casa)", !JSON.stringify(await p.evaluate(() => window.__pos.state().portfolio)).includes("Appartamento"));
+  console.log("Beni nei file");
+  const beni = await p.evaluate(async () => { const m = await import("/js/ui/patrimonio.js");
+    return m.pmFindBeni([{ name: "Dashboard", aoa: [[null, "Componente", null, null, "Valore (€)", "% del totale"], [null, "Portafoglio ETF", null, null, 6293.75, 0.68], [null, "Liquidità operativa", null, null, "-", "-"], [null, "Fondo emergenza", null, null, 1419.4, 0.153], [null, "Oro fisico", null, null, 1540, 0.166], [null, "TOTALE", null, null, 9253.15, 1]] },
+      { name: "Liquidità & Oro", aoa: [["Saldo liquidità (€)", 1419.4], ["di cui fondo emergenza", 1419.4], ["Grammi", 17.85], ["Oro puro contenuto (g)", 13.39], ["Contanti (€)", "-"], ["Conto deposito Banca X", 5000]] }]).map(b => [b.label, Math.round(b.valore), b.tipo]); });
+  t("nel file trova fondo emergenza, oro e conto deposito", JSON.stringify(beni) === JSON.stringify([["Fondo emergenza", 1419, "liquidita"], ["Oro fisico", 1540, "oro"], ["Conto deposito Banca X", 5000, "liquidita"]]), JSON.stringify(beni));
   console.log("Telefono");
   await p.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
   await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await wait(2000);
