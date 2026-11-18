@@ -1605,6 +1605,108 @@ function sameFlows(dates,bret,flowsByT){
   for(let t=0;t<dates.length;t++){if(V>0&&Number.isFinite(bret[t]))V*=1+bret[t];V=Math.max(0,V+flowsByT[t]);inv+=flowsByT[t];series.push(V);}
   return {series,value:V,invested:inv};
 }
-export const POS={sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest};
+/* ===== Registro delle operazioni: il patrimonio che vive dentro Portfolio OS =====
+   Le operazioni non si cancellano mai: una correzione è un'operazione {tipo:"annulla", rif:id} che toglie quella sbagliata.
+   Tutto si ricalcola sempre dalle operazioni, giorno per giorno.
+   Modello senza conto liquidità (come con gli Excel): ogni acquisto è denaro che entra, ogni vendita, dividendo o cedola è denaro che esce.
+   Costo fiscale col metodo del costo medio ponderato (quello italiano), spese d'acquisto comprese nel costo.
+   Cambi: unità di valuta estera per 1 euro (come la BCE); i GBX sono pence, cioè GBP/100.
+
+   strumenti: { id: { nome, valuta } }
+   operazioni: [{ id, data:"AAAA-MM-GG", tipo, strumento, quantita, prezzo, valuta?, cambio?, spese?, tasse?, importo?, rapporto?, rif? }]
+     acquisto / vendita: quantita, prezzo unitario nella valuta dello strumento, spese e tasse in euro
+     dividendo / cedola: importo netto nella valuta dello strumento (o in euro con valuta:"EUR")
+     commissione / tassa: importo in euro pagato a parte (bollo, canoni)
+     frazionamento: rapporto (2 = ogni quota diventa 2)
+     valutazione: prezzo unitario stimato, per i beni senza quotazione (immobili, polizze, private equity)
+     annulla: rif = id dell'operazione da togliere
+   prezzi: { id: [{ d:"AAAA-MM-GG", v }] } nella valuta dello strumento
+   cambi: { USD: [{ d:"AAAA-MM-GG" | p:"AAAA-MM", v }] } (un mese = cambio di fine mese, valido dall'ultimo giorno)
+   opzioni: { al: "AAAA-MM-GG" } ultimo giorno da calcolare (predefinito: ultima operazione o ultimo prezzo) */
+const LG_TIPI=new Set(["acquisto","vendita","dividendo","cedola","commissione","tassa","frazionamento","valutazione","annulla"]);
+const lgDay=s=>{const t=Date.parse(String(s).slice(0,10)+"T00:00:00Z");return Number.isFinite(t)?Math.round(t/864e5):NaN;};
+const lgStr=n=>new Date(n*864e5).toISOString().slice(0,10);
+/* serie a gradini: l'ultimo valore disponibile in un giorno (o prima) */
+function lgSteps(points){
+  const xs=(points||[]).map(p=>{const k=p.d||p.p;const n=/^\d{4}-\d{2}$/.test(String(k))?lgDay(k+"-01")+new Date(Date.UTC(+k.slice(0,4),+k.slice(5,7),0)).getUTCDate()-1:lgDay(k);return [n,+p.v];})
+    .filter(p=>Number.isFinite(p[0])&&Number.isFinite(p[1])&&p[1]>0).sort((a,b)=>a[0]-b[0]);
+  const at=n=>{let lo=0,hi=xs.length-1,r=null;while(lo<=hi){const m=(lo+hi)>>1;if(xs[m][0]<=n){r=xs[m];lo=m+1;}else hi=m-1;}return r;};
+  return {at,first:xs.length?xs[0][0]:NaN,last:xs.length?xs[xs.length-1][0]:NaN,n:xs.length};
+}
+function ledger(strumenti,operazioni,prezzi,cambi,opzioni){
+  strumenti=strumenti||{};prezzi=prezzi||{};cambi=cambi||{};opzioni=opzioni||{};
+  const avvisi=[],warn=m=>{if(!avvisi.includes(m))avvisi.push(m);};
+  const nome=id=>(strumenti[id]&&strumenti[id].nome)||id;
+  /* 1) operazioni valide, senza quelle annullate, in ordine di data (a parità di data, nell'ordine in cui sono state scritte) */
+  const all=(operazioni||[]).map((o,i)=>({...o,_i:i}));
+  const tolte=new Set(all.filter(o=>o.tipo==="annulla"&&o.rif!=null).map(o=>String(o.rif)));
+  const ops=[];
+  for(const o of all){
+    if(o.tipo==="annulla"||tolte.has(String(o.id)))continue;
+    if(!LG_TIPI.has(o.tipo)){warn(`Operazione di tipo sconosciuto «${o.tipo}»: ignorata.`);continue;}
+    const n=lgDay(o.data);if(!Number.isFinite(n)){warn(`Operazione senza data valida (${o.tipo} ${nome(o.strumento)}): ignorata.`);continue;}
+    if(!["commissione","tassa"].includes(o.tipo)&&!strumenti[o.strumento]){warn(`Strumento «${o.strumento}» non registrato: operazione ignorata.`);continue;}
+    if((o.tipo==="acquisto"||o.tipo==="vendita")&&!(+o.quantita>0&&+o.prezzo>=0)){warn(`${o.tipo} di ${nome(o.strumento)} del ${o.data} senza quantità o prezzo validi: ignorato.`);continue;}
+    ops.push({...o,_n:n});
+  }
+  ops.sort((a,b)=>a._n-b._n||a._i-b._i);
+  /* 2) valute e prezzi */
+  const ccyOf=id=>String((strumenti[id]&&strumenti[id].valuta)||"EUR").toUpperCase();
+  const fxS={};const fxAt=(ccy,n)=>{const c=ccy==="GBX"?"GBP":ccy;if(c==="EUR")return 1;fxS[c]||=lgSteps(cambi[c]);const r=fxS[c].at(n);return r?r[1]:NaN;};
+  const toEur=(amount,ccy,n,rate)=>{const k=ccy==="GBX"?100:1,c=ccy==="GBX"?"GBP":ccy;if(c==="EUR")return amount/k;const r=+rate>0?+rate:fxAt(ccy,n);return amount/k/r;};
+  /* prezzo usato per valutare: il dato più recente tra quotazioni di mercato e prezzi delle proprie operazioni (a parità di giorno vince il mercato) */
+  const own={};ops.forEach(o=>{if((o.tipo==="acquisto"||o.tipo==="vendita"||o.tipo==="valutazione")&&+o.prezzo>0)(own[o.strumento]||=[]).push({d:o.data,v:+o.prezzo});});
+  const mk={},ow={};
+  const pxAt=(id,n)=>{mk[id]||=lgSteps(prezzi[id]);ow[id]||=lgSteps(own[id]);const a=mk[id].at(n),b=ow[id].at(n);if(a&&(!b||a[0]>=b[0]))return {v:a[1],src:"mercato",d:a[0]};if(b)return {v:b[1],src:"operazione",d:b[0]};return null;};
+  /* 3) giorno per giorno */
+  if(!ops.length)return {vuoto:true,posizioni:[],serie:[],avvisi,totale:{valore:0,versato:0,guadagno:0}};
+  const n0=ops[0]._n,lastPx=Math.max(...Object.keys(strumenti).map(id=>{mk[id]||=lgSteps(prezzi[id]);return mk[id].last;}).filter(Number.isFinite),-Infinity);
+  const nEnd=opzioni.al?lgDay(opzioni.al):Math.max(ops[ops.length-1]._n,Number.isFinite(lastPx)?lastPx:-Infinity);
+  const P={};const pos=id=>P[id]||=({id,qta:0,costo:0,realizzato:0,proventi:0,spese:0,tasse:0,acquistato:0,venduto:0,ops:0,flussi:[]});
+  const flussi=[],serie=[];let k=0,prevV=0,twr=1,versato=0,picco=1,maxDD=0,speseExtra=0;
+  for(let n=n0;n<=nEnd;n++){
+    let F=0;
+    while(k<ops.length&&ops[k]._n===n){const o=ops[k++];const ccy=String(o.valuta||ccyOf(o.strumento)).toUpperCase();
+      if(o.tipo==="commissione"||o.tipo==="tassa"){const a=Math.abs(+o.importo||0);F+=a;speseExtra+=a;flussi.push({t:new Date(n*864e5),v:-a});if(o.strumento&&P[o.strumento])(o.tipo==="tassa"?P[o.strumento].tasse+=a:P[o.strumento].spese+=a);continue;}
+      const p=pos(o.strumento);p.ops++;
+      if(o.tipo==="acquisto"){const lordo=toEur(+o.quantita*+o.prezzo,ccy,n,o.cambio),sp=Math.abs(+o.spese||0)+Math.abs(+o.tasse||0);
+        if(!Number.isFinite(lordo)){warn(`Manca il cambio ${ccy} per l'acquisto di ${nome(o.strumento)} del ${o.data}.`);continue;}
+        p.qta+=+o.quantita;p.costo+=lordo+sp;p.spese+=Math.abs(+o.spese||0);p.tasse+=Math.abs(+o.tasse||0);p.acquistato+=lordo+sp;F+=lordo+sp;p.flussi.push({t:new Date(n*864e5),v:-(lordo+sp)});flussi.push({t:new Date(n*864e5),v:-(lordo+sp)});}
+      else if(o.tipo==="vendita"){let q=+o.quantita;if(q>p.qta+1e-9){warn(`Vendita di ${fmtN(q,4)} quote di ${nome(o.strumento)} il ${o.data}, ma ne risultano ${fmtN(p.qta,4)}: venduto solo quello che c'era.`);q=p.qta;}
+        if(!(q>0))continue;const lordo=toEur(q*+o.prezzo,ccy,n,o.cambio),sp=Math.abs(+o.spese||0)+Math.abs(+o.tasse||0);
+        if(!Number.isFinite(lordo)){warn(`Manca il cambio ${ccy} per la vendita di ${nome(o.strumento)} del ${o.data}.`);continue;}
+        const base=p.qta>0?p.costo*q/p.qta:0,netto=lordo-sp;p.realizzato+=netto-base;p.costo-=base;p.qta-=q;if(p.qta<1e-9){p.qta=0;p.costo=0;}
+        p.spese+=Math.abs(+o.spese||0);p.tasse+=Math.abs(+o.tasse||0);p.venduto+=netto;F-=netto;p.flussi.push({t:new Date(n*864e5),v:netto});flussi.push({t:new Date(n*864e5),v:netto});}
+      else if(o.tipo==="dividendo"||o.tipo==="cedola"){const a=toEur(+o.importo||0,ccy,n,o.cambio);if(!Number.isFinite(a)){warn(`Manca il cambio ${ccy} per il provento di ${nome(o.strumento)} del ${o.data}.`);continue;}
+        p.proventi+=a;F-=a;p.flussi.push({t:new Date(n*864e5),v:a});flussi.push({t:new Date(n*864e5),v:a});}
+      else if(o.tipo==="frazionamento"){const r=+o.rapporto;if(r>0)p.qta*=r;else warn(`Frazionamento di ${nome(o.strumento)} senza rapporto valido.`);}
+      /* valutazione: aggiorna solo il prezzo (già raccolto in own) */
+    }
+    let V=0,manca=false;
+    for(const p of Object.values(P)){if(!(p.qta>0))continue;const px=pxAt(p.id,n);if(!px){manca=true;continue;}const v=toEur(p.qta*px.v,ccyOf(p.id),n);if(!Number.isFinite(v)){manca=true;continue;}V+=v;}
+    if(manca&&n===nEnd)warn("Per qualche strumento manca il prezzo o il cambio: il valore di oggi può essere sottostimato.");
+    versato+=F;
+    let r=NaN;if(prevV>0){r=(V-F)/prevV-1;twr*=1+r;if(twr>picco)picco=twr;maxDD=Math.min(maxDD,twr/picco-1);}
+    serie.push({d:lgStr(n),valore:V,flusso:F,versato,twr:twr-1,r});prevV=V;
+  }
+  /* 4) posizioni di oggi e totali */
+  const oggi=nEnd,V=serie.length?serie[serie.length-1].valore:0;
+  const posizioni=Object.values(P).map(p=>{const px=p.qta>0?pxAt(p.id,oggi):null,ccy=ccyOf(p.id),valore=px?toEur(p.qta*px.v,ccy,oggi):0;
+    const fl=p.flussi.concat(valore>0?[{t:new Date(oggi*864e5),v:valore}]:[]);
+    return {id:p.id,nome:nome(p.id),valuta:ccy,qta:p.qta,prezzo:px?px.v:NaN,prezzoData:px?lgStr(px.d):null,prezzoFonte:px?px.src:null,valore,costo:p.costo,pmc:p.qta>0?p.costo/p.qta:NaN,
+      latente:valore-p.costo,realizzato:p.realizzato,proventi:p.proventi,spese:p.spese,tasse:p.tasse,acquistato:p.acquistato,venduto:p.venduto,
+      guadagno:valore-p.costo+p.realizzato+p.proventi,tir:fl.some(f=>f.v>0)&&fl.some(f=>f.v<0)?xirr(fl):NaN,ops:p.ops,aperta:p.qta>0};})
+    .sort((a,b)=>b.valore-a.valore);
+  posizioni.forEach(p=>{p.peso=V>0?p.valore/V:0;});
+  const ieri=serie.length>1?serie[serie.length-2]:null,ultimo=serie[serie.length-1];
+  const giorno=ieri&&ieri.valore>0?{euro:ultimo.valore-ultimo.flusso-ieri.valore,pct:(ultimo.valore-ultimo.flusso)/ieri.valore-1}:null;
+  const anni=(nEnd-n0)/365.25,fl=flussi.concat(V>0?[{t:new Date(oggi*864e5),v:V}]:[]);
+  return {vuoto:false,dal:lgStr(n0),al:lgStr(nEnd),posizioni,serie,avvisi,
+    totale:{valore:V,versato,guadagno:V-versato,guadagnoPct:versato>0?(V-versato)/versato:NaN,
+      realizzato:posizioni.reduce((s,p)=>s+p.realizzato,0),latente:posizioni.reduce((s,p)=>s+(p.aperta?p.latente:0),0),
+      proventi:posizioni.reduce((s,p)=>s+p.proventi,0),spese:posizioni.reduce((s,p)=>s+p.spese+p.tasse,0)+speseExtra,
+      tir:xirr(fl),twr:twr-1,twrAnn:anni>=1?Math.pow(twr,1/anni)-1:NaN,anni,maxDD,giorno}};
+}
+export const POS={sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
