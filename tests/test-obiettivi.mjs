@@ -85,6 +85,13 @@ const rep = await p.evaluate(() => window.__report({}) || "");
 t("report PDF: sezione «Gli obiettivi» con probabilità e quanto versare", /<h2>Gli obiettivi<\/h2>/.test(rep) && /Casa/.test(rep) && /Studi/.test(rep) && /in più al mese/.test(rep) && /Tutti insieme/.test(rep), rep.slice(rep.indexOf("Gli obiettivi"), rep.indexOf("Gli obiettivi") + 400));
 await p.evaluate(() => document.querySelectorAll("[data-mcgdel]")[1].click()); await wait(800);
 t("«×» toglie l'obiettivo", await p.evaluate(() => document.querySelectorAll("#mcGoals .mcg-row").length === 1 && JSON.parse(localStorage.getItem("pos-obiettivi-v1")).length === 1));
+/* presentazione per il cliente: una pagina con gli obiettivi */
+await p.evaluate(() => document.querySelector('.dock [data-go="lab"]').click()); await wait(1200);
+const pzIds = await p.evaluate(() => { document.getElementById("presentBtn").click(); return window.__present.slides(); }); await wait(600);
+const pzGoals = await p.evaluate(() => { const s = [...document.querySelectorAll("#present .pz-s")].find(x => /I tuoi obiettivi/.test(x.innerText)); return s ? s.innerText.replace(/\s+/g, " ") : ""; });
+t("presentazione: pagina «I tuoi obiettivi» (dopo la proposta) con la probabilità", pzIds.includes("goals") && pzIds.indexOf("goals") === pzIds.length - 2 && /Casa/.test(pzGoals) && /\d+%/.test(pzGoals) && /a portata/.test(pzGoals) && /quanto versare in più/.test(pzGoals), JSON.stringify(pzIds) + " " + pzGoals.slice(0, 300));
+await p.keyboard.press("Escape"); await wait(400);
+await p.evaluate(() => document.querySelector('.dock [data-go="sim"]').click()); await wait(1200);
 /* report senza aver aperto le simulazioni: una pagina nuova con gli obiettivi salvati */
 const p3 = await b.newPage(); await p3.setViewport({ width: 1366, height: 900 }); p3.on("pageerror", e => errs.push(e.message));
 await p3.goto(`http://localhost:${PORT}/?home`, { waitUntil: "networkidle2" }); await wait(2500);

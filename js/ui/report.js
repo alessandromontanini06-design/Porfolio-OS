@@ -296,6 +296,12 @@ function pzSlides(){
       ${Number.isFinite(ta)&&Number.isFinite(tb)?line("Costo all'anno",ta,tb,x=>fmtPct(x,2),lo):""}</tbody></table>
       ${(()=>{const M=cmpMoves(Rc);return M&&M.sell>1?`<p class="pz-move">Per passarci: vendite per <b>${eur(M.sell)}</b>, acquisti per <b>${eur(M.buy)}</b>${M.tax>1?`, imposte stimate <b>${eur(M.tax)}</b>`:", nessuna imposta stimata"}.</p>`:"";})()}
       <p class="pz-foot">Stessi ${unitN(Rc.ks.length,f)} di dati per entrambi, ribilanciati ai pesi indicati. Non è una previsione: è come sarebbero andati.</p>`});}}
+  /* 7b · gli obiettivi del cliente, con la probabilità e quanto versare */
+  {const G=simGoals();if(G&&G.R.obiettivi.length){const {R:Rg,I:Ig,need}=G,ok=Rg.obiettivi.filter(g=>g.prob>=.8).length,n=Rg.obiettivi.length,col=pr=>pr>=.8?"var(--lime)":pr>=.5?"#E0A100":"#C8102E";
+    out.push({id:"goals",html:`<span class="pz-k">I tuoi obiettivi</span>
+      <h2>${ok===n?`Con questo piano ${n===1?"il tuo obiettivo è":`i tuoi ${n} obiettivi sono`} <em>a portata</em>.`:ok?`${ok} obiettivi su ${n} sono <em>a portata</em>.`:`Per i tuoi obiettivi <em>serve qualcosa in più</em>.`}</h2>
+      <ul class="pz-bars">${Rg.obiettivi.map((g,k)=>`<li><span><b>${esc(g.nome)}</b><small>${eur(g.importo)} tra ${g.anno} ${g.anno===1?"anno":"anni"}</small></span><i><em style="width:${Math.max(2,Math.round(g.prob*100))}%;background:${col(g.prob)}"></em></i><strong>${fmtPct(g.prob,0)}</strong><small class="pz-eur">${g.prob>=.8?"a portata":Number.isFinite(need[k])&&need[k]>0?`+${eur(need[k])} al mese`:""}</small></li>`).join("")}</ul>
+      <p class="pz-foot">Probabilità su ${fmtN(Rg.n,0).replace(",00","")} futuri simulati con i rendimenti storici del portafoglio, partendo da ${eur(Ig.init)} e versando ${eur(Ig.monthly)} al mese. Importi in euro di oggi; accanto, quanto versare in più per arrivarci 8 volte su 10.</p>`});}}
   /* 8 · prossimi passi */
   out.push({id:"next",html:`<span class="pz-k">Prossimi passi</span>
     <h2>Cosa facciamo adesso</h2>
