@@ -132,6 +132,17 @@ async function renderArchive(){
   L.sort(AR.sort==="name"?(a,b)=>a.name.localeCompare(b.name,"it"):AR.sort==="value"?(a,b)=>((b.snap&&b.snap.value)||0)-((a.snap&&a.snap.value)||0):(a,b)=>b.reviewedAt-a.reviewedAt);
   const due=all.filter(arDue).length,tot=all.reduce((a,r)=>a+((r.snap&&r.snap.value)||0),0);
   $("#arSub").innerHTML=all.length?`<b>${all.length}</b> ${all.length===1?"portafoglio":"portafogli"}${tot>0?` · ${fmtEur(tot)} in totale`:""}${due?` · <b class="ar-due-t">${due} da rivedere</b>`:""}`:"Qui trovi i portafogli che salvi: per cliente, con note e storia delle revisioni.";
+  /* riquadri in alto, come uno studio: patrimonio seguito, rendimento medio pesato sul valore, revisioni da fare */
+  const kp=$("#arKpi");if(kp){const wv=all.filter(r=>r.snap&&r.snap.value>0&&Number.isFinite(r.snap.xirr)),wt=wv.reduce((a,r)=>a+r.snap.value,0),tir=wt>0?wv.reduce((a,r)=>a+r.snap.xirr*r.snap.value,0)/wt:NaN,pro=document.body.dataset.ruolo==="pro";
+    kp.hidden=all.length<2;
+    kp.innerHTML=`<div><span>${pro?"Patrimonio seguito":"Valore in archivio"}</span><b>${tot>0?fmtEur(tot):"—"}</b><small>${all.length} ${all.length===1?(pro?"cliente":"portafoglio"):pro?"clienti":"portafogli"}</small></div>`+
+      `<div><span>Rendimento medio (TIR)</span><b class="${tir>=0?"up":"dn"}">${Number.isFinite(tir)?fmtPct(tir,1,true):"—"}</b><small>${wv.length?`pesato sul valore · ${wv.length} con i movimenti`:"servono i movimenti nel file"}</small></div>`+
+      `<div><span>Da rivedere</span><b class="${due?"dn":""}">${due}</b><small>${due?"revisione oltre i tempi":"tutto in ordine"}</small></div>`+
+      `<div><span>Ultima revisione</span><b>${arAgo(Math.max(...all.map(r=>r.reviewedAt||0)))}</b><small>${new Date(Math.max(...all.map(r=>r.reviewedAt||0))).toLocaleDateString("it-IT",{day:"numeric",month:"long"})}</small></div>`;}
+  const tt=$("#arTitle");if(tt)tt.innerHTML=document.body.dataset.ruolo==="pro"?"I tuoi <em>clienti</em>":"Il tuo <em>archivio</em>";
+  {const pro=document.body.dataset.ruolo==="pro",cr=document.querySelector("#archive .bd-crumb"),nb=$("#arNew");
+    if(cr)cr.innerHTML=`Portfolio OS <i>/</i> ${pro?"Clienti":"Archivio"}`;if(nb)nb.textContent=pro?"+ Nuovo cliente":"+ Nuovo portafoglio";
+    if(pro&&all.length)$("#arSub").innerHTML=$("#arSub").innerHTML.replace(/(\d+<\/b>) portafoglio\b/,"$1 cliente").replace(/(\d+<\/b>) portafogli\b/,"$1 clienti");}
   document.querySelectorAll("#arF [data-arf]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.arf===AR.f)));
   if(!all.length){$("#arList").innerHTML=`<div class="ar-empty"><b>L'archivio è vuoto</b><p>Carica un file (l'Excel del cliente o l'estratto del broker), costruisci il laboratorio e scegli <b>Salva nell'archivio</b>.</p><button type="button" class="btn lime" id="arNew2">Carica un file</button></div>`;return;}
   if(!L.length){$("#arList").innerHTML=`<div class="ar-empty"><b>Nessun risultato</b><p>Prova un'altra ricerca o togli il filtro.</p></div>`;return;}

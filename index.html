@@ -31,7 +31,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800;900&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/css/app.css">
 <link rel="stylesheet" href="/css/v2.css">
 </head>
@@ -66,14 +66,28 @@
   <section class="scene" data-scene="home" id="scene-home" aria-label="Home">
     <div class="inner">
       <div class="bento">
-        <div class="s12 hero2">
+        <div class="s12 hero2 hm-hero">
           <div>
-            <p class="kick">Per chi investe da solo e per i consulenti finanziari</p>
-            <h1 id="heroTitle">I tuoi <em>investimenti</em> finalmente chiari.</h1>
-            <p class="lead">Carica l'Excel o l'estratto del broker, così com'è. Portfolio OS riconosce acquisti e vendite, scarica i prezzi di mercato di ogni ETF e risponde alle domande che contano: quanto si è guadagnato davvero, quanto si rischia, dove sono i soldi e quando si potrà smettere di lavorare.</p>
-            <p class="fine">Il file viene letto nel tuo browser e non lo salviamo su nessun server. Per capire un file nuovo all'IA mandiamo solo un estratto, e puoi spegnerla. <a href="/privacy.html">Come trattiamo i tuoi dati</a></p>
+            <h1 id="heroTitle">I tuoi <em>investimenti</em><br>finalmente chiari.</h1>
+            <p class="lead"><span class="hm-l1">ETF, BTP, conti, oro e casa in un posto solo.</span> <span class="hm-ser">Torni domani, ed è già tutto aggiornato.</span></p>
+            <div class="hm-cta"><button type="button" class="btn lime" data-hmgo="pmBtn">Crea il tuo patrimonio →</button><button type="button" class="btn" data-hmgo="file">Carica il file della banca</button></div>
+            <p class="hm-meta"><span><b>Nessun account</b> da creare</span><span><b>Nessuna banca</b> da collegare</span><span><b>I dati</b> restano nel tuo browser</span></p>
             <span class="v2-hidden" id="flowLabel"></span>
           </div>
+        </div>
+        <div class="s12 hm-show" aria-label="Esempio di patrimonio">
+          <div class="hm-phw"><div class="hm-ph"><span class="hm-notch" aria-hidden="true"></span>
+            <div class="hm-ph-h"><span>Il mio patrimonio</span><span class="hm-es">esempio</span></div>
+            <div class="hm-seg" role="group" aria-label="Raggruppa"><button type="button" class="on" aria-pressed="true" data-hmset="categorie">Per categoria</button><button type="button" aria-pressed="false" data-hmset="strumenti">Per strumento</button></div>
+            <div id="hmRing1"></div>
+            <div class="hm-k"><div><span>Guadagno</span><b class="up">+6.688 €</b></div><div><span>Rendimento annuo</span><b>+8,7%</b></div></div>
+            <ul class="hm-leg" id="hmLeg1"></ul></div>
+            <div class="hm-card hm-left"><small>Oggi</small><b>Patrimonio</b><span class="up">+212 € · +0,4%</span></div>
+            <div class="hm-card hm-right"><small>Prossima cedola · 1 marzo</small><b>BTP 3,35% 2035</b><span class="hm-vi">146,56 € netti</span></div>
+          </div>
+        </div>
+        <div class="s12 hm-start-wrap">
+          <div class="hm-sh"><h2>Da dove parti?</h2><p>Cinque strade, lo stesso risultato: il tuo patrimonio chiaro, con i prezzi di mercato.</p></div>
           <div class="start">
             <div class="sv-list" id="svList" hidden></div>
             <button type="button" class="opt pm-open" id="pmBtn" data-go="patrimonio"><span><b id="pmBtnT">Crea il tuo patrimonio</b><small id="pmBtnS">aggiungi ciò che possiedi: lo ritrovi qui ogni giorno, aggiornato</small></span><em aria-hidden="true">→</em></button>
@@ -87,53 +101,63 @@
             <button type="button" class="opt" id="builderBtn"><span><b>Non ho un file</b><small>crea un portafoglio scegliendo ETF e pesi</small></span><em aria-hidden="true">→</em></button>
             <button type="button" class="opt" id="sampleBtn"><span><b>Fammi vedere un esempio</b><small>7 ETF, 355 movimenti dal 2019</small></span><em aria-hidden="true">→</em></button>
           </div>
+          <p class="fine hm-fine">Il file viene letto nel tuo browser e non lo salviamo su nessun server. Per capire un file nuovo all'IA mandiamo solo un estratto, e puoi spegnerla. <a href="/privacy.html">Come trattiamo i tuoi dati</a></p>
         </div>
-        <div class="s12 audience" aria-label="Per chi è">
-          <div class="aud-card">
-            <span class="aud-tag">Investi da solo</span>
-            <h2>Capisci davvero i tuoi investimenti</h2>
-            <ul>
-              <li><b>Quanto hai guadagnato</b>, anno per anno, anche al netto di tasse e inflazione.</li>
-              <li><b>Quanto rischi</b>: cosa sarebbe successo nel 2008, nel 2020 o in uno scenario estremo.</li>
-              <li><b>Quando puoi smettere di lavorare</b>, con la tua età, la tua spesa e la tua pensione.</li>
-              <li><b>Dove sono i tuoi soldi</b>: paesi, valute, aziende ripetute in più ETF.</li>
-              <li><b>Quanto ti costano</b>: i costi dei fondi in euro, oggi e in vent'anni.</li>
-            </ul>
-            <div class="aud-cta"><button type="button" class="btn lime" onclick="document.getElementById('file').click()">Carica il tuo Excel</button><button type="button" class="btn" onclick="document.getElementById('sampleBtn').click()">Guarda un esempio</button></div>
+        <div class="s12 hm-story">
+          <div class="hm-stick"><div class="hm-sph"><div class="hm-ph hm-tall"><span class="hm-notch" aria-hidden="true"></span>
+            <div class="hm-scr hm-s-ring">
+              <div class="hm-ph-h"><span>Il mio patrimonio</span><span class="hm-es">esempio</span></div>
+              <div class="hm-seg hm-mini-seg" aria-hidden="true"><span id="hmSg1" class="on">Per strumento</span><span id="hmSg2">Per categoria</span></div>
+              <div id="hmRing2"></div><ul class="hm-leg" id="hmLeg2"></ul>
+            </div>
+            <div class="hm-scr hm-s-btp" aria-hidden="true">
+              <div class="hm-back">‹ Patrimonio</div><span class="hm-tag">Titolo di Stato</span><b class="hm-bt">BTP 3,35% 01MZ35</b>
+              <div class="hm-bv">9.912 €<small>10.000 € nominali</small></div>
+              <dl><dt>Prezzo oggi</dt><dd>99,12 su 100</dd><dt>Rendimento a scadenza</dt><dd>3,47% lordo</dd><dt>Scadenza</dt><dd>1 marzo 2035</dd><dt>Tassazione</dt><dd>12,5%</dd></dl>
+              <span class="hm-sub">Prossime cedole</span>
+              <ul class="hm-cal"><li><span>1 mar 2027</span><b>146,56 €</b></li><li><span>1 set 2027</span><b>146,56 €</b></li><li><span>1 mar 2028</span><b>146,56 €</b></li></ul>
+            </div>
+          </div></div></div>
+          <div class="hm-steps">
+            <div class="hm-step" data-hmstep="strumenti"><span class="hm-n">01 / 03</span><h2>Ogni investimento è una fetta.</h2><p>Tocchi la fetta e il centro ti dice quanto vale, quanto pesa e quanto ti ha fatto guadagnare. Tocchi ancora e torna il totale.</p></div>
+            <div class="hm-step" data-hmstep="categorie"><span class="hm-n">02 / 03</span><h2>Azioni, obbligazioni, liquidità, oro.</h2><p>Con un gesto vedi il patrimonio per categoria. Il fondo emergenza è liquidità, l'oro della nonna è oro: ogni cosa al suo posto.</p><p class="hm-note">Il guadagno in percentuale si calcola sugli investimenti: i soldi sul conto non sono «versati in borsa».</p></div>
+            <div class="hm-step" data-hmstep="btp"><span class="hm-n">03 / 03</span><h2>I BTP, come li tiene un italiano.</h2><p>Valore nominale e prezzo su 100, cedola e scadenza capite dal nome. Il giorno della cedola il sito te lo ricorda, con l'importo netto già calcolato.</p></div>
           </div>
-          <div class="aud-card pro">
-            <span class="aud-tag">Sei un consulente</span>
-            <h2>Analisi del cliente in minuti, non in ore</h2>
-            <ul>
-              <li><b>Leggi il portafoglio del cliente</b> dall'export della banca o del broker, o dal suo Excel, senza ricopiare nulla.</li>
-              <li><b>Mostra quanto costano i suoi fondi</b>, in euro e in vent'anni, contro strumenti a basso costo.</li>
-              <li><b>Dimostra la tua proposta</b> sugli stessi mesi e nelle stesse crisi, con le operazioni da fare e le imposte stimate.</li>
-              <li><b>Presentala a tutto schermo</b> al primo incontro, poi consegna il report col nome del tuo studio.</li>
-              <li><b>Alla revisione successiva</b> vedi cosa è cambiato: versamenti, mercati, pesi.</li>
-            </ul>
+        </div>
+        <div class="s12 hm-day">
+          <h2>Una giornata del tuo patrimonio, <span class="hm-ser">senza fare niente.</span></h2>
+          <div class="hm-tl">
+            <div><time>Dopo la chiusura</time><b>Prezzi aggiornati</b><p>Ogni strumento con il suo prezzo di fine giornata, i cambi ufficiali della BCE, la variazione rispetto a ieri.</p>
+              <div class="hm-mini"><div class="hm-mr"><span>Vanguard All-World</span><b>139,81</b><em class="hm-up">+0,6%</em></div><div class="hm-mr"><span>iShares EM IMI</span><b>33,12</b><em class="hm-dn">−0,3%</em></div><div class="hm-mr"><span>Oro fisico</span><b>88,40 €/g</b><em class="hm-up">+0,9%</em></div></div></div>
+            <div><time>Il giorno del PAC</time><b>Il promemoria</b><p>Importo già scritto: tu inserisci le quote che vedi nell'app del broker. Niente stime inventate.</p>
+              <div class="hm-mini"><div class="hm-mh">Vanguard All-World · 150 €</div><div class="hm-mf"><span>Quote comprate</span><i>1,07</i></div><div class="hm-mf"><span>Prezzo pagato</span><i>139,81</i></div></div></div>
+            <div><time>Il giorno della cedola</time><b>La cedola, netta</b><p>Al 12,5% per i titoli di Stato, al 26% per le altre obbligazioni. Un tocco e finisce tra i tuoi proventi.</p>
+              <div class="hm-mini"><div class="hm-mh">BTP 3,35% 2035 · 1 marzo</div><div class="hm-mr"><span>Lorda</span><b>167,50 €</b></div><div class="hm-mr"><span>Imposta 12,5%</span><b>−20,94 €</b></div><div class="hm-mr hm-tot"><span>Netta</span><b>146,56 €</b></div></div></div>
+          </div>
+          <p class="hm-es hm-es-d">Dati di esempio</p>
+        </div>
+        <div class="s12 hm-index">
+          <div class="hm-ih"><h2>Le domande che contano.</h2><p>Sei strumenti di analisi sul tuo portafoglio. Ogni numero ha la sua ricevuta: formula, dati usati, ipotesi.</p></div>
+          <div class="hm-rows">
+            <div class="hm-row"><span class="hm-i">01</span><b>Rischio</b><span>Quanto puoi perdere in un anno cattivo?</span><em class="dn">−14%</em></div>
+            <div class="hm-row"><span class="hm-i">02</span><b>Stress test</b><span>E se tornasse il 2008, il 2020, il 2022?</span><em class="dn">−24%</em></div>
+            <div class="hm-row"><span class="hm-i">03</span><b>Simulazioni</b><span>Quanto avrai tra vent'anni, con che probabilità?</span><em>78%</em></div>
+            <div class="hm-row"><span class="hm-i">04</span><b>Indipendenza</b><span>Quando puoi smettere di lavorare?</span><em>a 58 anni</em></div>
+            <div class="hm-row"><span class="hm-i">05</span><b>Frontiera</b><span>Esistono pesi più efficienti dei tuoi?</span><em>Sharpe 0,71</em></div>
+            <div class="hm-row"><span class="hm-i">06</span><b>Benchmark</b><span>Hai battuto MSCI World?</span><em class="up">+1,2% l'anno</em></div>
+          </div>
+          <div class="hm-ifoot"><span class="hm-es">Risultati di esempio</span><button type="button" class="btn" data-hmgo="sampleBtn">Prova con l'esempio completo →</button></div>
+        </div>
+        <div class="s12 audience hm-who" aria-label="Per chi è">
+          <div class="aud-card"><span class="aud-tag">Investi da solo</span><h2>Capisci davvero i tuoi soldi.</h2><p>Quanto hai guadagnato al netto delle tasse, quanto ti costano i fondi in euro, quando potrai smettere di lavorare.</p>
+            <ul class="hm-ck"><li>Patrimonio sempre aggiornato</li><li>Rendimento vero, anche dopo le tasse</li><li>Costi dei fondi in 20 anni</li><li>Indipendenza finanziaria</li></ul>
+            <div class="aud-cta"><button type="button" class="btn lime" data-hmgo="pmBtn">Crea il tuo patrimonio</button><span class="hm-free">Gratis, senza account</span></div></div>
+          <div class="aud-card pro"><span class="aud-tag">Sei un consulente</span><h2>Il cliente, in minuti.</h2><p>Dall'export della banca del cliente a una proposta chiara, pronta da mostrare.</p>
+            <ul class="hm-ck"><li>Proposta A/B con le operazioni e le imposte stimate</li><li>Presentazione al cliente a schermo intero</li><li>Report PDF con il nome del tuo studio</li><li>Cosa è cambiato dall'ultima revisione</li></ul>
             <p class="aud-trust">Il file del cliente resta nel tuo browser: nessun account, nessun server per i dati, nessun prodotto da vendere.</p>
-            <div class="aud-cta"><button type="button" class="btn primary" onclick="document.getElementById('file').click()">Analizza il portafoglio di un cliente</button><button type="button" class="btn" onclick="document.getElementById('builderBtn').click()">Costruisci una proposta</button></div>
-          </div>
+            <div class="aud-cta"><button type="button" class="btn lime" data-hmgo="file">Analizza un cliente</button><button type="button" class="btn hm-ghost" data-hmgo="builderBtn">Costruisci una proposta</button></div></div>
         </div>
-        <div class="s12 showcase">
-          <div class="sc-text">
-            <h2>Cosa ti risponde, per esempio</h2>
-            <p>Dal file di esempio, un piano di accumulo su sette ETF iniziato nel 2019:</p>
-            <ul class="answers">
-              <li><b>+31.791 €</b> guadagnati su 58.536 € versati, cioè <b>+10,3% l'anno</b>.</li>
-              <li><b>EUNL</b> ha fatto metà del guadagno; l'obbligazionario IEAG è ancora in perdita.</li>
-              <li>Sommando gli ETF, il <b>3,7%</b> del portafoglio è in NVIDIA.</li>
-              <li>Nel marzo 2020 il portafoglio ha perso il <b>14%</b> e ha recuperato in pochi mesi.</li>
-            </ul>
-            <button type="button" class="textlink" onclick="document.getElementById('sampleBtn').click()">Apri l'esempio completo</button>
-          </div>
-          <div class="sc-receipt" aria-hidden="true">
-            <p class="rc-label">Ricevuta · rendimento annuo</p>
-            <p class="rc-num">+10,3%</p>
-            <p>Ogni anno, in media, i soldi sono cresciuti del 10,3%, tenendo conto di quando sono stati versati.</p>
-            <p class="rc-f">Σ flussi / (1 + TIR)^(giorni/365) = 0<br>355 movimenti · versato 58.536 € · valore 90.328 €</p>
-          </div>
-        </div>
+        <div class="s12 hm-end"><h2>Il tuo patrimonio,<br><span class="hm-ser">finalmente chiaro.</span></h2><button type="button" class="btn" data-hmgo="pmBtn">Inizia gratis, senza account →</button></div>
         <div class="tile violet s4 mkt v2-hidden" id="mkt" aria-label="Dati di mercato ufficiali della BCE">
           <div class="mkt-head"><span class="eyebrow">Terminale · BCE</span><span class="mkt-live"><i></i>dati ufficiali</span></div>
           <div class="mkt-rows" id="mktRows"><div class="mkt-row sk"></div><div class="mkt-row sk"></div><div class="mkt-row sk"></div></div>
@@ -608,12 +632,13 @@
 <section class="bdpage arch" id="archive" role="dialog" aria-modal="true" aria-label="Archivio dei portafogli" aria-hidden="true">
   <div class="bd-top"><button type="button" class="btn sm" id="closeArchive">← Indietro</button><span class="bd-crumb">Portfolio OS <i>/</i> Archivio</span></div>
   <div class="ar-wrap">
-    <header class="ar-hd"><div><span class="eyebrow">Salvato solo in questo browser</span><h2>Il tuo <em>archivio</em></h2><p id="arSub"></p></div>
+    <header class="ar-hd"><div><span class="eyebrow">Salvato solo in questo browser</span><h2 id="arTitle">Il tuo <em>archivio</em></h2><p id="arSub"></p></div>
       <div class="ar-io"><button type="button" class="btn sm" id="arExport" title="Un Excel da leggere: clienti, valori, rendimenti, rischio, revisioni">Esporta in Excel</button><button type="button" class="btn sm" id="arBackup" title="Un file per rimettere l'archivio in un altro browser">Copia di sicurezza</button><label class="btn sm" for="arImport" title="Rimetti una copia di sicurezza">Importa la copia</label><input type="file" id="arImport" accept="application/json,.json" hidden><button type="button" class="btn sm lime" id="arNew">+ Nuovo portafoglio</button></div></header>
+    <div class="ar-kpi" id="arKpi" hidden></div>
     <div class="ar-tools"><input type="search" id="arQ" placeholder="Cerca per cliente, file o strumento" aria-label="Cerca nell'archivio"><div class="seg" role="group" aria-label="Filtro" id="arF"><button type="button" data-arf="all" aria-pressed="true">Tutti</button><button type="button" data-arf="due" aria-pressed="false">Da rivedere</button></div>
       <label class="ar-sort"><span>Ordina per</span><select id="arSort"><option value="rev">ultima revisione</option><option value="name">nome</option><option value="value">valore</option></select></label></div>
     <div class="ar-list" id="arList"></div>
-    <p class="ar-foot">L'archivio resta in questo browser, su questo computer: non va su nessun server. Per non perderlo (cambio di computer, pulizia del browser) usa <b>Esporta l'archivio</b> ogni tanto e conserva il file. <a href="/privacy.html">Privacy</a></p>
+    <p class="ar-foot">L'archivio resta in questo browser, su questo computer: non va su nessun server. Per non perderlo (cambio di computer, pulizia del browser) usa <b>Copia di sicurezza</b> ogni tanto e conserva il file. <b>Esporta in Excel</b> serve invece da leggere: clienti, valori, rendimenti, revisioni. <a href="/privacy.html">Privacy</a></p>
   </div>
 </section>
 <div class="rp-dlg" id="rpDlg" hidden role="dialog" aria-modal="true" aria-labelledby="rpDlgT">

@@ -28,6 +28,11 @@ await p.evaluate(() => document.getElementById("archBtn").click()); await wait(7
 t("nell'archivio: «Esporta in Excel» e «Copia di sicurezza»", await p.evaluate(() => /Excel/.test(document.getElementById("arExport").textContent) && !!document.getElementById("arBackup")));
 const inp = await p.$("#arImport"); await inp.uploadFile(BK); await wait(1500);
 t("la copia di sicurezza finta entra nell'archivio (2 portafogli)", await p.evaluate(async () => (await (await import("/js/ui/archivio.js")).svList()).length === 2));
+const kp = await p.evaluate(() => { const k = document.getElementById("arKpi"); return { vis: !k.hidden, t: k.innerText.replace(/\s+/g, " ") }; });
+t("riquadri in alto: valore totale, TIR medio pesato (+11,4%), 1 da rivedere", kp.vis && /204\.515/.test(kp.t) && /\+11,4%/.test(kp.t) && /Da rivedere 1/.test(kp.t), kp.t);
+await p.evaluate(() => { document.body.dataset.ruolo = "pro"; }); await p.evaluate(async () => (await import("/js/ui/archivio.js")).renderArchive());
+await wait(400); await p.screenshot({ path: `${OUT}/archivio-studio.jpg`, type: "jpeg", quality: 72 });
+t("da consulente il titolo diventa «I tuoi clienti»", await p.evaluate(() => /I tuoi clienti/.test(document.getElementById("arTitle").textContent) && /Patrimonio seguito/.test(document.getElementById("arKpi").textContent) && /2<\/b> clienti/.test(document.getElementById("arSub").innerHTML) && /Nuovo cliente/.test(document.getElementById("arNew").textContent)));
 if (process.env.DEBUG) console.log(await p.evaluate(() => ({ xlsx: !!window.XLSX, vis: document.getElementById("arExport").offsetParent !== null })));
 await p.click("#arExport"); await wait(1500); if (process.env.DEBUG) console.log(await p.evaluate(async () => { try { await (await import("/js/ui/archivio.js")).arExcel(); return "ok"; } catch (e) { return "ERR " + e.message; } }));
 let file = null; for (let k = 0; k < 40 && !file; k++) { await wait(250); file = readdirSync(DL).find(f => /\.xlsx$/.test(f)); }

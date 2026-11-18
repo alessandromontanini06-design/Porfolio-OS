@@ -19,16 +19,14 @@
   const home=document.getElementById("scene-home");
   const heroIn=()=>{
     rise(document.getElementById("heroTitle"),.05);
-    G.from(".hero2 .kick,.hero2 .lead,.hero2 .fine",{y:14,opacity:0,duration:.8,ease:"power3.out",stagger:.08,delay:.3,clearProps:"transform,opacity"});
+    G.from(".hero2 .kick,.hero2 .lead,.hero2 .fine,.hm-cta,.hm-meta",{y:14,opacity:0,duration:.8,ease:"power3.out",stagger:.08,delay:.3,clearProps:"transform,opacity"});
     G.from(".start .opt",{x:24,opacity:0,duration:.8,ease:"power3.out",stagger:.08,delay:.4,clearProps:"transform,opacity"});
   };
   if(ST&&home){
     const sc={scroller:home,start:"top 85%"};
     G.from(".aud-card",{y:28,opacity:0,duration:.8,ease:"power3.out",stagger:.12,scrollTrigger:{...sc,trigger:".audience"}});
-    G.from(".sc-text h2,.sc-text>p",{y:20,opacity:0,duration:.8,ease:"power3.out",stagger:.08,scrollTrigger:{...sc,trigger:".showcase"}});
-    G.from(".answers li",{y:16,opacity:0,duration:.7,ease:"power3.out",stagger:.1,scrollTrigger:{...sc,trigger:".answers"}});
-    G.fromTo(".sc-receipt",{y:40,rotate:-4,opacity:0},{y:0,rotate:1.2,opacity:1,duration:1.1,ease:"power3.out",scrollTrigger:{...sc,trigger:".showcase"}});
-    G.fromTo(".rc-num",{"--hl":0},{"--hl":1,duration:.7,ease:"power2.inOut",delay:.6,scrollTrigger:{...sc,trigger:".showcase"}});
+    /* home nuova: le sezioni entrano quando arrivano in vista */
+    [".hm-start-wrap",".hm-day",".hm-index",".hm-end"].forEach(sel=>{const el=document.querySelector(sel);if(el)G.from(el.children,{y:24,opacity:0,duration:.8,ease:"power3.out",stagger:.08,clearProps:"transform,opacity",scrollTrigger:{...sc,trigger:el}});});
   }
   /* il pulsante principale si avvicina appena al cursore */
   const pb=document.querySelector(".opt.primary");
