@@ -1612,7 +1612,7 @@ function sameFlows(dates,bret,flowsByT){
    Costo fiscale col metodo del costo medio ponderato (quello italiano), spese d'acquisto comprese nel costo.
    Cambi: unità di valuta estera per 1 euro (come la BCE); i GBX sono pence, cioè GBP/100.
 
-   strumenti: { id: { nome, valuta } }
+   strumenti: { id: { nome, valuta, per100? } }  (per100: obbligazioni, quantità = nominale, prezzo su 100)
    operazioni: [{ id, data:"AAAA-MM-GG", tipo, strumento, quantita, prezzo, valuta?, cambio?, spese?, tasse?, importo?, rapporto?, rif? }]
      acquisto / vendita: quantita, prezzo unitario nella valuta dello strumento, spese e tasse in euro
      dividendo / cedola: importo netto nella valuta dello strumento (o in euro con valuta:"EUR")
@@ -1652,6 +1652,8 @@ function ledger(strumenti,operazioni,prezzi,cambi,opzioni){
   ops.sort((a,b)=>a._n-b._n||a._i-b._i);
   /* 2) valute e prezzi */
   const ccyOf=id=>String((strumenti[id]&&strumenti[id].valuta)||"EUR").toUpperCase();
+  /* obbligazioni e titoli di Stato: la quantità è il valore nominale, il prezzo è per 100 di nominale */
+  const k100=id=>strumenti[id]&&strumenti[id].per100?0.01:1;
   const fxS={};const fxAt=(ccy,n)=>{const c=ccy==="GBX"?"GBP":ccy;if(c==="EUR")return 1;fxS[c]||=lgSteps(cambi[c]);const r=fxS[c].at(n);return r?r[1]:NaN;};
   const toEur=(amount,ccy,n,rate)=>{const k=ccy==="GBX"?100:1,c=ccy==="GBX"?"GBP":ccy;if(c==="EUR")return amount/k;const r=+rate>0?+rate:fxAt(ccy,n);return amount/k/r;};
   /* prezzo usato per valutare: il dato più recente tra quotazioni di mercato e prezzi delle proprie operazioni (a parità di giorno vince il mercato) */
@@ -1669,11 +1671,11 @@ function ledger(strumenti,operazioni,prezzi,cambi,opzioni){
     while(k<ops.length&&ops[k]._n===n){const o=ops[k++];const ccy=String(o.valuta||ccyOf(o.strumento)).toUpperCase();
       if(o.tipo==="commissione"||o.tipo==="tassa"){const a=Math.abs(+o.importo||0);F+=a;speseExtra+=a;flussi.push({t:new Date(n*864e5),v:-a});if(o.strumento&&P[o.strumento])(o.tipo==="tassa"?P[o.strumento].tasse+=a:P[o.strumento].spese+=a);continue;}
       const p=pos(o.strumento);p.ops++;
-      if(o.tipo==="acquisto"){const lordo=toEur(+o.quantita*+o.prezzo,ccy,n,o.cambio),sp=Math.abs(+o.spese||0)+Math.abs(+o.tasse||0);
+      if(o.tipo==="acquisto"){const lordo=toEur(+o.quantita*+o.prezzo*k100(o.strumento),ccy,n,o.cambio),sp=Math.abs(+o.spese||0)+Math.abs(+o.tasse||0);
         if(!Number.isFinite(lordo)){warn(`Manca il cambio ${ccy} per l'acquisto di ${nome(o.strumento)} del ${o.data}.`);continue;}
         p.qta+=+o.quantita;p.costo+=lordo+sp;p.spese+=Math.abs(+o.spese||0);p.tasse+=Math.abs(+o.tasse||0);p.acquistato+=lordo+sp;F+=lordo+sp;p.flussi.push({t:new Date(n*864e5),v:-(lordo+sp)});flussi.push({t:new Date(n*864e5),v:-(lordo+sp)});}
       else if(o.tipo==="vendita"){let q=+o.quantita;if(q>p.qta+1e-9){warn(`Vendita di ${fmtN(q,4)} quote di ${nome(o.strumento)} il ${o.data}, ma ne risultano ${fmtN(p.qta,4)}: venduto solo quello che c'era.`);q=p.qta;}
-        if(!(q>0))continue;const lordo=toEur(q*+o.prezzo,ccy,n,o.cambio),sp=Math.abs(+o.spese||0)+Math.abs(+o.tasse||0);
+        if(!(q>0))continue;const lordo=toEur(q*+o.prezzo*k100(o.strumento),ccy,n,o.cambio),sp=Math.abs(+o.spese||0)+Math.abs(+o.tasse||0);
         if(!Number.isFinite(lordo)){warn(`Manca il cambio ${ccy} per la vendita di ${nome(o.strumento)} del ${o.data}.`);continue;}
         const base=p.qta>0?p.costo*q/p.qta:0,netto=lordo-sp;p.realizzato+=netto-base;p.costo-=base;p.qta-=q;if(p.qta<1e-9){p.qta=0;p.costo=0;}
         p.spese+=Math.abs(+o.spese||0);p.tasse+=Math.abs(+o.tasse||0);p.venduto+=netto;F-=netto;p.flussi.push({t:new Date(n*864e5),v:netto});flussi.push({t:new Date(n*864e5),v:netto});}
@@ -1683,7 +1685,7 @@ function ledger(strumenti,operazioni,prezzi,cambi,opzioni){
       /* valutazione: aggiorna solo il prezzo (già raccolto in own) */
     }
     let V=0,manca=false;
-    for(const p of Object.values(P)){if(!(p.qta>0))continue;const px=pxAt(p.id,n);if(!px){manca=true;continue;}const v=toEur(p.qta*px.v,ccyOf(p.id),n);if(!Number.isFinite(v)){manca=true;continue;}V+=v;}
+    for(const p of Object.values(P)){if(!(p.qta>0))continue;const px=pxAt(p.id,n);if(!px){manca=true;continue;}const v=toEur(p.qta*px.v*k100(p.id),ccyOf(p.id),n);if(!Number.isFinite(v)){manca=true;continue;}V+=v;}
     if(manca&&n===nEnd)warn("Per qualche strumento manca il prezzo o il cambio: il valore di oggi può essere sottostimato.");
     versato+=F;
     let r=NaN;if(prevV>0){r=(V-F)/prevV-1;twr*=1+r;if(twr>picco)picco=twr;maxDD=Math.min(maxDD,twr/picco-1);}
@@ -1691,7 +1693,7 @@ function ledger(strumenti,operazioni,prezzi,cambi,opzioni){
   }
   /* 4) posizioni di oggi e totali */
   const oggi=nEnd,V=serie.length?serie[serie.length-1].valore:0;
-  const posizioni=Object.values(P).map(p=>{const px=p.qta>0?pxAt(p.id,oggi):null,ccy=ccyOf(p.id),valore=px?toEur(p.qta*px.v,ccy,oggi):0;
+  const posizioni=Object.values(P).map(p=>{const px=p.qta>0?pxAt(p.id,oggi):null,ccy=ccyOf(p.id),valore=px?toEur(p.qta*px.v*k100(p.id),ccy,oggi):0;
     const fl=p.flussi.concat(valore>0?[{t:new Date(oggi*864e5),v:valore}]:[]);
     return {id:p.id,nome:nome(p.id),valuta:ccy,qta:p.qta,prezzo:px?px.v:NaN,prezzoData:px?lgStr(px.d):null,prezzoFonte:px?px.src:null,valore,costo:p.costo,pmc:p.qta>0?p.costo/p.qta:NaN,
       latente:valore-p.costo,realizzato:p.realizzato,proventi:p.proventi,spese:p.spese,tasse:p.tasse,acquistato:p.acquistato,venduto:p.venduto,

@@ -93,6 +93,22 @@ console.log("Bene senza quotazione (valutazione a mano)");
   t("si sa che è una stima e di quando", p.prezzoFonte === "operazione" && p.prezzoData === "2023-06-01", `${p.prezzoFonte} ${p.prezzoData}`);
   t("la stima non è un versamento", near(R.totale.versato, 200000), R.totale.versato); }
 
+console.log("BTP: nominale e prezzo su 100");
+{ const B = { btp: { nome: "BTP 3,35% 01MZ35", valuta: "EUR", per100: true } };
+  const R = P.ledger(B, [{ id: 1, data: "2024-03-01", tipo: "acquisto", strumento: "btp", quantita: 10000, prezzo: 98.5, spese: 5 }], {}, {}, { al: "2024-06-01" });
+  const p = R.posizioni[0];
+  t("10.000 € nominali a 98,50 costano 9.850 € + 5 di spese", near(p.costo, 9855), p.costo);
+  t("il valore è nominale × prezzo / 100, non nominale × prezzo", near(R.totale.valore, 9850), R.totale.valore);
+  const R2 = P.ledger(B, [{ id: 1, data: "2024-03-01", tipo: "acquisto", strumento: "btp", quantita: 10000, prezzo: 98.5, spese: 5 },
+    { id: 2, data: "2024-09-01", tipo: "cedola", strumento: "btp", importo: 146.56, valuta: "EUR" },
+    { id: 3, data: "2025-01-10", tipo: "valutazione", strumento: "btp", prezzo: 101 }], {}, {}, { al: "2025-01-10" });
+  t("nuovo prezzo 101: vale 10.100 €", near(R2.totale.valore, 10100), R2.totale.valore);
+  t("cedola netta tra i proventi", near(R2.totale.proventi, 146.56), R2.totale.proventi);
+  const R3 = P.ledger(B, [{ id: 1, data: "2024-03-01", tipo: "acquisto", strumento: "btp", quantita: 10000, prezzo: 98.5, spese: 5 },
+    { id: 2, data: "2024-09-01", tipo: "cedola", strumento: "btp", importo: 146.56, valuta: "EUR" },
+    { id: 3, data: "2035-03-01", tipo: "vendita", strumento: "btp", quantita: 10000, prezzo: 100 }], {}, {}, { al: "2035-03-02" });
+  t("rimborso a 100: incassa 10.000 €, guadagno 145 € + cedola", near(R3.posizioni[0].realizzato, 145) && near(R3.totale.guadagno, 145 + 146.56) && R3.totale.valore === 0, `${R3.posizioni[0].realizzato} ${R3.totale.guadagno}`); }
+
 console.log("Dati sbagliati");
 { const R = P.ledger({ a: E }, [{ id: 1, data: "ieri", tipo: "acquisto", strumento: "a", quantita: 1, prezzo: 1 }, { id: 2, data: "2024-01-01", tipo: "regalo", strumento: "a" }, { id: 3, data: "2024-01-01", tipo: "acquisto", strumento: "zz", quantita: 1, prezzo: 1 }], {}, {});
   t("data, tipo e strumento sconosciuti: ignorati con avviso", R.vuoto && R.avvisi.length === 3, R.avvisi.join(" | "));

@@ -815,3 +815,4 @@ body.rp-on{overflow:hidden}
 .pm-form .wide-c{grid-column:1/-1;margin:0}#pmPac[hidden]{display:none}
 /* tablet e telefono: la barra delle sezioni sta sotto l'intestazione e coprirebbe il menu a tendina aperto */
 @media (max-width:1340px){body.mnu-on .topbar{z-index:60}}
+.pac-row.ced{grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) auto}.pac-wide{min-width:0}

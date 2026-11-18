@@ -1,0 +1,78 @@
+// BTP e obbligazioni nel patrimonio: nominale e prezzo su 100, cedola e scadenza dal nome, promemoria di cedole e rimborso.
+import { spawn } from "node:child_process";
+import puppeteer from "puppeteer-core";
+const PORT = 5223, wait = ms => new Promise(r => setTimeout(r, ms)), SHOTS = process.argv[2] || "";
+const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env: { ...process.env, PORT: String(PORT) }, stdio: "ignore" });
+await wait(1500);
+const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox"] });
+let pass = 0, fail = 0; const t = (n, ok, info = "") => { if (ok) { pass++; console.log("  ok      " + n); } else { fail++; console.log(`  FALLITO ${n} ${info}`); } };
+const iso = d => d.toISOString().slice(0, 10), now = new Date();
+const unAnnoFa = iso(new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), Math.min(now.getUTCDate(), 28))));
+try {
+  const p = await b.newPage(); await p.setViewport({ width: 1366, height: 900 });
+  const errs = []; p.on("pageerror", e => errs.push(e.message)); p.on("dialog", d => d.accept());
+  const msg = () => p.$eval("#pmMsg", e => e.textContent);
+  const fill = async vals => { for (const [k, v] of Object.entries(vals)) await p.$eval(`#pmForm [name=${k}]`, (e, v) => { e.value = v; e.dispatchEvent(new Event("change", { bubbles: true })); }, v); };
+  await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" });
+  await p.click("#pmBtn"); await wait(600);
+  await p.click('[data-pmt="btp"]'); await wait(200);
+  await fill({ bnome: "BTP 3,35% 01MZ35" }); await wait(200);
+  t("dal nome: cedola 3,35% e scadenza 01/03/2035", await p.$eval("#pmForm [name=bcpn]", e => e.value) === "3,35" && await p.$eval("#pmForm [name=bmat]", e => e.value) === "2035-03-01", await p.$eval("#pmBtpHint", e => e.textContent));
+  await fill({ bnom: "10.000", bpx: "98,50", data: unAnnoFa });
+  await p.$eval("#pmForm", f => f.requestSubmit()); await wait(600);
+  t("salvato: 10.000 € nominali costano 9.850 €", /costo 9\.850 €/.test(await msg()), await msg());
+  await wait(800);
+  const pos = await p.$eval("#pmPos", e => e.innerText.replace(/\s+/g, " "));
+  t("nelle posizioni: nominale, prezzo su 100, scadenza e rendimento a scadenza", /10\.000 € nominali/.test(pos) && /98,50 su 100/.test(pos) && /scade il 01\/03\/2035/.test(pos) && /rend\. a scadenza \d/.test(pos), pos.slice(0, 300));
+  t("vale 9.850 € (nominale × prezzo / 100)", /9\.850 €/.test(await p.$eval(".pm-center", e => e.innerText)));
+  const ced = await p.$$eval("#pmPacDue .pac-row.ced", r => r.map(x => x.innerText.replace(/\s+/g, " ")));
+  t("propone le cedole arrivate da quando l'hai comprato", ced.length >= 1 && ced.every(c => /Cedola/.test(c)), JSON.stringify(ced));
+  t("importo netto già scritto: 10.000 × 3,35% / 2 − 12,5% = 146,56 €", await p.$eval("#pmPacDue .pac-row.ced [name=imp]", e => e.value) === "146,56");
+  if (SHOTS) await p.screenshot({ path: `${SHOTS}/btp.jpg`, type: "jpeg", quality: 75 });
+  const n0 = ced.length;
+  await p.$eval("#pmPacDue .pac-row.ced", f => f.requestSubmit()); await wait(600);
+  const db1 = await p.evaluate(() => JSON.parse(localStorage.getItem("pos-patrimonio-v1")));
+  t("«Registra» salva la cedola tra i proventi", db1.operazioni.some(o => o.tipo === "cedola" && Math.abs(o.importo - 146.56) < 0.001) && await p.$$eval("#pmPacDue .pac-row.ced", r => r.length) === n0 - 1);
+  t("i dividendi e cedole in alto contano la cedola", /146,56|147 €/.test(await p.$eval("#pmKpis", e => e.innerText)));
+  /* aggiorna prezzo */
+  await p.click("[data-pmbpx]"); await wait(300);
+  await fill({ bpx: "101", data: iso(now) }); await p.$eval("#pmForm", f => f.requestSubmit()); await wait(800);
+  t("«Aggiorna prezzo» a 101: vale 10.100 €", /10\.100 €/.test(await p.$eval(".pm-center", e => e.innerText)), await p.$eval(".pm-center", e => e.innerText));
+  await p.click('[data-pmg="classi"]'); await wait(300);
+  t("nell'anello per categoria: Obbligazioni", /Obbligazioni/.test(await p.$eval("#pmLegend", e => e.innerText)));
+  t("un BTP non va nel laboratorio (nessuno storico gratuito): il pulsante non è attivo", await p.$eval("#pmLab", e => e.disabled));
+  /* titolo già scaduto: rimborso a 100 */
+  await p.click('[data-pmt="btp"]'); await wait(200);
+  await fill({ bnome: "BTP 1% 01AG25", bnom: "5.000", bpx: "97", data: "2024-01-10" });
+  await p.$eval("#pmForm", f => f.requestSubmit()); await wait(800);
+  const rim = await p.$$eval("#pmPacDue .pac-row.ced", r => r.map(x => x.innerText.replace(/\s+/g, " ")).filter(x => /Rimborso/.test(x)));
+  t("titolo scaduto: propone il rimborso di 5.000 €", rim.length === 1 && /5\.000 €/.test(rim[0]), JSON.stringify(rim));
+  await p.evaluate(() => [...document.querySelectorAll("#pmPacDue .pac-row.ced")].find(f => /Rimborso/.test(f.innerText)).requestSubmit()); await wait(800);
+  const db2 = await p.evaluate(() => JSON.parse(localStorage.getItem("pos-patrimonio-v1")));
+  t("rimborso registrato come vendita a 100", db2.operazioni.some(o => o.tipo === "vendita" && o.quantita === 5000 && o.prezzo === 100));
+  console.log("BTP da un file");
+  await p.evaluate(() => localStorage.removeItem("pos-patrimonio-v1"));
+  await p.goto(`http://localhost:${PORT}/?home`, { waitUntil: "networkidle2" });
+  await (await p.$("#file")).uploadFile(import.meta.dirname + "/files/Movimenti_cliente_banca.xlsx");
+  await p.waitForFunction(() => window.__pos.state().rebuilt, { timeout: 150000 });
+  await p.evaluate(() => document.querySelector('.dock [data-go="map"]').click()); await wait(2000);
+  /* il BTP non ha storico: la mappa chiede di procedere senza, come farebbe una persona */
+  await p.evaluate(() => [...document.querySelectorAll("button")].filter(x => /Procedi senza|Procedi comunque|Ho controllato|confermo/i.test(x.textContent)).forEach(x => x.click())); await wait(800);
+  await p.waitForFunction(() => !document.getElementById("confirmBtn").disabled, { timeout: 60000 }).catch(() => {});
+  await p.evaluate(() => { const b = document.getElementById("confirmBtn"); if (!b.disabled) b.click(); });
+  await p.waitForFunction(() => !document.getElementById("pmOffer").hidden && document.getElementById("pmOfferBtn"), { timeout: 60000 }); await wait(2500);
+  await p.evaluate(() => document.getElementById("pmOfferBtn").click());
+  await p.waitForFunction(() => /aggiunt|Niente/.test(document.getElementById("pmTopMsg").textContent), { timeout: 120000 }); await wait(1500);
+  const dbf = await p.evaluate(() => JSON.parse(localStorage.getItem("pos-patrimonio-v1")));
+  const bt = Object.entries(dbf.strumenti).filter(([, s]) => s.per100).map(([id, s]) => [id, s.nome, s.cedola, s.scadenza]);
+  t("i due BTP del file entrano nel patrimonio, con cedola e scadenza", bt.length === 2 && bt.every(x => x[2] > 0 && /^\d{4}-\d{2}-\d{2}$/.test(x[3])), JSON.stringify(bt));
+  const posf = await p.$eval("#pmPos", e => e.innerText.replace(/\s+/g, " "));
+  t("BTP 3,35% 01MZ35: 10.000 € nominali al prezzo del file (96,40)", /BTP 3,35% 01MZ35/.test(posf) && /10\.000 € nominali/.test(posf) && /96,40 su 100/.test(posf), posf.slice(0, 400));
+  t("le cedole del file sono tra i proventi", dbf.operazioni.filter(o => o.tipo === "cedola").length >= 4, dbf.operazioni.filter(o => o.tipo === "cedola").length);
+  t("il BTP già rimborsato resta come posizione chiusa", /chiusa/.test(posf) && /BTP 1,45%/.test(posf));
+  t("ENI (azione già venduta) non è scambiata per un'obbligazione", !Object.values(dbf.strumenti).some(x => x.per100 && /ENI/.test(x.nome)) && Object.values(dbf.strumenti).some(x => !x.per100 && /ENI/.test(x.nome)));
+  t("nessun errore JavaScript", !errs.length, errs.join(" | "));
+} catch (e) { t("eccezione", false, e.message); }
+await b.close(); srv.kill();
+console.log(`\n${pass} superati, ${fail} falliti`);
+process.exit(fail ? 1 : 0);
