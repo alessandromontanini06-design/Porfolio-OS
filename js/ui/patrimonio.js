@@ -3,7 +3,7 @@
    Le operazioni non si cancellano: un errore si annulla con un'operazione nuova, così lo storico resta affidabile.
    Si riempie a mano oppure da un file caricato (movimenti o posizioni), e porta al laboratorio con un clic. */
 import { $, P, S, esc, fmtN, fmtPct } from "./core.js";
-import { getJSON, fmtEur } from "./analisi.js";
+import { getJSON, fmtEur, obLoad } from "./analisi.js";
 import { BD, POPULAR, bdBtpMeta, bdGo, bondInfo, bondYtm, guessSymbol, isBondPos, isExample, trackOnce } from "./importa.js";
 import { btpLista, btpNota, btpPrezzi, btpSym, isBtpSym } from "./btp.js";
 import { go, current } from "./scene.js";
@@ -576,6 +576,7 @@ function pmRender() {
   pacRenderDue(); pacRenderList();
   pmTax(R);
   pmIncome(R);
+  pmGoals(R);
   const quoted = R.posizioni.some(p => { const s = PM.db.strumenti[p.id]; return p.aperta && !s.manuale && (!s.per100 || pmBtpSym(s)); });
   $("#pmLab").disabled = !quoted; $("#pmExport").disabled = !has;
   pmButton();
@@ -703,6 +704,75 @@ function pmDownload() {
   const blob = new Blob([JSON.stringify({ ...PM.db, esportato: new Date().toISOString(), app: "Portfolio OS" }, null, 1)], { type: "application/json" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `patrimonio-portfolio-os-${pmToday()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return true;
 }
+/* ---------- I tuoi obiettivi: quanto ne hai già, che probabilità hai, quanto versare in più ----------
+   Gli obiettivi sono gli stessi delle Simulazioni (salvati nel browser, pos-obiettivi-v1). La probabilità si calcola sugli strumenti
+   quotati che possiedi oggi: i loro rendimenti mensili passati, in euro, con i pesi di oggi (storia ricostruita), ricampionati
+   come nelle Simulazioni. Il versamento mensile parte dai piani di accumulo (o dalla media degli ultimi 12 mesi) e si può cambiare. */
+const PM_VERSA_KEY = "pos-pm-versa-v1", PM_OB_KEY = "pos-obiettivi-v1";
+const PM_OB_ESEMPI = [["Casa", 40000, 5], ["Studi dei figli", 30000, 12], ["Pensione integrativa", 150000, 25]];
+function pmGoalReturns(R) {
+  const open = R.posizioni.filter(p => p.aperta && p.valore > 0 && PM.px[p.id] && PM.px[p.id].points && PM.px[p.id].points.length > 2), tot = open.reduce((a, p) => a + p.valore, 0);
+  if (!open.length || !(tot > 0)) return null;
+  const fxMap = c => { const m = new Map(); (PM.fx[c] || []).forEach(x => m.set(String(x.p || x.d).slice(0, 7), +x.v)); return m; };
+  const ser = open.map(p => { const s = PM.db.strumenti[p.id], j = PM.px[p.id], c0 = String(j.currency || s.valuta || "EUR").toUpperCase(), c = c0 === "GBX" ? "GBP" : c0, k = c0 === "GBX" ? 100 : 1, fx = c === "EUR" ? null : fxMap(c), m = new Map();
+    j.points.forEach(x => { const ym = String(x.d).slice(0, 7), r = fx ? fx.get(ym) : 1; if (+x.v > 0 && r > 0) m.set(ym, +x.v / k / r); }); return { w: p.valore / tot, m }; });
+  const months = [...new Set(ser.flatMap(s => [...s.m.keys()]))].sort(), ret = [];
+  for (let i = 1; i < months.length; i++) { const a = months[i - 1], b = months[i]; let sw = 0, sr = 0;
+    for (const s of ser) { const pa = s.m.get(a), pb = s.m.get(b); if (pa > 0 && pb > 0) { sw += s.w; sr += s.w * (pb / pa - 1); } }
+    if (sw >= 0.6) ret.push(sr / sw); }
+  return { ret: ret.slice(-240), base: tot, n: open.length };
+}
+function pmVersa(R) {
+  try { const v = localStorage.getItem(PM_VERSA_KEY); if (v != null && v !== "" && isFinite(+v)) return { v: +v, da: "tu" }; } catch {}
+  const pac = (PM.db.pac || []).reduce((a, pl) => a + (+pl.importo || 0), 0); if (pac > 0) return { v: Math.round(pac), da: "pac" };
+  const from = new Date(Date.parse(pmToday()) - 365 * 864e5).toISOString().slice(0, 10), gone = new Set(PM.db.operazioni.filter(o => o.tipo === "annulla").map(o => String(o.rif)));
+  let net = 0; for (const o of PM.db.operazioni) { if (gone.has(String(o.id)) || o.data < from || o.posizioneDiOggi) continue; const s = PM.db.strumenti[o.strumento] || {}; if (s.manuale) continue;
+    const imp = (+o.quantita || 0) * (+o.prezzo || 0) * (s.per100 ? 0.01 : 1); if (o.tipo === "acquisto") net += imp; else if (o.tipo === "vendita") net -= imp; }
+  return { v: Math.max(0, Math.round(net / 12 / 10) * 10), da: "media" };
+}
+const pmObSave = L => { try { localStorage.setItem(PM_OB_KEY, JSON.stringify(L)); } catch {} if (!S.svSaved) S.mcOb = L.map(g => ({ ...g })); };
+const pmObValid = g => +g.importo > 0 && Math.round(+g.anno) >= 1 && Math.round(+g.anno) <= 60;
+let pmGoalT = null; const PM_NEED = new Map();
+function pmGoals(R) {
+  const box = $("#pmGoalBox"); if (!box) return;
+  const G = pmGoalReturns(R); if (!G || G.ret.length < 24) { box.hidden = true; PM.goal = null; return; }
+  box.hidden = false;
+  const L = PM.obEdit || obLoad(), V = pmVersa(R), valid = L.map((g, i) => ({ ...g, nome: g.nome || `Obiettivo ${i + 1}`, id: i })).filter(pmObValid);
+  const years = Math.max(1, ...valid.map(g => Math.round(+g.anno)));
+  const opts = { ret: G.ret, f: 12, years, initial: G.base, monthly: V.v, infl: 0.02, costs: 0, method: "boot", n: 2000, seed: 20261118, obiettivi: valid };
+  const MC = valid.length ? P.monteCarlo(opts) : null; PM.goal = { opts, MC, G, V };
+  $("#pmGoalSub").textContent = `con ${fmtEur(G.base)} investiti oggi e ${fmtEur(V.v)} al mese${V.da === "pac" ? " (i tuoi PAC)" : V.da === "media" ? " (media degli ultimi 12 mesi)" : ""}`;
+  const col = p => p >= .8 ? "good" : p >= .5 ? "warn" : "bad";
+  const row = (g, i) => { const o = MC && MC.obiettivi.find(x => x.id === i), have = Math.min(1, G.base / (+g.importo || 1)), nk = JSON.stringify([opts.initial, opts.monthly, opts.ret.length, valid, i]);
+    return `<div class="pmg-row" data-pmg="${i}"><div class="pmg-n"><input value="${esc(g.nome || "")}" placeholder="Obiettivo ${i + 1}" maxlength="40" aria-label="Nome dell'obiettivo ${i + 1}" data-pmgf="nome">
+        <span><label>€ <input type="number" inputmode="decimal" min="0" step="1000" value="${+g.importo || ""}" aria-label="Importo in euro di oggi" data-pmgf="importo"></label><label>tra <input type="number" min="1" max="60" step="1" value="${+g.anno || ""}" aria-label="Tra quanti anni" data-pmgf="anno"> anni</label></span></div>
+      <div class="pmg-have"><span class="pmg-bar"><i style="width:${Math.round(have * 100)}%"></i></span><small>${pmObValid(g) ? (have >= 1 ? "l'importo lo hai già oggi" : have < .01 ? "ne hai meno dell'1%" : `ne hai già il ${fmtPct(have, 0)}`) : "scrivi importo e anni"}</small></div>
+      <div class="pmg-p">${o ? `<b class="${col(o.prob)}">${fmtPct(o.prob, 0)}</b><small>${o.prob >= .8 ? "di arrivarci" : `<span data-pmneed="${esc(nk)}" data-id="${i}">${PM_NEED.has(nk) ? pmNeedTxt(PM_NEED.get(nk)) : "calcolo quanto versare…"}</span>`}</small>` : ""}</div>
+      <button type="button" class="mcg-x" data-pmgdel="${i}" aria-label="Togli l'obiettivo ${i + 1}">×</button></div>`; };
+  $("#pmGoals").innerHTML = `${L.length ? `<div class="pmg-list">${L.map(row).join("")}</div>` : `<p class="mcg-empty">Casa, studi dei figli, pensione: scrivi i tuoi obiettivi e vedi quanto ne hai già, che probabilità hai di arrivarci con quello che versi e quanto mettere da parte in più.</p>`}
+    <div class="mcg-foot">${L.length < 8 ? `<button type="button" class="btn sm" data-pmgadd="1">+ Aggiungi un obiettivo</button>` : ""}${L.length ? "" : PM_OB_ESEMPI.map(([n, a, y], k) => `<button type="button" class="chipbtn ghost" data-pmgex="${k}">${esc(n)} · ${fmtEur(a)} tra ${y} anni</button>`).join("")}
+      <label class="pmg-versa">Verso al mese <input type="number" inputmode="decimal" min="0" step="50" value="${V.v}" id="pmVersa" aria-label="Quanto versi al mese"> €</label>${MC && valid.length > 1 && Number.isFinite(MC.probTutti) ? `<span class="mcg-all">Tutti insieme: <b>${fmtPct(MC.probTutti, 0)}</b></span>` : ""}</div>
+    ${L.length ? `<p class="caption">Probabilità su ${fmtN(opts.n, 0).replace(",00", "")} futuri costruiti con i rendimenti mensili passati ${G.n === 1 ? "del tuo strumento quotato" : `dei tuoi ${G.n} strumenti quotati, con i pesi di oggi`} (${G.ret.length} mesi), inflazione 2% l'anno. Gli importi sono in euro di oggi; quando arriva l'anno, se basta, l'importo esce. Case e beni senza quotazione restano fuori. Stime sul passato, non garanzie.</p>` : ""}`;
+  pmNeeds();
+}
+const pmNeedTxt = v => !Number.isFinite(v) || v <= 0 ? "" : `+${fmtEur(v)} al mese per arrivarci 8 volte su 10`;
+function pmNeeds() { clearTimeout(pmGoalT); pmGoalT = setTimeout(async () => {
+  for (const el of [...document.querySelectorAll("#pmGoals [data-pmneed]")]) { const k = el.dataset.pmneed, id = +el.dataset.id;
+    if (!PM_NEED.has(k)) { await new Promise(r => setTimeout(r, 0)); if (!PM.goal) return; PM_NEED.set(k, P.mcVersamentoPer(PM.goal.opts, id, .8)); }
+    const cur = document.querySelector(`#pmGoals [data-pmneed="${CSS.escape(k)}"]`); if (cur) cur.textContent = pmNeedTxt(PM_NEED.get(k)) || "di arrivarci"; } }, 400); }
+let pmGoalIn = null;
+function pmGoalsFromDom() { const L = [...document.querySelectorAll("#pmGoals .pmg-row")].map(r => ({ nome: r.querySelector('[data-pmgf="nome"]').value.trim().slice(0, 40), importo: parseFloat(r.querySelector('[data-pmgf="importo"]').value) || 0, anno: Math.round(parseFloat(r.querySelector('[data-pmgf="anno"]').value)) || 0 })); pmObSave(L); return L; }
+/* mentre si scrive si aggiornano solo i numeri (il cursore resta nel campo); il disegno completo al cambio */
+document.addEventListener("input", e => { if (!e.target.closest("#pmGoals")) return; clearTimeout(pmGoalIn); pmGoalIn = setTimeout(() => {
+  if (e.target.id === "pmVersa") { const v = e.target.value; try { if (v === "") localStorage.removeItem(PM_VERSA_KEY); else localStorage.setItem(PM_VERSA_KEY, String(Math.max(0, +v))); } catch {} }
+  else pmGoalsFromDom();
+  const a = document.activeElement, sel = a && a.closest && a.closest("#pmGoals") ? (a.id ? "#" + a.id : `[data-pmg="${a.closest(".pmg-row") ? a.closest(".pmg-row").dataset.pmg : ""}"] [data-pmgf="${a.dataset.pmgf}"]`) : null, pos = a && a.selectionStart;
+  pmGoals(PM.R || pmCalc()); if (sel) { const n = document.querySelector("#pmGoals " + sel); if (n) { n.focus(); try { if (pos != null) n.setSelectionRange(pos, pos); } catch {} } } }, 450); });
+document.addEventListener("click", e => { const el = e.target.closest("#pmGoals"); if (!el) return;
+  if (e.target.closest("[data-pmgadd]")) { const L = pmGoalsFromDom(); L.push({ nome: "", importo: 0, anno: 5 }); pmObSave(L); pmGoals(PM.R || pmCalc()); const ins = document.querySelectorAll('#pmGoals [data-pmgf="nome"]'); if (ins.length) ins[ins.length - 1].focus(); return; }
+  const x = e.target.closest("[data-pmgex]"); if (x) { const [n, a, y] = PM_OB_ESEMPI[+x.dataset.pmgex], L = obLoad(); L.push({ nome: n, importo: a, anno: y }); pmObSave(L); pmGoals(PM.R || pmCalc()); return; }
+  const d = e.target.closest("[data-pmgdel]"); if (d) { const L = pmGoalsFromDom(); L.splice(+d.dataset.pmgdel, 1); pmObSave(L); pmGoals(PM.R || pmCalc()); } });
+
 /* ---------- il patrimonio in Excel: da leggere (o da dare al commercialista), non da reimportare ----------
    Riepilogo, Posizioni, Operazioni, Andamento (fine mese), Proventi in arrivo, Tasse, Leggimi. Numeri veri con i formati € e %. */
 function pmExcel() {

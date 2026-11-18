@@ -1,0 +1,60 @@
+// Patrimonio: «I tuoi obiettivi». Quanto ne hai già, probabilità sugli strumenti che possiedi (pesi di oggi), quanto versare in più;
+// versamento mensile dai PAC (si può cambiare), obiettivi modificabili e salvati nel browser (gli stessi delle Simulazioni).
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const puppeteer = require("puppeteer-core");
+const [,, OUT] = process.argv, PORT = +(process.env.TEST_PORT || 5186), wait = ms => new Promise(r => setTimeout(r, ms));
+const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env: { ...process.env, PORT: String(PORT), REAL_PRICES: "1" }, stdio: "ignore" });
+await wait(1500);
+const db = { v: 1, creato: "2024-01-01T00:00:00Z",
+  strumenti: { IE00B4L5Y983: { nome: "iShares Core MSCI World", ticker: "SWDA", isin: "IE00B4L5Y983", simbolo: "IWDA.AMS", valuta: "EUR" }, "m-casa": { nome: "Appartamento", manuale: true, classe: "Immobili", valuta: "EUR" } },
+  operazioni: [{ id: "a1", data: "2024-02-01", tipo: "acquisto", strumento: "IE00B4L5Y983", quantita: 50, prezzo: 85 }, { id: "m1", data: "2024-01-01", tipo: "acquisto", strumento: "m-casa", quantita: 1, prezzo: 250000 }],
+  pac: [{ id: "p1", strumento: "IE00B4L5Y983", importo: 300, giorno: 5, dal: "2099-01-01", fatti: {} }] };
+const goals = [{ nome: "Casa", importo: 20000, anno: 5 }, { nome: "Barca", importo: 2000000, anno: 20 }];
+const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox"] });
+const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 }); const errs = [];
+p.on("pageerror", e => errs.push(e.message));
+await p.evaluateOnNewDocument((d, g) => { if (!sessionStorage.getItem("seeded")) { localStorage.setItem("pos-patrimonio-v1", d); localStorage.setItem("pos-obiettivi-v1", g); localStorage.removeItem("pos-pm-versa-v1"); sessionStorage.setItem("seeded", "1"); } }, JSON.stringify(db), JSON.stringify(goals));
+let pass = 0, fail = 0; const t = (n, ok, i = "") => { ok ? pass++ : fail++; console.log(`  ${ok ? "ok     " : "FALLITO"} ${n}${!ok && i ? " · " + i : ""}`); };
+await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" });
+await p.waitForFunction(() => !document.getElementById("pmGoalBox").hidden && document.querySelectorAll("#pmGoals .pmg-row").length === 2, { timeout: 60000 }).catch(() => {});
+const rows = () => p.evaluate(() => [...document.querySelectorAll("#pmGoals .pmg-row")].map(r => r.innerText.replace(/\s+/g, " ") + " " + [...r.querySelectorAll("input")].map(i => i.value).join("|")));
+const sub = () => p.evaluate(() => document.getElementById("pmGoalSub").textContent);
+const swRow = await p.evaluate(() => { const r = [...document.querySelectorAll("#pmPos tbody tr")].find(tr => /MSCI World/.test(tr.innerText)); return r ? r.querySelectorAll("td")[3].innerText : ""; });
+const val = +((swRow.match(/([\d.]+) €/) || [])[1] || "0").replace(/\./g, "");
+t("riquadro «I tuoi obiettivi» con i due obiettivi salvati", (await rows()).length === 2, JSON.stringify(await rows()));
+t("versamento dai PAC: 300 € al mese, e la base sono i soldi investiti (la casa no)", /300 € al mese \(i tuoi PAC\)/.test(await sub()) && (await sub()).includes(val.toLocaleString("it-IT", { useGrouping: "always" }) + " €"), `${await sub()} · ${val}`);
+let R = await rows();
+const have = Math.round(val / 20000 * 100);
+t(`Casa (20.000 €): «ne hai già il ${have}%» e una probabilità alta`, new RegExp(`ne hai già il ${have}%`).test(R[0]) && /(\d+)%/.test(R[0].split("hai già")[1]) && +R[0].split("hai già")[1].match(/(\d+)%/g)[1].replace("%", "") >= 80, R[0]);
+await p.waitForFunction(() => /al mese per arrivarci/.test(document.querySelectorAll("#pmGoals .pmg-row")[1].innerText), { timeout: 20000 }).catch(() => {});
+R = await rows();
+t("Barca (2 milioni tra 20 anni): probabilità in rosso e quanto versare in più", await p.evaluate(() => !!document.querySelectorAll("#pmGoals .pmg-row")[1].querySelector(".pmg-p b.bad")) && /\+[\d.]+ € al mese per arrivarci 8 volte su 10/.test(R[1]), R[1]);
+const pBarca = () => p.evaluate(() => +document.querySelectorAll("#pmGoals .pmg-row")[1].querySelector(".pmg-p b").textContent.replace("%", ""));
+const p0 = await pBarca();
+await p.evaluate(() => document.getElementById("pmVersa").scrollIntoView({ block: "center" })); await wait(200);
+await p.click("#pmVersa"); await p.keyboard.down("Control"); await p.keyboard.press("KeyA"); await p.keyboard.up("Control"); await p.keyboard.type("6000"); await wait(1300);
+t("«Verso al mese» a 6.000 €: si ricalcola, si ricorda, e il cursore resta nel campo", /6\.000 € al mese/.test(await sub()) && await p.evaluate(() => localStorage.getItem("pos-pm-versa-v1") === "6000" && document.activeElement.id === "pmVersa") && (await pBarca()) >= p0, `${await sub()} · ${p0} → ${await pBarca()}`);
+await p.evaluate(() => document.querySelector("[data-pmgadd]").click()); await wait(300);
+await p.evaluate(() => { const r = [...document.querySelectorAll("#pmGoals .pmg-row")].pop(), set = (s, v) => { const i = r.querySelector(s); i.value = v; i.dispatchEvent(new Event("input", { bubbles: true })); }; set('[data-pmgf="nome"]', "Auto"); set('[data-pmgf="importo"]', "15000"); set('[data-pmgf="anno"]', "3"); });
+await wait(1300);
+const saved = await p.evaluate(() => JSON.parse(localStorage.getItem("pos-obiettivi-v1")));
+t("un obiettivo nuovo scritto a mano si salva (gli stessi delle Simulazioni)", saved.length === 3 && saved[2].nome === "Auto" && saved[2].importo === 15000 && saved[2].anno === 3, JSON.stringify(saved));
+t("«Tutti insieme» con più obiettivi", /Tutti insieme: \d+%/.test(await p.evaluate(() => document.getElementById("pmGoals").innerText)));
+await p.evaluate(() => document.getElementById("pmGoalBox").scrollIntoView({ block: "center" })); await wait(400);
+await p.screenshot({ path: `${OUT}/patrimonio-obiettivi.jpg`, type: "jpeg", quality: 72 });
+await p.evaluate(() => document.querySelectorAll("[data-pmgdel]")[1].click()); await wait(800);
+t("«×» toglie la barca", await p.evaluate(() => JSON.parse(localStorage.getItem("pos-obiettivi-v1")).map(g => g.nome).join() === "Casa,Auto" && document.querySelectorAll("#pmGoals .pmg-row").length === 2));
+await p.setViewport({ width: 390, height: 844 }); await wait(700);
+await p.evaluate(() => document.getElementById("pmGoalBox").scrollIntoView({ block: "center" })); await wait(300);
+await p.screenshot({ path: `${OUT}/patrimonio-obiettivi-tel.jpg`, type: "jpeg", quality: 72 });
+t("sul telefono niente esce dallo schermo", await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && [...document.querySelectorAll("#pmGoalBox *")].every(e => e.getBoundingClientRect().right <= innerWidth + 1)));
+/* solo beni senza quotazione: niente riquadro (non ci sono rendimenti da usare) */
+const p2 = await b.newPage(); p2.on("pageerror", e => errs.push(e.message));
+await p2.evaluateOnNewDocument(() => { localStorage.setItem("pos-patrimonio-v1", JSON.stringify({ v: 1, strumenti: { "m-casa": { nome: "Casa", manuale: true, classe: "Immobili", valuta: "EUR" } }, operazioni: [{ id: "m1", data: "2024-01-01", tipo: "acquisto", strumento: "m-casa", quantita: 1, prezzo: 250000 }] })); });
+await p2.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await wait(2500);
+t("solo beni senza quotazione: il riquadro non compare", await p2.evaluate(() => document.getElementById("pmGoalBox").hidden));
+t("nessun errore JavaScript", !errs.length, errs.join(" | "));
+console.log(`\n${pass} superati, ${fail} falliti`);
+await b.close(); srv.kill(); process.exit(fail ? 1 : 0);
