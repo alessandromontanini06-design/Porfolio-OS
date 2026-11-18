@@ -1,0 +1,35 @@
+// Due spazi distinti: il portafoglio vero (file) e le prove (creati a mano) non si sovrascrivono.
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const puppeteer = require("puppeteer-core");
+const [,, OUT] = process.argv, PORT = 5168, wait = ms => new Promise(r => setTimeout(r, ms));
+const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env: { ...process.env, PORT: String(PORT), REAL_PRICES: "1" }, stdio: "ignore" });
+await wait(1500);
+const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox"] });
+const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 }); const errs = []; p.on("pageerror", e => errs.push(e.message));
+let pass = 0, fail = 0;const t = (n, ok, i = "") => { ok ? pass++ : fail++; console.log(`  ${ok ? "ok     " : "FALLITO"} ${n}${!ok && i ? " · " + i : ""}`); };
+const st = () => p.evaluate(() => ({ ...window.__pos.state(), space: document.body.dataset.space, scene: document.body.dataset.scene, name: document.getElementById("dsName").innerText,
+  pf: !document.getElementById("pfCard").hidden, real: !document.getElementById("realCard").hidden, cmpFirst: document.getElementById("cmpCard").nextElementSibling === document.getElementById("profCard"), sw: !document.getElementById("spaceSw").hidden }));
+await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" });
+await p.waitForFunction(() => /ricostruito/.test(document.getElementById("dsName").innerText), { timeout: 150000 });
+await p.evaluate(() => document.querySelector('.dock [data-go="map"]').click()); await wait(1200);
+await p.evaluate(() => document.getElementById("confirmBtn").click()); await wait(4000);
+let s = await st();
+t("spazio vero: esempio con 7 strumenti, rendimento reale e «Il tuo portafoglio»", s.assets.length === 7 && s.pf && s.real && s.space !== "sim", JSON.stringify({ n: s.assets.length, pf: s.pf, real: s.real, space: s.space }));
+await p.click("#variantBtn"); await wait(600);
+t("«Prova una variante» apre il pannello con la tua allocazione", await p.evaluate(() => document.getElementById("builder").classList.contains("open") && document.querySelectorAll("#bdRows .bd-row").length === 7));
+await p.evaluate(() => { const ws = document.querySelectorAll("#bdRows input[data-bdw]"); ws[0].value = "10"; ws[0].dispatchEvent(new Event("change", { bubbles: true })); });
+await p.click("#bdGo"); await wait(1500); console.log("    errori dopo Analizza:", errs.join(" | ") || "nessuno");
+await p.waitForFunction(() => document.body.dataset.space === "sim" && document.body.dataset.scene === "lab" && !document.getElementById("lab").hidden, { timeout: 150000 }).catch(() => {});
+await wait(1500); s = await st();
+t("spazio di prova: laboratorio con il confronto in cima, senza schede dei soldi veri", s.space === "sim" && s.cmpFirst && !s.pf && !s.real, JSON.stringify({ space: s.space, cmpFirst: s.cmpFirst, pf: s.pf, real: s.real, checks: s.checks }));
+t("selettore degli spazi visibile", s.sw);
+await p.screenshot({ path: `${OUT}/sp-sim.jpg`, type: "jpeg", quality: 70 });
+await p.click('[data-space="real"]'); await wait(2500); s = await st();
+t("tornando al portafoglio vero è intatto (esempio, 7 strumenti, rendimento reale)", s.space === "real" && s.assets.length === 7 && /esempio/i.test(s.name) && s.real && s.pf, JSON.stringify({ name: s.name, n: s.assets.length, real: s.real }));
+await p.click('[data-space="sim"]'); await wait(2500); s = await st();
+t("di nuovo alle prove: ritrovi il portafoglio di prova", s.space === "sim" && /prova/i.test(s.name) && s.cmpFirst, s.name);
+t("nessun errore JavaScript", !errs.length, errs.join(" | "));
+console.log(`\n${pass} superati, ${fail} falliti`);
+await b.close(); srv.kill(); process.exit(fail ? 1 : 0);

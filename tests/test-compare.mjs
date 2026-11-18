@@ -1,0 +1,47 @@
+// Confronta allocazioni: dal pannello di creazione (A e B con strumenti diversi) e dal file di esempio (attuali contro target).
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const puppeteer = require("puppeteer-core");
+const [,, OUT] = process.argv, PORT = 5170, wait = ms => new Promise(r => setTimeout(r, ms));
+const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env: { ...process.env, PORT: String(PORT), REAL_PRICES: "1" }, stdio: "ignore" });
+await wait(1500);
+const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox"] });
+let pass = 0, fail = 0;const t = (n, ok, i = "") => { ok ? pass++ : fail++; console.log(`  ${ok ? "ok     " : "FALLITO"} ${n}${!ok && i ? " · " + i : ""}`); };
+const txt = (p, s) => p.evaluate(s => { const e = document.querySelector(s); return e ? e.innerText.replace(/\s+/g, " ") : ""; }, s);
+{ const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 }); const errs = []; p.on("pageerror", e => errs.push(e.message));
+  await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await wait(4500);
+  await p.click("#builderBtn"); await wait(600);
+  await p.evaluate(() => [...document.querySelectorAll("[data-bdp]")].find(x => /Azionario mondo/.test(x.textContent)).click()); await wait(200);
+  await p.evaluate(() => document.querySelector('[data-bdt="new"]').click()); await wait(200);
+  await p.evaluate(() => [...document.querySelectorAll("[data-bdp]")].find(x => /60\/40/.test(x.textContent)).click()); await wait(200);
+  t("pannello: due portafogli, B selezionato con il 60/40", await p.evaluate(() => document.querySelectorAll('[data-bdt]').length >= 2 && /AGGH/.test(document.getElementById("bdRows").innerText.replace(/\s/g, "")) || /AGGH/.test([...document.querySelectorAll("#bdRows input[list]")].map(i => i.value).join())));
+  await p.click("#bdGo");
+  const lab = await p.waitForFunction(() => document.body.dataset.scene === "lab" && !document.getElementById("cmpCard").hidden, { timeout: 150000 }).then(() => true).catch(() => false);
+  await wait(1500);
+  const st = await p.evaluate(() => window.__pos.state()), c = await txt(p, "#cmpCard");
+  t("il confronto dice quale strumento accorcia il periodo", /accorcia il periodo comune/.test(c), c.slice(c.indexOf("Confronto su")-300, c.indexOf("Confronto su")));
+  console.log("    ", (c.match(/[A-Z]{3,5} ha prezzi solo da[^.]*\./)||["(nessun avviso)"])[0]);
+  t("laboratorio con tutti gli strumenti di A e B", lab && st.assets.length === 3, st.assets.join(",") + " " + JSON.stringify(st.checks));
+  t("scheda di confronto con A e B e i loro risultati", /Rendimento annuo/.test(c) && /Volatilità/.test(c) && /\bA\b/.test(c) && /\bB\b/.test(c), c.slice(0, 300));
+  t("A = 100% VWCE, B = 60/40 come scelti", await p.evaluate(() => { const v = [...document.querySelectorAll("input.cmp-w")].map(i => [i.dataset.cp, i.closest("tr").querySelector(".an").textContent, +i.value]); const g = (cp, n) => (v.find(x => x[0] === cp && x[1] === n) || [])[2]; return g("0", "VWCE") === 100 && g("1", "SWDA") === 60 && g("1", "AGGH") === 40; }), await p.evaluate(() => [...document.querySelectorAll("input.cmp-w")].map(i => i.dataset.cp + ":" + i.closest("tr").querySelector(".an").textContent + "=" + i.value).join(" ")));
+  await p.evaluate(() => document.getElementById("cmpCard").scrollIntoView({ block: "start" })); await wait(800);
+  await p.screenshot({ path: `${OUT}/cmp-1.jpg`, type: "jpeg", quality: 70 });
+  t("nessun errore JavaScript", !errs.length, errs.join(" | "));
+  await p.close(); }
+{ const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 }); const errs = []; p.on("pageerror", e => errs.push(e.message));
+  await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" });
+  await p.waitForFunction(() => /ricostruito/.test(document.getElementById("dsName").innerText), { timeout: 150000 });
+  await p.evaluate(() => document.querySelector('.dock [data-go="map"]').click()); await wait(1200);
+  await p.evaluate(() => document.getElementById("confirmBtn").click()); await wait(4000);
+  const before = await txt(p, "#cmpCard .cmp-r");
+  t("esempio: confronto pesi attuali (A) contro target (B)", /Rendimento annuo/.test(before));
+  await p.evaluate(() => { const i = [...document.querySelectorAll('input.cmp-w[data-cp="1"]')].find(x => x.closest("tr").querySelector(".an").textContent === "IEAG"); i.value = "60"; i.dispatchEvent(new Event("change", { bubbles: true })); }); await wait(500);
+  const after = await txt(p, "#cmpCard .cmp-r");
+  t("cambiando un peso di B i risultati si aggiornano", after !== before && /Rendimento annuo/.test(after));
+  await p.click("#cmpAdd"); await wait(400);
+  t("si aggiunge C", await p.evaluate(() => document.querySelectorAll('input.cmp-w[data-cp="2"]').length > 0));
+  t("nessun errore JavaScript (esempio)", !errs.length, errs.join(" | "));
+  await p.close(); }
+console.log(`\n${pass} superati, ${fail} falliti`);
+await b.close(); srv.kill(); process.exit(fail ? 1 : 0);

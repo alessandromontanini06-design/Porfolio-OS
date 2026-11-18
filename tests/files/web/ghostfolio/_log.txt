@@ -1,0 +1,26 @@
+LAB  _log.txt                           tx=362 asset=7 ricostruito ERR:Il file è vuoto.
+---  avanza-export.csv                  tx=0 asset=0   TIMEOUT
+---  bitvavo-export.csv                 tx=10 asset=0   TIMEOUT
+---  bux-export.csv                     tx=10 asset=1   blocchi:split:6:18
+---  coinbase-export.csv                tx=0 asset=1  
+---  cointracking-export.csv            tx=0 asset=0   TIMEOUT
+---  cryptocom-export.csv               tx=0 asset=0   TIMEOUT
+---  degiro-export.csv                  tx=0 asset=1  
+---  delta-export.csv                   tx=3 asset=0   TIMEOUT
+LAB  directa-export.csv                 tx=21 asset=10 ricostruito 
+---  disnat-export.csv                  tx=0 asset=0   TIMEOUT
+---  etoro-export.csv                   tx=9 asset=0   TIMEOUT
+---  finpension-3a-export.csv           tx=15 asset=0   TIMEOUT
+---  finpension-bvg-export.csv          tx=2 asset=1   blocchi:split:9:2
+---  freetrade-export.csv               tx=0 asset=0   TIMEOUT
+---  ibkr-dividends-export.csv          tx=0 asset=8 ricostruito  blocchi:ccy,young:CHF,young:CHF,young:CHF
+---  ibkr-trades-export.csv             tx=0 asset=0   TIMEOUT
+---  investengine-export.csv            tx=0 asset=2   blocchi:ccy
+---  investimental-export.csv           tx=0 asset=2   blocchi:split:7:1
+---  parqet-export.csv                  tx=27 asset=0   TIMEOUT
+---  rabobank-export.csv                tx=0 asset=0   TIMEOUT
+LAB  relai-export.csv                   tx=3 asset=1  
+---  revolut-crypto-export.csv          tx=0 asset=0   TIMEOUT
+LAB  revolut-invest-export.csv          tx=5 asset=4 ricostruito  blocchi:young:WBD
+---  saxo-export.csv                    tx=0 asset=0   TIMEOUT
+---  schwab-export.csv                  tx=0 asset=0   TIMEOUT

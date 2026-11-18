@@ -1,0 +1,9 @@
+﻿Portafoglio di sintesi;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Titolo;ISIN;Simbolo;Mercato;Strumento;Valuta;Quantità;P.zo medio di carico;Cambio di carico;Valore di carico;P.zo di mercato;Cambio di mercato;Valore di mercato €;Var%;Var €;Var in valuta;Rateo
+BMW;DE0005190003;1BMW.MI;AFF;Azione;EUR;100,0;79,4495;1,0;7.944,95;78,22;1,0;7.822,00;-1,55;-122,95;-122,95;0,00
+NOVO NORDISK -B-;DK0062498333;NOVC.FRA;XETRA;Azione;EUR;135,0;105,32829;1,0;14.219,32;84,77;1,0;11.443,95;-19,52;-2.775,37;-2.775,37;0,00
+ADVANCED MICRO D;US0079031078;AMD.O;NASDAQ;Azione;USD;50,0;141,55881;1,058099;6.689,30;125,24;1,0428;6.004,99;-10,23;-684,31;-815,94;0,00
+;;;;;;;;;;;;;;;;
+Totale;;;;;;;;;;;Valore di carico;Valore di mercato;Var%;Var;;
+EUR;;;;;;;;;;;12.312,00;20.000,00;6,91;88.190,00;;

@@ -1,0 +1,15 @@
+{
+  "name": "portfolio-os-tools",
+  "private": true,
+  "type": "module",
+  "description": "Strumenti di sviluppo: anteprima locale, test del motore e test dell'interfaccia. Non vanno su Vercel.",
+  "scripts": {
+    "serve": "node serve.mjs",
+    "test": "node test-engine.mjs && node test-ui.mjs",
+    "test:engine": "node test-engine.mjs",
+    "test:ui": "node test-ui.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "25.17.0"
+  }
+}

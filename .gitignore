@@ -5,3 +5,9 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+# risultati generati dai test (foto, download, letture)
+tests/files/shots/
+tests/files/guarda*/
+tests/files/download/
+tests/files/web/**/_risultati.json
+tests/shots-v2/

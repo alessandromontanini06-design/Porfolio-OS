@@ -1,0 +1,30 @@
+// Carica un file nel sito locale (prezzi veri), costruisce il laboratorio, stampa lo stato e salva le foto. Uso: node guarda.mjs file.xlsx [cartella-foto]
+import { spawn } from "node:child_process";
+import puppeteer from "puppeteer-core";
+import fs from "node:fs";
+const [, , FILE, OUT = import.meta.dirname + "/files/guarda"] = process.argv, PORT = 5205, wait = ms => new Promise(r => setTimeout(r, ms));
+fs.mkdirSync(OUT, { recursive: true });
+const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env: { ...process.env, PORT: String(PORT), REAL_PRICES: "1" }, stdio: "ignore" });
+await wait(1500);
+const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox"] });
+const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 }); const errs = []; p.on("pageerror", e => errs.push(e.message));
+await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await p.evaluate(() => localStorage.setItem("pos-save", "0"));
+await (await p.$("#file")).uploadFile(FILE);
+await p.waitForFunction(() => { const s = window.__pos.state(); return s.rebuilt || s.confirmDisabled === false; }, { timeout: 150000 }).catch(() => console.log("attesa scaduta"));
+await wait(3000);
+await p.evaluate(() => document.querySelector('.dock [data-go="map"]').click()); await wait(2000);
+const st = await p.evaluate(() => window.__pos.state());
+console.log(JSON.stringify({ assets: st.assets, portfolio: st.portfolio, tx: st.tx, checks: st.checks, rebuilt: st.rebuilt }));
+console.log("AVVISI:", await p.evaluate(() => [...document.querySelectorAll(".chk, .check, [data-chk]")].map(e => e.innerText.replace(/\s+/g, " ").slice(0, 300)).slice(0, 6)));
+await p.screenshot({ path: `${OUT}/mappa.png`, fullPage: false });
+const dis = await p.evaluate(() => document.getElementById("confirmBtn").disabled);
+if (dis) { /* scelte bloccanti: «procedi» dove c'è */ await p.evaluate(() => { [...document.querySelectorAll("button")].filter(x => /Procedi senza|Procedi comunque|Ho controllato|confermo/i.test(x.textContent)).forEach(x => x.click()); }); await wait(1500); }
+await p.evaluate(() => document.getElementById("confirmBtn").click());
+await p.waitForFunction(() => !document.getElementById("lab").hidden, { timeout: 60000 }).catch(() => console.log("laboratorio non aperto"));
+await wait(4000);
+console.log("REALE:", await p.evaluate(() => (document.getElementById("realCard").innerText || "").replace(/\n+/g, " | ").slice(0, 1800)));
+console.log("COSTI:", await p.evaluate(() => (document.getElementById("costCard").innerText || "").replace(/\n+/g, " | ").slice(0, 500)));
+await p.evaluate(() => document.getElementById("realCard").scrollIntoView()); await wait(600);
+await p.screenshot({ path: `${OUT}/lab.png` });
+console.log("errori:", errs);
+await b.close(); srv.kill();
