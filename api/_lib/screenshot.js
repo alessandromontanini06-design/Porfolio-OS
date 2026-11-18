@@ -1,9 +1,10 @@
-// Funzione server: legge uno o più screenshot del portafoglio (app della banca o del broker) con l'IA.
-// POST /api/screenshot  { immagini: [{ mime: "image/jpeg", data: "<base64>" }] }   (fino a 8, già rimpicciolite dal browser)
+// Lettura di uno o più screenshot del portafoglio (app della banca o del broker) con l'IA.
+// POST /api/screenshot (su Vercel: riscritto in /api/understand?modo=screenshot, vedi vercel.json) { immagini: [{ mime: "image/jpeg", data: "<base64>" }] }   (fino a 8, già rimpicciolite dal browser)
 // Restituisce le posizioni lette: { posizioni: [{ nome, isin, ticker, quantita, prezzo, valore, valuta, immagine }], avvisi, piattaforma }.
 // L'IA legge solo quello che vede: niente ISIN inventati, niente calcoli. Il sito mostra tutto in una tabella da controllare.
 // Le immagini non vengono salvate: passano all'IA e basta.
-import { json, fromOwnSite, rateLimited, readBody, z } from "./_lib/llm.js";
+/* Sta in _lib (non è una funzione a sé) perché il piano gratuito di Vercel ammette al massimo 12 funzioni: la chiama api/understand.js. */
+import { json, fromOwnSite, rateLimited, readBody, z } from "./llm.js";
 
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 const MAX_IMG = 8, MAX_TOTAL = 4_300_000; // limite del corpo delle richieste su Vercel: 4,5 MB
@@ -31,7 +32,7 @@ Estrai SOLO le posizioni possedute oggi (titoli, ETF, fondi, obbligazioni, BTP, 
 - avvisi: brevi frasi in italiano su cosa non si legge bene (per esempio "nell'immagine 2 il valore di ENI è tagliato"). Se un'immagine non è un portafoglio, dillo negli avvisi.
 - piattaforma: il nome dell'app se si capisce, altrimenti null.`;
 
-export default async function handler(req, res) {
+export default async function screenshotHandler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Usa una richiesta POST." }); return; }
   if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
   if (rateLimited(req, "screenshot", Number(process.env.SCREENSHOT_HOURLY_LIMIT || 20))) { res.status(429).json({ error: "Troppe letture di screenshot in un'ora: riprova più tardi." }); return; }

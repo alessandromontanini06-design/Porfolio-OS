@@ -2,6 +2,7 @@
 // Restituisce solo ciò che serve all'analisi (asset, prezzi, pesi) ed elenca ciò che ha scartato.
 // I numeri restano quelli del file: Claude classifica e collega, non calcola e non inventa.
 import { json, fromOwnSite, rateLimited, readBody, z } from "./_lib/llm.js";
+import screenshotHandler from "./_lib/screenshot.js";
 
 
 const Understanding = z.object({
@@ -49,6 +50,8 @@ Regole:
 - "spiegazione": una o due frasi in italiano su cosa hai capito.`;
 
 export default async function handler(req, res) {
+  /* /api/screenshot arriva qui (vercel.json): una funzione in meno, il limite del piano gratuito è 12 */
+  if (req.query && req.query.modo === "screenshot") return screenshotHandler(req, res);
   if (req.method !== "POST") { res.status(405).json({ error: "Usa una richiesta POST." }); return; }
   if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
   if (rateLimited(req, "understand", Number(process.env.AI_HOURLY_LIMIT || 20))) { res.status(429).json({ error: "Hai raggiunto il limite di analisi per quest'ora. Riprova più tardi." }); return; }
