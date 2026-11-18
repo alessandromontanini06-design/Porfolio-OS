@@ -5,7 +5,7 @@
 import { $, P, S, esc, fmtN, fmtPct } from "./core.js";
 import { getJSON, fmtEur } from "./analisi.js";
 import { BD, POPULAR, bdBtpMeta, bdGo, bondInfo, bondYtm, guessSymbol, isBondPos, isExample, trackOnce } from "./importa.js";
-import { btpNota, btpPrezzi, btpSym, isBtpSym } from "./btp.js";
+import { btpLista, btpNota, btpPrezzi, btpSym, isBtpSym } from "./btp.js";
 import { go, current } from "./scene.js";
 import { txMatch } from "./rendimento.js";
 
@@ -273,11 +273,11 @@ function btpSubmit(v) {
     if (!pmAdd({ data, tipo: "valutazione", strumento: PM.btpId, prezzo: px })) return; pmMsg(`Prezzo aggiornato: ${fmtN(px, 2)} su 100.`, "ok");
     /* la stima del BTP si riallinea al prezzo appena scritto */
     delete PM.px[PM.btpId]; PM.btpId = ""; pmRenderForm(); pmRefresh(false); return; }
-  const nome = String(v.bnome || "").trim().slice(0, 80), nom = num(v.bnom), px = num(v.bpx), cpn = num(v.bcpn), spese = num(v.spese) || 0;
+  const raw = String(v.bnome || "").trim(), mm = raw.match(/^(.*?)\s*·\s*([A-Z]{2}[A-Z0-9]{9}\d)$/i), nome = (mm ? mm[1] : raw).slice(0, 80), nom = num(v.bnom), px = num(v.bpx), cpn = num(v.bcpn), spese = num(v.spese) || 0;
   if (!nome) return pmMsg("Scrivi il nome o l'ISIN del titolo.", "err");
   if (!(nom > 0)) return pmMsg("Scrivi il valore nominale, per esempio 10.000.", "err");
   if (!(px > 0 && px < 1000)) return pmMsg("Scrivi il prezzo su 100, per esempio 98,50.", "err");
-  const isin = (nome.toUpperCase().match(/\b[A-Z]{2}[A-Z0-9]{9}\d\b/) || [])[0] || null, b = bondInfo(nome);
+  const isin = (raw.toUpperCase().match(/\b[A-Z]{2}[A-Z0-9]{9}\d\b/) || [])[0] || null, b = bondInfo(nome);
   const id = Object.keys(db.strumenti).find(k => db.strumenti[k].per100 && ((isin && db.strumenti[k].isin === isin) || db.strumenti[k].nome.toUpperCase() === nome.toUpperCase())) || (isin || "b-" + newId());
   if (!db.strumenti[id]) db.strumenti[id] = { nome, isin, valuta: "EUR", per100: true, classe: "Obbligazioni",
     cedola: Number.isFinite(cpn) ? cpn / 100 : (b && b.cpn != null ? b.cpn : null), scadenza: v.bmat || (b && b.mat ? b.mat.toISOString().slice(0, 10) : null), freq: +v.bfreq || 2 };
@@ -468,7 +468,7 @@ function pmForm() {
       <label>Nuovo prezzo (su 100)<input name="bpx" inputmode="decimal" placeholder="${p && Number.isFinite(p.prezzo) ? String(p.prezzo).replace(".", ",") : "100"}" required></label>${date}
       <button type="submit" class="btn lime">Salva il prezzo</button><p class="caption wide-c">Lo trovi nel tuo home banking o sul sito di Borsa Italiana: è il prezzo per 100 € di valore nominale.</p>`; }
     return `${own.length ? `<label class="wide">Titolo<select name="bsel" id="pmBtpSel"><option value="">Nuovo acquisto di un BTP o un'obbligazione</option>${opt(own, "")}</select></label>` : ""}
-      <label class="wide">Nome o ISIN<input name="bnome" placeholder="BTP 3,35% 01MZ35 oppure IT0005…" spellcheck="false" required><small class="pm-hint" id="pmBtpHint">dal nome ricavo cedola e scadenza</small></label>
+      <label class="wide">Nome o ISIN<input name="bnome" list="pmBtpList" placeholder="BTP 3,35% 01MZ35 oppure IT0005…" spellcheck="false" autocomplete="off" required><datalist id="pmBtpList"></datalist><small class="pm-hint" id="pmBtpHint">scrivi «BTP 2033» per scegliere tra i BTP in circolazione, oppure nome o ISIN</small></label>
       <label>Valore nominale (€)<input name="bnom" inputmode="decimal" placeholder="10.000" required></label>
       <label>Prezzo di acquisto (su 100)<input name="bpx" inputmode="decimal" placeholder="98,50" required></label>${date}
       <label>Cedola annua (%)<input name="bcpn" inputmode="decimal" placeholder="3,35"></label>
@@ -492,6 +492,7 @@ function pmForm() {
 }
 function pmRenderForm() {
   const f = $("#pmForm"); if (!f) return; f.innerHTML = pmForm(); PM.res = null;
+  if (PM.tipo === "btp" && $("#pmBtpList")) btpLista().then(L => { const dl = $("#pmBtpList"); if (dl) dl.innerHTML = L.righe.map(b => `<option value="${esc(b.nome)} · ${b.isin}"></option>`).join(""); });
   document.querySelectorAll("#pmTipo [data-pmt]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pmt === PM.tipo)));
 }
 function pmButton() {
@@ -821,7 +822,14 @@ sc().addEventListener("change", async e => {
   const el = e.target;
   if (el.id === "pmBene") { PM.beneId = el.value; pmRenderForm(); return; }
   if (el.id === "pmBtpSel") { PM.btpId = el.value; pmRenderForm(); return; }
-  if (el.name === "bnome") { const b = bondInfo(el.value), f = el.form, h = $("#pmBtpHint");
+  if (el.name === "bnome") { const v = String(el.value || "").trim(), f = el.form, h = $("#pmBtpHint"), isin = (v.toUpperCase().match(/\b[A-Z]{2}[A-Z0-9]{9}\d\b/) || [])[0];
+    const setCM = (c, sc) => { if (c != null) f.bcpn.value = String(+(c * 100).toFixed(3)).replace(".", ","); if (sc) f.bmat.value = sc; };
+    if (isin) { const L = await btpLista(), m = L.righe.find(x => x.isin === isin);
+      if (m) { setCM(m.c, m.sc); if (!/·/.test(v)) el.value = `${m.nome} · ${m.isin}`; h.textContent = `✓ ${m.nome} · cedola ${fmtPct(m.c, 2)} · prezzo stimato ogni giorno dalla curva della Banca d'Italia`; h.className = "pm-hint ok"; return; }
+      if (/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(v.toUpperCase())) { h.textContent = "verifico l'ISIN…"; h.className = "pm-hint"; const j = await getJSON(`/api/isin?isin=${isin}`), r = j && (j.results || [])[0], st = r && r.stato; if (el.value.trim() !== v) return;
+        if (st) { setCM(st.cedola, st.scadenza); el.value = `${st.nome} · ${isin}`; h.textContent = st.tipo === "fisso" ? `✓ ${st.nome} · prezzo stimato dalla curva della Banca d'Italia` : `✓ ${st.nome}: le cedole cambiano, il prezzo resta quello che scrivi tu`; h.className = "pm-hint ok"; }
+        else { h.textContent = r && r.simbolo ? "questo ISIN è quotato in borsa: aggiungilo come «Acquisto»" : "ISIN non trovato: scrivi cedola e scadenza qui sotto"; h.className = "pm-hint"; } return; } }
+    const b = bondInfo(el.value);
     if (b) { if (b.cpn != null && !f.bcpn.value) f.bcpn.value = String(+(b.cpn * 100).toFixed(3)).replace(".", ","); if (b.mat && !f.bmat.value) f.bmat.value = b.mat.toISOString().slice(0, 10); h.textContent = `✓ ${b.cpn != null ? "cedola " + fmtPct(b.cpn, 2) + " · " : ""}scadenza ${b.mat.toLocaleDateString("it-IT", { timeZone: "UTC" })}`; h.className = "pm-hint ok"; }
     else { h.textContent = "cedola e scadenza: scrivile qui sotto (le trovi nel tuo home banking)"; h.className = "pm-hint"; } return; }
   if (el.name === "sid" && PM.tipo === "vendita") { const p = PM.R.posizioni.find(x => x.id === el.value), s = PM.db.strumenti[el.value]; if (p) $("#pmHint").textContent = `Possiedi ${fmtN(p.qta, p.qta % 1 ? 3 : 0)} quote`; if (s) $("#pmCcy").textContent = `(${s.valuta || "€"})`; return; }

@@ -61,6 +61,36 @@ await p.waitForFunction(() => window.__pos.state().rebuilt && (window.__pos.stat
 const st = await p.evaluate(() => window.__pos.state());
 t("nel laboratorio arrivano SWDA e il BTP a tasso fisso (non il BTP Italia)", (st.assets || []).some(a => /^BTP 1,35% apr 2030/.test(a)) && (st.assets || []).length === 2, JSON.stringify(st.assets));
 
+/* aggiungere un BTP a mano: il campo propone i BTP del MEF; sceglierne uno compila cedola e scadenza esatte */
+const pa = await b.newPage(); await pa.setViewport({ width: 1440, height: 900 }); pa.on("pageerror", e => errs.push(e.message));
+await pa.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" });
+await pa.waitForFunction(() => document.body.dataset.scene === "patrimonio", { timeout: 30000 }).catch(() => {});
+await pa.evaluate(() => document.querySelector('[data-pmt="btp"]').click()); await wait(300);
+await pa.evaluate(() => { const s = document.getElementById("pmBtpSel"); if (s && s.value) { s.value = ""; s.dispatchEvent(new Event("change", { bubbles: true })); } }); await wait(300);
+await pa.waitForFunction(() => document.querySelectorAll("#pmBtpList option").length > 100, { timeout: 15000 }).catch(() => {});
+const nOpt = await pa.evaluate(() => document.querySelectorAll("#pmBtpList option").length);
+t("«Nome o ISIN» propone i BTP in circolazione (elenco del MEF)", nOpt >= 100, nOpt);
+const opt = await pa.evaluate(() => [...document.querySelectorAll("#pmBtpList option")].map(o => o.value).find(v => /IT0005722845/.test(v)));
+const setF = (n, v) => pa.evaluate((n, v) => { const i = document.querySelector(`#pmForm [name=${n}]`); i.value = v; i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); }, n, v);
+await setF("bnome", opt); await wait(400);
+const f1 = await pa.evaluate(() => ({ c: document.querySelector("#pmForm [name=bcpn]").value, m: document.querySelector("#pmForm [name=bmat]").value, h: document.getElementById("pmBtpHint").textContent }));
+t("scelto «BTP 3,35% 15/09/2033 · IT0005722845»: cedola 3,35 e scadenza 15/09/2033", f1.c === "3,35" && f1.m === "2033-09-15" && /prezzo stimato/.test(f1.h), JSON.stringify(f1));
+await setF("bnom", "5.000"); await setF("bpx", "99,10"); await setF("data", "2026-09-01");
+await pa.evaluate(() => document.getElementById("pmForm").requestSubmit()); await wait(1500);
+const Dm = await pa.evaluate(() => JSON.parse(localStorage.getItem("pos-patrimonio-v1")));
+const Sm = Dm.strumenti.IT0005722845;
+t("salvato con il nome pulito, l'ISIN, cedola e scadenza", !!Sm && Sm.nome === "BTP 3,35% 15/09/2033" && Sm.isin === "IT0005722845" && Math.abs(Sm.cedola - 0.0335) < 1e-9 && Sm.scadenza === "2033-09-15", JSON.stringify(Sm));
+await pa.waitForFunction(() => [...document.querySelectorAll("#pmPos tbody tr")].some(tr => /BTP 3,35% 15\/09\/2033/.test(tr.innerText) && /stimato con i tassi/.test(tr.innerText)), { timeout: 30000 }).catch(() => {});
+t("e ha subito il prezzo stimato", await pa.evaluate(() => [...document.querySelectorAll("#pmPos tbody tr")].some(tr => /BTP 3,35% 15\/09\/2033/.test(tr.innerText) && /stimato con i tassi/.test(tr.innerText))));
+/* solo l'ISIN di un BTP Italia: lo riconosce e avvisa che il prezzo resta quello scritto */
+await pa.evaluate(() => document.querySelector('[data-pmt="btp"]').click()); await wait(300);
+await pa.evaluate(() => { const s = document.getElementById("pmBtpSel"); if (s && s.value) { s.value = ""; s.dispatchEvent(new Event("change", { bubbles: true })); } }); await wait(300);
+await setF("bnome", "IT0005497000");
+await pa.waitForFunction(() => /cedole cambiano/.test(document.getElementById("pmBtpHint").textContent), { timeout: 20000 }).catch(() => {});
+const f2 = await pa.evaluate(() => ({ v: document.querySelector("#pmForm [name=bnome]").value, h: document.getElementById("pmBtpHint").textContent, m: document.querySelector("#pmForm [name=bmat]").value }));
+t("ISIN di un BTP Italia: nome completato, scadenza, e «il prezzo resta quello che scrivi»", /BTP 1,6% 28\/06\/2030/.test(f2.v) && /cedole cambiano/.test(f2.h) && f2.m === "2030-06-28", JSON.stringify(f2));
+await pa.close();
+
 /* dal file al patrimonio: i BTP restano obbligazioni con nominale, cedola e scadenza */
 const p2 = await b.newPage(); await p2.setViewport({ width: 1440, height: 900 }); p2.on("pageerror", e => errs.push(e.message));
 await p2.goto(`http://localhost:${PORT}/?home`, { waitUntil: "networkidle2" }); await p2.evaluate(() => { localStorage.removeItem("pos-patrimonio-v1"); localStorage.setItem("pos-save", "0"); });

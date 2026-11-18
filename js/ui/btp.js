@@ -53,4 +53,12 @@ const btpScheda = (st, isin) => ({ isin: isin || null, nome: st.nome, fonte: "Ti
 const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
 function btpEtichetta(sym) { const b = P.btpDaSimbolo(sym); if (!b) return sym; return `BTP ${String(+(b.cedola * 100).toFixed(3)).replace(".", ",")}% ${MESI[+b.scadenza.slice(5, 7) - 1]} ${b.scadenza.slice(0, 4)}`; }
 
-export { BTP_SRC, btpCurva, btpEtichetta, btpNota, btpPrezzi, btpScheda, btpSym, isBtpSym };
+/* elenco ufficiale dei BTP a tasso fisso in circolazione (MEF, js/data/btp.json), una volta per visita */
+let LISTA = null;
+function btpLista() {
+  return LISTA ||= fetch("/js/data/btp.json").then(r => r.json()).then(j => { const today = new Date().toISOString().slice(0, 10);
+    return { al: j.al || null, righe: (j.righe || []).filter(x => x[3] > today).map(([isin, g, em, sc, c]) => ({ isin, g, em, sc, c, nome: `${g} ${String(+(c * 100).toFixed(3)).replace(".", ",")}% ${sc.slice(8, 10)}/${sc.slice(5, 7)}/${sc.slice(0, 4)}` })) }; })
+    .catch(() => { LISTA = null; return { al: null, righe: [] }; });
+}
+
+export { BTP_SRC, btpCurva, btpEtichetta, btpLista, btpNota, btpPrezzi, btpScheda, btpSym, isBtpSym };
