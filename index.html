@@ -188,7 +188,7 @@
         <button type="button" class="pm-act" data-pmgo="add"><b>Aggiungi</b><small>acquisto, vendita, dividendo, casa</small></button>
         <button type="button" class="pm-act" id="pmFile"><b>Importa da un file</b><small>l'Excel o l'export del broker</small></button>
         <button type="button" class="pm-act lime" id="pmLab"><b>Analizza nel laboratorio</b><small>rischio, crisi, simulazioni, frontiera</small></button>
-        <button type="button" class="pm-act" id="pmExport"><b>Scarica una copia</b><small>per non perderlo</small></button>
+        <button type="button" class="pm-act" id="pmExport"><b>Scarica in Excel</b><small>posizioni, operazioni, tasse</small></button>
       </div>
       <p class="caption" id="pmTopMsg" role="status"></p>
       <div class="pm-beni" id="pmBeni" hidden></div>
@@ -204,7 +204,7 @@
         <p class="caption" id="pmMsg" role="status"></p></section>
       <section class="bd-step"><div class="bd-sh"><h3>Storico delle operazioni</h3><small>niente si cancella: un'operazione sbagliata si annulla</small></div><div id="pmOps"></div></section>
       <footer class="pm-foot"><p>Il patrimonio è salvato <b>solo in questo browser</b>, su questo dispositivo: non va su nessun server. Scarica ogni tanto una copia per non perderlo. I prezzi sono di fine giornata (Yahoo Finance), indicativi, non in tempo reale. Non è un consiglio di investimento.</p>
-        <div class="pm-io"><label class="btn sm" for="pmImport">Ripristina da una copia</label><input type="file" id="pmImport" accept="application/json,.json" hidden><button type="button" class="btn sm pm-danger" id="pmReset">Ricomincia da zero</button></div></footer>
+        <div class="pm-io"><button type="button" class="btn sm" id="pmBackup">Scarica la copia di sicurezza</button><label class="btn sm" for="pmImport">Ripristina da una copia</label><input type="file" id="pmImport" accept="application/json,.json" hidden><button type="button" class="btn sm pm-danger" id="pmReset">Ricomincia da zero</button></div></footer>
     </div>
   </section>
 

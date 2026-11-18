@@ -519,7 +519,7 @@ function pmFiscStrumenti() {
 }
 function pmTax(R) {
   const box = $("#pmTaxBox"); if (!box) return;
-  const ST = pmFiscStrumenti(), F = P.fisco(R, ST, { oggi: pmToday() }), L = F.latente, y = +pmToday().slice(0, 4);
+  const ST = pmFiscStrumenti(), F = P.fisco(R, ST, { oggi: pmToday() }), L = F.latente, y = +pmToday().slice(0, 4); PM.fisc = F;
   const show = L.righe.length || F.vendite.length || F.zainetto.length; box.hidden = !show; if (!show) { $("#pmTax").innerHTML = ""; return; }
   const z = F.zainetto, zTot = z.reduce((a, x) => a + x.residuo, 0), zFirst = z.length ? z.slice().sort((a, b) => a.scadenza < b.scadenza ? -1 : 1)[0] : null, A = F.anni[y];
   const opt = (id, c) => `<select data-pmfisc="${esc(id)}" aria-label="Categoria fiscale di ${esc(ST[id].nome)}">${["fondo", "diversi", "statale", "obbligazione", "cripto"].map(k => `<option value="${k}"${k === c ? " selected" : ""}>${P.FISCO_CAT_L[k]}</option>`).join("")}</select>`;
@@ -557,6 +557,7 @@ function pmIncome(R) {
     for (const x of dv) { const d = new Date(Date.parse(x.d) + 365 * 864e5).toISOString().slice(0, 10); if (d <= today || d > to) continue; const lordo = p.qta * x.v * k; out.push({ d, nome: s.nome, tipo: "Dividendo", lordo, netto: lordo * 0.74, certo: false }); }
   }
   out.sort((a, b) => a.d < b.d ? -1 : 1);
+  PM.inc = out.slice().sort((a, b) => (a.d < b.d ? -1 : 1));
   box.hidden = !out.length; if (!out.length) { $("#pmInc").innerHTML = ""; return; }
   const tot = out.reduce((a, x) => a + x.netto, 0), stima = out.some(x => !x.certo), next = out[0];
   $("#pmInc").innerHTML = `<div class="pm-inc-h"><div><span>Prossimi 12 mesi, netti${stima ? " (stima)" : ""}</span><b>${fmtEur(tot)}</b></div><div><span>Il prossimo</span><b>${dIt(next.d)}</b><small>${esc(next.nome)} · ${fmtN(next.netto, 2)} €</small></div></div>
@@ -702,6 +703,61 @@ function pmDownload() {
   const blob = new Blob([JSON.stringify({ ...PM.db, esportato: new Date().toISOString(), app: "Portfolio OS" }, null, 1)], { type: "application/json" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `patrimonio-portfolio-os-${pmToday()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return true;
 }
+/* ---------- il patrimonio in Excel: da leggere (o da dare al commercialista), non da reimportare ----------
+   Riepilogo, Posizioni, Operazioni, Andamento (fine mese), Proventi in arrivo, Tasse, Leggimi. Numeri veri con i formati € e %. */
+function pmExcel() {
+  if (!pmHas()) return false;
+  if (!window.XLSX) { pmMsg("Il lettore Excel non si è caricato: ricarica la pagina e riprova.", "err"); return false; }
+  const db = PM.db, R = PM.R || pmCalc(), T = R.totale, F = PM.fisc || P.fisco(R, pmFiscStrumenti(), { oggi: pmToday() }), inc = PM.inc || [];
+  const r2 = v => v == null || !isFinite(v) ? null : Math.round(v * 100) / 100, pc = v => v == null || !isFinite(v) ? null : Math.round(v * 10000) / 10000, dd = s => s ? new Date(s + "T12:00:00Z") : null;
+  const tipoL = { acquisto: "Acquisto", vendita: "Vendita", dividendo: "Dividendo", cedola: "Cedola", valutazione: "Nuovo prezzo o stima", commissione: "Commissione", tassa: "Tassa", frazionamento: "Frazionamento" };
+  const gone = new Set(db.operazioni.filter(o => o.tipo === "annulla").map(o => String(o.rif)));
+  const cls = s => s.manuale ? (s.classe || "Bene senza quotazione") : s.per100 ? "Obbligazioni" : s.classe || "";
+  const st = id => db.strumenti[id] || {};
+  const incTot = inc.reduce((a, x) => a + (x.netto || 0), 0), zTot = F.zainetto.reduce((a, z) => a + z.residuo, 0);
+  const riep = [["Voce", "Valore", "Nota"],
+    ["Valore oggi", r2(T.valore), `al ${dIt(R.al)}`], ["Versato netto", r2(T.versato), "acquisti meno vendite, dividendi e cedole incassati"], ["Guadagno", r2(T.guadagno), "valore oggi meno versato netto"],
+    ["Guadagno sul versato", pc(T.guadagnoPct), ""], ["Rendimento annuo (TIR)", pc(T.tir), "tiene conto di quando hai versato ogni euro"],
+    ["Rendimento ponderato nel tempo", pc(T.twr), `dal ${dIt(R.dal)}, senza l'effetto dei versamenti`], ["…all'anno", pc(T.twrAnn), T.anni >= 1 ? "" : "meno di un anno: non annualizzato"],
+    ["Calo massimo", pc(T.maxDD), "dal punto più alto al più basso, senza i versamenti"], ["Proventi incassati", r2(T.proventi), "dividendi e cedole registrati"], ["Spese e tasse pagate", r2(T.spese), "commissioni e imposte registrate"],
+    ["Bollo stimato, anno in corso", r2(F.bollo.annuo), "0,2% del valore dei titoli"], ["Imposte se vendessi tutto oggi", r2(F.latente.imposta), "stima, vedi il foglio Tasse"],
+    ["Minusvalenze da recuperare", r2(zTot), "lo «zainetto fiscale»"], ["Proventi in arrivo, prossimi 12 mesi (netti)", r2(incTot), "cedole certe e dividendi stimati"]];
+  const pos = [["Strumento", "ISIN", "Ticker", "Classe", "Quote o nominale", "Prezzo", "Data del prezzo", "Fonte del prezzo", "Valore (€)", "Peso", "Costo (€)", "Prezzo medio", "Guadagno latente (€)", "Guadagno realizzato (€)", "Proventi (€)", "Guadagno totale (€)", "Rendimento annuo (TIR)", "Aperta"]];
+  for (const p of R.posizioni) { const s = st(p.id), j = PM.px[p.id], fonte = p.prezzoFonte === "mercato" ? (j && j.stima ? "stima Banca d'Italia" : (j && j.source) || "mercato") : p.prezzoFonte === "operazione" ? (s.manuale ? "tua stima" : "tuo prezzo") : "";
+    pos.push([s.nome || p.id, s.isin || "", s.ticker || "", cls(s), p.aperta ? (s.per100 ? r2(p.qta) : +p.qta.toFixed(6)) : 0, p.aperta && isFinite(p.prezzo) ? +(+p.prezzo).toFixed(4) : null, p.aperta ? dd(p.prezzoData) : null, p.aperta ? fonte : "",
+      r2(p.valore), pc(p.peso), r2(p.costo), p.aperta && isFinite(p.pmc) ? +(s.per100 ? p.pmc * 100 : p.pmc).toFixed(4) : null, p.aperta ? r2(p.latente) : null, r2(p.realizzato), r2(p.proventi), r2(p.guadagno), pc(p.tir), p.aperta ? "sì" : "no"]); }
+  const ops = [["Data", "Operazione", "Strumento", "ISIN", "Quantità o nominale", "Prezzo", "Importo", "Spese", "Valuta", "Cambio", "Da dove", "Annullata", "Nota"]];
+  for (const o of db.operazioni.filter(o => o.tipo !== "annulla").slice().sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0))) {
+    const s = st(o.strumento), q = +o.quantita, px = +o.prezzo, imp = (o.tipo === "acquisto" || o.tipo === "vendita") && q > 0 && px >= 0 ? q * px * (s.per100 ? 0.01 : 1) : +o.importo;
+    ops.push([dd(o.data), tipoL[o.tipo] || o.tipo, s.nome || o.strumento || "", s.isin || "", q > 0 ? q : null, px > 0 ? px : null, isFinite(imp) ? r2(imp) : null, +o.spese ? r2(+o.spese) : null, o.valuta || s.valuta || "EUR", +o.cambio || null,
+      o.origine === "file" ? "da file" : o.posizioneDiOggi ? "posizione di oggi" : "a mano", gone.has(String(o.id)) ? "sì" : "", o.nota || (o.stima ? "quote stimate" : "")]); }
+  const and = [["Data", "Valore (€)", "Versato netto (€)", "Guadagno (€)", "Rendimento ponderato nel tempo"]], byM = new Map();
+  R.serie.forEach(x => byM.set(x.d.slice(0, 7), x));
+  for (const x of byM.values()) if (x.valore > 0 || x.versato > 0) and.push([dd(x.d), r2(x.valore), r2(x.versato), r2(x.valore - x.versato), pc(x.twr)]);
+  const pro = [["Data", "Strumento", "Tipo", "Lordo (€)", "Netto (€)", "Certo o stimato"], ...inc.map(x => [dd(x.d), x.nome, x.tipo, r2(x.lordo), r2(x.netto), x.certo ? "certo" : "stima (ultimi 12 mesi ripetuti)"])];
+  const tas = [["Strumento", "Categoria fiscale", "Valore (€)", "Costo (€)", "Guadagno o perdita (€)", "Imposta se vendessi oggi (€)"], ...F.latente.righe.map(r => [r.nome, P.FISCO_CAT_L[r.cat] || r.cat, r2(r.valore), r2(r.costo), r2(r.lat), r2(r.imposta)])];
+  if (F.zainetto.length) { tas.push([], ["Minusvalenze da recuperare", "Nata nel", "Importo iniziale (€)", "Ancora da usare (€)", "Scade il"]); F.zainetto.forEach(z => tas.push([z.nome, z.anno, r2(z.iniziale), r2(z.residuo), dd(z.scadenza)])); }
+  F.note.forEach(n => tas.push([], [n]));
+  const leggi = [["Il mio patrimonio · Portfolio OS"], [`Esportato il ${new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" })}`], [],
+    ["Riepilogo", "i numeri principali di oggi"], ["Posizioni", "ogni strumento con quote, prezzo, valore, guadagno e TIR (anche le posizioni chiuse)"], ["Operazioni", "tutte le operazioni, in ordine di data; quelle annullate restano segnate"],
+    ["Andamento", "valore e versato a fine mese"], ["Proventi in arrivo", "cedole e dividendi dei prossimi 12 mesi"], ["Tasse", "imposte se vendessi oggi, per strumento, e minusvalenze da recuperare"], [],
+    ["Prezzi", "fine giornata, indicativi; per i BTP a tasso fisso il prezzo è stimato dalla curva dei rendimenti della Banca d'Italia"], ["Tasse", "stime: le imposte vere le calcola la banca (regime amministrato) o il commercialista"], [],
+    ["Per rimettere il patrimonio in un altro browser usa «Scarica la copia di sicurezza»: questo Excel serve da leggere, non da reimportare."], ["Strumento di analisi: non è un consiglio di investimento."]];
+  const E = "#,##0.00 €", P2 = "0.0%", D = "dd/mm/yyyy", N4 = "#,##0.####";
+  const wb = XLSX.utils.book_new(), sheet = (aoa, cols, fmt) => { const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true }); ws["!cols"] = cols.map(w => ({ wch: w }));
+    const rg = XLSX.utils.decode_range(ws["!ref"]); for (let r = 1; r <= rg.e.r; r++) for (const [c, z] of Object.entries(fmt)) { const cell = ws[XLSX.utils.encode_cell({ r, c: +c })]; if (cell && cell.t !== "s") cell.z = typeof z === "function" ? z(r) : z; }
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ r: 0, c: 0 }, { r: 0, c: rg.e.c }) }; return ws; };
+  const pctRows = new Set([4, 5, 6, 7, 8]);
+  XLSX.utils.book_append_sheet(wb, sheet(riep, [44, 16, 56], { 1: r => pctRows.has(r) ? P2 : E }), "Riepilogo");
+  XLSX.utils.book_append_sheet(wb, sheet(pos, [34, 14, 9, 16, 14, 11, 12, 20, 13, 8, 13, 11, 14, 14, 12, 14, 12, 7], { 4: N4, 5: N4, 6: D, 8: E, 9: P2, 10: E, 11: N4, 12: E, 13: E, 14: E, 15: E, 16: P2 }), "Posizioni");
+  XLSX.utils.book_append_sheet(wb, sheet(ops, [12, 20, 34, 14, 14, 11, 13, 10, 7, 8, 16, 9, 24], { 0: D, 4: N4, 5: N4, 6: E, 7: E }), "Operazioni");
+  if (and.length > 1) XLSX.utils.book_append_sheet(wb, sheet(and, [12, 14, 16, 14, 14], { 0: D, 1: E, 2: E, 3: E, 4: P2 }), "Andamento");
+  if (pro.length > 1) XLSX.utils.book_append_sheet(wb, sheet(pro, [12, 34, 11, 12, 12, 30], { 0: D, 3: E, 4: E }), "Proventi in arrivo");
+  if (tas.length > 1) XLSX.utils.book_append_sheet(wb, sheet(tas, [34, 22, 14, 14, 18, 18], { 2: E, 3: E, 4: E, 5: E }), "Tasse");
+  const wl = XLSX.utils.aoa_to_sheet(leggi); wl["!cols"] = [{ wch: 22 }, { wch: 100 }]; XLSX.utils.book_append_sheet(wb, wl, "Leggimi");
+  XLSX.writeFile(wb, `patrimonio-portfolio-os-${pmToday()}.xlsx`);
+  trackOnce("feature", "patrimonio_excel", { name: "patrimonio_excel" }); return true;
+}
 /* ricominciare da zero: prima una copia di sicurezza scaricata, poi si cancella (si può rimettere con «Ripristina da una copia») */
 function pmReset() {
   if (!pmHas()) { pmMsg("Il patrimonio è già vuoto.", "", "#pmTopMsg"); return; }
@@ -805,7 +861,8 @@ sc().addEventListener("click", e => {
     pmAdd({ data: pmToday(), tipo: "annulla", rif: o.id }); if (o.strumento && PM.db.strumenti[o.strumento] && PM.db.strumenti[o.strumento].per100) { delete PM.px[o.strumento]; pmRenderForm(); pmRefresh(false); return; } pmRenderForm(); pmRender(); return; }
   if (e.target.closest("#pmFile")) { PM.pending = true; pmMsg("Scegli il file: dopo la lettura e la mappa, il portafoglio entra da solo nel tuo patrimonio.", "", "#pmTopMsg"); $("#file").click(); return; }
   if (e.target.closest("#pmLab")) { pmToLab(); return; }
-  if (e.target.closest("#pmExport")) pmDownload();
+  if (e.target.closest("#pmExport")) pmExcel();
+  if (e.target.closest("#pmBackup")) pmDownload();
   if (e.target.closest("#pmReset")) pmReset();
   if (e.target.closest("[data-pacadd]")) { PM.tipo = "pac"; PM.beneId = ""; pmRenderForm(); pmMsg(""); $("#pmAdd").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const cs = e.target.closest("[data-cedskip]"); if (cs) { cedSkip(+cs.dataset.cedskip); return; }
