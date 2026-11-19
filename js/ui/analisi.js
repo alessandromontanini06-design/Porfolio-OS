@@ -198,7 +198,9 @@ const fmtEur=v=>Number.isFinite(v)?Math.round(v).toLocaleString("it-IT",{useGrou
 const fmtK=v=>!Number.isFinite(v)?"—":Math.abs(v)>=1e6?fmtN(v/1e6,1)+" mln":Math.abs(v)>=1e4?fmtN(v/1e3,0)+"k":fmtN(v,0);
 const MC_M={boot:"Storico",block:"A blocchi",normal:"Normale"};
 /* capitale di partenza: il valore di oggi ai prezzi di mercato (dal rendimento reale) se c'è, altrimenti la somma delle posizioni del file */
-const pfNow=()=>S.real&&S.real.pp&&S.real.pp.value>0?S.real.pp.value:pfNow();
+/* capitale di oggi: il valore ai prezzi di mercato se c'è, altrimenti la somma delle posizioni (portafogli dal costruttore o dal patrimonio).
+   Prima qui si richiamava sé stessa: dal patrimonio stress test, simulazioni e indipendenza restavano vuoti (19/11/2026). */
+const pfNow=()=>S.real&&S.real.pp&&S.real.pp.value>0?S.real.pp.value:(S.portfolio?S.portfolio.positions.reduce((a,p)=>a+(p.valore||0),0):0);
 function simDefaults(){
   const mm=macroFor(S.rfSrc),pfv=pfNow(),init=pfv>0?Math.round(pfv):10000,monthly=200,years=20;
   return {init,monthly,years,goal:Math.max(1000,Math.round((init+monthly*12*years)*1.5/10000)*10000),infl:mm?+(mm.infl*100).toFixed(2):2,inflSrc:mm?`media ${mm.cpiName}`:"ipotesi: nessun dato macro",costs:.2,method:"boot",n:2000,real:false};
