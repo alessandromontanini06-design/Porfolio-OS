@@ -60,7 +60,7 @@ document.addEventListener("click", e => {
   if (e.target.closest("#cbCopy")) { const R = cbCalc(cbLoad()); if (!R) return;
     const t = `Quanto costa il portafoglio (dal rendiconto costi e oneri)\nPatrimonio medio: ${eur(R.base)}\nCosti dell'anno: ${eur2(R.tot)} (${fmtPct(R.pct, 2)}), circa ${eur(R.mese)} al mese\n` +
       `  servizi ${eur2(R.serv)} · prodotti ${eur2(R.prod)}${R.inc > 0 ? ` · di cui incentivi ${eur2(R.inc)}` : ""}\nIn 10 anni: −${eur(R.d10)} · in 20 anni: −${eur(R.d20)} di capitale (rendimento lordo ipotizzato 5%)\n` +
-      `Con ETF allo 0,20% l'anno: ${eur(R.etf)} l'anno${R.risp > 1 ? `, ${eur(R.risp)} in meno` : ""}\nCalcolato con Portfolio OS. Indicativo, non è un consiglio di investimento.`;
+      `Con ETF allo 0,20% l'anno: ${eur(R.etf)} l'anno${R.risp > 1 ? `, ${eur(R.risp)} in meno` : ""}\nCalcolato con Quanta Portfolio. Indicativo, non è un consiglio di investimento.`;
     const b = e.target.closest("#cbCopy"); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { b.textContent = "Copiato"; setTimeout(() => { b.textContent = "Copia il riepilogo"; }, 1600); }).catch(() => { b.textContent = "Non riesco a copiare"; }); return; }
   const o = e.target.closest("[data-cbopen]"); if (o) { go("strumenti"); setTimeout(() => { cbFill(); const box = $("#cbBox"); if (box) box.scrollIntoView({ behavior: "smooth", block: "start" }); const i = document.querySelector('#cbForm input[name="pat"]'); if (i) i.focus({ preventScroll: true }); }, 450); }
 });

@@ -151,7 +151,7 @@ async function cmpExport(){
     ...(Number.isFinite(M.ta)&&Number.isFinite(M.tb)?[["Costo annuo (TER e altri costi)",p4(M.ta),p4(M.tb)]]:[])];
   const s3=[["Proposta di portafoglio"],["Data",today],...(B.studio?[["Preparata da",B.studio]]:[]),["File",S.source&&S.source.name||""],["Periodo del confronto",`${R.ks.length} ${UNIT[f]?UNIT[f][1]:"periodi"} comuni, ${fmtDate(ds.dates[R.ks[0]-1]||ds.dates[R.ks[0]],f)} – ${fmtDate(ds.dates[R.ks[R.ks.length-1]],f)}`],
     ["Ipotesi","Portafogli ribilanciati ogni mese ai pesi indicati, senza costi né tasse. Importi sul valore di oggi, senza nuovi versamenti."],["Imposte","Stima: guadagno latente realizzato in proporzione alla vendita, 26% (12,5% titoli di Stato). Non considera minusvalenze, commissioni e spread."],
-    ["Avvertenza","Analisi dei dati storici calcolata da Portfolio OS: i rendimenti passati non garantiscono quelli futuri."]];
+    ["Avvertenza","Analisi dei dati storici calcolata da Quanta Portfolio: i rendimenti passati non garantiscono quelli futuri."]];
   const wb=XLSX.utils.book_new(),pct=(ws,cols,rows)=>{rows.forEach(r=>cols.forEach(c=>{const a=XLSX.utils.encode_cell({r,c});if(ws[a]&&typeof ws[a].v==="number")ws[a].z="0.0%";}));};
   const w1=XLSX.utils.aoa_to_sheet(s1);pct(w1,[3,4],s1.map((_,i)=>i).slice(1));w1["!cols"]=[{wch:14},{wch:44},{wch:14},{wch:10},{wch:10},{wch:14},{wch:14},{wch:12},{wch:12},{wch:16}];
   const w2=XLSX.utils.aoa_to_sheet(s2);s2.forEach((r,i)=>{if(i&&!/Sharpe/.test(r[0]))pct(w2,[1,2],[i]);});w2["!cols"]=[{wch:34},{wch:12},{wch:12}];

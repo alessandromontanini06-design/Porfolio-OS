@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Statistiche · Portfolio OS</title>
+<title>Statistiche · Quanta Portfolio</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600..800&family=Plus+Jakarta+Sans:wght@400..700&family=JetBrains+Mono:wght@400..600&display=swap">
 <style>
@@ -28,7 +28,7 @@ svg text{fill:var(--faint);font:11px "JetBrains Mono",monospace}
 </head>
 <body>
 <div class="wrap">
-  <div class="row" style="justify-content:space-between"><div><span class="ey">Portfolio OS · beta</span><h1>Statistiche d'uso</h1></div>
+  <div class="row" style="justify-content:space-between"><div><span class="ey">Quanta Portfolio · beta</span><h1>Statistiche d'uso</h1></div>
     <div class="row"><select id="days" aria-label="Periodo"><option value="7">Ultimi 7 giorni</option><option value="30" selected>Ultimi 30 giorni</option><option value="90">Ultimi 90 giorni</option></select><button type="button" id="reload">Aggiorna</button></div></div>
   <div class="card" id="login" hidden><h2>Chiave delle statistiche</h2><p class="muted" style="margin-top:0">È il valore di STATS_KEY impostato su Vercel. Resta salvata solo in questo browser.</p>
     <div class="row"><input type="password" id="key" autocomplete="current-password" aria-label="Chiave delle statistiche" style="min-width:260px"><button type="button" id="go">Entra</button><span id="err" class="bad"></span></div></div>

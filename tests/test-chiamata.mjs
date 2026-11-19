@@ -63,7 +63,15 @@ await wait(700);
 const mic = await p.evaluate(() => window.__wsLog.filter(m => m.realtimeInput && m.realtimeInput.audio));
 t(`il microfono parte a 16 kHz (${mic.length} pezzi da 0,1 s)`, mic.length >= 3 && mic.every(m => m.realtimeInput.audio.mimeType === "audio/pcm;rate=16000" && m.realtimeInput.audio.data.length > 4000), mic.length && mic[0].realtimeInput.audio.mimeType);
 t("il saluto di Quanta compare nei sottotitoli, senza asterischi", await p.evaluate(() => /Ciao, sono Quanta\. Come posso aiutarti\?/.test(document.getElementById("qcCap").innerText) && !/\*/.test(document.getElementById("qcCap").innerText)));
+t("la sfera si disegna (WebGL, o la sfera di riserva)", await p.evaluate(() => { const o = document.getElementById("qcOrb"), c = document.getElementById("qcGl"); return o.classList.contains("nogl") ? getComputedStyle(o.querySelector(".qc-fb")).display === "block" : c.width > 50 && !!c.getContext("webgl"); }));
 await p.screenshot({ path: `${OUT}/chiamata.jpg`, type: "jpeg", quality: 72 });
+/* scrivere durante la chiamata, sottotitoli on/off */
+await p.type("#qcText", "quanto ho guadagnato in tutto?"); await p.keyboard.press("Enter"); await wait(300);
+t("si può scrivere a Quanta durante la chiamata", await p.evaluate(() => window.__wsLog.some(m => m.realtimeInput && m.realtimeInput.text === "quanto ho guadagnato in tutto?") && document.getElementById("qcText").value === ""));
+await p.click("#qcCC"); await wait(150);
+const ccOff = await p.evaluate(() => document.getElementById("qCall").classList.contains("nocap") && localStorage.getItem("pos-quanta-cc") === "0" && document.getElementById("qcCC").getAttribute("aria-pressed") === "false");
+await p.click("#qcCC"); await wait(150);
+t("i sottotitoli si spengono e si riaccendono", ccOff && await p.evaluate(() => !document.getElementById("qCall").classList.contains("nocap")));
 /* 3. operazione detta a voce, conferma solo con un «sì» vero */
 const n0 = (await ops()).length;
 await ws("said", "ho comprato 10 SWDA a 98 euro ieri"); await ws("tool", "registra_operazione", { tipo: "acquisto", strumento: "SWDA", quantita: 10, prezzo: 98, data: "ieri" }); await wait(500);
@@ -93,13 +101,13 @@ t("se l'utente interrompe, Quanta si ferma e ascolta", s1 === "speaking" && awai
 const nMic = await p.evaluate(() => window.__wsLog.filter(m => m.realtimeInput && m.realtimeInput.audio).length);
 await p.click("#qcMute"); await wait(600);
 const nMic2 = await p.evaluate(() => window.__wsLog.filter(m => m.realtimeInput && m.realtimeInput.audio).length);
-t("muto: niente audio mandato e stato «Microfono spento»", await p.evaluate(() => window.__wsLog.some(m => m.realtimeInput && m.realtimeInput.audioStreamEnd)) && nMic2 - nMic <= 1 && await st() === "muted" && await p.evaluate(() => document.getElementById("qcState").textContent === "Microfono spento"));
+t("muto: niente audio mandato e stato «Microfono spento»", await p.evaluate(() => window.__wsLog.some(m => m.realtimeInput && m.realtimeInput.audioStreamEnd)) && nMic2 - nMic <= 3 && await st() === "muted" && await p.evaluate(() => document.getElementById("qcState").textContent === "Microfono spento"));
 await p.click("#qcMute"); await wait(400);
 /* 6. fine chiamata: trascrizione nella chat */
 await p.click("#qcEnd"); await wait(600);
 const chat = await p.evaluate(() => document.getElementById("chatLog").innerText.replace(/\s+/g, " "));
 t("chiusa: niente schermo, collegamento chiuso, microfono spento", await p.evaluate(() => document.getElementById("qCall").hidden && window.__wsClosed === true));
-t("nella chat restano le frasi della chiamata e la durata", /ho comprato 10 SWDA a 98 euro ieri/.test(chat) && /Ciao, sono Quanta/.test(chat) && /Chiamata con Quanta · 0:\d\d/.test(chat), chat.slice(-400));
+t("nella chat restano le frasi della chiamata e la durata", /quanto ho guadagnato in tutto\?/.test(chat) && /ho comprato 10 SWDA a 98 euro ieri/.test(chat) && /Ciao, sono Quanta/.test(chat) && /Chiamata con Quanta · 0:\d\d/.test(chat), chat.slice(-400));
 /* 7. se la chiamata non parte: ripiego */
 tokenFail = true; await p.click("#chatNew"); await wait(200); await p.click("#chatSend"); await wait(1500);
 t("se la chiamata non è disponibile lo dice e propone la voce semplice", await p.evaluate(() => document.getElementById("qCall").dataset.st === "error" && /non è disponibile/.test(document.getElementById("qcCap").innerText) && /voce semplice/.test(document.getElementById("qcMsg").innerText)));

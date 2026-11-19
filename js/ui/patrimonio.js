@@ -716,8 +716,8 @@ async function pmImport() {
 
 function pmDownload() {
   if (!pmHas()) return false;
-  const blob = new Blob([JSON.stringify({ ...PM.db, esportato: new Date().toISOString(), app: "Portfolio OS" }, null, 1)], { type: "application/json" });
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `patrimonio-portfolio-os-${pmToday()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return true;
+  const blob = new Blob([JSON.stringify({ ...PM.db, esportato: new Date().toISOString(), app: "Quanta Portfolio" }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `patrimonio-quanta-portfolio-${pmToday()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); return true;
 }
 /* ---------- I tuoi obiettivi: quanto ne hai già, che probabilità hai, quanto versare in più ----------
    Gli obiettivi sono gli stessi delle Simulazioni (salvati nel browser, pos-obiettivi-v1). La probabilità si calcola sugli strumenti
@@ -906,7 +906,7 @@ async function pmExcel() {
   const tas = [["Strumento", "Categoria fiscale", "Valore (€)", "Costo (€)", "Guadagno o perdita (€)", "Imposta se vendessi oggi (€)"], ...F.latente.righe.map(r => [r.nome, P.FISCO_CAT_L[r.cat] || r.cat, r2(r.valore), r2(r.costo), r2(r.lat), r2(r.imposta)])];
   if (F.zainetto.length) { tas.push([], ["Minusvalenze da recuperare", "Nata nel", "Importo iniziale (€)", "Ancora da usare (€)", "Scade il"]); F.zainetto.forEach(z => tas.push([z.nome, z.anno, r2(z.iniziale), r2(z.residuo), dd(z.scadenza)])); }
   F.note.forEach(n => tas.push([], [n]));
-  const leggi = [["Il mio patrimonio · Portfolio OS"], [`Esportato il ${new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" })}`], [],
+  const leggi = [["Il mio patrimonio · Quanta Portfolio"], [`Esportato il ${new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" })}`], [],
     ["Riepilogo", "i numeri principali di oggi"], ["Posizioni", "ogni strumento con quote, prezzo, valore, guadagno e TIR (anche le posizioni chiuse)"], ["Operazioni", "tutte le operazioni, in ordine di data; quelle annullate restano segnate"],
     ["Andamento", "valore e versato a fine mese"], ["Proventi in arrivo", "cedole e dividendi dei prossimi 12 mesi"], ["Tasse", "imposte se vendessi oggi, per strumento, e minusvalenze da recuperare"], [],
     ["Prezzi", "fine giornata, indicativi; per i BTP a tasso fisso il prezzo è stimato dalla curva dei rendimenti della Banca d'Italia"], ["Tasse", "stime: le imposte vere le calcola la banca (regime amministrato) o il commercialista"], [],
@@ -923,7 +923,7 @@ async function pmExcel() {
   if (pro.length > 1) XLSX.utils.book_append_sheet(wb, sheet(pro, [12, 34, 11, 12, 12, 30], { 0: D, 3: E, 4: E }), "Proventi in arrivo");
   if (tas.length > 1) XLSX.utils.book_append_sheet(wb, sheet(tas, [34, 22, 14, 14, 18, 18], { 2: E, 3: E, 4: E, 5: E }), "Tasse");
   const wl = XLSX.utils.aoa_to_sheet(leggi); wl["!cols"] = [{ wch: 22 }, { wch: 100 }]; XLSX.utils.book_append_sheet(wb, wl, "Leggimi");
-  XLSX.writeFile(wb, `patrimonio-portfolio-os-${pmToday()}.xlsx`);
+  XLSX.writeFile(wb, `patrimonio-quanta-portfolio-${pmToday()}.xlsx`);
   trackOnce("feature", "patrimonio_excel", { name: "patrimonio_excel" }); return true;
 }
 /* ricominciare da zero: prima una copia di sicurezza scaricata, poi si cancella (si può rimettere con «Ripristina da una copia») */
@@ -1072,7 +1072,7 @@ sc().addEventListener("change", async e => {
 $("#pmImport").addEventListener("change", async e => {
   const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
   try { const x = JSON.parse(await f.text());
-    if (!x || x.v !== 1 || !x.strumenti || !Array.isArray(x.operazioni)) throw new Error("non è una copia del patrimonio di Portfolio OS");
+    if (!x || x.v !== 1 || !x.strumenti || !Array.isArray(x.operazioni)) throw new Error("non è una copia del patrimonio di Quanta Portfolio");
     if (pmHas() && !confirm(`Sostituire il patrimonio di questo browser con la copia (${x.operazioni.length} operazioni)?`)) return;
     PM.db = { v: 1, strumenti: x.strumenti, operazioni: x.operazioni, creato: x.creato || new Date().toISOString() }; PM.px = {}; PM.fx = {}; PM.sel = null;
     if (!pmSave()) return; pmMsg(`Ripristinato: ${x.operazioni.length} operazioni.`, "ok", "#pmTopMsg"); pmRenderForm(); pmRefresh(true);

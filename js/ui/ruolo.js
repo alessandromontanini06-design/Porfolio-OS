@@ -28,7 +28,7 @@ function apply() {
   let ask = $("#ruoloAsk");
   if (!r && start && !ask) {
     ask = document.createElement("div"); ask.id = "ruoloAsk"; ask.className = "ruolo-ask";
-    ask.innerHTML = `<span>Come usi Portfolio OS?</span><div class="ruolo-b"><button type="button" class="btn sm" data-ruolo="priv">Investo da solo</button><button type="button" class="btn sm" data-ruolo="pro">Sono un consulente</button></div>`;
+    ask.innerHTML = `<span>Come usi Quanta Portfolio?</span><div class="ruolo-b"><button type="button" class="btn sm" data-ruolo="priv">Investo da solo</button><button type="button" class="btn sm" data-ruolo="pro">Sono un consulente</button></div>`;
     start.prepend(ask);
   }
   if (ask) ask.hidden = !!r;

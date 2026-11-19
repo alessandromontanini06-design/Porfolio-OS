@@ -53,7 +53,7 @@ if (file) {
   t("Revisioni: 5 righe (3 + 2)", x.rev.length === 6);
 }
 await p.click("#arBackup");
-let js = null; for (let k = 0; k < 40 && !js; k++) { await wait(250); js = readdirSync(DL).find(f => /^portfolio-os-archivio.*\.json$/.test(f)); }
+let js = null; for (let k = 0; k < 40 && !js; k++) { await wait(250); js = readdirSync(DL).find(f => /^quanta-portfolio-archivio.*\.json$/.test(f)); }
 t("la copia di sicurezza (JSON) si scarica ancora", !!js);
 t("nessun errore JavaScript", !errs.length, errs.join(" | "));
 console.log(`\n${pass} superati, ${fail} falliti`);

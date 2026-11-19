@@ -181,7 +181,7 @@ async function renderArchive(){
       `<div><span>Ultima revisione</span><b>${arAgo(Math.max(...all.map(r=>r.reviewedAt||0)))}</b><small>${new Date(Math.max(...all.map(r=>r.reviewedAt||0))).toLocaleDateString("it-IT",{day:"numeric",month:"long"})}</small></div>`;}
   const tt=$("#arTitle");if(tt)tt.innerHTML=document.body.dataset.ruolo==="pro"?"I tuoi <em>clienti</em>":"Il tuo <em>archivio</em>";
   {const pro=document.body.dataset.ruolo==="pro",cr=document.querySelector("#archive .bd-crumb"),nb=$("#arNew");
-    if(cr)cr.innerHTML=`Portfolio OS <i>/</i> ${pro?"Clienti":"Archivio"}`;if(nb)nb.textContent=pro?"+ Nuovo cliente":"+ Nuovo portafoglio";
+    if(cr)cr.innerHTML=`Quanta Portfolio <i>/</i> ${pro?"Clienti":"Archivio"}`;if(nb)nb.textContent=pro?"+ Nuovo cliente":"+ Nuovo portafoglio";
     if(pro&&all.length)$("#arSub").innerHTML=$("#arSub").innerHTML.replace(/(\d+<\/b>) portafoglio\b/,"$1 cliente").replace(/(\d+<\/b>) portafogli\b/,"$1 clienti");}
   document.querySelectorAll("#arF [data-arf]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.arf===AR.f)));
   if(!all.length){$("#arList").innerHTML=`<div class="ar-empty"><b>L'archivio è vuoto</b><p>Carica un file (l'Excel del cliente o l'estratto del broker), costruisci il laboratorio e scegli <b>Salva nell'archivio</b>.</p><button type="button" class="btn lime" id="arNew2">Carica un file</button></div>`;return;}
@@ -227,7 +227,7 @@ async function arExcel(){
     (s.weights||[]).forEach(([n,w])=>pesi.push([r.name,n,pc(w)]));
     (r.history||[]).forEach(h=>rev.push([r.name,day(h.at),r2(h.value),pc(h.xirr),pc(h.vol),pc(h.mdd)]));
     (Array.isArray(r.ob)?r.ob:[]).filter(g=>g&&+g.importo>0&&+g.anno>=1).forEach((g,i)=>obi.push([r.name,g.nome||`Obiettivo ${i+1}`,r2(+g.importo),Math.round(+g.anno),y0+Math.round(+g.anno)]));}
-  const leggi=[["Archivio di Portfolio OS"],[`Esportato il ${new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"})} · ${L.length} ${L.length>1?"portafogli":"portafoglio"}`],[],
+  const leggi=[["Archivio di Quanta Portfolio"],[`Esportato il ${new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"})} · ${L.length} ${L.length>1?"portafogli":"portafoglio"}`],[],
     ["Clienti","una riga per portafoglio salvato, con i numeri dell'ultima revisione"],["Pesi","la composizione di ogni portafoglio all'ultima revisione"],["Revisioni","lo storico: una riga per ogni revisione salvata"],["Obiettivi","gli obiettivi di ogni cliente (casa, studi, pensione…), in euro di oggi; le probabilità si calcolano nelle Simulazioni"],[],
     ["Rendimento annuo (TIR)","calcolato dai movimenti (date e importi dei versamenti); vuoto se il file non ha i movimenti"],["Crescita annua storica","crescita media annua dei prezzi con i pesi attuali"],["Volatilità e perdita massima","dai prezzi storici con i pesi attuali"],[],
     ["Per rimettere l'archivio in un altro browser usa «Copia di sicurezza» nell'archivio: questo Excel serve da leggere, non da reimportare."],["Strumento di analisi: non è un consiglio di investimento."]];
@@ -240,14 +240,14 @@ async function arExcel(){
   XLSX.utils.book_append_sheet(wb,sheet(rev,[28,12,14,12,12,12],{1:D,2:E,3:P2,4:P2,5:P2}),"Revisioni");
   if(obi.length>1)XLSX.utils.book_append_sheet(wb,sheet(obi,[28,28,18,10,8],{2:E}),"Obiettivi");
   const wl=XLSX.utils.aoa_to_sheet(leggi);wl["!cols"]=[{wch:30},{wch:90}];XLSX.utils.book_append_sheet(wb,wl,"Leggimi");
-  XLSX.writeFile(wb,`portfolio-os-archivio-${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb,`quanta-portfolio-archivio-${new Date().toISOString().slice(0,10)}.xlsx`);
   trackOnce("feature","archivio_excel",{name:"archivio_excel"});
 }
 /* esporta e importa: un file JSON con tutto l'archivio (le date dei fogli tornano date all'importazione) */
 async function arExport(){
   const L=await svList();if(!L.length){alert("L'archivio è vuoto.");return;}
   const blob=new Blob([JSON.stringify({formato:"portfolio-os-archivio",versione:1,esportato:new Date().toISOString(),portafogli:L})],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`portfolio-os-archivio-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`quanta-portfolio-archivio-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
   trackOnce("feature","archivio_esporta",{name:"archivio_esporta"});
 }
 async function arImport(file){
@@ -256,7 +256,7 @@ async function arImport(file){
     const cur=new Map((await svList()).map(r=>[r.id,r]));let n=0;
     for(const r of j.portafogli){if(!r||!r.id||!Array.isArray(r.sheets))continue;const old=cur.get(r.id);if(old&&old.savedAt>=r.savedAt)continue;await svPut(r);n++;}
     alert(n?`Importati ${n} ${n===1?"portafoglio":"portafogli"}.`:"Niente di nuovo da importare: l'archivio era già aggiornato.");renderArchive();svHome();
-  }catch(e){alert("Questo file non è un archivio di Portfolio OS.");}
+  }catch(e){alert("Questo file non è un archivio di Quanta Portfolio.");}
 }
 const arNoteT={};
 document.addEventListener("input",e=>{

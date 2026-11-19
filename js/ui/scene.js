@@ -205,7 +205,7 @@ if(HAS_G&&!CALM){
   let seen=false;try{seen=sessionStorage.getItem("pos-boot")==="1";sessionStorage.setItem("pos-boot","1");}catch{}
   const K=seen?.5:1,today=new Date().toLocaleDateString("it-IT",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});
   ld.innerHTML=`<div class="ld-sh t"></div><div class="ld-sh b"></div><canvas class="ld-cv"></canvas>
-    <div class="ld-ui"><div class="ld-top"><span>PORTFOLIO OS <em>v4</em></span><span>${today}</span><span>FINANCIAL INTELLIGENCE LAB</span></div>
+    <div class="ld-ui"><div class="ld-top"><span>QUANTA PORTFOLIO <em>beta</em></span><span>${today}</span><span>FINANCIAL INTELLIGENCE LAB</span></div>
     <div><div class="ld-mid"><div class="ld-num">000</div><ul class="ld-log"></ul></div><div class="ld-bar"><i></i></div></div></div>
     <div class="ld-title"><span class="a">PORTFOLIO</span><span class="b">OS</span></div><div class="ld-skip">clic per entrare</div>`;
   document.body.appendChild(ld);

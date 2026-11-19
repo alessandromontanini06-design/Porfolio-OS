@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Portfolio OS · Come trattiamo i tuoi dati</title>
-<meta name="description" content="Cosa resta sul tuo computer, cosa va all'IA, cosa raccolgono le statistiche anonime di Portfolio OS. E come spegnere o cancellare tutto.">
+<title>Quanta Portfolio · Come trattiamo i tuoi dati</title>
+<meta name="description" content="Cosa resta sul tuo computer, cosa va all'IA, cosa raccolgono le statistiche anonime di Quanta Portfolio. E come spegnere o cancellare tutto.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,11 +53,12 @@ button.del:hover{background:#fff4f5}
 .msg{color:var(--good);font-size:.9rem;min-height:1.4em;margin-top:8px}
 .note{font-size:.88rem;color:var(--faint);margin-top:32px}
 @media (max-width:700px){.sum{grid-template-columns:1fr}td:first-child{white-space:normal}.set{align-items:flex-start}}
+.brand .bw1{font-weight:800}.brand .bw2{font-weight:500;opacity:.62}
 </style>
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/"><i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></i>PORTFOLIO OS</a>
+  <a class="brand" href="/"><i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span class="bw"><b class="bw1">Quanta</b> <span class="bw2">Portfolio</span></span></a>
   <a class="back" href="/">← Torna al sito</a>
 </header>
 <main>
@@ -144,7 +145,7 @@ button.del:hover{background:#fff4f5}
     <p class="msg" id="msg" aria-live="polite"></p>
   </div>
 
-  <p class="note">Ultimo aggiornamento: 15 novembre 2026. Portfolio OS è un progetto in versione beta. Se qualcosa non è chiaro o vuoi sapere di più su un dato, scrivici dal sito con «Il tuo file non è stato letto bene? Segnalalo» oppure contattaci su LinkedIn.</p>
+  <p class="note">Ultimo aggiornamento: 15 novembre 2026. Quanta Portfolio (prima Portfolio OS) è un progetto in versione beta. Se qualcosa non è chiaro o vuoi sapere di più su un dato, scrivici dal sito con «Il tuo file non è stato letto bene? Segnalalo» oppure contattaci su LinkedIn.</p>
 </main>
 <script>
 (()=>{
@@ -160,7 +161,7 @@ button.del:hover{background:#fff4f5}
   const info=()=>count().then(n=>{$("savedInfo").textContent=n?`${n} ${n===1?"analisi salvata":"analisi salvate"} su questo computer.`:"Nessuna analisi salvata su questo computer.";});
   info();
   $("delSaved").addEventListener("click",()=>{if(!confirm("Cancellare le analisi salvate su questo computer? Non si possono recuperare."))return;clearSaved().then(()=>{info();msg("Analisi cancellate.");});});
-  $("delAll").addEventListener("click",()=>{if(!confirm("Cancellare tutto quello che Portfolio OS ricorda su questo computer?"))return;
+  $("delAll").addEventListener("click",()=>{if(!confirm("Cancellare tutto quello che Quanta Portfolio ricorda su questo computer?"))return;
     clearSaved().then(()=>{try{Object.keys(localStorage).filter(k=>/^pos[-_]|^portfolio/i.test(k)).forEach(k=>localStorage.removeItem(k));}catch(e){}
       $("setAi").checked=true;$("setSave").checked=false;info();msg("Fatto: il sito non ricorda più niente su questo computer.");});});
 })();

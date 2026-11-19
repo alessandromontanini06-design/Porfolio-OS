@@ -35,7 +35,7 @@ function md(t){
 }
 function chatSuggestions(){
   if(!S.lab&&pmHas())return ["Quanto ho guadagnato in tutto?","Quante tasse pagherei se vendessi oggi?","Quali cedole e dividendi arrivano?","Come va verso i miei obiettivi?"];
-  if(!S.lab)return ["Come funziona Portfolio OS?","Che cos'è il TIR?","Che file posso caricare?","Che differenza c'è tra volatilità e drawdown?"];
+  if(!S.lab)return ["Come funziona Quanta Portfolio?","Che cos'è il TIR?","Che file posso caricare?","Che differenza c'è tra volatilità e drawdown?"];
   const n=S.ds.assets.map(a=>a.name),s=["Qual è l'asset più rischioso?","Riassumi il portafoglio in tre punti","Quanto si è perso nel periodo peggiore?"];
   s.splice(1,2,"Come ha retto il portafoglio nelle crisi?","Con 300 € al mese, quanto avrei tra 15 anni?");
   if(n.length>=2)s.splice(1,0,"Qual è l'allocazione più efficiente con massimo 50% per asset?");
@@ -47,7 +47,7 @@ function renderChat(){
   const log=$("#chatLog");if(!log)return;
   const intro=S.lab?`<div class="msg ai"><p>Ciao! Chiedimi qualsiasi cosa su <b>${esc(S.source.name)}</b>: rischio, rendimenti, correlazioni, oppure "e se cambiassi i pesi?". Ogni numero lo prendo dal motore di calcolo.</p></div>`
     :pmHas()?`<div class="msg ai"><p>Ciao! Sono <b>Quanta</b> e conosco il tuo <b>patrimonio</b>. Chiedimi guadagni, tasse e cedole, oppure dimmi cosa hai comprato: preparo l'operazione e la salvi tu con «Conferma».</p></div>`
-    :`<div class="msg ai"><p>Ciao! Sono <b>Quanta</b>, l'analista IA di Portfolio OS. Puoi chiedermi subito come funziona il sito o cosa vuol dire un termine (TIR, volatilità, drawdown…). Per i numeri del <b>tuo</b> portafoglio carica il file o apri l'esempio e costruisci il laboratorio.</p></div>`;
+    :`<div class="msg ai"><p>Ciao! Sono <b>Quanta</b>, il tuo analista IA. Puoi chiedermi subito come funziona il sito o cosa vuol dire un termine (TIR, volatilità, drawdown…). Per i numeri del <b>tuo</b> portafoglio carica il file o apri l'esempio e costruisci il laboratorio.</p></div>`;
   log.innerHTML=intro+S.chatView.map((v,i)=>v.k==="user"?`<div class="msg user">${v.img&&v.img.length?`<span class="q-imgs">${v.img.map(u=>`<img src="${u}" alt="Foto mandata a Quanta">`).join("")}</span>`:""}${v.voce?`<span class="q-vtag">messaggio vocale</span>`:""}${esc(v.t)}</div>`
     :v.k==="op"?opCard(v)
     :v.k==="tool"?`<span class="toolchip"><i></i>calcolo: ${esc(v.t)}</span>`

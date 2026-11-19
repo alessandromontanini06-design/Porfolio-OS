@@ -145,7 +145,7 @@ function buildReport(o={}){
   if(idx.length===1)tips.push("Il portafoglio ha un solo strumento: la diversificazione dipende tutta da quel fondo.");
   const html=`<div class="rp">
   ${o.studio?`<header class="rp-h rp-pro"><div class="rp-who">${o.logo?`<img src="${o.logo}" alt="" class="rp-logo-img">`:""}<div><b class="rp-studio">${esc(o.studio)}</b>${o.contact?`<span>${esc(o.contact)}</span>`:""}</div></div><div class="rp-meta">${o.cliente?`Per <b>${esc(o.cliente)}</b><br>`:""}${today}</div></header>`
-    :`<header class="rp-h"><div><b class="rp-brand">Portfolio OS</b><span>Report del portafoglio</span></div><div class="rp-meta">${esc(S.source&&S.source.name||"")}<br>${today}</div></header>`}
+    :`<header class="rp-h"><div><b class="rp-brand">Quanta Portfolio</b><span>Report del portafoglio</span></div><div class="rp-meta">${esc(S.source&&S.source.name||"")}<br>${today}</div></header>`}
   <h1>${o.cliente?`Il portafoglio di ${esc(o.cliente)}`:o.studio?"Analisi del portafoglio":"Il tuo portafoglio in una pagina"}</h1>
   <p class="rp-sub">${ds.assets.length} strumenti · dati ${ds.freq.adj} da ${fmtDate(ds.dates[0],f)} a ${fmtDate(ds.dates[ds.dates.length-1],f)} · pesi: ${esc(R.wLabel)}</p>
   ${real?`<h2>Il tuo rendimento</h2><table class="rp-t">${row("Rendimento annuo (TIR)",fmtPct(real.pp.xirr,1,true),"tiene conto di quando hai versato")}${row("Al netto delle tasse",fmtPct(real.taxes.xirr,1,true),`imposte stimate ${fmtEur(real.taxes.tax)} se vendessi oggi`)}${row("Valore stimato oggi",fmtEur(real.pp.value),"")}${row("Versato",fmtEur(real.pp.invested),"")}${row("Guadagno",(real.pp.gain>=0?"+":"−")+fmtEur(Math.abs(real.pp.gain)),fmtPct(real.pp.gainPct,1,true)+" sul versato")}${real.bm?row(`Stessi versamenti in ${real.bm.label}`,fmtEur(real.bm.value),`TIR ${fmtPct(real.bm.xirr,1,true)}`):""}</table>${svg("#realChart")}`:""}
@@ -165,7 +165,7 @@ function buildReport(o={}){
   ${o.prop?reportProposal():""}
   ${o.note?`<h2>Note del consulente</h2><div class="rp-note-box">${esc(o.note).replace(/\n/g,"<br>")}</div>`:""}
   <h2>Considerazioni</h2><ul class="rp-tips">${tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
-  <footer class="rp-f">${o.studio?`Preparato da ${esc(o.studio)} con Portfolio OS. `:""}Analisi dei dati storici del file, calcolata in modo deterministico da Portfolio OS: i rendimenti passati non garantiscono quelli futuri. Non è un consiglio di investimento. Le imposte sono una stima (26%, 12,5% sui titoli di Stato) e non includono il bollo.</footer>
+  <footer class="rp-f">${o.studio?`Preparato da ${esc(o.studio)} con Quanta Portfolio. `:""}Analisi dei dati storici del file, calcolata in modo deterministico da Quanta Portfolio: i rendimenti passati non garantiscono quelli futuri. Non è un consiglio di investimento. Le imposte sono una stima (26%, 12,5% sui titoli di Stato) e non includono il bollo.</footer>
   </div>`;
   return html;
 }
@@ -223,7 +223,7 @@ document.addEventListener("submit",e=>{if(e.target.id!=="rpForm")return;e.preven
 function printReport(o={}){
   const h=buildReport(o);if(!h)return;trackOnce("feature","report",{name:"report"});
   let el=$("#report");if(!el){el=document.createElement("section");el.id="report";el.setAttribute("aria-hidden","true");document.body.appendChild(el);}
-  el.innerHTML=h;const old=document.title;document.title=`Portfolio OS · report · ${(S.source&&S.source.name||"portafoglio").replace(/\.(xlsx?|csv|ods)$/i,"")}`;
+  el.innerHTML=h;const old=document.title;document.title=`Quanta Portfolio · report · ${(S.source&&S.source.name||"portafoglio").replace(/\.(xlsx?|csv|ods)$/i,"")}`;
   setTimeout(()=>{window.print();document.title=old;},80);
 }
 document.addEventListener("click",e=>{if(e.target.closest("#reportBtn"))openReportDlg();});
@@ -307,7 +307,7 @@ function pzSlides(){
     <h2>Cosa facciamo adesso</h2>
     <div class="pz-ed pz-notes" contenteditable="true" spellcheck="true" data-pz="next" data-ph="Scrivi qui cosa avete deciso: ribilanciare, il prossimo incontro, i documenti da portare…">${esc(PZ.next).replace(/\n/g,"<br>")}</div>
     ${B.studio?`<p class="pz-contact"><b>${esc(B.studio)}</b>${B.contact?` · ${esc(B.contact)}`:""}</p>`:""}
-    <p class="pz-foot">Analisi dei dati storici del file, calcolata da Portfolio OS. I rendimenti passati non garantiscono quelli futuri.</p>`});
+    <p class="pz-foot">Analisi dei dati storici del file, calcolata da Quanta Portfolio. I rendimenti passati non garantiscono quelli futuri.</p>`});
   return out;
 }
 function openPresent(){
@@ -315,7 +315,7 @@ function openPresent(){
   if(!PZ.client&&S.svSaved)svGet(S.svSaved).then(r=>{if(r&&!PZ.client){PZ.client=r.name;const e=document.querySelector('#present [data-pz="client"]');if(e&&!e.textContent)e.textContent=r.name;}});
   let el=$("#present");if(!el){el=document.createElement("section");el.id="present";el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-label","Presentazione al cliente");document.body.appendChild(el);}
   el.innerHTML=`<div class="pz-stage">${PZ.slides.map((s,i)=>`<article class="pz-s pz-${s.id}" data-i="${i}" aria-hidden="true">${s.html}</article>`).join("")}</div>
-    <div class="pz-bar"><span class="pz-brand"><span class="mk" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M2 13.5 6.5 8l3.5 3 6-7.5" stroke="#130A24" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Portfolio OS</span>
+    <div class="pz-bar"><span class="pz-brand"><span class="mk" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M2 13.5 6.5 8l3.5 3 6-7.5" stroke="#130A24" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Quanta Portfolio</span>
       <div class="pz-dots">${PZ.slides.map((s,i)=>`<button type="button" data-pzg="${i}" aria-label="Pagina ${i+1}"></button>`).join("")}</div>
       <div class="pz-nav"><button type="button" class="btn sm" data-pzm="-1" aria-label="Pagina precedente">←</button><button type="button" class="btn sm lime" data-pzm="1" aria-label="Pagina successiva">→</button><button type="button" class="btn sm" id="pzClose">Esci</button></div></div>`;
   el.hidden=false;document.body.classList.add("pz-on");PZ.i=0;pzShow(0);trackOnce("feature","presenta",{name:"presenta"});

@@ -1,4 +1,4 @@
-// «Come usi Portfolio OS?»: privato o consulente. Senza scelta il sito resta com'è; la scelta resta dopo la ricarica e si cambia dal menu.
+// «Come usi Quanta Portfolio?»: privato o consulente. Senza scelta il sito resta com'è; la scelta resta dopo la ricarica e si cambia dal menu.
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
@@ -13,7 +13,7 @@ let pass = 0, fail = 0; const t = (n, ok, i = "") => { ok ? pass++ : fail++; con
 const U = `http://localhost:${PORT}/?home`;
 await p.goto(U, { waitUntil: "networkidle2" }); await wait(2500);
 const vis = sel => p.evaluate(s => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== "none" && !e.hidden; }, sel);
-t("senza scelta: in home la domanda «Come usi Portfolio OS?»", await vis("#ruoloAsk"));
+t("senza scelta: in home la domanda «Come usi Quanta Portfolio?»", await vis("#ruoloAsk"));
 t("senza scelta: il pulsante «Presenta al cliente» non è nascosto dal ruolo", await p.evaluate(() => getComputedStyle(document.getElementById("presentBtn")).display !== "none" || document.getElementById("presentBtn").closest("[hidden]")));
 await p.click('#ruoloAsk [data-ruolo="priv"]'); await wait(200);
 t("«Investo da solo»: la domanda sparisce", !(await vis("#ruoloAsk")));

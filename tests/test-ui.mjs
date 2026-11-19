@@ -36,7 +36,7 @@ try {
   console.log("Avvio");
   await page.goto(URL0, { waitUntil: "networkidle2" });
   t("motore caricato come modulo", await page.evaluate(() => typeof window.POS === "object" && typeof window.POS.monteCarlo === "function"));
-  t("titolo della pagina", (await page.title()).includes("Portfolio OS"));
+  t("titolo della pagina", (await page.title()).includes("Quanta Portfolio"));
 
   console.log("Esempio e laboratorio");
   await wait(3000); // intro
