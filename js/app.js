@@ -10,6 +10,7 @@ import { loadMarket, renderLabs } from "./ui/home.js";
 import { pmHas, pmRender } from "./ui/patrimonio.js";
 import "./ui/screenshot.js";
 import "./ui/ruolo.js";
+import "./ui/tema.js";
 import "./ui/vetrina.js";
 import "./ui/costibanca.js";
 

@@ -201,7 +201,7 @@ function renderMatrix(){
   el.style.gridTemplateColumns=`minmax(70px,1.2fr) repeat(${k},minmax(0,1fr))`;
   let h=`<span></span>`+ds.assets.map(a=>`<span class="h" title="${esc(a.name)}">${short(a.name)}</span>`).join("");
   ds.assets.forEach((a,i)=>{h+=`<span class="h rowh" title="${esc(a.name)}">${short(a.name)}</span>`;
-    ds.assets.forEach((b,j)=>{const r=L.C[i][j].r,pct=Number.isFinite(r)?Math.round(Math.abs(r)*72):0,base=r>=0?"var(--c1)":"var(--bad)";
+    ds.assets.forEach((b,j)=>{const r=L.C[i][j].r,pct=Number.isFinite(r)?Math.round(Math.abs(r)*72):0,base=r>=0?"var(--heat,var(--c1))":"var(--bad)";
       h+=`<button type="button" data-rc="corr-${i}-${j}" style="background:color-mix(in oklab,${base} ${pct}%,var(--raise))">${Number.isFinite(r)?fmtN(r):"—"}</button>`;});});
   el.innerHTML=h;
 }

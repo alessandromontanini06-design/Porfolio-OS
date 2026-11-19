@@ -25,7 +25,7 @@ const num = v => { const t = String(v ?? "").trim().replace(/\s|€|'/g, ""); if
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const TIPO_L = { acquisto: "Acquisto", vendita: "Vendita", dividendo: "Dividendo", cedola: "Cedola", valutazione: "Nuova stima", commissione: "Commissione", tassa: "Tassa", frazionamento: "Frazionamento" };
 /* colori dell'anello: quelli del sito, distinti tra loro anche per chi vede male rosso e verde */
-const RING = ["#C9F24A", "#8F3BFF", "#2E6FD1", "#D4572E", "#C99A00", "#1D9A8A", "#E0569B", "#161616", "#8A8F98"];
+const RING = ["#C9F24A", "#8F3BFF", "#2E6FD1", "#D4572E", "#C99A00", "#1D9A8A", "#E0569B", "var(--ink-mark,#161616)", "#8A8F98"];
 
 function pmLoad() { try { const x = JSON.parse(localStorage.getItem(PM_KEY) || "null"); if (x && x.v === 1 && x.strumenti && Array.isArray(x.operazioni)) return x; } catch {} return null; }
 const PM = { db: pmLoad(), px: {}, fx: {}, tipo: "acquisto", R: null, res: null, loading: false, beneId: "", group: "strumenti", sel: null, pending: false };

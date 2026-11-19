@@ -2,6 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
+<script>(function(){var t="auto";try{t=localStorage.getItem("pos-tema-v1")||"auto"}catch(e){}var d=t==="scuro"||(t!=="chiaro"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})()</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quanta Portfolio · Come trattiamo i tuoi dati</title>
 <meta name="description" content="Cosa resta sul tuo computer, cosa va all'IA, cosa raccolgono le statistiche anonime di Quanta Portfolio. E come spegnere o cancellare tutto.">
@@ -11,6 +12,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800&display=swap">
 <style>
 :root{--bg:#fff;--fg:#161616;--muted:#5c5c5c;--faint:#8c8c8c;--line:#e8e8e8;--raise:#f5f5f4;--lime:#C9F24A;--violet:#8F3BFF;--good:#0B7A3E}
+:root[data-theme="dark"]{--bg:#0B0B0A;--fg:#F2F2EE;--muted:#A6A6A0;--faint:#76766F;--line:#2A2A27;--raise:#1F1F1D;--good:#4CC38A;color-scheme:dark}
+:root[data-theme="dark"] h1 em{background:none;color:var(--lime)}:root[data-theme="dark"] .sum div:first-child{color:#111}:root[data-theme="dark"] button.del{background:transparent;color:#F27A8C;border-color:#F27A8C}:root[data-theme="dark"] .top{background:rgba(11,11,10,.85)!important}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
