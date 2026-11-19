@@ -10,7 +10,7 @@ import { NO_LAB, Q, TOOLS_LOCAL, chatContext, hush, opDecide, opText, openChat, 
 
 const WSS = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=";
 const C = { on: false, ws: null, ctx: null, stream: null, node: null, inAn: null, outAn: null, gain: null, next: 0, play: new Set(), muted: false, t0: 0, timer: 0, raf: 0,
-  user: "", ai: "", lastUser: "", max: 10, st: "", ready: false, busy: false, lv: 0, ph: 0, last: 0, warned: false, gl: null };
+  user: "", ai: "", lastUser: "", max: 10, st: "", ready: false, busy: false, lv: 0, sc: 0.66, warned: false };
 const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const consentOk = () => { try { return localStorage.getItem("pos-quanta-chiamata-ok") === "1"; } catch { return false; } };
 export const callSupported = () => !!(window.WebSocket && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.AudioContext || window.webkitAudioContext));
@@ -49,49 +49,13 @@ function playPcm(b64, mime) {
 }
 function flush() { C.play.forEach(s => { try { s.stop(); } catch {} }); C.play.clear(); C.next = 0; }
 
-/* ---------- la sfera: WebGL, nuvole bianche sul lime che si muovono con la voce (senza WebGL una sfera disegnata in CSS) ---------- */
-const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
-const FS = `precision mediump float;uniform vec2 r;uniform float t,ph,lv,md;
-float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}
-float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}
-void main(){vec2 uv=(gl_FragCoord.xy*2.-r)/min(r.x,r.y);float d=length(uv);float e=smoothstep(1.,.982,d);if(e<=0.){gl_FragColor=vec4(0.);return;}
-vec2 q=uv*1.45;if(md>1.5&&md<2.5){float a=t*.5;q=mat2(cos(a),-sin(a),sin(a),cos(a))*q;}
-float w=fbm(q*1.15+vec2(ph*.45,-ph*.25));float f=fbm(q+vec2(ph*.8,ph*.12)+w*1.5);
-float hz=-.2+(f-.5)*1.15+lv*.38+.05*sin(uv.x*2.4+t*.8);
-float c=smoothstep(hz+.24,hz-.2,uv.y);
-vec3 lime=vec3(.788,.949,.29),deep=vec3(.52,.73,.08),wh=vec3(.985,.99,.955);
-vec3 col=mix(deep,lime,smoothstep(1.05,-.35,uv.y));col=mix(col,wh,c*(.66+.34*f));
-col+=(h(gl_FragCoord.xy+fract(t*7.))-.5)*.035;
-float g=dot(col,vec3(.3,.55,.15));
-if(md>2.5&&md<3.5)col=vec3(g*.4);
-if(md>3.5)col=mix(vec3(g*.5),col,.3+.2*sin(t*2.4));
-gl_FragColor=vec4(col*e,e);}`;
-const MODE = { listening: 0, speaking: 1, thinking: 2, muted: 3, error: 3, connecting: 4 };
-function glInit() {
-  if (C.gl) return true; const cv = $("#qcGl"), orb = $("#qcOrb"); let gl = null;
-  try { gl = cv.getContext("webgl", { premultipliedAlpha: true, antialias: true, alpha: true }); } catch {}
-  if (!gl) { orb.classList.add("nogl"); return false; }
-  try {
-    const sh = (k, src) => { const o = gl.createShader(k); gl.shaderSource(o, src); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
-    const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr);
-    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error("link"); gl.useProgram(pr);
-    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    const u = n => gl.getUniformLocation(pr, n); C.gl = { gl, u: { r: u("r"), t: u("t"), ph: u("ph"), lv: u("lv"), md: u("md") }, t0: performance.now() };
-    orb.classList.remove("nogl"); return true;
-  } catch { orb.classList.add("nogl"); return false; }
-}
-function glDraw() {
-  const G = C.gl; if (!G) return; const gl = G.gl, cv = gl.canvas, dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.max(2, Math.round(cv.clientWidth * dpr)), h = Math.max(2, Math.round(cv.clientHeight * dpr));
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-  gl.viewport(0, 0, w, h); gl.uniform2f(G.u.r, w, h); gl.uniform1f(G.u.t, (performance.now() - G.t0) / 1000); gl.uniform1f(G.u.ph, C.ph); gl.uniform1f(G.u.lv, C.lv);
-  gl.uniform1f(G.u.md, MODE[($("#qCall") || {}).dataset ? $("#qCall").dataset.st : "listening"] ?? 0); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
+/* ---------- la sfera di Quanta: grande quando parla (e pulsa con la voce), piccola quando ascolta, grigia in muto ---------- */
+const BASE = { speaking: 1, thinking: 0.8, listening: 0.7, connecting: 0.66, muted: 0.62, error: 0.62 };
+function sferaSet(sc) { const el = $("#qcSfera"); if (el) el.style.transform = `scale(${sc.toFixed(3)})`; }
 
 /* ---------- interfaccia ---------- */
 const LAB = { connecting: "Mi collego…", listening: "Ti ascolto", speaking: "Quanta parla", thinking: "Guardo i numeri…", muted: "Microfono spento", error: "Chiamata non riuscita" };
-function state(st) { C.st = st; const box = $("#qCall"); if (!box) return; box.dataset.st = C.muted && st === "listening" ? "muted" : st; $("#qcState").textContent = LAB[box.dataset.st] || ""; if (REDUCE) glDraw(); }
+function state(st) { C.st = st; const box = $("#qCall"); if (!box) return; box.dataset.st = C.muted && st === "listening" ? "muted" : st; $("#qcState").textContent = LAB[box.dataset.st] || ""; if (REDUCE) sferaSet(BASE[box.dataset.st] || 0.7); }
 const clean = t => String(t || "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*/g, "").replace(/\s+/g, " ").trim();
 function caption() {
   const el = $("#qcCap"); if (!el) return;
@@ -106,10 +70,11 @@ function clock() {
 function level(now) {
   const an = C.st === "speaking" ? C.outAn : C.muted ? null : C.inAn; let v = 0;
   if (an) { const d = new Uint8Array(an.fftSize); an.getByteTimeDomainData(d); let sum = 0; for (let i = 0; i < d.length; i++) { const x = (d[i] - 128) / 128; sum += x * x; } v = Math.min(1, Math.sqrt(sum / d.length) * 4); }
-  C.lv = C.lv * 0.8 + v * 0.2; const orb = $("#qcOrb"); if (orb) orb.style.setProperty("--lv", C.lv.toFixed(3));
-  const dt = C.last ? Math.min(0.1, (now - C.last) / 1000) : 0; C.last = now;
-  C.ph += dt * (C.st === "speaking" ? 0.35 + C.lv * 1.6 : C.st === "thinking" ? 0.3 : 0.12 + C.lv * 0.9);
-  glDraw(); C.raf = requestAnimationFrame(level);
+  C.lv = C.lv * 0.75 + v * 0.25;
+  /* quando parla Quanta la sfera cresce e pulsa con la sua voce; quando ascolta si rimpicciolisce piano (e respira appena con la tua voce) */
+  const st = ($("#qCall") || {}).dataset ? $("#qCall").dataset.st : "listening", target = (BASE[st] || 0.7) + C.lv * (st === "speaking" ? 0.16 : 0.05);
+  C.sc += (target - C.sc) * (target > C.sc ? 0.16 : 0.07); sferaSet(C.sc);
+  C.raf = requestAnimationFrame(level);
 }
 function opRender() {
   const box = $("#qcOp"); if (!box) return;
@@ -185,7 +150,7 @@ export async function callStart() {
   /* l'audio va creato subito, dentro il tocco (Safari su iPhone) */
   const AC = window.AudioContext || window.webkitAudioContext; C.ctx = new AC(); C.ctx.resume().catch(() => {});
   C.gain = C.ctx.createGain(); C.outAn = C.ctx.createAnalyser(); C.outAn.fftSize = 512; C.gain.connect(C.outAn); C.outAn.connect(C.ctx.destination);
-  C.on = true; C.muted = false; C.user = ""; C.ai = ""; C.lastUser = ""; C.warned = false; C.last = 0; glInit(); ccUi(); muteUi(); state("connecting"); $("#qcEnd").focus();
+  C.on = true; C.muted = false; C.user = ""; C.ai = ""; C.lastUser = ""; C.warned = false; C.sc = 0.66; sferaSet(C.sc); ccUi(); muteUi(); state("connecting"); $("#qcEnd").focus();
   trackOnce("feature", "quanta_chiamata", { name: "quanta_chiamata" });
   try { await micStart(); }
   catch (e) { fail(e && e.name === "NotAllowedError" ? "Per chiamare Quanta permetti l'uso del microfono nelle impostazioni del browser." : "Non riesco ad aprire il microfono.", false); return; }
@@ -202,7 +167,7 @@ export async function callStart() {
   ws.onerror = () => {};
   ws.onclose = e => { if (!C.on) return; if (!C.ready) fail(`La chiamata non si è aperta${e.reason ? ` (${String(e.reason).slice(0, 120)})` : ""}.`, true); else callEnd("La chiamata si è interrotta."); };
   C.t0 = Date.now(); C.timer = setInterval(clock, 1000);
-  if (!REDUCE) C.raf = requestAnimationFrame(level); else glDraw();
+  if (!REDUCE) C.raf = requestAnimationFrame(level); else sferaSet(BASE.connecting);
 }
 export function callEnd(note) {
   const was = C.on, secs = C.t0 ? Math.round((Date.now() - C.t0) / 1000) : 0;
