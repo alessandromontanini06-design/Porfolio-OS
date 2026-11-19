@@ -63,7 +63,7 @@ await wait(700);
 const mic = await p.evaluate(() => window.__wsLog.filter(m => m.realtimeInput && m.realtimeInput.audio));
 t(`il microfono parte a 16 kHz (${mic.length} pezzi da 0,1 s)`, mic.length >= 3 && mic.every(m => m.realtimeInput.audio.mimeType === "audio/pcm;rate=16000" && m.realtimeInput.audio.data.length > 4000), mic.length && mic[0].realtimeInput.audio.mimeType);
 t("il saluto di Quanta compare nei sottotitoli, senza asterischi", await p.evaluate(() => /Ciao, sono Quanta\. Come posso aiutarti\?/.test(document.getElementById("qcCap").innerText) && !/\*/.test(document.getElementById("qcCap").innerText)));
-t("nella chiamata c'è la sfera di Quanta (quella che gira)", await p.evaluate(() => { const s = document.getElementById("qcSfera"); return !!s && s.classList.contains("orb") && getComputedStyle(s.querySelector(".o1")).animationName === "orbspin"; }));
+t("nella chiamata c'è la sfera di Quanta (quella che gira)", await p.evaluate(() => { const s = document.getElementById("qcSfera"); return !!s && s.classList.contains("orb") && /rotate\(/.test(s.querySelector(".o1").style.transform); }));
 await p.screenshot({ path: `${OUT}/chiamata.jpg`, type: "jpeg", quality: 72 });
 /* scrivere durante la chiamata, sottotitoli on/off */
 await p.type("#qcText", "quanto ho guadagnato in tutto?"); await p.keyboard.press("Enter"); await wait(300);
@@ -96,9 +96,14 @@ await ws("tool", "rischio_asset", {}); await wait(300);
 t("gli strumenti del laboratorio senza laboratorio danno un errore spiegato", /Nessun portafoglio nel laboratorio/.test((await lastResp("rischio_asset")).error || ""));
 /* 5. interruzione e muto */
 await ws("srv", { serverContent: { modelTurn: { parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: await p.evaluate(() => btoa(String.fromCharCode(...new Uint8Array(96000)))) } }] }, outputTranscription: { text: "Allora, il tuo portafoglio" } } }); await wait(200);
-const s1 = await st(); await wait(700); const wBig = await p.evaluate(() => document.getElementById("qcSfera").getBoundingClientRect().width);
-await ws("srv", { serverContent: { interrupted: true } }); await wait(1600); const wSmall = await p.evaluate(() => document.getElementById("qcSfera").getBoundingClientRect().width);
-t(`quando Quanta parla la sfera è grande, quando tace si rimpicciolisce (${Math.round(wBig)} → ${Math.round(wSmall)} px)`, wBig > wSmall * 1.25, `${wBig} ${wSmall}`);
+/* velocità di rotazione del riflesso (gradi al secondo), misurata due volte a 400 ms di distanza */
+const ang = () => p.evaluate(() => { const m = (document.querySelector("#qcSfera .o1").style.transform || "").match(/rotate\(([-\d.]+)deg\)/); return m ? +m[1] : NaN; });
+const rate = async () => { const a = await ang(); const t0 = Date.now(); await wait(400); const b = await ang(); return ((b - a + 360) % 360) / ((Date.now() - t0) / 1000); };
+const w0 = await p.evaluate(() => document.getElementById("qcSfera").getBoundingClientRect().width);
+const s1 = await st(); await wait(1200); const vFast = await rate(); const w1 = await p.evaluate(() => document.getElementById("qcSfera").getBoundingClientRect().width);
+await ws("srv", { serverContent: { interrupted: true } }); await wait(2600); const vSlow = await rate();
+t(`quando Quanta parla la sfera gira veloce, quando tace gira piano (${Math.round(vFast)}°/s → ${Math.round(vSlow)}°/s)`, vFast > 150 && vSlow < 80 && vSlow > 0, `${vFast} ${vSlow}`);
+t("la sfera non cambia grandezza", Math.abs(w1 - w0) < 1, `${w0} ${w1}`);
 t("se l'utente interrompe, Quanta si ferma e ascolta", s1 === "speaking" && await st() === "listening", `${s1} → ${await st()}`);
 const nMic = await p.evaluate(() => window.__wsLog.filter(m => m.realtimeInput && m.realtimeInput.audio).length);
 await p.click("#qcMute"); await wait(600);

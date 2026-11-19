@@ -1228,13 +1228,11 @@ body.q-calling{overflow:hidden}
 .qc-end{background:#fff;color:#000}
 .q-call[data-st="connecting"] #qcMute,.q-call[data-st="error"] #qcMute,.q-call[data-st="connecting"] .qc-in,.q-call[data-st="error"] .qc-in{opacity:.35;pointer-events:none}
 /* la sfera di Quanta nella chiamata: la scala la decide chiamata.js (grande quando parla, piccola quando ascolta) */
-.qc-orb{position:relative;width:min(58vw,260px);aspect-ratio:1;display:grid;place-items:center}
-.qc-orb .qc-sfera{width:100%;height:100%;transform:scale(.7);will-change:transform;transition:filter .4s,box-shadow .5s;
+.qc-orb{position:relative;width:min(50vw,220px);aspect-ratio:1;display:grid;place-items:center}
+.qc-orb .qc-sfera{width:100%;height:100%;transition:filter .4s,box-shadow .6s;
   box-shadow:0 0 0 1px rgba(255,255,255,.05),0 0 70px rgba(201,242,74,.22),inset 0 -16px 34px rgba(60,80,0,.38),inset 0 12px 26px rgba(255,255,255,.5)}
-.qc-sfera .o1{animation-duration:7s}.qc-sfera .o3{animation-duration:3.6s}
+.qc-sfera .o1,.qc-sfera .o2{animation:none!important;will-change:transform}.qc-sfera .o3{animation-duration:3.6s}
 .q-call[data-st="speaking"] .qc-sfera{box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 120px rgba(201,242,74,.42),inset 0 -16px 34px rgba(60,80,0,.38),inset 0 12px 26px rgba(255,255,255,.5)}
-.q-call[data-st="speaking"] .qc-sfera .o1{animation-duration:1.5s}.q-call[data-st="speaking"] .qc-sfera .o3{animation-duration:1.1s}
-.q-call[data-st="thinking"] .qc-sfera .o1{animation-duration:.9s}
 .q-call[data-st="connecting"] .qc-sfera{animation:qcbr 1.8s ease-in-out infinite}
 @keyframes qcbr{50%{opacity:.55}}
 .q-call[data-st="muted"] .qc-sfera,.q-call[data-st="error"] .qc-sfera{filter:grayscale(1) brightness(.55);box-shadow:none}

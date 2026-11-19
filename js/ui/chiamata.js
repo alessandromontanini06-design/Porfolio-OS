@@ -10,7 +10,7 @@ import { NO_LAB, Q, TOOLS_LOCAL, chatContext, hush, opDecide, opText, openChat, 
 
 const WSS = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=";
 const C = { on: false, ws: null, ctx: null, stream: null, node: null, inAn: null, outAn: null, gain: null, next: 0, play: new Set(), muted: false, t0: 0, timer: 0, raf: 0,
-  user: "", ai: "", lastUser: "", max: 10, st: "", ready: false, busy: false, lv: 0, sc: 0.66, warned: false };
+  user: "", ai: "", lastUser: "", max: 10, st: "", ready: false, busy: false, lv: 0, ang: 0, vel: 28, last: 0, warned: false };
 const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const consentOk = () => { try { return localStorage.getItem("pos-quanta-chiamata-ok") === "1"; } catch { return false; } };
 export const callSupported = () => !!(window.WebSocket && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.AudioContext || window.webkitAudioContext));
@@ -49,13 +49,14 @@ function playPcm(b64, mime) {
 }
 function flush() { C.play.forEach(s => { try { s.stop(); } catch {} }); C.play.clear(); C.next = 0; }
 
-/* ---------- la sfera di Quanta: grande quando parla (e pulsa con la voce), piccola quando ascolta, grigia in muto ---------- */
-const BASE = { speaking: 1, thinking: 0.8, listening: 0.7, connecting: 0.66, muted: 0.62, error: 0.62 };
-function sferaSet(sc) { const el = $("#qcSfera"); if (el) el.style.transform = `scale(${sc.toFixed(3)})`; }
+/* ---------- la sfera di Quanta: sempre della stessa grandezza; gira veloce quando Quanta parla, piano quando ascolta (gradi al secondo) ---------- */
+const SPIN = { speaking: 330, thinking: 200, listening: 38, connecting: 28, muted: 12, error: 0 };
+function sferaSpin(deg) { const el = $("#qcSfera"); if (!el) return; const a = el.querySelector(".o1"), b = el.querySelector(".o2");
+  if (a) a.style.transform = `rotate(${deg.toFixed(1)}deg)`; if (b) b.style.transform = `rotate(${(-deg * 0.6).toFixed(1)}deg)`; }
 
 /* ---------- interfaccia ---------- */
 const LAB = { connecting: "Mi collego…", listening: "Ti ascolto", speaking: "Quanta parla", thinking: "Guardo i numeri…", muted: "Microfono spento", error: "Chiamata non riuscita" };
-function state(st) { C.st = st; const box = $("#qCall"); if (!box) return; box.dataset.st = C.muted && st === "listening" ? "muted" : st; $("#qcState").textContent = LAB[box.dataset.st] || ""; if (REDUCE) sferaSet(BASE[box.dataset.st] || 0.7); }
+function state(st) { C.st = st; const box = $("#qCall"); if (!box) return; box.dataset.st = C.muted && st === "listening" ? "muted" : st; $("#qcState").textContent = LAB[box.dataset.st] || ""; }
 const clean = t => String(t || "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*/g, "").replace(/\s+/g, " ").trim();
 function caption() {
   const el = $("#qcCap"); if (!el) return;
@@ -71,9 +72,9 @@ function level(now) {
   const an = C.st === "speaking" ? C.outAn : C.muted ? null : C.inAn; let v = 0;
   if (an) { const d = new Uint8Array(an.fftSize); an.getByteTimeDomainData(d); let sum = 0; for (let i = 0; i < d.length; i++) { const x = (d[i] - 128) / 128; sum += x * x; } v = Math.min(1, Math.sqrt(sum / d.length) * 4); }
   C.lv = C.lv * 0.75 + v * 0.25;
-  /* quando parla Quanta la sfera cresce e pulsa con la sua voce; quando ascolta si rimpicciolisce piano (e respira appena con la tua voce) */
-  const st = ($("#qCall") || {}).dataset ? $("#qCall").dataset.st : "listening", target = (BASE[st] || 0.7) + C.lv * (st === "speaking" ? 0.16 : 0.05);
-  C.sc += (target - C.sc) * (target > C.sc ? 0.16 : 0.07); sferaSet(C.sc);
+  /* la velocità segue lo stato (accelera e rallenta piano, niente scatti); la grandezza non cambia */
+  const st = ($("#qCall") || {}).dataset ? $("#qCall").dataset.st : "listening", dt = C.last ? Math.min(0.05, (now - C.last) / 1000) : 0; C.last = now;
+  C.vel += ((SPIN[st] ?? 38) - C.vel) * 0.035; C.ang = (C.ang + C.vel * dt) % 360; sferaSpin(C.ang);
   C.raf = requestAnimationFrame(level);
 }
 function opRender() {
@@ -150,7 +151,7 @@ export async function callStart() {
   /* l'audio va creato subito, dentro il tocco (Safari su iPhone) */
   const AC = window.AudioContext || window.webkitAudioContext; C.ctx = new AC(); C.ctx.resume().catch(() => {});
   C.gain = C.ctx.createGain(); C.outAn = C.ctx.createAnalyser(); C.outAn.fftSize = 512; C.gain.connect(C.outAn); C.outAn.connect(C.ctx.destination);
-  C.on = true; C.muted = false; C.user = ""; C.ai = ""; C.lastUser = ""; C.warned = false; C.sc = 0.66; sferaSet(C.sc); ccUi(); muteUi(); state("connecting"); $("#qcEnd").focus();
+  C.on = true; C.muted = false; C.user = ""; C.ai = ""; C.lastUser = ""; C.warned = false; C.ang = 0; C.vel = SPIN.connecting; C.last = 0; ccUi(); muteUi(); state("connecting"); $("#qcEnd").focus();
   trackOnce("feature", "quanta_chiamata", { name: "quanta_chiamata" });
   try { await micStart(); }
   catch (e) { fail(e && e.name === "NotAllowedError" ? "Per chiamare Quanta permetti l'uso del microfono nelle impostazioni del browser." : "Non riesco ad aprire il microfono.", false); return; }
@@ -167,7 +168,7 @@ export async function callStart() {
   ws.onerror = () => {};
   ws.onclose = e => { if (!C.on) return; if (!C.ready) fail(`La chiamata non si è aperta${e.reason ? ` (${String(e.reason).slice(0, 120)})` : ""}.`, true); else callEnd("La chiamata si è interrotta."); };
   C.t0 = Date.now(); C.timer = setInterval(clock, 1000);
-  if (!REDUCE) C.raf = requestAnimationFrame(level); else sferaSet(BASE.connecting);
+  if (!REDUCE) C.raf = requestAnimationFrame(level);
 }
 export function callEnd(note) {
   const was = C.on, secs = C.t0 ? Math.round((Date.now() - C.t0) / 1000) : 0;
