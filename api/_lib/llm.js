@@ -257,8 +257,12 @@ function toClaude(messages) {
 let callSeq = 0;
 const newId = () => `call_${Date.now().toString(36)}_${(callSeq++).toString(36)}`;
 
+/* Gemini lento: dopo un tempo scaduto, per 5 minuti (finché questa funzione resta accesa) si parte dalla riserva,
+   così chi scrive non aspetta ogni volta 16 secondi prima che risponda l'altra IA. */
+let geminiSlowUntil = 0;
 export async function chat({ system, messages, tools, order }) {
-  const prov = (order || ["gemini", "groq"]).filter(p => has[p]);
+  const prov0 = (order || ["gemini", "groq"]).filter(p => has[p]);
+  const prov = Date.now() < geminiSlowUntil && prov0.length > 1 ? [...prov0.filter(p => p !== "gemini"), ...prov0.filter(p => p === "gemini")] : prov0;
   if (!prov.length) throw new ProviderError("nessuno", "Nessuna chiave IA configurata sul server.", false);
   // 40 s in tutto (il browser aspetta 55 s): la prima IA ha al massimo 16 s, poi tocca alla riserva.
   const started = Date.now(), BUDGET = 40_000, errors = [];
@@ -304,6 +308,7 @@ export async function chat({ system, messages, tools, order }) {
       if (!calls.length && !text) throw new ProviderError("groq", "risposta vuota", true);
       return { text, calls, provider: p, model };
     } catch (e) {
+      if (p === "gemini" && /tempo|timeout|abort/i.test(String(e.message))) geminiSlowUntil = Date.now() + 5 * 60_000;
       errors.push(`${p}: ${e instanceof ProviderError ? e.message : e instanceof Anthropic.APIError ? `${e.status} ${String(e.message).slice(0, 120)}` : String(e.message || e)}`);
     }
   }
