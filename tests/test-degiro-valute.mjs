@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
-const [,, OUT] = process.argv, PORT = +(process.env.TEST_PORT || 5191), wait = ms => new Promise(r => setTimeout(r, ms));
+const [,, OUT] = process.argv, PORT = +(process.env.TEST_PORT || 5202), wait = ms => new Promise(r => setTimeout(r, ms));
 const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env: { ...process.env, PORT: String(PORT), REAL_PRICES: "1" }, stdio: "ignore" });
 await wait(1500);
 const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox"] });
