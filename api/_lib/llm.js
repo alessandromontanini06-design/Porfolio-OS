@@ -233,12 +233,33 @@ function toOpenAI(system, messages) {
   }
   return out;
 }
+/* Claude (solo per i messaggi con una foto, quando Gemini non risponde): blocchi tool_use / tool_result.
+   La cronologia viaggia senza blocchi di ragionamento: è ammesso, il modello risponde senza quelli precedenti. */
+const claudeId = id => (String(id || "x").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "x");
+function toClaude(messages) {
+  const out = [];
+  for (const m of messages) {
+    if (m.role === "user") out.push({ role: "user", content: claudeContent(m.text || "(foto senza testo)", m.images || []) });
+    else if (m.role === "assistant") {
+      const content = [];
+      if (m.text) content.push({ type: "text", text: m.text });
+      (m.calls || []).forEach(c => content.push({ type: "tool_use", id: claudeId(c.id), name: c.name, input: c.args || {} }));
+      if (content.length) out.push({ role: "assistant", content });
+    } else if (m.role === "tool") {
+      const block = { type: "tool_result", tool_use_id: claudeId(m.id), content: JSON.stringify(m.result ?? null) };
+      const prev = out[out.length - 1];
+      if (prev && prev.role === "user" && Array.isArray(prev.content) && prev.content.every(b => b.type === "tool_result")) prev.content.push(block);
+      else out.push({ role: "user", content: [block] });
+    }
+  }
+  return out;
+}
 let callSeq = 0;
 const newId = () => `call_${Date.now().toString(36)}_${(callSeq++).toString(36)}`;
 
 export async function chat({ system, messages, tools, order }) {
-  const prov = (order || ["gemini", "groq"]).filter(p => has[p] && p !== "claude");
-  if (!prov.length) throw new ProviderError("nessuno", "Nessuna chiave IA gratuita configurata (Gemini o Groq).", false);
+  const prov = (order || ["gemini", "groq"]).filter(p => has[p]);
+  if (!prov.length) throw new ProviderError("nessuno", "Nessuna chiave IA configurata sul server.", false);
   // 40 s in tutto (il browser aspetta 55 s): la prima IA ha al massimo 16 s, poi tocca alla riserva.
   const started = Date.now(), BUDGET = 40_000, errors = [];
   for (const [n, p] of prov.entries()) {
@@ -246,6 +267,19 @@ export async function chat({ system, messages, tools, order }) {
     if (left < 5000) break;
     const ms = n < prov.length - 1 ? Math.min(16_000, left) : left;
     try {
+      if (p === "claude") {
+        const r = await claude.messages.create({
+          model: CLAUDE_MODEL, max_tokens: 8000, system, output_config: { effort: "low" },
+          tools: tools.map(t => ({ name: t.name, description: t.description, input_schema: t.parameters })),
+          messages: toClaude(messages)
+        }, { timeout: ms });
+        if (r.stop_reason === "refusal") throw new ProviderError("claude", "richiesta rifiutata", true);
+        const calls = r.content.filter(b => b.type === "tool_use").map(b => ({ id: b.id, name: b.name, args: b.input || {} }));
+        if (calls.length && r.stop_reason === "max_tokens") throw new ProviderError("claude", "risposta troncata", true);
+        const text = r.content.filter(b => b.type === "text").map(b => b.text).join("").trim();
+        if (!calls.length && !text) throw new ProviderError("claude", "risposta vuota", true);
+        return { text, calls, provider: p, model: CLAUDE_MODEL };
+      }
       if (p === "gemini") {
         const { j, model } = await geminiCall({
           systemInstruction: { parts: [{ text: system }] },
@@ -270,7 +304,7 @@ export async function chat({ system, messages, tools, order }) {
       if (!calls.length && !text) throw new ProviderError("groq", "risposta vuota", true);
       return { text, calls, provider: p, model };
     } catch (e) {
-      errors.push(`${p}: ${e instanceof ProviderError ? e.message : String(e.message || e)}`);
+      errors.push(`${p}: ${e instanceof ProviderError ? e.message : e instanceof Anthropic.APIError ? `${e.status} ${String(e.message).slice(0, 120)}` : String(e.message || e)}`);
     }
   }
   throw new ProviderError("tutti", `Nessuna IA ha risposto (${errors.join(" · ")}).`, true);

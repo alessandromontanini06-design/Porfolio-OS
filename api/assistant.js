@@ -106,8 +106,8 @@ export default async function handler(req, res) {
   if (JSON.stringify(clean.map(m => m.images ? { ...m, images: [] } : m)).length > 80_000) { res.status(413).json({ error: "La conversazione è troppo lunga: ricomincia la chat." }); return; }
   const ctx = body.context ? `\n\nContesto attuale dell'app: ${String(body.context).slice(0, 600)}` : "";
   try {
-    /* con una foto solo Gemini (Groq non legge le immagini) */
-    const order = withImg ? ["gemini"] : (process.env.ASSISTANT_ORDER || "gemini,groq").split(",").map(s => s.trim());
+    /* con una foto Gemini e, se non risponde, Claude (Groq non legge le immagini) */
+    const order = withImg ? ["gemini", "claude"] : (process.env.ASSISTANT_ORDER || "gemini,groq").split(",").map(s => s.trim());
     const out = await chat({ system: SYSTEM + ctx, messages: clean, tools: TOOLS, order });
     const known = new Set(TOOLS.map(t => t.name));
     res.status(200).json({ text: out.text, calls: out.calls.filter(c => known.has(c.name)).slice(0, 6), provider: out.provider, model: out.model });
