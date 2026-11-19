@@ -22,14 +22,15 @@
     G.from(".hero2 .kick,.hero2 .lead,.hero2 .fine,.hm-cta,.hm-meta",{y:14,opacity:0,duration:.8,ease:"power3.out",stagger:.08,delay:.3,clearProps:"transform,opacity"});
     G.from(".start .opt",{x:24,opacity:0,duration:.8,ease:"power3.out",stagger:.08,delay:.4,clearProps:"transform,opacity"});
   };
-  if(ST&&home){
-    const sc={scroller:home,start:"top 85%"};
-    /* entrate allo scorrimento solo sul computer: sul telefono a volte restavano a metà e i testi sparivano */
-    if(matchMedia("(min-width:981px)").matches){
-    G.from(".aud-card",{y:28,opacity:0,duration:.8,ease:"power3.out",stagger:.12,scrollTrigger:{...sc,trigger:".audience"}});
-    /* home nuova: le sezioni entrano quando arrivano in vista */
-    [".hm-start-wrap",".hm-day",".hm-index",".hm-end"].forEach(sel=>{const el=document.querySelector(sel);if(el)G.from(el.children,{y:24,opacity:0,duration:.8,ease:"power3.out",stagger:.08,clearProps:"transform,opacity",scrollTrigger:{...sc,trigger:el}});});
-    }
+  /* le sezioni della home entrano quando arrivano in vista, solo sul computer (sul telefono a volte restavano a metà).
+     Con IntersectionObserver e non ScrollTrigger: chi ha un patrimonio apre il sito con la home nascosta, e ScrollTrigger
+     calcolava le posizioni sulla pagina nascosta, così i riquadri restavano vuoti per sempre (19/11/2026). */
+  if(home&&"IntersectionObserver" in window&&matchMedia("(min-width:981px)").matches){
+    const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;io.unobserve(e.target);const r=e.target.__rv;
+      G.to(r.items,{y:0,opacity:1,duration:.8,ease:"power3.out",stagger:r.st,clearProps:"transform,opacity"});}),{root:home,rootMargin:"0px 0px -12% 0px"});
+    [[".audience",".aud-card",.12,28],[".hm-start-wrap",null,.08,24],[".hm-day",null,.08,24],[".hm-index",null,.08,24],[".hm-end",null,.08,24]].forEach(([sel,child,st,y])=>{
+      const el=document.querySelector(sel);if(!el)return;const items=[...(child?el.querySelectorAll(child):el.children)];if(!items.length)return;
+      G.set(items,{y,opacity:0});el.__rv={items,st};io.observe(el);});
   }
   /* il pulsante principale si avvicina appena al cursore */
   const pb=document.querySelector(".opt.primary");
