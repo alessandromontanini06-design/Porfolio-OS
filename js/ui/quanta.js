@@ -1,7 +1,9 @@
 /* Portfolio OS · interfaccia · Quanta: la chat con l'analista e la sua presentazione.
    Parte di app.js divisa in moduli: il codice è lo stesso, cambiano solo import ed export. */
 import { $, CALM, G, HAS_G, P, REDUCE, S, esc, fmtDate, fmtN, fmtPct } from "./core.js";
-import { current } from "./scene.js";
+import { current, go } from "./scene.js";
+import { pmHas, pmQuantaOp, pmQuantaSummary } from "./patrimonio.js";
+import { cbSet } from "./costibanca.js";
 import { trackOnce } from "./importa.js";
 import { cmpCalc, pfAsset } from "./portafoglio.js";
 import { macroFor } from "./laboratorio.js";
@@ -18,7 +20,11 @@ $("#chatClose").addEventListener("click",closeChat);
 $("#chatNew").addEventListener("click",()=>{if(chatBusy)return;S.chat=[];S.chatView=[];renderChat();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#chat").classList.contains("open"))closeChat();});
 function chatContext(){
-  if(!S.lab||!S.ds||!S.ds.ok)return "nessun laboratorio costruito: rispondi a domande generali sul sito e sui concetti, senza inventare numeri del portafoglio dell'utente";
+  const oggi=new Date().toISOString().slice(0,10),pm=pmHas()?"l'utente ha un patrimonio salvato (strumento patrimonio)":"nessun patrimonio salvato",extra=`oggi è il ${oggi}; ${pm}${Q.lastSaved?`; appena salvato: ${Q.lastSaved}`:""}${Q.fromVoice?"; l'utente sta parlando a voce: rispondi breve e naturale":""}`;
+  if(!S.lab||!S.ds||!S.ds.ok)return `${extra}; nessun laboratorio costruito: rispondi a domande generali sul sito e sui concetti, senza inventare numeri del portafoglio dell'utente (quelli del patrimonio si leggono con lo strumento patrimonio)`;
+  return extra+"; "+chatContextLab();
+}
+function chatContextLab(){
   return `file «${S.source.name}», ${S.ds.assets.length} asset (${S.ds.assets.map(a=>a.name).join(", ")}), ${S.ds.nObs} osservazioni ${S.ds.freq.adj}, pesi selezionati nell'app: ${S.risk?S.risk.wLabel:(S.portfolio?"pesi attuali dell'utente":"pesi uguali")}${S.portfolio?", l'utente ha caricato un riepilogo con i suoi pesi":""}`;
 }
 function md(t){
@@ -27,6 +33,7 @@ function md(t){
   return h+(list?"</ul>":"");
 }
 function chatSuggestions(){
+  if(!S.lab&&pmHas())return ["Quanto ho guadagnato in tutto?","Quante tasse pagherei se vendessi oggi?","Quali cedole e dividendi arrivano?","Come va verso i miei obiettivi?"];
   if(!S.lab)return ["Come funziona Portfolio OS?","Che cos'è il TIR?","Che file posso caricare?","Che differenza c'è tra volatilità e drawdown?"];
   const n=S.ds.assets.map(a=>a.name),s=["Qual è l'asset più rischioso?","Riassumi il portafoglio in tre punti","Quanto si è perso nel periodo peggiore?"];
   s.splice(1,2,"Come ha retto il portafoglio nelle crisi?","Con 300 € al mese, quanto avrei tra 15 anni?");
@@ -38,17 +45,21 @@ function chatSuggestions(){
 function renderChat(){
   const log=$("#chatLog");if(!log)return;
   const intro=S.lab?`<div class="msg ai"><p>Ciao! Chiedimi qualsiasi cosa su <b>${esc(S.source.name)}</b>: rischio, rendimenti, correlazioni, oppure "e se cambiassi i pesi?". Ogni numero lo prendo dal motore di calcolo.</p></div>`
+    :pmHas()?`<div class="msg ai"><p>Ciao! Sono <b>Quanta</b> e conosco il tuo <b>patrimonio</b>. Chiedimi guadagni, tasse e cedole, oppure dimmi cosa hai comprato: preparo l'operazione e la salvi tu con «Conferma».</p></div>`
     :`<div class="msg ai"><p>Ciao! Sono <b>Quanta</b>, l'analista IA di Portfolio OS. Puoi chiedermi subito come funziona il sito o cosa vuol dire un termine (TIR, volatilità, drawdown…). Per i numeri del <b>tuo</b> portafoglio carica il file o apri l'esempio e costruisci il laboratorio.</p></div>`;
-  log.innerHTML=intro+S.chatView.map(v=>v.k==="user"?`<div class="msg user">${esc(v.t)}</div>`
+  log.innerHTML=intro+S.chatView.map((v,i)=>v.k==="user"?`<div class="msg user">${v.img&&v.img.length?`<span class="q-imgs">${v.img.map(u=>`<img src="${u}" alt="Foto mandata a Quanta">`).join("")}</span>`:""}${v.voce?`<span class="q-vtag">messaggio vocale</span>`:""}${esc(v.t)}</div>`
+    :v.k==="op"?opCard(v)
     :v.k==="tool"?`<span class="toolchip"><i></i>calcolo: ${esc(v.t)}</span>`
     :v.k==="typing"?`<div class="typing" aria-label="Quanta sta rispondendo"><i></i><i></i><i></i></div>`
     :v.k==="error"?`<div class="msg err">${esc(v.t)}</div>`
-    :`<div class="msg ai">${md(v.t)}<span class="by">Quanta · numeri dal motore</span></div>`).join("");
+    :`<div class="msg ai">${md(v.t)}<span class="by">Quanta · numeri dal motore${TTS?`<button type="button" class="q-say${Q.speaking===i?" on":""}" data-say="${i}" aria-label="${Q.speaking===i?"Ferma la lettura":"Ascolta la risposta"}">${Q.speaking===i?"■ Ferma":"▶ Ascolta"}</button>`:""}</span></div>`).join("");
   log.scrollTop=log.scrollHeight;
-  $("#chatSugg").innerHTML=S.chatView.length?"":chatSuggestions().map(q=>`<button type="button" data-ask="${esc(q)}">${esc(q)}</button>`).join("");
+  $("#chatSugg").innerHTML=S.chatView.length?"":sugItems().map(x=>`<button type="button" ${x.act?`data-qact="${x.act}"`:`data-ask="${esc(x.t)}"`}>${ICO[x.ico]||ICO.chat}<span>${esc(x.t)}</span></button>`).join("");
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ask]");if(b)askChat(b.dataset.ask);});
-$("#chatForm").addEventListener("submit",e=>{e.preventDefault();const t=$("#chatIn").value;$("#chatIn").value="";askChat(t);});
+$("#chatForm").addEventListener("submit",e=>{e.preventDefault();const t=$("#chatIn").value;$("#chatIn").value="";grow();askChat(t);});
+$("#chatNew").addEventListener("click",()=>{talkStop();Q.imgs=[];attRender();});
+$("#chatClose").addEventListener("click",()=>talkStop());
 $("#chatIn").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#chatForm").requestSubmit();}});
 /* Strumenti che l'IA può chiamare: tutti calcolati dal motore, sui dati confermati */
 function fmtW(w){return S.ds.assets.map((a,i)=>w[i]>0?`${a.name} ${fmtPct(w[i],0)}`:null).filter(Boolean).join(", ");}
@@ -183,37 +194,168 @@ const TOOLS_LOCAL={
       risposte:B.ans,scelte_nelle_crisi:B.cr.map((c,i)=>`${c.name} (${fmtPct(c.mdd,0)}): ${B.ch[i]||"-"}`),nota:"Profilo educativo basato sulle scelte nelle crisi rivissute; non è consulenza."};},
   portafoglio_utente:()=>S.portfolio?{da_file:S.portfolio.from,posizioni:S.portfolio.positions.map(p=>({nome:p.nome,ticker:p.ticker,valore:p.valore==null?null:`${fmtN(p.valore)} €`,peso_attuale:p.pesoAttuale==null?null:fmtPct(p.pesoAttuale,1),peso_target:p.pesoTarget==null?null:fmtPct(p.pesoTarget,1)}))}:{nota:"Nessun riepilogo di portafoglio caricato: si usano pesi uguali o quelli indicati nella domanda."}
 };
-async function askChat(text){
+async function askChat(text,opt={}){
   trackOnce("feature","assistente",{name:"assistente"});
-  text=String(text||"").trim();
-  if(chatBusy||!text)return;
-  chatBusy=true;$("#chatSend").disabled=true;orbBusy(true);
-  S.chat.push({role:"user",text});S.chatView.push({k:"user",t:text},{k:"typing"});renderChat();
+  text=String(text||"").trim();const imgs=Q.imgs.slice();
+  if(chatBusy||(!text&&!imgs.length))return;
+  if(TTS)TTS.cancel();Q.speaking=null;Q.fromVoice=!!opt.voce;if(imgs.length)trackOnce("feature","quanta_foto",{name:"quanta_foto"});if(opt.voce)trackOnce("feature","quanta_voce",{name:"quanta_voce"});
+  chatBusy=true;orbBusy(true);Q.imgs=[];attRender();barUi();
+  S.chat.push({role:"user",text,...(imgs.length?{images:imgs.map(x=>({mime:x.mime,data:x.data}))}:{})});S.chatView.push({k:"user",t:text,img:imgs.map(x=>x.url),voce:!!opt.voce},{k:"typing"});renderChat();
   try{
     for(let round=0;round<5;round++){
-      const r=await fetch("/api/assistant",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:S.chat.slice(-30),context:chatContext()}),signal:AbortSignal.timeout(55000)});
+      /* le foto viaggiano solo con l'ultimo messaggio che le ha: le precedenti diventano un promemoria */
+      const msgs=S.chat.slice(-30),li=msgs.map((m,i)=>m.images&&m.images.length?i:-1).filter(i=>i>=0).pop();
+      const r=await fetch("/api/assistant",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:msgs.map((m,i)=>m.images&&i!==li?{role:m.role,text:(m.text||"")+" [foto mandata prima]"}:m),context:chatContext()}),signal:AbortSignal.timeout(55000)});
       const j=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(j.error||`Il server ha risposto con un errore (${r.status}).`);
       const calls=Array.isArray(j.calls)?j.calls:[];
       S.chat.push({role:"assistant",text:j.text||"",calls});
       if(calls.length){
         for(const c of calls){
-          let result;if(!S.lab){result={error:"Nessun portafoglio caricato: rispondi in generale e, se servono numeri, invita a caricare il file o ad aprire l'esempio."};}else try{result=await (TOOLS_LOCAL[c.name]||(()=>({error:"strumento sconosciuto"})))(c.args||{});}catch(e){result={error:String(e.message||e)};}
+          let result;if(!S.lab&&!NO_LAB.has(c.name)){result={error:"Nessun portafoglio nel laboratorio: rispondi in generale, usa il patrimonio se c'è e, se servono numeri del file, invita a caricarlo o ad aprire l'esempio."};}else try{result=await (TOOLS_LOCAL[c.name]||(()=>({error:"strumento sconosciuto"})))(c.args||{});}catch(e){result={error:String(e.message||e)};}
           S.chat.push({role:"tool",id:c.id,name:c.name,result});
-          S.chatView.splice(S.chatView.length-1,0,{k:"tool",t:TOOL_L[c.name]||c.name});
+          if(c.name!=="registra_operazione")S.chatView.splice(S.chatView.length-1,0,{k:"tool",t:TOOL_L[c.name]||c.name});
         }
         renderChat();continue;
       }
-      S.chatView=S.chatView.filter(v=>v.k!=="typing");S.chatView.push({k:"ai",t:j.text,p:j.provider});renderChat();return;
+      S.chatView=S.chatView.filter(v=>v.k!=="typing");S.chatView.push({k:"ai",t:j.text,p:j.provider});renderChat();
+      if(opt.voce||Q.talk){if(TTS)speakAt(S.chatView.length-1,talkNext);else setTimeout(talkNext,0);}return;
     }
     throw new Error("La domanda ha richiesto troppi passaggi: prova a farla più semplice.");
   }catch(e){
     S.chatView=S.chatView.filter(v=>v.k!=="typing");
     S.chatView.push({k:"error",t:e instanceof TypeError?"Quanta funziona nella versione del sito pubblicata su Vercel.":e.name==="TimeoutError"?"Le IA non hanno risposto in tempo. Riprova.":String(e.message||e)});
-    renderChat();
-  }finally{chatBusy=false;$("#chatSend").disabled=false;orbBusy(false);}
+    renderChat();if(Q.talk)talkStop();
+  }finally{chatBusy=false;orbBusy(false);barUi();}
 }
 
+
+/* ---------- Quanta parla, ascolta e guarda ----------
+   Voce: la sintesi vocale del browser (gratis; il testo non esce dal dispositivo), con la voce italiana migliore che c'è.
+   Dettatura: il riconoscimento vocale del browser (Chrome lo fa con Google, Safari con Apple); il testo dettato parte come messaggio.
+   Foto: rimpicciolite nel browser e mandate all'IA solo dopo il permesso (pos-quanta-foto-ok). */
+const TTS=("speechSynthesis" in window)&&window.SpeechSynthesisUtterance?window.speechSynthesis:null,SR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
+const Q={speaking:null,rec:null,listening:false,auto:false,talk:false,imgs:[],fromVoice:false,lastSaved:""};
+function pickVoice(){if(!TTS)return null;const vs=TTS.getVoices().filter(v=>/^it([-_]|$)/i.test(v.lang));for(const re of [/natural|neural|online|premium|enhanced/i,/google/i,/alice|federica|elsa|isabella|paola|emma|diego|luca/i]){const v=vs.find(x=>re.test(x.name));if(v)return v;}return vs[0]||null;}
+if(TTS&&TTS.addEventListener)TTS.addEventListener("voiceschanged",()=>{});
+/* testo da leggere: senza grassetti ed elenchi, segni detti a parole */
+function plain(t){return String(t||"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/^\s*[-*•]\s+/gm,"").replace(/[#_`>]/g,"").replace(/−/g,"meno ").replace(/(\d)\s?%/g,"$1 per cento").replace(/€/g," euro").replace(/\s+/g," ").trim();}
+/* legge un testo a pezzi di frasi (Chrome si ferma sui testi lunghi); i = risposta della chat che si sta leggendo, done = cosa fare dopo */
+function speakText(text,i=null,done=null){
+  if(!TTS){if(done)done();return;}TTS.cancel();
+  const parts=(plain(text).match(/[^.!?;:]+[.!?;:]*/g)||[]).reduce((a,x)=>{const t=x.trim();if(!t)return a;if(a.length&&a[a.length-1].length+t.length<180)a[a.length-1]+=" "+t;else a.push(t);return a;},[]);
+  if(!parts.length){if(done)done();return;}const voice=pickVoice(),tok={};Q.speaking=i;Q.tok=tok;speakUi(true);renderChat();barUi();
+  const end=ok=>{if(Q.tok!==tok)return;Q.tok=null;Q.speaking=null;speakUi(false);renderChat();barUi();if(ok&&done)done();};
+  parts.forEach((t,k)=>{const u=new SpeechSynthesisUtterance(t);u.lang="it-IT";if(voice)u.voice=voice;u.rate=1.03;u.pitch=1;
+    if(k===parts.length-1)u.onend=()=>end(true);u.onerror=()=>end(false);TTS.speak(u);});
+}
+function speakAt(i,done){const v=S.chatView[i];if(v&&v.k==="ai")speakText(v.t,i,done);}
+function hush(){if(TTS)TTS.cancel();Q.tok=null;Q.speaking=null;speakUi(false);}
+/* Safari su iPhone parla solo se la prima lettura parte da un tocco: una frase vuota al primo tocco sblocca le successive */
+let ttsOk=false;function ttsUnlock(){if(!TTS||ttsOk)return;ttsOk=true;try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;TTS.speak(u);}catch{}}
+function speakUi(on){document.querySelectorAll(".orb").forEach(o=>o.classList.toggle("speaking",on));}
+document.addEventListener("click",e=>{const sb=e.target.closest("[data-say]");if(!sb)return;ttsUnlock();const i=+sb.dataset.say;if(Q.speaking===i){hush();renderChat();barUi();}else speakAt(i);});
+
+/* ---------- la barra: «+» foto, testo, microfono (dettatura), pulsante tondo (conversazione a voce, invio o stop) ---------- */
+function grow(){const i=$("#chatIn");if(!i)return;i.style.height="auto";i.style.height=Math.min(i.scrollHeight,160)+"px";}
+function barUi(){
+  const go=$("#chatSend"),mic=$("#chatMic"),inp=$("#chatIn"),f=$("#chatForm");if(!go||!inp)return;
+  const has=!!(inp.value.trim()||Q.imgs.length),mode=Q.talk?"stop":has||!SR?"send":"talk";
+  go.dataset.mode=mode;go.disabled=mode!=="stop"&&(chatBusy||(mode==="send"&&!has));
+  go.setAttribute("aria-label",mode==="stop"?"Chiudi la conversazione a voce":mode==="talk"?"Parla con Quanta a voce":"Invia");go.title=go.getAttribute("aria-label");
+  if(mic){mic.hidden=!SR||Q.talk;const on=Q.listening&&!Q.auto;mic.classList.toggle("on",on);mic.setAttribute("aria-pressed",String(on));mic.setAttribute("aria-label",on?"Ho finito di dettare":"Detta il messaggio");}
+  f.classList.toggle("talking",Q.talk);
+  inp.placeholder=Q.talk?(Q.listening?"Ti ascolto…":chatBusy?"Quanta ci pensa…":Q.speaking!==null||Q.tok?"Quanta risponde… tocca il quadrato per fermarla":"Conversazione a voce"):Q.listening?"Ti ascolto…":"Chiedi a Quanta";
+}
+$("#chatIn").addEventListener("input",()=>{grow();barUi();});
+$("#chatSend").addEventListener("click",()=>{const m=$("#chatSend").dataset.mode;if(m==="stop")talkStop();else if(m==="talk")talkStart();else $("#chatForm").requestSubmit();});
+/* ascolto: auto = conversazione a voce (manda da solo), altrimenti dettatura (il testo resta nella barra da controllare) */
+function listen(auto){
+  if(!SR||Q.listening||(auto&&(chatBusy||!Q.talk)))return;hush();
+  const r=new SR();r.lang="it-IT";r.interimResults=true;r.continuous=false;r.maxAlternatives=1;let heard="",err="";const pre=auto?"":$("#chatIn").value.trim();
+  r.onresult=e=>{let t="";for(let k=0;k<e.results.length;k++)t+=e.results[k][0].transcript;heard=t;$("#chatIn").value=(pre?pre+" ":"")+t;grow();};
+  r.onerror=e=>{err=e.error||"errore";};
+  r.onend=()=>{Q.listening=false;Q.rec=null;const t=heard.trim();
+    if(err==="not-allowed"||err==="service-not-allowed"){Q.talk=false;chatNote("Per parlare con Quanta permetti l'uso del microfono nelle impostazioni del browser.");}
+    if(!auto){barUi();if(!t&&err==="no-speech")chatNote("Non ho sentito niente: riprova, oppure scrivi.");$("#chatIn").focus();return;}
+    $("#chatIn").value="";grow();if(!Q.talk){barUi();return;}
+    if(!t){Q.talk=false;barUi();if(err!=="aborted")chatNote("Non ti ho sentito, così ho chiuso la conversazione a voce. Tocca il pulsante tondo per riprendere.");return;}
+    if(voiceCmd(t))return;askChat(t,{voce:true});};
+  Q.rec=r;Q.listening=true;Q.auto=auto;barUi();try{r.start();}catch{Q.listening=false;Q.rec=null;if(auto)Q.talk=false;barUi();}
+}
+function talkStart(){if(!SR||chatBusy)return;ttsUnlock();trackOnce("feature","quanta_conversazione",{name:"quanta_conversazione"});Q.talk=true;$("#chatConsent").hidden=true;barUi();listen(true);}
+function talkStop(){Q.talk=false;if(Q.rec){try{(Q.rec.abort||Q.rec.stop).call(Q.rec);}catch{}}hush();renderChat();barUi();}
+function talkNext(){if(Q.talk)setTimeout(()=>listen(true),350);}
+/* in conversazione, la scheda da confermare si conferma a voce: «sì», «conferma», «annulla», «no»; «basta» chiude */
+function voiceCmd(t){
+  const s=t.toLowerCase().trim(),v=[...S.chatView].reverse().find(x=>x.k==="op"&&x.st==="wait");
+  const W="(?![a-zà-ù])";if(new RegExp("^(basta|stop|fine|chiudi|ho finito)"+W).test(s)){talkStop();return true;}
+  if(!v)return false;
+  const yes=new RegExp("^(s[iì]|conferma|confermo|ok|okay|va bene|salva|salvala|certo)"+W).test(s),no=new RegExp("^(no|annulla|lascia|non salvare)"+W).test(s);if(!yes&&!no)return false;
+  S.chatView.push({k:"user",t,voce:true});renderChat();
+  opDecide(v,yes).then(()=>speakText(v.st==="done"?v.msg:v.st==="no"?"Va bene, non ho registrato niente.":v.msg||"Non sono riuscita a salvarla.",null,talkNext));return true;
+}
+function chatNote(t){S.chatView.push({k:"error",t});renderChat();}
+document.addEventListener("click",e=>{if(!e.target.closest("#chatMic"))return;ttsUnlock();if(Q.listening){if(Q.rec)Q.rec.stop();}else listen(false);});
+/* foto: permesso la prima volta, poi la scelta (sul telefono anche la fotocamera) */
+const fotoOk=()=>{try{return localStorage.getItem("pos-quanta-foto-ok")==="1";}catch{return false;}};
+async function shrinkImg(file,max=1600,q=.82){const bmp=await createImageBitmap(file),k=Math.min(1,max/bmp.width,max/bmp.height),w=Math.round(bmp.width*k),h=Math.round(bmp.height*k);
+  const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,w,h);g.drawImage(bmp,0,0,w,h);bmp.close&&bmp.close();const url=c.toDataURL("image/jpeg",q);return {url,data:url.split(",")[1],mime:"image/jpeg"};}
+function attRender(){const a=$("#chatAtt");if(!a)return;a.hidden=!Q.imgs.length;a.innerHTML=Q.imgs.map((x,i)=>`<span class="q-thumb"><img src="${x.url}" alt="Foto da mandare"><button type="button" data-attdel="${i}" aria-label="Togli la foto">×</button></span>`).join("")+(Q.imgs.length?`<small>${Q.imgs.length===1?"La foto parte":"Le foto partono"} con il prossimo messaggio</small>`:"");barUi();}
+function photoStart(){if(Q.talk)talkStop();if(Q.imgs.length>=2){chatNote("Al massimo due foto per messaggio.");return;}if(fotoOk())$("#chatFile").click();else $("#chatConsent").hidden=false;}
+document.addEventListener("click",e=>{
+  if(e.target.closest("#chatPhoto")){photoStart();return;}
+  const qa=e.target.closest("[data-qact]");if(qa){if(qa.dataset.qact==="foto")photoStart();else talkStart();return;}
+  if(e.target.closest("#chatConsentOk")){try{localStorage.setItem("pos-quanta-foto-ok","1");}catch{}$("#chatConsent").hidden=true;$("#chatFile").click();return;}
+  if(e.target.closest("#chatConsentNo")){$("#chatConsent").hidden=true;return;}
+  const d=e.target.closest("[data-attdel]");if(d){Q.imgs.splice(+d.dataset.attdel,1);attRender();}
+});
+document.addEventListener("change",async e=>{if(e.target.id!=="chatFile")return;const fs=[...e.target.files].filter(f=>/^image\//.test(f.type)).slice(0,2-Q.imgs.length);e.target.value="";
+  for(const f of fs){try{Q.imgs.push(await shrinkImg(f));}catch{chatNote("Non riesco ad aprire questa foto: prova con un'altra (JPEG o PNG).");}}attRender();const i=$("#chatIn");if(i)i.focus();});
+/* suggerimenti con le icone: due domande per il momento in cui sei, poi foto e conversazione a voce */
+const SVGI=b=>`<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${b}</svg>`;
+const ICO={chat:SVGI('<path d="M5 5h14v10H9l-4 4z"/>'),chart:SVGI('<path d="M4 17l5-5 4 3 7-7"/><path d="M15 8h5v5"/>'),tax:SVGI('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9.5 9h5M9.5 13h5"/>'),
+  coin:SVGI('<ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>'),flag:SVGI('<path d="M6 21V4M6 4h11l-2 4 2 4H6"/>'),shield:SVGI('<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>'),
+  bolt:SVGI('<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>'),help:SVGI('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7M12 17h.01"/>'),book:SVGI('<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/>'),
+  file:SVGI('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/>'),sliders:SVGI('<path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/>'),
+  photo:SVGI('<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 8"/>'),wave:SVGI('<path d="M5 10v4M9 7v10M13 4v16M17 8v8M21 11v2"/>')};
+function icoFor(t){return /guadagn|rendiment|tir\b|riassumi/i.test(t)?"chart":/tass|impost/i.test(t)?"tax":/cedol|dividend/i.test(t)?"coin":/obiettiv/i.test(t)?"flag":/rischi|perso|peggiore/i.test(t)?"shield":/crisi/i.test(t)?"bolt":/come funziona/i.test(t)?"help":/che cos|differenza/i.test(t)?"book":/file/i.test(t)?"file":/pesi|allocazione|metto/i.test(t)?"sliders":"chat";}
+function sugItems(){const acts=[{t:"Leggi la foto del rendiconto della banca",ico:"photo",act:"foto"}];if(SR)acts.push({t:"Parla con Quanta a voce",ico:"wave",act:"talk"});
+  return [...chatSuggestions().slice(0,4-acts.length).map(t=>({t,ico:icoFor(t)})),...acts];}
+/* strumenti che non hanno bisogno del laboratorio */
+const NO_LAB=new Set(["patrimonio","registra_operazione","costi_banca","vai_a"]);
+Object.assign(TOOL_L,{patrimonio:"il tuo patrimonio",costi_banca:"quanto ti costa la banca",vai_a:"apro la pagina"});
+const OPQ_L={acquisto:"Acquisto",vendita:"Vendita",dividendo:"Dividendo",cedola:"Cedola"};
+const dIt=d=>`${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}`;
+function opText(o){const n=x=>fmtN(x,x%1?(x<10?3:2):0);return o.tipo==="acquisto"||o.tipo==="vendita"?`${OPQ_L[o.tipo]} · ${n(o.quantita)} ${o.quantita===1?"quota":"quote"} di ${o.strumento} a ${fmtN(o.prezzo,2)} € · ${dIt(o.data)}${o.spese?` · spese ${fmtN(o.spese,2)} €`:""}`:`${OPQ_L[o.tipo]} · ${fmtN(o.importo,2)} € da ${o.strumento} · ${dIt(o.data)}`;}
+function opCard(v){const o=v.op;return `<div class="msg q-op ${v.st}" data-op="${v.id}"><span class="eyebrow">${v.st==="done"?"Salvato nel patrimonio":v.st==="no"?"Non salvato":v.st==="err"?"Non salvato":"Da confermare"}</span><b>${esc(opText(o))}</b>${v.st==="wait"?`<span class="q-opb"><button type="button" class="btn sm lime" data-opok="${v.id}">Conferma</button><button type="button" class="btn sm" data-opno="${v.id}">Annulla</button></span>`:v.st==="saving"?`<small>Salvo…</small>`:v.msg?`<small>${esc(v.msg)}</small>`:""}</div>`;}
+Object.assign(TOOLS_LOCAL,{
+  patrimonio:()=>pmQuantaSummary(),
+  registra_operazione:a=>{
+    const tipo=String(a.tipo||""),str=String(a.strumento||"").trim().slice(0,60),oggi=new Date().toISOString().slice(0,10),data=/^\d{4}-\d{2}-\d{2}$/.test(a.data||"")?a.data:oggi;
+    if(!OPQ_L[tipo])return {error:"tipo di operazione non previsto"};if(!str)return {error:"manca lo strumento: chiedilo all'utente"};if(data>oggi)return {error:"la data è nel futuro: chiedi la data giusta"};
+    const o={tipo,strumento:str,data,quantita:+a.quantita||0,prezzo:+a.prezzo||0,importo:+a.importo||0,spese:Math.max(0,+a.spese||0)};
+    if((tipo==="acquisto"||tipo==="vendita")&&!(o.quantita>0&&o.prezzo>0))return {error:"mancano le quote o il prezzo: chiedili all'utente"};
+    if((tipo==="dividendo"||tipo==="cedola")&&!(o.importo>0))return {error:"manca l'importo incassato: chiedilo all'utente"};
+    S.chatView.splice(S.chatView.length-1,0,{k:"op",op:o,id:"op"+Date.now().toString(36),st:"wait"});
+    return {stato:"proposta mostrata all'utente in una scheda: NON è salvata finché non preme «Conferma»",operazione:opText(o)};
+  },
+  costi_banca:a=>cbSet({pat:a.patrimonio_medio,serv:a.costi_servizi,prod:a.costi_prodotti,inc:a.incentivi}),
+  vai_a:a=>{const M={home:"home",patrimonio:"patrimonio",laboratorio:"lab",strumenti:"strumenti",rischio:"risk",simulazioni:"sim",indipendenza_finanziaria:"fire",crisi:"stress",frontiera:"opt",benchmark:"bench",costi_banca:"strumenti"},t=M[a.pagina];
+    if(!t)return {error:"pagina sconosciuta"};if(["lab","risk","sim","fire","stress","opt","bench"].includes(t)&&!S.lab)return {error:"questa pagina si apre dopo aver costruito il laboratorio con un file o con il patrimonio"};
+    setTimeout(()=>{go(t);if(a.pagina==="costi_banca")setTimeout(()=>{const b=$("#cbBox");if(b)b.scrollIntoView({behavior:"smooth",block:"start"});},500);if(window.innerWidth<760&&!Q.talk)closeChat();},250);return {fatto:true,pagina:a.pagina};}
+});
+async function opDecide(v,ok){
+  if(!v||v.st!=="wait")return;
+  if(!ok){v.st="no";v.msg="Annullato: non ho registrato niente.";renderChat();return;}
+  v.st="saving";renderChat();const r=await pmQuantaOp(v.op).catch(err=>({error:String(err.message||err)}));
+  if(r.ok){v.st="done";v.msg=r.testo;Q.lastSaved=opText(v.op);}else{v.st="err";v.msg=`Non salvato: ${r.error}.`;}renderChat();
+}
+document.addEventListener("click",e=>{
+  const ok=e.target.closest("[data-opok]"),no=e.target.closest("[data-opno]");if(!ok&&!no)return;
+  opDecide(S.chatView.find(x=>x.k==="op"&&x.id===(ok||no).dataset[ok?"opok":"opno"]),!!ok);
+});
+barUi();
 
 /* ---------- Quanta si presenta: fumetti per sezione e qualche giro per lo schermo ---------- */
 const QTIPS={

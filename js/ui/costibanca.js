@@ -67,4 +67,13 @@ document.addEventListener("click", e => {
 /* la sezione si prepara quando si entra negli Strumenti (e subito, se ci si arriva da un link) */
 new MutationObserver(() => { if (document.body.dataset.scene === "strumenti") cbFill(); }).observe(document.body, { attributes: true, attributeFilter: ["data-scene"] });
 
-export { cbCalc, cbNum };
+/* Quanta compila il calcolatore (per esempio dalla foto del rendiconto): valori come stringhe, euro o percentuali */
+function cbSet(v) {
+  const cur = { pat: v.pat != null ? String(v.pat) : "", serv: v.serv != null ? String(v.serv) : "", prod: v.prod != null ? String(v.prod) : "", inc: v.inc != null ? String(v.inc) : "" };
+  cbSave(cur); const f = $("#cbForm"); if (f) { f.dataset.on = ""; cbFill(); }
+  const R = cbCalc(cur); if (!R) return { error: "servono il patrimonio medio e almeno un costo" };
+  return { costo_annuo: eur(R.tot), percentuale_del_patrimonio: fmtPct(R.pct, 2), al_mese: eur(R.mese), livello: R.lv, in_10_anni: "−" + eur(R.d10), in_20_anni: "−" + eur(R.d20),
+    con_etf_allo_0_20: eur(R.etf), risparmio_annuo_con_etf: eur(R.risp), incentivi: R.inc > 0 ? eur(R.inc) : "nessuno indicato", nota: "rendimento lordo ipotizzato 5% l'anno; calcolo indicativo" };
+}
+
+export { cbCalc, cbNum, cbSet };

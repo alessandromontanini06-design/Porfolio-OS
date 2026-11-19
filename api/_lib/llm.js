@@ -208,7 +208,7 @@ ${schemaText}`,
 function toGemini(messages) {
   const out = [];
   for (const m of messages) {
-    if (m.role === "user") out.push({ role: "user", parts: [{ text: m.text }] });
+    if (m.role === "user") out.push({ role: "user", parts: [...(m.images || []).map(x => ({ inline_data: { mime_type: x.mime, data: x.data } })), { text: m.text || "(foto senza testo)" }] });
     else if (m.role === "assistant") {
       const parts = [];
       if (m.text) parts.push({ text: m.text });
@@ -227,7 +227,7 @@ function toGemini(messages) {
 function toOpenAI(system, messages) {
   const out = [{ role: "system", content: system }];
   for (const m of messages) {
-    if (m.role === "user") out.push({ role: "user", content: m.text });
+    if (m.role === "user") out.push({ role: "user", content: (m.images && m.images.length ? "[l'utente ha mandato una foto che non puoi vedere] " : "") + (m.text || "") });
     else if (m.role === "assistant") out.push({ role: "assistant", content: m.text || "", ...(m.calls && m.calls.length ? { tool_calls: m.calls.map(c => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args || {}) } })) } : {}) });
     else if (m.role === "tool") out.push({ role: "tool", tool_call_id: m.id, content: JSON.stringify(m.result) });
   }

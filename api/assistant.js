@@ -53,6 +53,19 @@ const TOOLS = [
   { name: "rendimento_reale", description: "Rendimento vero dell'utente dalle sue transazioni: TIR, valore oggi, versato, guadagno, rendimento ponderato nel tempo; per ogni strumento acquisti, vendite, dividendi incassati, valore, guadagno in euro, TIR e quota del guadagno; e per classe di attivo. Usalo per 'quanto ho guadagnato', 'quale ETF mi ha reso di più'.", parameters: { type: "object", properties: {} } },
   { name: "composizione", description: "Dove è investito il portafoglio, dalle schede dei fondi: paesi, aree, sviluppati/emergenti, valute, classi di attivo, dimensione e stile, settori, TER medio e costo annuo, aziende principali con peso minimo e massimo sommando tutti gli ETF, sovrapposizione tra ETF. Usalo per 'quanta Apple ho', 'quanto sono esposto al dollaro', 'quanto costa il mio portafoglio'.", parameters: { type: "object", properties: {} } },
   { name: "confronto_allocazioni", description: "I portafogli A, B (e C) della scheda «Confronta allocazioni»: pesi e risultati sugli stessi mesi (rendimento annuo, volatilità, Sharpe, perdita massima, peggiori 12 mesi, crisi).", parameters: { type: "object", properties: {} } },
+  { name: "patrimonio", description: "Il patrimonio salvato dall'utente nella pagina Patrimonio (non serve il laboratorio): valore di oggi, versato, guadagno, TIR, rendimento ponderato nel tempo, posizioni con quote, valore, peso e guadagno, posizioni chiuse, tasse (bollo, imposte se vendesse oggi, minusvalenze), proventi in arrivo, piani di accumulo, obiettivi con la probabilità, quanto potrebbe perdere in una crisi.", parameters: { type: "object", properties: {} } },
+  { name: "registra_operazione", description: "Propone di registrare nel patrimonio un'operazione detta dall'utente (acquisto, vendita, dividendo o cedola). NON salva niente: mostra all'utente una scheda con «Conferma» e «Annulla». Usalo solo se l'utente dice chiaramente di aver fatto l'operazione e ci sono i dati; se manca qualcosa (quante quote, prezzo, importo) chiedilo prima.", parameters: { type: "object", properties: {
+    tipo: { type: "string", enum: ["acquisto", "vendita", "dividendo", "cedola"] },
+    strumento: { type: "string", description: "Come l'ha detto l'utente: ticker (SWDA), ISIN o nome." },
+    quantita: { type: "number", description: "Quote (o nominale per un BTP); per acquisto e vendita." },
+    prezzo: { type: "number", description: "Prezzo per quota in euro; per acquisto e vendita." },
+    importo: { type: "number", description: "Importo netto incassato in euro; per dividendo e cedola." },
+    data: { type: "string", description: "AAAA-MM-GG; se l'utente non la dice, la data di oggi del contesto. «Ieri» = un giorno prima." },
+    spese: { type: "number", description: "Commissioni in euro, se dette." } }, required: ["tipo", "strumento"] } },
+  { name: "costi_banca", description: "Compila il calcolatore «Quanto ti costa la tua banca» con i numeri del rendiconto costi e oneri (MiFID), per esempio letti da una foto, e restituisce costo annuo, percentuale, effetto in 10 e 20 anni e confronto con un portafoglio di ETF. Valori come testo: euro («1.250,50») o percentuali («0,9%»).", parameters: { type: "object", properties: {
+    patrimonio_medio: { type: "string" }, costi_servizi: { type: "string" }, costi_prodotti: { type: "string" }, incentivi: { type: "string", description: "«pagamenti ricevuti da terzi» o retrocessioni, già compresi nei costi." } }, required: ["patrimonio_medio"] } },
+  { name: "vai_a", description: "Porta l'utente a una pagina del sito quando lo chiede («portami alle simulazioni», «apri il patrimonio»).", parameters: { type: "object", properties: {
+    pagina: { type: "string", enum: ["home", "patrimonio", "laboratorio", "strumenti", "rischio", "simulazioni", "indipendenza_finanziaria", "crisi", "frontiera", "benchmark", "costi_banca"] } }, required: ["pagina"] } },
   { name: "profilo_rischio", description: "Risultato del test «La tua allocazione è coerente con te?», se l'utente lo ha fatto: perdita che regge, perdita peggiore del portafoglio, coerenza, quota investibile entro la soglia, risposte su orizzonte e liquidità.", parameters: { type: "object", properties: {} } }
 ];
 
@@ -69,7 +82,12 @@ Regole:
 - Non fare calcoli tu, nemmeno semplici moltiplicazioni: se un valore in euro non è negli strumenti, non scriverlo.
 - Per guadagni in euro e rendimento dei singoli strumenti usa rendimento_reale; per paesi, valute, settori, aziende e costi usa composizione; per i portafogli A/B/C usa confronto_allocazioni; per il test del profilo usa profilo_rischio. Le esposizioni da justETF sono parziali: se lo strumento restituisce un intervallo o un minimo, riportalo così.
 - Risposte brevi: due-cinque frasi o un elenco puntato corto. Usa **grassetto** per i numeri chiave.
-- Se i dati non bastano a rispondere, dillo e spiega cosa servirebbe.`;
+- Se i dati non bastano a rispondere, dillo e spiega cosa servirebbe.
+- Il patrimonio salvato dall'utente si legge con lo strumento patrimonio, anche senza laboratorio: usalo per domande su «quanto ho», «quanto ho guadagnato», tasse, cedole, obiettivi.
+- Operazioni dette a parole («ho comprato 20 SWDA a 100 euro»): chiama registra_operazione. Non dire mai che è salvata: l'utente la vede in una scheda e la salva lui con «Conferma». Se mancano quote, prezzo o importo, chiedili prima.
+- Foto: descrivi solo ciò che vedi davvero, senza inventare numeri illeggibili. Se è un rendiconto costi e oneri della banca, leggi patrimonio medio, costi dei servizi, costi dei prodotti e incentivi e chiama costi_banca. Se è l'elenco delle posizioni di un broker, riassumilo e suggerisci «Carica uno screenshot» nella home per importarlo. Non ripetere dati personali (nomi, numeri di conto) che vedi nella foto.
+- Se l'utente parla a voce, la risposta sarà letta ad alta voce: frasi brevi e naturali, niente tabelle, niente elenchi lunghi, al massimo tre numeri importanti.
+- Se l'utente chiede di andare in una pagina, usa vai_a.`;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Usa una richiesta POST." }); return; }
@@ -78,13 +96,19 @@ export default async function handler(req, res) {
   const body = readBody(req);
   const messages = body && Array.isArray(body.messages) ? body.messages : null;
   if (!messages || !messages.length || messages.length > 40) { res.status(400).json({ error: "Conversazione mancante o troppo lunga: ricomincia la chat." }); return; }
-  const clean = messages.map(m => m.role === "user" ? { role: "user", text: String(m.text || "").slice(0, 2000) }
+  /* foto: solo nell'ultimo messaggio dell'utente che ne ha, al massimo 2, JPEG/PNG/WebP, 1,5 MB ciascuna (base64) */
+  const lastImg = messages.map((m, i) => (m.role === "user" && Array.isArray(m.images) && m.images.length ? i : -1)).filter(i => i >= 0).pop();
+  const imgs = m => (Array.isArray(m.images) ? m.images : []).slice(0, 2).filter(x => x && /^image\/(jpeg|png|webp)$/.test(x.mime) && typeof x.data === "string" && x.data.length < 1_600_000 && /^[A-Za-z0-9+/=]+$/.test(x.data.slice(0, 200))).map(x => ({ mime: x.mime, data: x.data }));
+  const clean = messages.map((m, i) => m.role === "user" ? { role: "user", text: String(m.text || "").slice(0, 2000), ...(i === lastImg ? { images: imgs(m) } : {}) }
     : m.role === "assistant" ? { role: "assistant", text: String(m.text || "").slice(0, 4000), calls: Array.isArray(m.calls) ? m.calls.slice(0, 6).map(c => ({ id: String(c.id), name: String(c.name), args: c.args && typeof c.args === "object" ? c.args : {}, ...(typeof c.sig === "string" && c.sig.length < 20000 ? { sig: c.sig } : {}) })) : [] }
     : m.role === "tool" ? { role: "tool", id: String(m.id), name: String(m.name), result: m.result } : null).filter(Boolean);
-  if (JSON.stringify(clean).length > 80_000) { res.status(413).json({ error: "La conversazione è troppo lunga: ricomincia la chat." }); return; }
+  const withImg = clean.some(m => m.images && m.images.length);
+  if (JSON.stringify(clean.map(m => m.images ? { ...m, images: [] } : m)).length > 80_000) { res.status(413).json({ error: "La conversazione è troppo lunga: ricomincia la chat." }); return; }
   const ctx = body.context ? `\n\nContesto attuale dell'app: ${String(body.context).slice(0, 600)}` : "";
   try {
-    const out = await chat({ system: SYSTEM + ctx, messages: clean, tools: TOOLS, order: (process.env.ASSISTANT_ORDER || "gemini,groq").split(",").map(s => s.trim()) });
+    /* con una foto solo Gemini (Groq non legge le immagini) */
+    const order = withImg ? ["gemini"] : (process.env.ASSISTANT_ORDER || "gemini,groq").split(",").map(s => s.trim());
+    const out = await chat({ system: SYSTEM + ctx, messages: clean, tools: TOOLS, order });
     const known = new Set(TOOLS.map(t => t.name));
     res.status(200).json({ text: out.text, calls: out.calls.filter(c => known.has(c.name)).slice(0, 6), provider: out.provider, model: out.model });
   } catch (e) {

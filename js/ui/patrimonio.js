@@ -817,6 +817,59 @@ function pmRisk(R) {
     <p class="caption">Come si sarebbero mossi i titoli che hai oggi, con i pesi di oggi, negli ultimi ${fmtN(C.anni, 0)} anni di prezzi (dal ${ymIt(C.da)}). Case e beni senza quotazione non sono inclusi. Non è una previsione: mostra quanto si è mosso in passato, per capire se ti va bene vederlo succedere.</p>`;
 }
 
+/* ---------- per Quanta: il patrimonio in breve (numeri già calcolati e scritti, l'IA non fa conti)
+   e le operazioni dette a parole, che si salvano SOLO quando l'utente preme «Conferma» ---------- */
+function pmQuantaSummary() {
+  if (!pmHas()) return { vuoto: true, nota: "Il patrimonio è vuoto: si crea dalla pagina Patrimonio (Aggiungi) o portando i movimenti di un file della banca." };
+  const R = PM.R || pmCalc(), T = R.totale, F = PM.fisc || P.fisco(R, pmFiscStrumenti(), { oggi: pmToday() }), inc = PM.inc || [], db = PM.db;
+  const G = pmGoalReturns(R), C = G && pmRiskCalc(G), zTot = F.zainetto.reduce((a, z) => a + z.residuo, 0);
+  return {
+    valore_oggi: fmtEur(T.valore), versato_netto: fmtEur(T.versato), guadagno: sEur(T.guadagno), guadagno_sul_versato: sPct(T.guadagnoPct), rendimento_annuo_tir: sPct(T.tir),
+    rendimento_ponderato_nel_tempo: sPct(T.twr), dal: dIt(R.dal), calo_massimo: sPct(T.maxDD), proventi_incassati: fmtEur(T.proventi), prezzi: PM.loading ? "in aggiornamento" : "di fine giornata",
+    posizioni: R.posizioni.filter(p => p.aperta).map(p => { const s = db.strumenti[p.id] || {}; return { nome: s.nome, isin: s.isin || null, ticker: s.ticker || null, quantita: s.per100 ? `${fmtEur(p.qta)} nominali` : fmtN(p.qta, p.qta % 1 ? 3 : 0),
+      prezzo: Number.isFinite(p.prezzo) ? (s.per100 ? `${fmtN(p.prezzo, 2)} su 100` : fmtN(p.prezzo, 2)) : null, valore: fmtEur(p.valore), peso: fmtPct(p.peso, 1), guadagno: sEur(p.guadagno), tir: sPct(p.tir),
+      tipo: s.manuale ? "bene senza quotazione (stima dell'utente)" : s.per100 ? (PM.px[p.id] && PM.px[p.id].stima ? "titolo di Stato, prezzo stimato dalla curva della Banca d'Italia" : "obbligazione") : "titolo quotato" }; }),
+    chiuse: R.posizioni.filter(p => !p.aperta).map(p => ({ nome: (db.strumenti[p.id] || {}).nome, guadagno_realizzato: sEur(p.realizzato + p.proventi) })),
+    tasse: { bollo_annuo_stimato: fmtEur(F.bollo.annuo), imposte_se_vendessi_tutto_oggi: fmtEur(F.latente.imposta), minusvalenze_da_recuperare: zTot > 0.5 ? fmtEur(zTot) : "nessuna",
+      prima_scadenza_minusvalenze: F.zainetto.length ? dIt(F.zainetto.slice().sort((a, b) => a.scadenza < b.scadenza ? -1 : 1)[0].scadenza) : null },
+    proventi_prossimi_12_mesi_netti: fmtEur(inc.reduce((a, x) => a + (x.netto || 0), 0)), prossimi_proventi: inc.slice(0, 4).map(x => ({ data: dIt(x.d), strumento: x.nome, tipo: x.tipo, netto: fmtEur(x.netto), certo: !!x.certo })),
+    piani_di_accumulo: (db.pac || []).map(pl => ({ strumento: (db.strumenti[pl.strumento] || {}).nome, importo: fmtEur(+pl.importo), giorno_del_mese: pl.giorno })),
+    obiettivi: PM.goal && PM.goal.MC ? PM.goal.MC.obiettivi.map(o => ({ nome: o.nome, importo_euro_di_oggi: fmtEur(o.importo), tra_anni: o.anno, probabilita: fmtPct(o.prob, 0) })) : [],
+    versamento_mensile_usato_per_gli_obiettivi: PM.goal ? fmtEur(PM.goal.V.v) : null,
+    se_arriva_una_crisi: C ? { base: fmtEur(G.base), anno_brutto_1_su_20: sEur(G.base * C.p5), anno_peggiore: sEur(G.base * C.worst.v), calo_massimo: sEur(G.base * C.dd), crisi: C.crisi.map(c => ({ nome: c.nome, effetto: sEur(G.base * c.v) })) } : null
+  };
+}
+/* operazione proposta da Quanta e confermata dall'utente: { tipo, strumento, quantita, prezzo, importo, data, spese } */
+async function pmQuantaOp(op) {
+  const db = pmDb(), data = /^\d{4}-\d{2}-\d{2}$/.test(op.data || "") ? op.data : pmToday(), q = +op.quantita, px = +op.prezzo, imp = +op.importo, spese = Math.max(0, +op.spese || 0);
+  if (data > pmToday()) return { error: "la data è nel futuro" };
+  const key = v => String(v || "").trim().toUpperCase();
+  const own = () => { const t = key(op.strumento); return Object.entries(db.strumenti).find(([id, s]) => !s.manuale && [s.nome, s.ticker, s.isin, s.simbolo, id].some(x => x && (key(x) === t || (t.length >= 4 && key(x).includes(t))))); };
+  if (op.tipo === "acquisto") {
+    if (!(q > 0) || !(px > 0)) return { error: "servono quante quote e il prezzo per quota" };
+    const o = own(); let id = o && o[0];
+    if (!id) { const r = await pmResolve(op.strumento); if (!r || r.error) return { error: r ? `non riconosco «${op.strumento}»: ${r.error}` : "manca lo strumento" };
+      id = r.id; if (!db.strumenti[id]) db.strumenti[id] = { nome: r.nome, ticker: r.ticker || null, isin: r.isin || null, simbolo: r.simbolo, valuta: r.valuta || "EUR", classe: r.classe || null }; if (r.px && !PM.px[id]) PM.px[id] = r.px; }
+    await pmFx(false);
+    if (!pmAdd({ data, tipo: "acquisto", strumento: id, quantita: q, prezzo: px, spese, origine: "quanta" })) return { error: "non riesco a salvare in questo browser" };
+    pmRefresh(false); return { ok: true, testo: `Salvato nel patrimonio: ${fmtN(q, q % 1 ? 3 : 0)} quote di ${db.strumenti[id].nome} a ${fmtN(px, 2)} il ${dIt(data)}.` };
+  }
+  const o = own(); if (!o) return { error: `nel patrimonio non trovo «${op.strumento}»` };
+  const [id, s] = o, R = PM.R || pmCalc(), p = R.posizioni.find(x => x.id === id);
+  if (op.tipo === "vendita") {
+    if (!(q > 0) || !(px > 0)) return { error: "servono quante quote hai venduto e il prezzo" };
+    if (!p || q > p.qta + 1e-9) return { error: `ne possiedi ${p ? fmtN(p.qta, p.qta % 1 ? 3 : 0) : 0}: non puoi venderne ${fmtN(q, q % 1 ? 3 : 0)}` };
+    if (!pmAdd({ data, tipo: "vendita", strumento: id, quantita: q, prezzo: px, spese, origine: "quanta" })) return { error: "non riesco a salvare in questo browser" };
+    pmRefresh(false); return { ok: true, testo: `Salvata la vendita di ${fmtN(q, q % 1 ? 3 : 0)} quote di ${s.nome} a ${fmtN(px, 2)} il ${dIt(data)}.` };
+  }
+  if (op.tipo === "dividendo" || op.tipo === "cedola") {
+    if (!(imp > 0)) return { error: "serve l'importo netto incassato" };
+    if (!pmAdd({ data, tipo: op.tipo === "cedola" ? "cedola" : "dividendo", strumento: id, importo: imp, valuta: "EUR", origine: "quanta" })) return { error: "non riesco a salvare in questo browser" };
+    pmRefresh(false); return { ok: true, testo: `Salvato un provento di ${fmtN(imp, 2)} € da ${s.nome} il ${dIt(data)}.` };
+  }
+  return { error: `operazione «${op.tipo}» non prevista` };
+}
+
 /* ---------- il patrimonio in Excel: da leggere (o da dare al commercialista), non da reimportare ----------
    Riepilogo, Posizioni, Operazioni, Andamento (fine mese), Proventi in arrivo, Tasse, Leggimi. Numeri veri con i formati € e %. */
 async function pmExcel() {
@@ -1030,4 +1083,4 @@ document.addEventListener("click", e => { if (e.target.closest("#pmBeniOk")) pmB
 /* se il grafico è stato disegnato a un'altra larghezza (rotazione del telefono), si ridisegna */
 let pmRz = 0; window.addEventListener("resize", () => { clearTimeout(pmRz); pmRz = setTimeout(() => { if (current === "patrimonio" && PM.R && pmHas()) $("#pmChart").innerHTML = pmChart(PM.R); }, 250); });
 
-export { pmImport, PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu, pmFindBeni, beneTipo, pmReset, pacDue, pacNext, pacDate, cedDue };
+export { pmQuantaSummary, pmQuantaOp, pmImport, PM, pmCalc, pmEnter, pmFromFile, pmHas, pmOfferRender, pmRender, pmToLab, pmDownload, pmMenu, pmFindBeni, beneTipo, pmReset, pacDue, pacNext, pacDate, cedDue };

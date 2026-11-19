@@ -74,7 +74,7 @@ button.del:hover{background:#fff4f5}
   <h2>1. Il tuo file</h2>
   <p>Quando carichi un Excel o un CSV, il file viene aperto e letto <b>dal tuo browser</b>, sul tuo computer. Il motore di calcolo (rendimenti, rischio, simulazioni, stress test, FIRE) gira anch'esso nel browser. Non carichiamo il file su un server e non ne conserviamo copie.</p>
 
-  <h2>2. Quando interviene l'IA</h2>
+  <h2 id="ia">2. Quando interviene l'IA</h2>
   <p>Alcune funzioni usano un modello di intelligenza artificiale di un fornitore esterno (a seconda della disponibilità: Google Gemini, Groq o Anthropic Claude). Il nostro server inoltra la richiesta e non la conserva. Ecco cosa viene mandato:</p>
   <div class="tw"><table>
     <thead><tr><th>Funzione</th><th>Quando</th><th>Cosa viene mandato</th></tr></thead>
@@ -84,7 +84,9 @@ button.del:hover{background:#fff4f5}
       <tr><td>«Carica uno screenshot»</td><td>Solo se scegli le immagini e spunti «Ho capito: invia le immagini all'IA»</td><td>Le immagini intere, rimpicciolite dal browser, per leggere titoli, quantità e valori. Non le salviamo. Prima di inviarle puoi coprire quello che non serve (nome, numero di conto). Per i titoli che hanno solo il nome, all'IA mandiamo anche il nome per trovare l'ISIN, poi verificato su OpenFIGI.</td></tr>
       <tr><td>«Correggi con l'IA»</td><td>Solo se premi il pulsante</td><td>Le intestazioni e le righe con un possibile problema (al massimo 90), per proporre una correzione.</td></tr>
       <tr><td>Ricerca degli ISIN mancanti</td><td>Quando nel file mancano gli ISIN</td><td>Nome e ticker degli strumenti senza ISIN. Nessuna quantità né valore.</td></tr>
-      <tr><td>Quanta, l'analista IA</td><td>Solo quando le scrivi</td><td>I tuoi messaggi e i risultati dei calcoli che servono per rispondere (per esempio rendimento, rischio o valori in euro). Non il file.</td></tr>
+      <tr><td>Quanta, l'analista IA</td><td>Solo quando le scrivi o le parli</td><td>I tuoi messaggi e i risultati dei calcoli che servono per rispondere (per esempio rendimento, rischio o valori in euro). Se le chiedi del tuo patrimonio, anche il suo riepilogo: strumenti, quote, valori, guadagni, tasse stimate e obiettivi. Non il file. Le operazioni che le detti non si salvano finché non premi «Conferma».</td></tr>
+      <tr><td>Foto mandate a Quanta</td><td>Solo se scegli una foto, dopo il permesso («Ho capito, scegli la foto»)</td><td>La foto, rimpicciolita dal browser, solo a Google Gemini, per leggerla e risponderti. Non la salviamo. Puoi coprire prima nome, indirizzo o numero di conto.</td></tr>
+      <tr><td>Voce e dettatura di Quanta</td><td>Solo se premi il microfono o accendi «Voce»</td><td>Da noi niente audio: la dettatura è quella del tuo browser (Chrome la affida ai server di Google, Safari a quelli di Apple, secondo le loro regole) e arriva a Quanta come testo. La lettura ad alta voce la fa il tuo dispositivo.</td></tr>
       <tr><td>«Cosa stava succedendo sui mercati?»</td><td>Solo se premi il pulsante</td><td>I nomi degli strumenti, il periodo e la perdita del calo peggiore.</td></tr>
     </tbody>
   </table></div>
