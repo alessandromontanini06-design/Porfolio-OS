@@ -243,7 +243,10 @@ function plain(t){return String(t||"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/^
 /* ---------- voce: prima quella naturale online (Gemini TTS da /api/assistant?modo=voce), se non risponde quella del dispositivo ----------
    L'audio arriva a pezzi di frasi: il primo suona mentre si prepara il secondo. Se la voce online fallisce, per 5 minuti si usa quella del dispositivo. */
 const VOX={ctx:null,src:null,off:0,cache:new Map()};
-const splitParts=(t,max)=>(t.match(/[^.!?;:]+[.!?;:]*/g)||[]).reduce((a,x)=>{const s=x.trim();if(!s)return a;if(a.length&&a[a.length-1].length+s.length<max)a[a.length-1]+=" "+s;else a.push(s.slice(0,max));return a;},[]);
+/* frasi: finiscono dove dopo il segno c'è uno spazio (così «12.829» resta un numero); le frasi troppo lunghe si tagliano a una virgola o a uno spazio */
+const sentences=t=>String(t||"").replace(/([.!?;:])\s+/g,"$1\n").split("\n").map(x=>x.trim()).filter(Boolean);
+const cutLong=(s,max)=>{const out=[];while(s.length>max){let c=s.lastIndexOf(", ",max);if(c<max*.5)c=s.lastIndexOf(" ",max);if(c<=0)c=max;out.push(s.slice(0,c+1).trim());s=s.slice(c+1).trim();}if(s)out.push(s);return out;};
+const splitParts=(t,max)=>sentences(t).flatMap(s=>cutLong(s,max)).reduce((a,s)=>{if(a.length&&a[a.length-1].length+s.length<max)a[a.length-1]+=" "+s;else a.push(s);return a;},[]);
 function audioCtx(){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;if(!VOX.ctx){try{VOX.ctx=new C();}catch{return null;}}if(VOX.ctx.state==="suspended")VOX.ctx.resume().catch(()=>{});return VOX.ctx;}
 const cloudOn=()=>Date.now()>VOX.off&&!!(window.AudioContext||window.webkitAudioContext);
 const voceScelta=()=>{try{return localStorage.getItem("pos-quanta-voce-v1")||undefined;}catch{return undefined;}};
@@ -259,6 +262,9 @@ async function playBuf(buf,tok){
   const ab=await ctx.decodeAudioData(buf.slice(0));if(Q.tok!==tok)return false;
   return new Promise(res=>{const s=ctx.createBufferSource();s.buffer=ab;s.connect(ctx.destination);VOX.src=s;s.onended=()=>{if(VOX.src===s)VOX.src=null;res(true);};s.start();});
 }
+/* per la voce online la prima parte è solo la prima frase (arriva prima), poi pezzi più lunghi preparati mentre parla */
+function cloudParts(t){const sent=sentences(t).flatMap(s=>cutLong(s,450));let n=1;while(n<sent.length&&sent.slice(0,n).join(" ").length<25)n++;
+  return [sent.slice(0,n).join(" "),...splitParts(sent.slice(n).join(" "),450)].filter(Boolean);}
 function browserSpeak(t,end){const parts=splitParts(t,180),voice=pickVoice();if(!parts.length){end(true);return;}
   parts.forEach((x,k)=>{const u=new SpeechSynthesisUtterance(x);u.lang="it-IT";if(voice)u.voice=voice;u.rate=1.03;u.pitch=1;if(k===parts.length-1)u.onend=()=>end(true);u.onerror=()=>end(false);TTS.speak(u);});}
 /* legge un testo; i = risposta della chat che si sta leggendo, done = cosa fare dopo */
@@ -267,7 +273,7 @@ async function speakText(text,i=null,done=null){
   Q.speaking=i;Q.tok=tok;speakUi(true);renderChat();barUi();
   const end=ok=>{if(Q.tok!==tok)return;Q.tok=null;Q.speaking=null;speakUi(false);renderChat();barUi();if(ok&&done)done();};
   let rest=t;
-  if(cloudOn()){const parts=splitParts(t,450);let k=0;
+  if(cloudOn()){const parts=cloudParts(t);let k=0;
     try{let next=cloudAudio(parts[0]);
       for(;k<parts.length;k++){const buf=await next;if(Q.tok!==tok)return;next=k+1<parts.length?cloudAudio(parts[k+1]):null;if(next)next.catch(()=>{});
         if(!await playBuf(buf,tok)||Q.tok!==tok)return;}

@@ -57,10 +57,11 @@ export async function voce(req, res) {
   if (rateLimited(req, "voce", Number(env.VOICE_HOURLY_LIMIT || 200))) { res.status(429).json({ error: "Troppe letture in quest'ora: uso la voce del dispositivo." }); return; }
   const b = readBody(req) || {}, text = String(b.testo || "").replace(/\s+/g, " ").trim().slice(0, MAX), voice = VOCI.includes(b.voce) ? b.voce : VOCE;
   if (!text) { res.status(400).json({ error: "Manca il testo." }); return; }
-  const k = keyOf({ text, voice, m: MODELS[0] }), hit = cache.get(k);
+  const models = MODELS.includes(b.modello) ? [b.modello, ...MODELS.filter(m => m !== b.modello)] : MODELS;
+  const k = keyOf({ text, voice, m: models[0] }), hit = cache.get(k);
   if (hit) { res.status(200).json({ ...hit, cached: true }); return; }
   const started = Date.now(), errors = [];
-  for (const model of MODELS) for (const via of [viaInteractions, viaGenerate]) {
+  for (const model of models) for (const via of [viaInteractions, viaGenerate]) {
     const left = BUDGET - (Date.now() - started); if (left < 3000) break;
     try {
       const audio = await via(model, text, voice, Math.min(18_000, left));
