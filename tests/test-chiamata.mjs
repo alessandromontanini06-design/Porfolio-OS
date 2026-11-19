@@ -102,7 +102,7 @@ const rate = async () => { const a = await ang(); const t0 = Date.now(); await w
 const w0 = await p.evaluate(() => document.getElementById("qcSfera").getBoundingClientRect().width);
 const s1 = await st(); await wait(1200); const vFast = await rate(); const w1 = await p.evaluate(() => document.getElementById("qcSfera").getBoundingClientRect().width);
 await ws("srv", { serverContent: { interrupted: true } }); await wait(2600); const vSlow = await rate();
-t(`quando Quanta parla la sfera gira veloce, quando tace gira piano (${Math.round(vFast)}°/s → ${Math.round(vSlow)}°/s)`, vFast > 150 && vSlow < 80 && vSlow > 0, `${vFast} ${vSlow}`);
+t(`quando Quanta parla la sfera gira veloce, quando ascolta gira come nella home (${Math.round(vFast)}°/s → ${Math.round(vSlow)}°/s)`, vFast > 300 && vSlow > 70 && vSlow < 160 && vFast > 2.5 * vSlow, `${vFast} ${vSlow}`);
 t("la sfera non cambia grandezza", Math.abs(w1 - w0) < 1, `${w0} ${w1}`);
 t("se l'utente interrompe, Quanta si ferma e ascolta", s1 === "speaking" && await st() === "listening", `${s1} → ${await st()}`);
 const nMic = await p.evaluate(() => window.__wsLog.filter(m => m.realtimeInput && m.realtimeInput.audio).length);

@@ -1227,15 +1227,17 @@ body.q-calling{overflow:hidden}
 .qc-btn .qc-slash{display:none}.qc-btn.off{background:#fff;color:#000}.qc-btn.off .qc-slash{display:inline}
 .qc-end{background:#fff;color:#000}
 .q-call[data-st="connecting"] #qcMute,.q-call[data-st="error"] #qcMute,.q-call[data-st="connecting"] .qc-in,.q-call[data-st="error"] .qc-in{opacity:.35;pointer-events:none}
-/* la sfera di Quanta nella chiamata: la scala la decide chiamata.js (grande quando parla, piccola quando ascolta) */
+/* la sfera di Quanta nella chiamata: sempre della stessa grandezza, il riflesso gira (velocità decisa da chiamata.js).
+   clip-path: su Safari (iPhone) il riflesso sfocato che gira usciva dal bordo rotondo e lasciava un'ombra quadrata; l'alone sta dietro, nel ::before */
 .qc-orb{position:relative;width:min(50vw,220px);aspect-ratio:1;display:grid;place-items:center}
-.qc-orb .qc-sfera{width:100%;height:100%;transition:filter .4s,box-shadow .6s;
-  box-shadow:0 0 0 1px rgba(255,255,255,.05),0 0 70px rgba(201,242,74,.22),inset 0 -16px 34px rgba(60,80,0,.38),inset 0 12px 26px rgba(255,255,255,.5)}
-.qc-sfera .o1,.qc-sfera .o2{animation:none!important;will-change:transform}.qc-sfera .o3{animation-duration:3.6s}
-.q-call[data-st="speaking"] .qc-sfera{box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 120px rgba(201,242,74,.42),inset 0 -16px 34px rgba(60,80,0,.38),inset 0 12px 26px rgba(255,255,255,.5)}
+.qc-orb::before{content:"";position:absolute;inset:-26%;border-radius:50%;background:radial-gradient(circle,rgba(201,242,74,.3) 0,rgba(201,242,74,.12) 38%,rgba(201,242,74,0) 66%);opacity:.7;transition:opacity .6s;pointer-events:none}
+.qc-orb .qc-sfera{width:100%;height:100%;-webkit-clip-path:circle(50% at 50% 50%);clip-path:circle(50% at 50% 50%);transition:filter .4s;box-shadow:inset 0 -16px 34px rgba(60,80,0,.38),inset 0 12px 26px rgba(255,255,255,.5)}
+.qc-sfera .o1,.qc-sfera .o2{animation:none!important}.qc-sfera .o3{animation-duration:3.6s}
+.q-call[data-st="speaking"] .qc-orb::before{opacity:1}
 .q-call[data-st="connecting"] .qc-sfera{animation:qcbr 1.8s ease-in-out infinite}
 @keyframes qcbr{50%{opacity:.55}}
-.q-call[data-st="muted"] .qc-sfera,.q-call[data-st="error"] .qc-sfera{filter:grayscale(1) brightness(.55);box-shadow:none}
+.q-call[data-st="muted"] .qc-sfera,.q-call[data-st="error"] .qc-sfera{filter:grayscale(1) brightness(.55)}
+.q-call[data-st="muted"] .qc-orb::before,.q-call[data-st="error"] .qc-orb::before{opacity:0}
 @media (prefers-reduced-motion:reduce){.qc-sfera i,.q-call .qc-sfera{animation:none!important}}
 
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */

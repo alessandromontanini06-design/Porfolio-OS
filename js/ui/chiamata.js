@@ -50,7 +50,8 @@ function playPcm(b64, mime) {
 function flush() { C.play.forEach(s => { try { s.stop(); } catch {} }); C.play.clear(); C.next = 0; }
 
 /* ---------- la sfera di Quanta: sempre della stessa grandezza; gira veloce quando Quanta parla, piano quando ascolta (gradi al secondo) ---------- */
-const SPIN = { speaking: 330, thinking: 200, listening: 38, connecting: 28, muted: 12, error: 0 };
+/* in ascolto gira come la sfera della home (un giro ogni 3,2 s); quando parla circa tre volte più veloce */
+const SPIN = { speaking: 400, thinking: 260, listening: 112, connecting: 90, muted: 24, error: 0 };
 function sferaSpin(deg) { const el = $("#qcSfera"); if (!el) return; const a = el.querySelector(".o1"), b = el.querySelector(".o2");
   if (a) a.style.transform = `rotate(${deg.toFixed(1)}deg)`; if (b) b.style.transform = `rotate(${(-deg * 0.6).toFixed(1)}deg)`; }
 
@@ -74,7 +75,7 @@ function level(now) {
   C.lv = C.lv * 0.75 + v * 0.25;
   /* la velocità segue lo stato (accelera e rallenta piano, niente scatti); la grandezza non cambia */
   const st = ($("#qCall") || {}).dataset ? $("#qCall").dataset.st : "listening", dt = C.last ? Math.min(0.05, (now - C.last) / 1000) : 0; C.last = now;
-  C.vel += ((SPIN[st] ?? 38) - C.vel) * 0.035; C.ang = (C.ang + C.vel * dt) % 360; sferaSpin(C.ang);
+  C.vel += ((SPIN[st] ?? 112) - C.vel) * 0.035; C.ang = (C.ang + C.vel * dt) % 360; sferaSpin(C.ang);
   C.raf = requestAnimationFrame(level);
 }
 function opRender() {
