@@ -27,7 +27,7 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.03em}
 /* ---------- barra in alto: marchio a sinistra, sezioni al centro, spazi e stato a destra ---------- */
 .topbar{background:rgba(255,255,255,.86);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--line);padding:10px max(20px,calc((100vw - 1360px)/2 + 20px));height:60px}
 .brand{color:var(--fg);font-family:var(--f-display);font-weight:800;letter-spacing:-.025em;text-transform:none}
-.brand .mk{width:34px;height:34px;background:none!important;border-radius:0;box-shadow:none;display:block;color:var(--fg)}
+.brand .mk{width:38px;height:38px;background:none!important;border-radius:0;box-shadow:none;display:block;color:var(--fg)}
 .brand .mk svg{width:100%;height:100%;overflow:visible;display:block}
 .pz-brand .mk{width:28px;height:28px;background:none!important;border-radius:0;display:block;color:currentColor}.pz-brand .mk svg{width:100%;height:100%;overflow:visible}
 .status .chip.live{display:none}
@@ -1189,7 +1189,7 @@ body[data-ruolo="pro"] .ar-topm{display:none}
 .chat .q-note{font-size:.74rem;text-align:center;margin:0}.chat .q-note a{color:inherit}
 
 /* ---------- Marchio: Quanta Portfolio ---------- */
-.brand .bw{white-space:nowrap}.brand .bw1{font-weight:800;letter-spacing:-.03em}.brand .bw2{font-weight:500;letter-spacing:-.02em;opacity:.62}
+.brand{gap:8px}.brand .bw{white-space:nowrap;font-family:"Inter Tight",sans-serif;font-size:1.22rem;letter-spacing:-.05em;line-height:1}.brand .bw1{font-weight:800;color:var(--fg)}.brand .bw2{font-weight:500;color:#8A8A84;opacity:1}
 @media (max-width:340px){.brand .bw2{display:none}}
 
 /* ---------- Chiamata con Quanta: come la modalità voce delle app di IA (nero, una sfera viva, barra in basso) ---------- */
