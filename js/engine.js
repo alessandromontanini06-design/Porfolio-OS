@@ -1648,6 +1648,47 @@ function personalPerformance(dates,assets,tx){
       return {value:V[i],invested:inv_,bought:q.bought,sold:q.sold,income:q.income,gain:V[i]-inv_,clipped:q.clipped,ops:q.flows.length,
         xirr:q.flows.length&&fl.some(f=>f.v>0)&&fl.some(f=>f.v<0)?xirr(fl):NaN};})};
 }
+/* rendimento personale ESATTO quando i movimenti hanno le quote: valore = quote possedute × prezzo di mercato a ogni data (euro).
+   I prezzi si ricostruiscono a ritroso dai rendimenti dei dati, partendo dall'ultimo prezzo di mercato di ogni strumento (lastPx, euro),
+   così sono gli stessi numeri del resto del laboratorio. k100[i] = 0,01 per le obbligazioni (quantità = nominale, prezzo su 100).
+   Restituisce null (si usa il calcolo con gli euro) se un movimento non ha le quote o se i prezzi pagati non tornano con quelli di mercato
+   (frazionamenti non registrati, pence contro sterline, prezzi su 100): mediana del rapporto fuori da 0,6–1,6. */
+function personalPerformanceQty(dates,assets,tx,lastPx,k100){
+  const n=dates.length,k=assets.length,out={unmatched:[],before:0,after:0,used:0,metodo:"quote"};k100=k100||[];
+  const rows=[];
+  for(const x of tx){if(x.i==null||x.i<0||x.i>=k){out.unmatched.push(x);continue;}const inc=/divid|cedol|coupon|interess/i.test(x.type||"");if(!inc&&!(x.qty>0))return null;rows.push({...x,inc});}
+  if(!rows.length||n<2)return null;
+  rows.sort((a,b)=>a.d-b.d);
+  /* prezzi a ogni data, a ritroso dall'ultimo prezzo */
+  const px=assets.map((a,i)=>{const P=new Array(n).fill(NaN),L=+lastPx[i];if(!(L>0))return P;P[n-1]=L;for(let t=n-2;t>=0;t--){const r=a.ret[t+1];P[t]=Number.isFinite(r)&&r>-1?P[t+1]/(1+r):P[t+1];}return P;});
+  const idxOf=d=>{let p=dates.findIndex(x=>x.getTime()>=d.getTime());return p<0?n-1:p;};
+  /* i prezzi pagati tornano con quelli di mercato? (per ogni strumento con acquisti o vendite) */
+  const ratios=assets.map(()=>[]);
+  for(const x of rows){if(x.inc)continue;if(!(lastPx[x.i]>0))return null;const t=idxOf(x.d),m=px[x.i][Math.max(0,t-1)],m2=px[x.i][t],mk=Number.isFinite(m)&&Number.isFinite(m2)?(m+m2)/2:m2,paid=Math.abs(x.amount)/x.qty/(k100[x.i]||1);if(mk>0&&paid>0)ratios[x.i].push(paid/mk);}
+  for(const r of ratios){if(!r.length)continue;const so=r.slice().sort((a,b)=>a-b),med=so[Math.floor(so.length/2)];if(!(med>0.6&&med<1.6))return null;}
+  const per=assets.map(()=>({q:0,bought:0,sold:0,income:0,clipped:0,flows:[],inv:0}));
+  const series=[],flowsT=new Array(n).fill(0);let ri=0,inv=0,twr=1,peak=1,mdd=0,first=-1,prevV=0,neg=false;
+  for(let t=0;t<n;t++){
+    let F=0;
+    while(ri<rows.length&&(rows[ri].d.getTime()<=dates[t].getTime()||t===n-1)){const x=rows[ri++],q=per[x.i];if(x.d.getTime()>dates[n-1].getTime())out.after++;
+      if(t===0&&n>1&&dates[0].getTime()-x.d.getTime()>dates[1].getTime()-dates[0].getTime())out.before++;
+      F+=x.amount;q.inv+=x.amount;q.flows.push({t:x.d,v:-x.amount});out.used++;
+      if(x.inc){q.income-=x.amount;continue;}
+      if(x.amount>0){q.bought+=x.amount;q.q+=x.qty;}else{q.sold-=x.amount;q.q-=x.qty;if(q.q<-1e-9){neg=true;q.clipped+=-q.q*(px[x.i][t]||0)*(k100[x.i]||1);q.q=0;}}}
+    flowsT[t]=F;
+    let V=0;for(let i=0;i<k;i++)if(per[i].q>1e-12)V+=per[i].q*px[i][t]*(k100[i]||1);
+    if(prevV>0){const r=(V-F)/prevV-1;if(Number.isFinite(r)){twr*=1+r;if(twr>peak)peak=twr;mdd=Math.min(mdd,twr/peak-1);}}
+    inv+=F;if(first<0&&F!==0)first=t;
+    if(first>=0)series.push({t,value:V,invested:inv,twr});prevV=V;
+  }
+  if(first<0)return null;
+  const last=n-1,value=per.reduce((s,q,i)=>s+(q.q>1e-12?q.q*px[i][last]*(k100[i]||1):0),0);if(!Number.isFinite(value))return null;
+  const years=(dates[last]-dates[first])/(365.25*864e5),flows=rows.map(x=>({t:x.d,v:-x.amount}));flows.push({t:dates[last],v:value});
+  return {...out,series,first,flowsT,value,invested:inv,gain:value-inv,gainPct:inv>0?value/inv-1:NaN,xirr:xirr(flows),twr:twr-1,twrAnn:years>0?Math.pow(twr,1/Math.max(years,1e-9))-1:NaN,years,mdd,miss:0,venduteTroppo:neg,
+    byAsset:assets.map((a,i)=>{const q=per[i],v=q.q>1e-12?q.q*px[i][last]*(k100[i]||1):0,fl=q.flows.concat(v>0?[{t:dates[last],v}]:[]);
+      return {value:v,invested:q.inv,bought:q.bought,sold:q.sold,income:q.income,gain:v-q.inv,clipped:q.clipped,ops:q.flows.length,quote:q.q,
+        xirr:q.flows.length&&fl.some(f=>f.v>0)&&fl.some(f=>f.v<0)?xirr(fl):NaN};})};
+}
 /* gli stessi versamenti messi in un benchmark (rendimenti di periodo allineati alle date) */
 function sameFlows(dates,bret,flowsByT){
   let V=0,inv=0;const series=[];
@@ -1899,6 +1940,6 @@ const btpSimbolo=b=>`BTP:${+(+b.cedola*100).toFixed(4)}:${String(b.scadenza).sli
 function btpDaSimbolo(s){const m=String(s||"").toUpperCase().match(/^BTP:(\d+(?:\.\d+)?):(\d{4}-\d{2}-\d{2})$/);return m?{cedola:+m[1]/100,scadenza:m[2],freq:2}:null;}
 const btpNome=b=>{const d=btpD(b.scadenza),c=+(+b.cedola*100).toFixed(3);return `BTP ${String(c).replace(".",",")}% ${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;};
 
-export const POS={bkNum,mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
+export const POS={personalPerformanceQty,bkNum,mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

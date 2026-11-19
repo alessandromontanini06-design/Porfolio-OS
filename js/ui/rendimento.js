@@ -44,6 +44,13 @@ function txEur(x){
   if(!(r>0)){const ks=[...m.keys()].sort(),prev=ks.filter(z=>z<=ym).pop()||ks[0];r=m.get(prev);}
   return r>0?{...x,amount:x.amount/k/r,amountOrig:x.amount}:x;
 }
+/* ultimo prezzo di mercato in euro di ogni strumento (dalla ricostruzione) e obbligazioni su 100 */
+function ppQuote(ds,tx,pos){
+  const last=ds.dates[ds.dates.length-1].toISOString().slice(0,7);
+  const lastPx=ds.assets.map(a=>{const c=S.rb.cols.find(x=>x.name===a.name);if(!c||!c.map||!c.map.size)return NaN;const ks=[...c.map.keys()].sort(),k=ks.filter(z=>z<=last).pop();return k?+c.map.get(k).v:NaN;});
+  const k100=ds.assets.map(a=>{const p=pos.find(x=>(x.ticker||x.nome)===a.name);return p&&(p.per100||p.btp)?0.01:1;});
+  try{return P.personalPerformanceQty(ds.dates,ds.assets,tx,lastPx,k100);}catch{return null;}
+}
 function realCalc(){
   if(!S.tx||!S.ds||!S.ds.ok)return null;
   const ds=S.ds,names=ds.assets.map(a=>a.name);
@@ -52,6 +59,8 @@ function realCalc(){
   const akas=ds.assets.map(a=>{const c=S.rb&&S.rb.cols.find(x=>x.name===a.name),q=pos.find(x=>(x.ticker||x.nome)===a.name);return new Set([a.name,c&&c.nome,c&&c.sym,q&&q.isin,q&&q.nome,q&&q.ticker].filter(Boolean).map(key));});
   const match=x=>{for(const v of [x.ticker,...(x.alias||[])]){const i=akas.findIndex(s=>s.has(key(v)));if(i>=0)return i;}return txMatch(x.ticker,names);};
   const tx=S.tx.rows.map(x=>({...txEur(x),i:match(x)}));
+  /* con le quote nel file e i prezzi di mercato: valore = quote × prezzo (come il patrimonio e come il broker); altrimenti euro × rendimenti */
+  const q=S.source&&S.source.kind==="rebuilt"&&S.rb?ppQuote(ds,tx,pos):null;if(q)return {pp:q,tx};
   const pp=P.personalPerformance(ds.dates,ds.assets,tx);if(pp.error)return {error:pp.error,tx};
   return {pp,tx};
 }
@@ -103,7 +112,7 @@ function renderReal(){
         :src.loading?`<span class="eyebrow">Confronto con l'indice</span><span style="color:var(--muted)">Scarico lo storico di ${esc(src.sym||"S&P 500")}…</span>`
         :`<span class="eyebrow">Confronto con l'indice</span><span style="color:var(--muted)">${esc(src.error||"Scegli un indice nella sezione Benchmark.")}</span>`}
       </div></div>
-    <p class="caption" style="margin-top:12px">Il valore segue i rendimenti degli strumenti nei dati e aggiunge ogni versamento a fine ${UNIT[f]?UNIT[f][0]:"periodo"}. ${S.source.kind==="rebuilt"?"I rendimenti sono quelli di mercato convertiti in euro con il cambio BCE di fine mese; il valore può differire un po' da quello del tuo broker (prezzi di fine mese, borsa diversa).":"I rendimenti vengono dai prezzi del file: se sono prezzi medi pagati, il valore è una stima."}${un.length?` Transazioni non collegate (strumento non nei dati): ${esc(un.join(", "))}.`:""}${pp.before?` ${pp.before} transazioni sono prima dell'inizio dei dati e sono contate dal primo periodo.`:""} TIR e rendimento ponderato su meno di un anno o due possono cambiare molto: non sono previsioni.</p>`;
+    <p class="caption" style="margin-top:12px">${pp.metodo==="quote"?"Il valore è quello delle quote del file per il prezzo di mercato di ogni mese, come lo calcola il broker (e il tuo patrimonio).":`Il valore segue i rendimenti degli strumenti nei dati e aggiunge ogni versamento a fine ${UNIT[f]?UNIT[f][0]:"periodo"}: nel file mancano le quote, quindi è una stima.`} ${S.source.kind==="rebuilt"?"I rendimenti sono quelli di mercato convertiti in euro con il cambio BCE di fine mese; il valore può differire un po' da quello del tuo broker (prezzi di fine mese, borsa diversa).":"I rendimenti vengono dai prezzi del file: se sono prezzi medi pagati, il valore è una stima."}${un.length?` Transazioni non collegate (strumento non nei dati): ${esc(un.join(", "))}.`:""}${pp.before?` ${pp.before} transazioni sono prima dell'inizio dei dati e sono contate dal primo periodo.`:""} TIR e rendimento ponderato su meno di un anno o due possono cambiare molto: non sono previsioni.</p>`;
   el.insertAdjacentHTML("beforeend",attribHTML(R));
   drawReal();
   {const gv=$("#growView");if(gv)gv.hidden=false;if(S.growView==="money")drawChart(false);}
