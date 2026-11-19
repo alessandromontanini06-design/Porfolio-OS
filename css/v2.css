@@ -1292,6 +1292,9 @@ body.q-calling{overflow:hidden}
 :root[data-theme="dark"] :is(h1,h2) em{background:none!important;color:var(--lime)}
 :root[data-theme="dark"] :is(.hm-end,.tile.lime,.kpi:first-child,.aud-card:not(.pro)) :is(h1,h2) em{color:inherit}
 :root[data-theme="dark"]{--ink-mark:#4A4A45}
+/* Safari (iPhone, iPad): il riflesso sfocato usciva dal cerchio della sfera e lasciava un quadrato grigio.
+   Gli strati che girano (grandi il 160% della sfera) si ritagliano sul cerchio della sfera: 50/160 = 31,25%. */
+.orb .o1,.orb .o2{-webkit-clip-path:circle(31.25% at 50% 50%);clip-path:circle(31.25% at 50% 50%)}
 
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
