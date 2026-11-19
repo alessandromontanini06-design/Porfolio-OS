@@ -60,10 +60,11 @@ const TOOLS = [
     quantita: { type: "number", description: "Quote (o nominale per un BTP); per acquisto e vendita." },
     prezzo: { type: "number", description: "Prezzo per quota in euro; per acquisto e vendita." },
     importo: { type: "number", description: "Importo netto incassato in euro; per dividendo e cedola." },
-    data: { type: "string", description: "AAAA-MM-GG; se l'utente non la dice, la data di oggi del contesto. «Ieri» = un giorno prima." },
+    data: { type: "string", description: "Sempre nel formato AAAA-MM-GG (per esempio 2026-11-18), calcolata dalla data di oggi del contesto: «ieri» = un giorno prima. Se l'utente non la dice, la data di oggi." },
     spese: { type: "number", description: "Commissioni in euro, se dette." } }, required: ["tipo", "strumento"] } },
   { name: "costi_banca", description: "Compila il calcolatore «Quanto ti costa la tua banca» con i numeri del rendiconto costi e oneri (MiFID), per esempio letti da una foto, e restituisce costo annuo, percentuale, effetto in 10 e 20 anni e confronto con un portafoglio di ETF. Valori come testo: euro («1.250,50») o percentuali («0,9%»).", parameters: { type: "object", properties: {
-    patrimonio_medio: { type: "string" }, costi_servizi: { type: "string" }, costi_prodotti: { type: "string" }, incentivi: { type: "string", description: "«pagamenti ricevuti da terzi» o retrocessioni, già compresi nei costi." } }, required: ["patrimonio_medio"] } },
+    patrimonio_medio: { type: "string", description: "Solo il numero, come scritto: «100.000,00» o «0,9%»." }, costi_servizi: { type: "string", description: "Solo il numero." }, costi_prodotti: { type: "string", description: "Solo il numero." },
+    incentivi: { type: "string", description: "Solo il numero della riga degli incentivi (nel rendiconto si chiama «pagamenti ricevuti da terzi» o retrocessioni), già compresi nei costi; vuoto se non c'è." } }, required: ["patrimonio_medio"] } },
   { name: "vai_a", description: "Porta l'utente a una pagina del sito quando lo chiede («portami alle simulazioni», «apri il patrimonio»).", parameters: { type: "object", properties: {
     pagina: { type: "string", enum: ["home", "patrimonio", "laboratorio", "strumenti", "rischio", "simulazioni", "indipendenza_finanziaria", "crisi", "frontiera", "benchmark", "costi_banca"] } }, required: ["pagina"] } },
   { name: "profilo_rischio", description: "Risultato del test «La tua allocazione è coerente con te?», se l'utente lo ha fatto: perdita che regge, perdita peggiore del portafoglio, coerenza, quota investibile entro la soglia, risposte su orizzonte e liquidità.", parameters: { type: "object", properties: {} } }

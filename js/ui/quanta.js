@@ -20,7 +20,7 @@ $("#chatClose").addEventListener("click",closeChat);
 $("#chatNew").addEventListener("click",()=>{if(chatBusy)return;S.chat=[];S.chatView=[];renderChat();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#chat").classList.contains("open"))closeChat();});
 function chatContext(){
-  const oggi=new Date().toISOString().slice(0,10),pm=pmHas()?"l'utente ha un patrimonio salvato (strumento patrimonio)":"nessun patrimonio salvato",extra=`oggi è il ${oggi}; ${pm}${Q.lastSaved?`; appena salvato: ${Q.lastSaved}`:""}${Q.fromVoice?"; l'utente sta parlando a voce: rispondi breve e naturale":""}`;
+  const oggi=oggiLoc(),pm=pmHas()?"l'utente ha un patrimonio salvato (strumento patrimonio)":"nessun patrimonio salvato",extra=`oggi è il ${oggi}; ${pm}${Q.lastSaved?`; appena salvato: ${Q.lastSaved}`:""}${Q.fromVoice?"; l'utente sta parlando a voce: rispondi breve e naturale":""}`;
   if(!S.lab||!S.ds||!S.ds.ok)return `${extra}; nessun laboratorio costruito: rispondi a domande generali sul sito e sui concetti, senza inventare numeri del portafoglio dell'utente (quelli del patrimonio si leggono con lo strumento patrimonio)`;
   return extra+"; "+chatContextLab();
 }
@@ -326,14 +326,28 @@ function sugItems(){const acts=[{t:"Leggi la foto del rendiconto della banca",ic
 const NO_LAB=new Set(["patrimonio","registra_operazione","costi_banca","vai_a"]);
 Object.assign(TOOL_L,{patrimonio:"il tuo patrimonio",costi_banca:"quanto ti costa la banca",vai_a:"apro la pagina"});
 const OPQ_L={acquisto:"Acquisto",vendita:"Vendita",dividendo:"Dividendo",cedola:"Cedola"};
+/* la data di oggi sul fuso dell'utente, e le date come le dicono le IA o le persone: «ieri», «18/11», «18 novembre 2026» (null se non è chiara) */
+const oggiLoc=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+const MESI_IT=["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
+function dataIt(v,oggi){
+  const s=String(v||"").trim().toLowerCase().replace(/[’`]/g,"'");if(!s||s==="oggi")return oggi;
+  const ok=r=>{const t=new Date(r+"T12:00:00Z");return !isNaN(t)&&t.toISOString().slice(0,10)===r?r:null;},pad=n=>String(n).padStart(2,"0");
+  const back=n=>{const t=new Date(oggi+"T12:00:00Z");t.setUTCDate(t.getUTCDate()-n);return t.toISOString().slice(0,10);};
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return ok(s);if(s==="ieri")return back(1);if(/^(l')?altro ?ieri$/.test(s))return back(2);
+  const fix=(y,mo,d,hasY)=>{let r=ok(`${y}-${pad(mo)}-${pad(d)}`);if(r&&!hasY&&r>oggi)r=ok(`${y-1}-${pad(mo)}-${pad(d)}`);return r;};
+  let m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2}|\d{4}))?$/);if(m){const y=m[3]?(+m[3]<100?2000+ +m[3]:+m[3]):+oggi.slice(0,4);return fix(y,+m[2],+m[1],!!m[3]);}
+  m=s.match(/^(\d{1,2})\s+([a-zà-ù]+)\.?(?:\s+(\d{4}))?$/);if(m){const k=MESI_IT.indexOf(m[2].slice(0,3));if(k>=0)return fix(m[3]?+m[3]:+oggi.slice(0,4),k+1,+m[1],!!m[3]);}
+  return null;
+}
 const dIt=d=>`${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}`;
 function opText(o){const n=x=>fmtN(x,x%1?(x<10?3:2):0);return o.tipo==="acquisto"||o.tipo==="vendita"?`${OPQ_L[o.tipo]} · ${n(o.quantita)} ${o.quantita===1?"quota":"quote"} di ${o.strumento} a ${fmtN(o.prezzo,2)} € · ${dIt(o.data)}${o.spese?` · spese ${fmtN(o.spese,2)} €`:""}`:`${OPQ_L[o.tipo]} · ${fmtN(o.importo,2)} € da ${o.strumento} · ${dIt(o.data)}`;}
 function opCard(v){const o=v.op;return `<div class="msg q-op ${v.st}" data-op="${v.id}"><span class="eyebrow">${v.st==="done"?"Salvato nel patrimonio":v.st==="no"?"Non salvato":v.st==="err"?"Non salvato":"Da confermare"}</span><b>${esc(opText(o))}</b>${v.st==="wait"?`<span class="q-opb"><button type="button" class="btn sm lime" data-opok="${v.id}">Conferma</button><button type="button" class="btn sm" data-opno="${v.id}">Annulla</button></span>`:v.st==="saving"?`<small>Salvo…</small>`:v.msg?`<small>${esc(v.msg)}</small>`:""}</div>`;}
 Object.assign(TOOLS_LOCAL,{
   patrimonio:()=>pmQuantaSummary(),
   registra_operazione:a=>{
-    const tipo=String(a.tipo||""),str=String(a.strumento||"").trim().slice(0,60),oggi=new Date().toISOString().slice(0,10),data=/^\d{4}-\d{2}-\d{2}$/.test(a.data||"")?a.data:oggi;
-    if(!OPQ_L[tipo])return {error:"tipo di operazione non previsto"};if(!str)return {error:"manca lo strumento: chiedilo all'utente"};if(data>oggi)return {error:"la data è nel futuro: chiedi la data giusta"};
+    const tipo=String(a.tipo||""),str=String(a.strumento||"").trim().slice(0,60),oggi=oggiLoc(),data=dataIt(a.data,oggi);
+    if(!OPQ_L[tipo])return {error:"tipo di operazione non previsto"};if(!str)return {error:"manca lo strumento: chiedilo all'utente"};
+    if(!data)return {error:"data non chiara: chiedi all'utente il giorno (per esempio 18/11/2026)"};if(data>oggi)return {error:"la data è nel futuro: chiedi la data giusta"};
     const o={tipo,strumento:str,data,quantita:+a.quantita||0,prezzo:+a.prezzo||0,importo:+a.importo||0,spese:Math.max(0,+a.spese||0)};
     if((tipo==="acquisto"||tipo==="vendita")&&!(o.quantita>0&&o.prezzo>0))return {error:"mancano le quote o il prezzo: chiedili all'utente"};
     if((tipo==="dividendo"||tipo==="cedola")&&!(o.importo>0))return {error:"manca l'importo incassato: chiedilo all'utente"};

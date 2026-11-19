@@ -38,6 +38,8 @@ p.on("request", r => {
     : /comprato/.test(t) ? call("registra_operazione", OP.acquisto)
     : /venduto 5 /.test(t) ? call("registra_operazione", OP.v5)
     : /venduto 1000/.test(t) ? call("registra_operazione", OP.v1000)
+    : /2 SWDA ieri/.test(t) ? call("registra_operazione", { tipo: "acquisto", strumento: "SWDA", quantita: 2, prezzo: 99, data: "ieri" })
+    : /data strana/.test(t) ? call("registra_operazione", { tipo: "acquisto", strumento: "SWDA", quantita: 2, prezzo: 99, data: "il giorno di Natale" })
     : /costa/.test(t) ? call("costi_banca", { patrimonio_medio: "100.000", costi_servizi: "800", costi_prodotti: "700", incentivi: "300" })
     : /portami/.test(t) ? call("vai_a", { pagina: "costi_banca" })
     : /simulazioni/.test(t) ? call("vai_a", { pagina: "simulazioni" })
@@ -48,6 +50,7 @@ let pass = 0, fail = 0; const t = (n, ok, i = "") => { ok ? pass++ : fail++; con
 const ops = () => p.evaluate(() => JSON.parse(localStorage.getItem("pos-patrimonio-v1")).operazioni);
 const idle = () => p.waitForFunction(() => !document.querySelector("#chatLog .typing") && !document.getElementById("chatForm").classList.contains("talking") && document.getElementById("chatSend").dataset.mode !== "stop", { timeout: 20000 }).catch(() => {});
 const ask = async q => { await p.evaluate(q => { const i = document.getElementById("chatIn"); i.value = q; document.getElementById("chatForm").requestSubmit(); }, q); await wait(300); await idle(); await wait(200); };
+const lastToolIn = bs => { const x = bs[bs.length - 1].messages.filter(m => m.role === "tool").pop(); return x && x.result; };
 const lastTool = name => { for (let k = bodies.length - 1; k >= 0; k--) { const x = bodies[k].messages.filter(m => m.role === "tool" && m.name === name).pop(); if (x) return x.result; } return null; };
 const log = () => p.evaluate(() => document.getElementById("chatLog").innerText.replace(/\s+/g, " "));
 const mode = () => p.evaluate(() => document.getElementById("chatSend").dataset.mode);
@@ -102,6 +105,15 @@ await p.evaluate(() => { window.__hearQ = []; }); await p.click("#chatSend"); aw
 const mid = await mode(); await p.click("#chatSend"); await wait(400);
 t("il quadrato chiude la conversazione a voce", mid === "stop" && await mode() === "talk" && !(await log()).endsWith("per riprendere. Non ti ho sentito, così ho chiuso la conversazione a voce. Tocca il pulsante tondo per riprendere."));
 
+/* date dette dall'IA a parole: «ieri» diventa la data vera, una data non chiara si chiede */
+await ask("ho comprato 2 SWDA ieri a 99");
+const ieri = await p.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 1); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; });
+const cIeri = await p.evaluate(() => [...document.querySelectorAll(".q-op")].pop().innerText.replace(/\s+/g, " "));
+t(`«ieri» detto dall'IA diventa ${ieri}`, cIeri.includes(ieri), cIeri);
+await p.evaluate(() => [...document.querySelectorAll("[data-opno]")].pop().click()); await wait(200);
+const nOp = await p.evaluate(() => document.querySelectorAll(".q-op").length);
+await ask("data strana");
+t("una data non chiara non prepara la scheda e la chiede", await p.evaluate(() => document.querySelectorAll(".q-op").length) === nOp && /data non chiara/.test(JSON.stringify(lastToolIn(bodies))), "");
 /* 5. vendere troppo */
 await ask("ho venduto 1000 quote a 100");
 await p.evaluate(() => [...document.querySelectorAll("[data-opok]")].pop().click()); await wait(1200);
