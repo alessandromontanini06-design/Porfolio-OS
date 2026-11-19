@@ -18,6 +18,7 @@ p.on("pageerror", e => errs.push(e.message));
 await p.evaluateOnNewDocument(d => {
   if (!sessionStorage.getItem("seeded")) { localStorage.clear(); localStorage.setItem("pos-patrimonio-v1", d); sessionStorage.setItem("seeded", "1"); }
   window.__spoken = []; window.__hearQ = [];
+  window.WebSocket = undefined; /* niente chiamata in tempo reale: qui si prova la conversazione a voce semplice (la riserva); la chiamata ha test-chiamata */
   window.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
   Object.defineProperty(window, "speechSynthesis", { configurable: true, value: { speak(u) { window.__spoken.push(u.text); setTimeout(() => u.onend && u.onend(), 20); }, cancel() {}, getVoices: () => [{ name: "Google italiano", lang: "it-IT" }], addEventListener() {} } });
   const Rec = class { start() { const t = window.__hearQ.shift(); setTimeout(() => { if (t) this.onresult && this.onresult({ results: [[{ transcript: t }]] }); else this.onerror && this.onerror({ error: "no-speech" }); setTimeout(() => this.onend && this.onend(), 60); }, 150); }

@@ -4,6 +4,7 @@ import { $, CALM, G, HAS_G, P, REDUCE, S, esc, fmtDate, fmtN, fmtPct } from "./c
 import { current, go } from "./scene.js";
 import { pmHas, pmQuantaOp, pmQuantaSummary } from "./patrimonio.js";
 import { cbSet } from "./costibanca.js";
+import { callStart, callSupported } from "./chiamata.js";
 import { trackOnce } from "./importa.js";
 import { cmpCalc, pfAsset } from "./portafoglio.js";
 import { macroFor } from "./laboratorio.js";
@@ -50,6 +51,7 @@ function renderChat(){
   log.innerHTML=intro+S.chatView.map((v,i)=>v.k==="user"?`<div class="msg user">${v.img&&v.img.length?`<span class="q-imgs">${v.img.map(u=>`<img src="${u}" alt="Foto mandata a Quanta">`).join("")}</span>`:""}${v.voce?`<span class="q-vtag">messaggio vocale</span>`:""}${esc(v.t)}</div>`
     :v.k==="op"?opCard(v)
     :v.k==="tool"?`<span class="toolchip"><i></i>calcolo: ${esc(v.t)}</span>`
+    :v.k==="sys"?`<span class="toolchip q-sys"><i></i>${esc(v.t)}</span>`
     :v.k==="typing"?`<div class="typing" aria-label="Quanta sta rispondendo"><i></i><i></i><i></i></div>`
     :v.k==="error"?`<div class="msg err">${esc(v.t)}</div>`
     :`<div class="msg ai">${md(v.t)}<span class="by">Quanta · numeri dal motore${TTS?`<button type="button" class="q-say${Q.speaking===i?" on":""}" data-say="${i}" aria-label="${Q.speaking===i?"Ferma la lettura":"Ascolta la risposta"}">${Q.speaking===i?"■ Ferma":"▶ Ascolta"}</button>`:""}</span></div>`).join("");
@@ -294,13 +296,15 @@ function barUi(){
   const go=$("#chatSend"),mic=$("#chatMic"),inp=$("#chatIn"),f=$("#chatForm");if(!go||!inp)return;
   const has=!!(inp.value.trim()||Q.imgs.length),mode=Q.talk?"stop":has||!SR?"send":"talk";
   go.dataset.mode=mode;go.disabled=mode!=="stop"&&(chatBusy||(mode==="send"&&!has));
-  go.setAttribute("aria-label",mode==="stop"?"Chiudi la conversazione a voce":mode==="talk"?"Parla con Quanta a voce":"Invia");go.title=go.getAttribute("aria-label");
+  go.setAttribute("aria-label",mode==="stop"?"Chiudi la conversazione a voce":mode==="talk"?(callSupported()?"Chiama Quanta":"Parla con Quanta a voce"):"Invia");go.title=go.getAttribute("aria-label");
   if(mic){mic.hidden=!SR||Q.talk;const on=Q.listening&&!Q.auto;mic.classList.toggle("on",on);mic.setAttribute("aria-pressed",String(on));mic.setAttribute("aria-label",on?"Ho finito di dettare":"Detta il messaggio");}
   f.classList.toggle("talking",Q.talk);
   inp.placeholder=Q.talk?(Q.listening?"Ti ascolto…":chatBusy?"Quanta ci pensa…":Q.speaking!==null||Q.tok?"Quanta risponde… tocca il quadrato per fermarla":"Conversazione a voce"):Q.listening?"Ti ascolto…":"Chiedi a Quanta";
 }
 $("#chatIn").addEventListener("input",()=>{grow();barUi();});
-$("#chatSend").addEventListener("click",()=>{const m=$("#chatSend").dataset.mode;if(m==="stop")talkStop();else if(m==="talk")talkStart();else $("#chatForm").requestSubmit();});
+$("#chatSend").addEventListener("click",()=>{const m=$("#chatSend").dataset.mode;if(m==="stop")talkStop();else if(m==="talk")voiceStart();else $("#chatForm").requestSubmit();});
+/* il pulsante tondo apre la chiamata in tempo reale; dove non si può, la conversazione a voce semplice */
+function voiceStart(){if(callSupported())callStart();else talkStart();}
 /* ascolto: auto = conversazione a voce (manda da solo), altrimenti dettatura (il testo resta nella barra da controllare) */
 function listen(auto){
   if(!SR||Q.listening||(auto&&(chatBusy||!Q.talk)))return;hush();
@@ -337,7 +341,7 @@ function attRender(){const a=$("#chatAtt");if(!a)return;a.hidden=!Q.imgs.length;
 function photoStart(){if(Q.talk)talkStop();if(Q.imgs.length>=2){chatNote("Al massimo due foto per messaggio.");return;}if(fotoOk())$("#chatFile").click();else $("#chatConsent").hidden=false;}
 document.addEventListener("click",e=>{
   if(e.target.closest("#chatPhoto")){photoStart();return;}
-  const qa=e.target.closest("[data-qact]");if(qa){if(qa.dataset.qact==="foto")photoStart();else talkStart();return;}
+  const qa=e.target.closest("[data-qact]");if(qa){if(qa.dataset.qact==="foto")photoStart();else voiceStart();return;}
   if(e.target.closest("#chatConsentOk")){try{localStorage.setItem("pos-quanta-foto-ok","1");}catch{}$("#chatConsent").hidden=true;$("#chatFile").click();return;}
   if(e.target.closest("#chatConsentNo")){$("#chatConsent").hidden=true;return;}
   const d=e.target.closest("[data-attdel]");if(d){Q.imgs.splice(+d.dataset.attdel,1);attRender();}
@@ -352,7 +356,7 @@ const ICO={chat:SVGI('<path d="M5 5h14v10H9l-4 4z"/>'),chart:SVGI('<path d="M4 1
   file:SVGI('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/>'),sliders:SVGI('<path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/>'),
   photo:SVGI('<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 8"/>'),wave:SVGI('<path d="M5 10v4M9 7v10M13 4v16M17 8v8M21 11v2"/>')};
 function icoFor(t){return /guadagn|rendiment|tir\b|riassumi/i.test(t)?"chart":/tass|impost/i.test(t)?"tax":/cedol|dividend/i.test(t)?"coin":/obiettiv/i.test(t)?"flag":/rischi|perso|peggiore/i.test(t)?"shield":/crisi/i.test(t)?"bolt":/come funziona/i.test(t)?"help":/che cos|differenza/i.test(t)?"book":/file/i.test(t)?"file":/pesi|allocazione|metto/i.test(t)?"sliders":"chat";}
-function sugItems(){const acts=[{t:"Leggi la foto del rendiconto della banca",ico:"photo",act:"foto"}];if(SR)acts.push({t:"Parla con Quanta a voce",ico:"wave",act:"talk"});
+function sugItems(){const acts=[{t:"Leggi la foto del rendiconto della banca",ico:"photo",act:"foto"}];if(SR||callSupported())acts.push({t:callSupported()?"Chiama Quanta: parlale come al telefono":"Parla con Quanta a voce",ico:"wave",act:"talk"});
   return [...chatSuggestions().slice(0,4-acts.length).map(t=>({t,ico:icoFor(t)})),...acts];}
 /* strumenti che non hanno bisogno del laboratorio */
 const NO_LAB=new Set(["patrimonio","registra_operazione","costi_banca","vai_a"]);
@@ -383,7 +387,8 @@ Object.assign(TOOLS_LOCAL,{
     const o={tipo,strumento:str,data,quantita:+a.quantita||0,prezzo:+a.prezzo||0,importo:+a.importo||0,spese:Math.max(0,+a.spese||0)};
     if((tipo==="acquisto"||tipo==="vendita")&&!(o.quantita>0&&o.prezzo>0))return {error:"mancano le quote o il prezzo: chiedili all'utente"};
     if((tipo==="dividendo"||tipo==="cedola")&&!(o.importo>0))return {error:"manca l'importo incassato: chiedilo all'utente"};
-    S.chatView.splice(S.chatView.length-1,0,{k:"op",op:o,id:"op"+Date.now().toString(36),st:"wait"});
+    const last=S.chatView[S.chatView.length-1],at=last&&last.k==="typing"?S.chatView.length-1:S.chatView.length;
+    S.chatView.splice(at,0,{k:"op",op:o,id:"op"+Date.now().toString(36),st:"wait"});
     return {stato:"proposta mostrata all'utente in una scheda: NON è salvata finché non preme «Conferma»",operazione:opText(o)};
   },
   costi_banca:a=>cbSet({pat:a.patrimonio_medio,serv:a.costi_servizi,prod:a.costi_prodotti,inc:a.incentivi}),
@@ -393,9 +398,9 @@ Object.assign(TOOLS_LOCAL,{
 });
 async function opDecide(v,ok){
   if(!v||v.st!=="wait")return;
-  if(!ok){v.st="no";v.msg="Annullato: non ho registrato niente.";renderChat();return;}
+  if(!ok){v.st="no";v.msg="Annullato: non ho registrato niente.";v.when=Date.now();renderChat();return;}
   v.st="saving";renderChat();const r=await pmQuantaOp(v.op).catch(err=>({error:String(err.message||err)}));
-  if(r.ok){v.st="done";v.msg=r.testo;Q.lastSaved=opText(v.op);}else{v.st="err";v.msg=`Non salvato: ${r.error}.`;}renderChat();
+  if(r.ok){v.st="done";v.msg=r.testo;Q.lastSaved=opText(v.op);}else{v.st="err";v.msg=`Non salvato: ${r.error}.`;}v.when=Date.now();renderChat();
 }
 document.addEventListener("click",e=>{
   const ok=e.target.closest("[data-opok]"),no=e.target.closest("[data-opno]");if(!ok&&!no)return;
@@ -467,4 +472,4 @@ orbBtn.addEventListener("click",()=>{QG.opened=true;say.classList.remove("on");i
 window.addEventListener("resize",()=>{if(say.classList.contains("on"))placeSay();});
 window.__quanta={roam:()=>{QG.lastInput=0;roam();},say:s=>showSay(s||current)}; // per i test automatici
 
-export { QG, QTIPS, TOOLS_LOCAL, TOOL_L, askChat, chatBusy, chatContext, chatSuggestions, closeChat, fmtW, md, narrowUI, openChat, orbBtn, orbBusy, orbSpark, parseWeights, pfSummary, placeSay, quantaScene, renderChat, roam, say, setOrb, showSay };
+export { NO_LAB, Q, hush, opDecide, opText, talkStart, QG, QTIPS, TOOLS_LOCAL, TOOL_L, askChat, chatBusy, chatContext, chatSuggestions, closeChat, fmtW, md, narrowUI, openChat, orbBtn, orbBusy, orbSpark, parseWeights, pfSummary, placeSay, quantaScene, renderChat, roam, say, setOrb, showSay };

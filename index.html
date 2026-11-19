@@ -38,6 +38,7 @@
 <link rel="modulepreload" href="/js/app.js">
 <link rel="modulepreload" href="/js/engine.js">
 <link rel="modulepreload" href="/js/ui/analisi.js">
+<link rel="modulepreload" href="/js/ui/chiamata.js">
 <link rel="modulepreload" href="/js/ui/archivio.js">
 <link rel="modulepreload" href="/js/ui/btp.js">
 <link rel="modulepreload" href="/js/ui/core.js">
@@ -595,6 +596,15 @@
   <form class="chat-form q-bar" id="chatForm"><label for="chatIn" class="eyebrow" style="position:absolute;left:-9999px">Domanda per Quanta</label><button type="button" class="q-ico" id="chatPhoto" aria-label="Aggiungi una foto" title="Aggiungi una foto"><svg class="" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button><textarea id="chatIn" rows="1" placeholder="Chiedi a Quanta"></textarea><button type="button" class="q-ico q-mic" id="chatMic" aria-label="Detta il messaggio" aria-pressed="false" title="Detta"><svg class="" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg></button><button type="button" class="q-go" id="chatSend" data-mode="talk" aria-label="Parla con Quanta a voce"><svg class="i-wave" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10v4M9 7v10M13 4v16M17 8v8M21 11v2"/></svg><svg class="i-up" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg><svg class="i-stop" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg></button><input type="file" id="chatFile" accept="image/*" hidden></form>
   <p class="caption q-note">Quanta usa IA di fornitori esterni: riceve i risultati dei calcoli, mai il file, e le foto solo se le mandi tu. <a href="/privacy.html#ia">Dettagli</a></p>
 </aside>
+<div class="q-call" id="qCall" hidden role="dialog" aria-modal="true" aria-label="Chiamata con Quanta" data-st="connecting">
+  <div class="qc-top"><span class="qc-badge">Chiamata con Quanta</span><span class="qc-time" id="qcTime">0:00</span></div>
+  <div class="qc-stage"><div class="qc-orb" id="qcOrb" aria-hidden="true"><i class="o3"></i><i class="o2"></i><i class="o1"></i></div><p class="qc-state" id="qcState">Mi collego…</p><div class="qc-cap" id="qcCap" aria-live="polite"></div></div>
+  <div class="qc-op" id="qcOp" hidden></div>
+  <div class="qc-consent" id="qcConsent" hidden><b>Parli con Quanta come al telefono</b><span>Durante la chiamata la tua voce va a Google (Gemini Live), in tempo reale, solo per capirti e risponderti: non registriamo l'audio. Alla fine resta il testo nella chat. Puoi interrompere Quanta quando vuoi.</span><span class="qc-cb"><button type="button" class="btn lime" id="qcConsentOk">Inizia la chiamata</button><button type="button" class="btn" id="qcConsentNo">Non ora</button></span></div>
+  <div class="qc-msg" id="qcMsg" hidden></div>
+  <p class="qc-note" id="qcNote"></p>
+  <div class="qc-bar"><button type="button" class="qc-btn" id="qcMute" aria-pressed="false" aria-label="Spegni il microfono"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/><path class="qc-slash" d="M4 4l16 16"/></svg></button><button type="button" class="qc-btn qc-end" id="qcEnd" aria-label="Chiudi la chiamata"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M3.5 14.2c4.7-4.4 12.3-4.4 17 0 .5.5.5 1.2.1 1.7l-1.6 1.9c-.4.5-1.1.6-1.6.2l-2.3-1.6c-.4-.3-.6-.8-.5-1.3l.3-1.6c-2.2-.8-4.6-.8-6.8 0l.3 1.6c.1.5-.1 1-.5 1.3l-2.3 1.6c-.5.4-1.2.3-1.6-.2l-1.6-1.9c-.4-.5-.4-1.2.1-1.7z" fill="currentColor"/></svg></button></div>
+</div>
 <div class="scrim" id="scrim"></div>
 <aside class="drawer builder" id="profile" aria-label="Il tuo profilo di rischio" aria-hidden="true">
   <button type="button" class="btn sm x" id="closeProfile">Chiudi</button>
