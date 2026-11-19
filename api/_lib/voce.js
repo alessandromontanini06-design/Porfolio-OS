@@ -9,7 +9,7 @@ const env = process.env;
 const MODELS = (env.GEMINI_TTS_MODEL || "gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts").split(",").map(s => s.trim()).filter(Boolean);
 export const VOCI = ["Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina",
   "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"];
-const VOCE = VOCI.includes(env.GEMINI_TTS_VOICE) ? env.GEMINI_TTS_VOICE : "Sulafat";
+const VOCE = VOCI.includes(env.GEMINI_TTS_VOICE) ? env.GEMINI_TTS_VOICE : "Algieba";
 const STILE = "Italiano naturale e colloquiale, voce calda e sicura, ritmo scorrevole come una consulente che parla con un amico. Non da annuncio, non da centralino.";
 const MAX = 600, BUDGET = 28_000;
 

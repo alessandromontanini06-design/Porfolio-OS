@@ -33,7 +33,7 @@ await p.setRequestInterception(true);
 p.on("request", r => {
   if (!r.url().includes("/api/assistant")) { r.continue(); return; }
   if (r.url().includes("modo=voce")) { const d = JSON.parse(r.postData() || "{}"); voce.push(d.testo);
-    r.respond(voiceDown ? { status: 503, contentType: "application/json", body: JSON.stringify({ error: "Voce online non disponibile." }) } : { status: 200, contentType: "application/json", body: JSON.stringify({ audio: WAV, mime: "audio/wav", modello: "test", voce: "Sulafat" }) }); return; }
+    r.respond(voiceDown ? { status: 503, contentType: "application/json", body: JSON.stringify({ error: "Voce online non disponibile." }) } : { status: 200, contentType: "application/json", body: JSON.stringify({ audio: WAV, mime: "audio/wav", modello: "test", voce: "Algieba" }) }); return; }
   const d = JSON.parse(r.postData() || "{}"); bodies.push(d);
   const m = d.messages || [], last = m[m.length - 1] || {}, t = last.text || "";
   const call = (name, args) => ({ text: "", calls: [{ id: "c" + bodies.length, name, args }], provider: "gemini", model: "test" });

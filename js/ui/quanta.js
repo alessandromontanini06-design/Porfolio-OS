@@ -329,7 +329,7 @@ function voiceCmd(t){
   if(!v)return false;
   const yes=new RegExp("^(s[iì]|conferma|confermo|ok|okay|va bene|salva|salvala|certo)"+W).test(s),no=new RegExp("^(no|annulla|lascia|non salvare)"+W).test(s);if(!yes&&!no)return false;
   S.chatView.push({k:"user",t,voce:true});renderChat();
-  opDecide(v,yes).then(()=>speakText(v.st==="done"?v.msg:v.st==="no"?"Va bene, non ho registrato niente.":v.msg||"Non sono riuscita a salvarla.",null,talkNext));return true;
+  opDecide(v,yes).then(()=>speakText(v.st==="done"?v.msg:v.st==="no"?"Va bene, non ho registrato niente.":v.msg||"Non è stato possibile salvarla.",null,talkNext));return true;
 }
 function chatNote(t){S.chatView.push({k:"error",t});renderChat();}
 document.addEventListener("click",e=>{if(!e.target.closest("#chatMic"))return;ttsUnlock();if(Q.listening){if(Q.rec)Q.rec.stop();}else listen(false);});

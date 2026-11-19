@@ -7,13 +7,14 @@ import { VOCI } from "./voce.js";
 
 const env = process.env;
 const MODEL = env.GEMINI_LIVE_MODEL || "gemini-3.8-live";
-const VOCE = VOCI.includes(env.GEMINI_TTS_VOICE) ? env.GEMINI_TTS_VOICE : "Sulafat";
+const VOCE = VOCI.includes(env.GEMINI_TTS_VOICE) ? env.GEMINI_TTS_VOICE : "Algieba";
 export const MINUTI = Math.min(14, Number(env.CALL_MAX_MINUTES || 10));
 
 const IN_CHIAMATA = `
 
 SEI IN CHIAMATA VOCE CON L'UTENTE (come al telefono):
-- Parla sempre in italiano e dai sempre del tu all'utente (mai del Lei), con frasi brevi e naturali. Una cosa alla volta, al massimo due o tre numeri per risposta, niente elenchi e niente simboli.
+- Parla sempre in italiano e dai sempre del tu all'utente (mai del Lei), con frasi brevi e naturali.
+- Hai una voce maschile: quando parli di te usa il maschile («sono pronto», «ne sono sicuro»). Una cosa alla volta, al massimo due o tre numeri per risposta, niente elenchi e niente simboli.
 - Se l'utente ti interrompe, fermati e ascolta. Se una domanda non è chiara, chiedi.
 - Prima di dare un numero del patrimonio o del portafoglio, usa lo strumento giusto: non inventare mai cifre.
 - Operazioni: se l'utente dice di aver comprato, venduto o incassato qualcosa, chiama registra_operazione con i dati; poi rileggi l'operazione e chiedi «Confermi?». Chiama conferma_operazione solo dopo che l'utente ha detto chiaramente sì (o no, per annullare). Non dire mai che è salvata prima del risultato di conferma_operazione.

@@ -134,7 +134,7 @@ http.createServer(async (req, res) => {
       if (process.env.VOICE_DOWN) { wrapRes(res).status(503).json({ error: "Voce online non disponibile." }); return; }
       const pcm = Buffer.alloc(14400), h = Buffer.alloc(44);
       h.write("RIFF", 0); h.writeUInt32LE(36 + pcm.length, 4); h.write("WAVE", 8); h.write("fmt ", 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(24000, 24); h.writeUInt32LE(48000, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write("data", 36); h.writeUInt32LE(pcm.length, 40);
-      setTimeout(() => wrapRes(res).json({ audio: Buffer.concat([h, pcm]).toString("base64"), mime: "audio/wav", modello: "simulazione", voce: "Sulafat" }), 150); });
+      setTimeout(() => wrapRes(res).json({ audio: Buffer.concat([h, pcm]).toString("base64"), mime: "audio/wav", modello: "simulazione", voce: "Algieba" }), 150); });
     return;
   }
   if (u.pathname === "/api/assistant") {
