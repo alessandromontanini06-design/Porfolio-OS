@@ -1295,6 +1295,11 @@ body.q-calling{overflow:hidden}
 /* Safari (iPhone, iPad): il riflesso sfocato usciva dal cerchio della sfera e lasciava un quadrato grigio.
    Gli strati che girano (grandi il 160% della sfera) si ritagliano sul cerchio della sfera: 50/160 = 31,25%. */
 .orb .o1,.orb .o2{-webkit-clip-path:circle(31.25% at 50% 50%);clip-path:circle(31.25% at 50% 50%)}
+/* telefono: con l'interruttore Mio/Prove e la rotellina la barra non ci stava (il valore andava a capo) */
+@media (max-width:480px){.topbar:has(#spaceSw:not([hidden])) .brand .bw2{display:none}.topbar .status{gap:6px}.set-btn{width:34px;height:34px}}
+@media (max-width:360px){.topbar .space-sw button{padding:6px 8px}}
+@media (max-width:400px){.topbar .status{flex-wrap:nowrap;min-width:0}.mnu-lbl i{display:none}.mnu-btn{padding-left:10px;padding-right:8px}.topbar:has(#spaceSw:not([hidden])) .brand .bw{display:none}}
+.mnu-lbl b{white-space:nowrap}
 
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
