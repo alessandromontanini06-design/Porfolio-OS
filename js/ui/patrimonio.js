@@ -62,7 +62,7 @@ async function pmPrices(force) {
   await pmFx(force);
 }
 async function pmFx(force) {
-  const need = [...new Set(Object.values(pmDb().strumenti).map(s => s.valuta === "GBX" ? "GBP" : s.valuta).filter(c => c && c !== "EUR"))];
+  const need = [...new Set([...Object.values(pmDb().strumenti).map(s => s.valuta), ...pmDb().operazioni.map(o => o.valuta)].map(c => c === "GBX" ? "GBP" : c).filter(c => c && c !== "EUR"))];
   for (const c of need) if (!PM.fx[c] || force) { const j = await getJSON(`/api/fx?ccy=${c}`); PM.fx[c] = j && j.points ? j.points : []; }
 }
 function pmCalc() {
@@ -623,6 +623,9 @@ async function pmFromFile() {
   let est = 0, skipped = 0, dup = 0;
   const add = (o, base) => { const n = (seen.get(base) || 0) + 1; seen.set(base, n); const imp = `${base}#${n}`; if (have.has(imp)) { dup++; return; } ops.push({ id: newId(), ...o, origine: "file", file: fileName, imp }); };
   const rows = S.tx && S.tx.rows && S.tx.rows.length ? S.tx.rows : null, bondRows = [];
+  /* movimenti in altre valute (export dei broker): l'operazione resta nella sua valuta, il registro la converte con il cambio BCE */
+  for (const c of [...new Set((rows || []).map(x => x.ccy === "GBX" ? "GBP" : x.ccy).filter(c => c && c !== "EUR"))]) if (!PM.fx[c] || !PM.fx[c].length) { const j = await getJSON(`/api/fx?ccy=${c}`); PM.fx[c] = j && j.points ? j.points : []; }
+  const toEurRow = (x, a) => { if (!x.ccy) return a; const c = x.ccy === "GBX" ? "GBP" : x.ccy, k = x.ccy === "GBX" ? 100 : 1, fs = P.lgSteps(PM.fx[c]), n = Math.round(Date.parse(isoOf(x.d) + "T00:00:00Z") / 864e5), f = fs.at(n) || (fs.n ? fs.at(fs.first) : null); return f ? a / k / f[1] : NaN; };
   if (rows) {
     const akas = pos.map(p => new Set([p.nome, p.ticker, p.isin, p.simbolo, p.simboloHint, ...(p.alt || [])].filter(Boolean).map(keyOf)));
     const names = pos.map(p => p.ticker || p.nome);
@@ -630,9 +633,9 @@ async function pmFromFile() {
       let i = -1; for (const v of [x.ticker, ...(x.alias || [])]) { i = akas.findIndex(s => s.has(keyOf(v))); if (i >= 0) break; }
       if (i < 0) i = txMatch(x.ticker, names); if (i < 0) { bondRows.push(x); continue; }
       const id = ids[i], data = isoOf(x.d), amt = Math.abs(x.amount), base = `${data}|${id}|${Math.round(x.amount * 100)}`;
-      if (x.amount < 0 && /divid|cedol|coupon|interess/i.test(x.type || "")) { add({ data, tipo: "dividendo", strumento: id, importo: amt, valuta: "EUR" }, base); continue; }
-      let qta = x.qty, stima = false; if (!(qta > 0)) { const pe = eurPx(id, data); if (!(pe > 0)) { skipped++; continue; } qta = amt / pe; stima = true; est++; }
-      add({ data, tipo: x.amount > 0 ? "acquisto" : "vendita", strumento: id, quantita: qta, prezzo: amt / qta, valuta: "EUR", ...(stima ? { stima: true } : {}) }, base);
+      if (x.amount < 0 && /divid|cedol|coupon|interess/i.test(x.type || "")) { add({ data, tipo: "dividendo", strumento: id, importo: amt, valuta: x.ccy || "EUR" }, base); continue; }
+      let qta = x.qty, stima = false; if (!(qta > 0)) { const pe = eurPx(id, data), ae = toEurRow(x, amt); if (!(pe > 0) || !(ae > 0)) { skipped++; continue; } qta = ae / pe; stima = true; est++; }
+      add({ data, tipo: x.amount > 0 ? "acquisto" : "vendita", strumento: id, quantita: qta, prezzo: amt / qta, valuta: x.ccy || "EUR", ...(stima ? { stima: true } : {}) }, base);
     }
   } else {
     const today = pmToday();
@@ -658,8 +661,8 @@ async function pmFromFile() {
     const id = O.isin || "x-" + k.replace(/[^a-z0-9]+/g, "-").slice(0, 40);
     if (!db.strumenti[id]) db.strumenti[id] = { nome: O.nome, isin: O.isin, valuta: "EUR", classe: null };
     for (const x of O.rows) { const data = isoOf(x.d), amt = Math.abs(x.amount), base = `${data}|${id}|${Math.round(x.amount * 100)}`;
-      if (x.amount < 0 && /divid|cedol|coupon/i.test(x.type || "")) add({ data, tipo: "dividendo", strumento: id, importo: amt, valuta: "EUR" }, base);
-      else add({ data, tipo: x.amount > 0 ? "acquisto" : "vendita", strumento: id, quantita: x.qty, prezzo: amt / x.qty, valuta: "EUR" }, base); }
+      if (x.amount < 0 && /divid|cedol|coupon/i.test(x.type || "")) add({ data, tipo: "dividendo", strumento: id, importo: amt, valuta: x.ccy || "EUR" }, base);
+      else add({ data, tipo: x.amount > 0 ? "acquisto" : "vendita", strumento: id, quantita: x.qty, prezzo: amt / x.qty, valuta: x.ccy || "EUR" }, base); }
   }
   for (const [k, B] of bonds) {
     /* cedola e scadenza dal nome; se il nome non le dice, dalla stima del laboratorio (OpenFIGI con l'ISIN) */

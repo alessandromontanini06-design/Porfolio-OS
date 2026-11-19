@@ -965,7 +965,7 @@ async function rebuildFromPrices(o={}){
     /* tutto in euro: ogni serie nella sua valuta di quotazione viene convertita con il cambio BCE di fine mese
        (pence GBX → sterline ÷ 100, poi ÷ unità di valuta per 1 euro) */
     const ccyOf=s=>{const c=String(s.currency||"").toUpperCase();return c==="GBX"||c==="GBP"?"GBP":c||null;};
-    const need=[...new Set(ok.map(o=>ccyOf(o.s)).filter(c=>c&&c!=="EUR"))],fxm={},fxErr=[];
+    const need=[...new Set([...ok.map(o=>ccyOf(o.s)),...((S.tx&&S.tx.rows)||[]).map(x=>x.ccy==="GBX"?"GBP":x.ccy)].filter(c=>c&&c!=="EUR"))],fxm={},fxErr=[];
     for(const c of need){const j=await getJSON(`/api/fx?ccy=${c}`);if(j.error||!j.points)fxErr.push(`${c}: ${j.error||"cambio non disponibile"}`);else fxm[c]=new Map(j.points.map(x=>[x.p,x.v]));}
     if(fxErr.length)throw new Error(`Non riesco a convertire in euro (${fxErr.join("; ")}). Riprova tra poco.`);
     const unknown=ok.filter(o=>!ccyOf(o.s)).map(o=>o.p.simbolo);

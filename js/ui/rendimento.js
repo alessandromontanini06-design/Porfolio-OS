@@ -18,6 +18,9 @@ function detectTx(sheets){
     /* altre colonne che identificano lo stesso strumento: servono ad abbinare i movimenti agli asset anche se nei dati hanno un altro nome */
     const alias=[find(/^isin\b|\bisin\b/i),find(/^(ticker|simbolo|symbol)\b/i),find(/^(strumento|nome|descrizione|titolo|prodotto|name)\b/i)].filter(c=>c>=0&&c!==cT);
     if(cD<0||cT<0||(cA<0&&(cU<0||cP<0)))return;
+    /* valuta della riga: solo nei fogli «★ Movimenti» che il sito costruisce dagli export dei broker, dove «Importo» è nella «Valuta» della riga.
+       Nei file delle banche «Valuta» o «Divisa» può essere la data valuta o la valuta del prezzo con il controvalore già in euro: lì non si usa. */
+    const cCy=/^★ Movimenti/.test(s.name)?hd.findIndex(x=>/^valuta$/i.test(x)):-1;
     const rows=[];
     for(let r=h+1;r<s.aoa.length;r++){const row=s.aoa[r]||[],d=P.parseDate(row[cD],true),tk=String(row[cT]==null?"":row[cT]).trim(),ty=cY>=0?String(row[cY]==null?"":row[cY]).trim():"";
       if(!d||!tk||/^[—–-]+$/.test(tk)||/totale|valore oggi|saldo/i.test(ty+" "+tk))continue;
@@ -25,7 +28,7 @@ function detectTx(sheets){
       if(!Number.isFinite(amt)&&cU>=0&&cP>=0){const u=P.parseNum(row[cU]),p=P.parseNum(row[cP]);if(u&&p)amt=u.n*p.n;}
       if(!Number.isFinite(amt)||amt===0)continue;
       const qn=cU>=0?P.parseNum(row[cU]):null,sell=/^(v|s)$/i.test(ty)||/(^|[^a-z])(vend|sell|riscatt|prelie|rimbors)|divid|cedol|coupon/i.test(ty)||(!ty&&!!qn&&qn.n<0);/* dividendi e cedole incassati escono dal portafoglio come un prelievo */
-      rows.push({d,ticker:tk,alias:alias.map(c=>String(row[c]==null?"":row[c]).trim()).filter(Boolean),type:ty,amount:sell?-Math.abs(amt):Math.abs(amt),qty:qn&&Number.isFinite(qn.n)&&qn.n!==0?Math.abs(qn.n):null});}
+      rows.push({d,ticker:tk,alias:alias.map(c=>String(row[c]==null?"":row[c]).trim()).filter(Boolean),type:ty,amount:sell?-Math.abs(amt):Math.abs(amt),qty:qn&&Number.isFinite(qn.n)&&qn.n!==0?Math.abs(qn.n):null,ccy:(()=>{const c=cCy>=0?String(row[cCy]==null?"":row[cCy]).trim().toUpperCase():"";return /^[A-Z]{3}$/.test(c)&&c!=="EUR"?c:null;})()});}
     if(rows.length>=2&&(!best||rows.length>best.rows.length))best={sheet:s.name,rows,cols:{data:hd[cD],strumento:hd[cT],importo:cA>=0?hd[cA]:`${hd[cU]} × ${hd[cP]}`,tipo:cY>=0?hd[cY]:null}};
   });
   return best;
@@ -34,6 +37,13 @@ function txMatch(tk,names){
   const t=tk.toLowerCase(),re=new RegExp(`\\b${tk.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}\\b`,"i");
   let i=names.findIndex(n=>n.toLowerCase()===t);if(i<0)i=names.findIndex(n=>re.test(n));if(i<0)i=names.findIndex(n=>t.includes(n.toLowerCase())&&n.length>=3);return i;
 }
+/* importo di un movimento in euro: cambio BCE di fine mese (unità per 1 euro) preso dalla ricostruzione; senza cambio resta com'è */
+function txEur(x){
+  if(!x.ccy)return x;const c=x.ccy==="GBX"?"GBP":x.ccy,k=x.ccy==="GBX"?100:1,m=S.rb&&S.rb.fxm&&S.rb.fxm[c];if(!m||!m.size)return x;
+  const ym=(x.d instanceof Date?x.d:new Date(x.d)).toISOString().slice(0,7);let r=m.get(ym);
+  if(!(r>0)){const ks=[...m.keys()].sort(),prev=ks.filter(z=>z<=ym).pop()||ks[0];r=m.get(prev);}
+  return r>0?{...x,amount:x.amount/k/r,amountOrig:x.amount}:x;
+}
 function realCalc(){
   if(!S.tx||!S.ds||!S.ds.ok)return null;
   const ds=S.ds,names=ds.assets.map(a=>a.name);
@@ -41,7 +51,7 @@ function realCalc(){
   const pos=(S.portfolio&&S.portfolio.positions)||[],key=v=>String(v||"").trim().toLowerCase();
   const akas=ds.assets.map(a=>{const c=S.rb&&S.rb.cols.find(x=>x.name===a.name),q=pos.find(x=>(x.ticker||x.nome)===a.name);return new Set([a.name,c&&c.nome,c&&c.sym,q&&q.isin,q&&q.nome,q&&q.ticker].filter(Boolean).map(key));});
   const match=x=>{for(const v of [x.ticker,...(x.alias||[])]){const i=akas.findIndex(s=>s.has(key(v)));if(i>=0)return i;}return txMatch(x.ticker,names);};
-  const tx=S.tx.rows.map(x=>({...x,i:match(x)}));
+  const tx=S.tx.rows.map(x=>({...txEur(x),i:match(x)}));
   const pp=P.personalPerformance(ds.dates,ds.assets,tx);if(pp.error)return {error:pp.error,tx};
   return {pp,tx};
 }

@@ -583,6 +583,10 @@ function bkNum(v,dec){
   if(typeof v==="number")return Number.isFinite(v)?v:null;
   let s=String(v??"").trim();if(!s||s==="-"||s==="—")return null;
   s=s.replace(/[A-Za-z€$£¥\s'"]/g,"").replace(/^\((.*)\)$/,"-$1");if(!s||!/\d/.test(s))return null;
+  /* un solo tipo di separatore che non può essere delle migliaia (le migliaia vanno a gruppi di 3 cifre): è il decimale,
+     anche se il resto del foglio usa l'altro (export misti, come quello di Degiro: «-1,00» e «-97.93» nello stesso file) */
+  if(dec===","&&!s.includes(",")&&(/\.\d{1,2}$|\.\d{4,}$|^-?0\./.test(s))&&(s.match(/\./g)||[]).length===1)dec=".";
+  else if(dec==="."&&!s.includes(".")&&(/,\d{1,2}$|,\d{4,}$|^-?0,/.test(s))&&(s.match(/,/g)||[]).length===1)dec=",";
   if(dec===","){s=s.replace(/\./g,"").replace(",",".");}
   else if(dec==="."){s=s.replace(/,/g,"");}
   else{const p=parseNum(s);return p?p.n:null;}
@@ -1895,6 +1899,6 @@ const btpSimbolo=b=>`BTP:${+(+b.cedola*100).toFixed(4)}:${String(b.scadenza).sli
 function btpDaSimbolo(s){const m=String(s||"").toUpperCase().match(/^BTP:(\d+(?:\.\d+)?):(\d{4}-\d{2}-\d{2})$/);return m?{cedola:+m[1]/100,scadenza:m[2],freq:2}:null;}
 const btpNome=b=>{const d=btpD(b.scadenza),c=+(+b.cedola*100).toFixed(3);return `BTP ${String(c).replace(".",",")}% ${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;};
 
-export const POS={mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
+export const POS={bkNum,mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
