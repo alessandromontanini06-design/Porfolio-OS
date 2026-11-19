@@ -2,6 +2,7 @@
 // i numeri al motore di Portfolio OS attraverso degli strumenti. Gli strumenti girano nel browser,
 // sui dati confermati: l'IA non calcola e non inventa, legge risultati già verificati.
 import { chat, fromOwnSite, rateLimited, readBody } from "./_lib/llm.js";
+import { voce } from "./_lib/voce.js";
 
 const PESI = {
   type: "array",
@@ -91,6 +92,8 @@ Regole:
 - Se l'utente chiede di andare in una pagina, usa vai_a.`;
 
 export default async function handler(req, res) {
+  /* la voce di Quanta (testo → audio) sta qui dentro: il piano gratuito di Vercel ammette 12 funzioni */
+  if (req.query && req.query.modo === "voce") return voce(req, res);
   if (req.method !== "POST") { res.status(405).json({ error: "Usa una richiesta POST." }); return; }
   if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
   if (rateLimited(req, "assistant", Number(process.env.ASSISTANT_HOURLY_LIMIT || 60))) { res.status(429).json({ error: "Hai fatto molte domande in quest'ora. Riprova più tardi." }); return; }

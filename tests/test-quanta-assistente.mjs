@@ -12,7 +12,7 @@ const srv = spawn(process.execPath, [import.meta.dirname + "/serve.mjs"], { env:
 await wait(1500);
 const db = { v: 1, strumenti: { IE00B4L5Y983: { nome: "iShares Core MSCI World", ticker: "SWDA", isin: "IE00B4L5Y983", simbolo: "IWDA.AMS", valuta: "EUR" } },
   operazioni: [{ id: "a1", data: "2024-02-01", tipo: "acquisto", strumento: "IE00B4L5Y983", quantita: 100, prezzo: 85 }] };
-const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox"] });
+const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"] });
 const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 }); const errs = [];
 p.on("pageerror", e => errs.push(e.message));
 await p.evaluateOnNewDocument(d => {
@@ -24,12 +24,15 @@ await p.evaluateOnNewDocument(d => {
     stop() { setTimeout(() => this.onend && this.onend(), 10); } abort() { this.onerror && this.onerror({ error: "aborted" }); setTimeout(() => this.onend && this.onend(), 10); } };
   window.SpeechRecognition = Rec; window.webkitSpeechRecognition = Rec;
 }, JSON.stringify(db));
-/* IA finta: risponde in base all'ultimo messaggio e ricorda le richieste */
-const bodies = [];
+/* IA finta: risponde in base all'ultimo messaggio e ricorda le richieste; la voce online finta risponde con 0,3 s di silenzio (voiceDown: ferma) */
+const bodies = [], voce = []; let voiceDown = false;
+const WAV = (() => { const pcm = Buffer.alloc(14400), h = Buffer.alloc(44); h.write("RIFF", 0); h.writeUInt32LE(36 + pcm.length, 4); h.write("WAVE", 8); h.write("fmt ", 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(24000, 24); h.writeUInt32LE(48000, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write("data", 36); h.writeUInt32LE(pcm.length, 40); return Buffer.concat([h, pcm]).toString("base64"); })();
 const OP = { acquisto: { tipo: "acquisto", strumento: "SWDA", quantita: 10, prezzo: 98, data: "2026-11-18" }, v5: { tipo: "vendita", strumento: "SWDA", quantita: 5, prezzo: 100 }, v1000: { tipo: "vendita", strumento: "SWDA", quantita: 1000, prezzo: 100 } };
 await p.setRequestInterception(true);
 p.on("request", r => {
   if (!r.url().includes("/api/assistant")) { r.continue(); return; }
+  if (r.url().includes("modo=voce")) { const d = JSON.parse(r.postData() || "{}"); voce.push(d.testo);
+    r.respond(voiceDown ? { status: 503, contentType: "application/json", body: JSON.stringify({ error: "Voce online non disponibile." }) } : { status: 200, contentType: "application/json", body: JSON.stringify({ audio: WAV, mime: "audio/wav", modello: "test", voce: "Sulafat" }) }); return; }
   const d = JSON.parse(r.postData() || "{}"); bodies.push(d);
   const m = d.messages || [], last = m[m.length - 1] || {}, t = last.text || "";
   const call = (name, args) => ({ text: "", calls: [{ id: "c" + bodies.length, name, args }], provider: "gemini", model: "test" });
@@ -43,7 +46,7 @@ p.on("request", r => {
     : /costa/.test(t) ? call("costi_banca", { patrimonio_medio: "100.000", costi_servizi: "800", costi_prodotti: "700", incentivi: "300" })
     : /portami/.test(t) ? call("vai_a", { pagina: "costi_banca" })
     : /simulazioni/.test(t) ? call("vai_a", { pagina: "simulazioni" })
-    : { text: "Ecco la risposta: il **TIR** è il rendimento annuo vero, −3% o +5%.", calls: [], provider: "gemini" };
+    : { text: `Ecco la risposta numero ${bodies.length}: il **TIR** è il rendimento annuo vero, −3% o +5%.`, calls: [], provider: "gemini" };
   r.respond({ status: 200, contentType: "application/json", body: JSON.stringify(out) });
 });
 let pass = 0, fail = 0; const t = (n, ok, i = "") => { ok ? pass++ : fail++; console.log(`  ${ok ? "ok     " : "FALLITO"} ${n}${!ok && i ? " · " + i : ""}`); };
@@ -54,7 +57,8 @@ const lastToolIn = bs => { const x = bs[bs.length - 1].messages.filter(m => m.ro
 const lastTool = name => { for (let k = bodies.length - 1; k >= 0; k--) { const x = bodies[k].messages.filter(m => m.role === "tool" && m.name === name).pop(); if (x) return x.result; } return null; };
 const log = () => p.evaluate(() => document.getElementById("chatLog").innerText.replace(/\s+/g, " "));
 const mode = () => p.evaluate(() => document.getElementById("chatSend").dataset.mode);
-const talk = async (...frasi) => { await p.evaluate(f => { window.__hearQ = f; window.__spoken = []; }, frasi); await p.click("#chatSend"); await wait(500); await idle(); await wait(300); };
+const heard = async () => voce.join(" ") + " " + await p.evaluate(() => window.__spoken.join(" "));
+const talk = async (...frasi) => { voce.length = 0; await p.evaluate(f => { window.__hearQ = f; window.__spoken = []; }, frasi); await p.click("#chatSend"); await wait(500); await idle(); await wait(300); };
 
 await p.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle2" }); await wait(2500);
 await p.click("#chatBtn"); await wait(600);
@@ -71,7 +75,7 @@ await ask("Quanto ho guadagnato in tutto?");
 const pm = lastTool("patrimonio");
 t("lo strumento patrimonio risponde senza laboratorio (valore, TIR, posizioni)", pm && !pm.error && /€/.test(pm.valore_oggi) && /%/.test(pm.rendimento_annuo_tir) && pm.posizioni.length === 1 && pm.posizioni[0].nome === "iShares Core MSCI World", JSON.stringify(pm).slice(0, 300));
 t("nel contesto: data di oggi e patrimonio salvato", /oggi è il \d{4}-\d{2}-\d{2}; l'utente ha un patrimonio salvato/.test(bodies[0].context), bodies[0].context.slice(0, 160));
-t("una risposta scritta non viene letta da sola", await p.evaluate(() => window.__spoken.filter(x => x.trim()).length === 0));
+t("una risposta scritta non viene letta da sola", await p.evaluate(() => window.__spoken.filter(x => x.trim()).length === 0) && voce.length === 0);
 
 /* 2. dettatura: il testo resta nella barra da controllare */
 const nb = bodies.length;
@@ -87,7 +91,7 @@ t("in conversazione la frase parte da sola, col contesto «a voce»", bVoce && /
 t("il messaggio è segnato come vocale", /messaggio vocale/.test(await log()));
 const card = await p.evaluate(() => { const c = document.querySelector(".q-op"); return c && c.innerText.replace(/\s+/g, " "); });
 t("scheda «Da confermare» con l'operazione", /Da confermare/.test(card || "") && /Acquisto · 10 quote di SWDA a 98,00 € · 18\/11\/2026/.test(card || ""), card);
-t("la risposta è letta ad alta voce, senza asterischi", await p.evaluate(() => /preparato l'operazione/.test(window.__spoken.join(" ")) && !/\*/.test(window.__spoken.join(" "))), JSON.stringify(await p.evaluate(() => window.__spoken)));
+t("la risposta è letta con la voce online, senza asterischi", /preparato l'operazione/.test(voce.join(" ")) && !/\*/.test(voce.join(" ")) && await p.evaluate(() => window.__spoken.filter(x => x.trim()).length === 0), JSON.stringify(voce));
 t("dopo la risposta Quanta si rimette in ascolto e, nel silenzio, chiude la conversazione", /Non ti ho sentito, così ho chiuso la conversazione a voce/.test(await log()) && await mode() === "talk");
 t("senza conferma nel patrimonio non c'è niente di nuovo", (await ops()).length === n0);
 await p.evaluate(() => [...document.querySelectorAll("[data-opok]")].pop().click()); await wait(1500);
@@ -97,9 +101,9 @@ t("la scheda dice «Salvato nel patrimonio»", /Salvato nel patrimonio/.test(awa
 
 /* 4. a voce: «annulla» e «sì, conferma» */
 await talk("ho venduto 5 quote a 100", "annulla");
-t("«annulla» detto a voce non registra niente", (await ops()).length === n0 + 1 && /Annullato/.test(await log()) && /non ho registrato niente/.test(await p.evaluate(() => window.__spoken.join(" "))));
+t("«annulla» detto a voce non registra niente", (await ops()).length === n0 + 1 && /Annullato/.test(await log()) && /non ho registrato niente/.test(await heard()));
 await talk("ho comprato 10 SWDA a 98 euro", "sì, conferma");
-t("«sì, conferma» detto a voce salva e Quanta lo dice", (await ops()).length === n0 + 2 && /Salvato nel patrimonio/.test(await p.evaluate(() => window.__spoken.join(" "))), JSON.stringify(await p.evaluate(() => window.__spoken)));
+t("«sì, conferma» detto a voce salva e Quanta lo dice", (await ops()).length === n0 + 2 && /Salvato nel patrimonio/.test(await heard()), await heard());
 /* il quadrato ferma la conversazione mentre ascolta */
 await p.evaluate(() => { window.__hearQ = []; }); await p.click("#chatSend"); await wait(60);
 const mid = await mode(); await p.click("#chatSend"); await wait(400);
@@ -121,9 +125,17 @@ t("vendere più quote di quelle possedute non si salva e lo spiega", (await ops(
 
 /* 6. «Ascolta» */
 await ask("Che cos'è il TIR?");
-await p.evaluate(() => { window.__spoken = []; const b = [...document.querySelectorAll("#chatLog [data-say]")].pop(); b.click(); }); await wait(300);
-const sp = await p.evaluate(() => window.__spoken.join(" "));
-t("«Ascolta» legge la risposta con i segni detti a parole", /TIR/.test(sp) && /meno 3 per cento/.test(sp) && /5 per cento/.test(sp) && !/[*%−]/.test(sp), sp);
+const sayLast = async () => { await p.evaluate(() => { window.__spoken = []; [...document.querySelectorAll("#chatLog [data-say]")].pop().click(); }); await wait(1200); };
+voce.length = 0; await sayLast();
+const sp = voce.join(" ");
+t("«Ascolta» legge con la voce online, con i segni detti a parole", /TIR/.test(sp) && /meno 3 per cento/.test(sp) && /5 per cento/.test(sp) && !/[*%−]/.test(sp) && await p.evaluate(() => window.__spoken.length === 0), sp);
+t("mentre legge il pulsante diventa «Ferma» e alla fine torna «Ascolta»", await p.evaluate(() => !document.querySelector("#chatLog .q-say.on")));
+voiceDown = true; voce.length = 0; await ask("Che cos'è il TIR?"); await sayLast();
+const sp2 = await p.evaluate(() => window.__spoken.join(" "));
+t("se la voce online è ferma legge la voce del dispositivo", voce.length === 1 && /TIR/.test(sp2) && /meno 3 per cento/.test(sp2), `${voce.length} · ${sp2}`);
+voce.length = 0; await ask("Che cos'è il TIR?"); await sayLast();
+t("per qualche minuto non riprova la voce online (niente attese)", voce.length === 0 && /TIR/.test(await p.evaluate(() => window.__spoken.join(" "))));
+voiceDown = false;
 
 /* 7. foto: prima il permesso, poi la foto rimpicciolita va all'IA solo con il messaggio */
 const img = OUT + "/_rendiconto-finto.png";

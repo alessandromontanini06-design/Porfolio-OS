@@ -57,7 +57,7 @@ function renderChat(){
   $("#chatSugg").innerHTML=S.chatView.length?"":sugItems().map(x=>`<button type="button" ${x.act?`data-qact="${x.act}"`:`data-ask="${esc(x.t)}"`}>${ICO[x.ico]||ICO.chat}<span>${esc(x.t)}</span></button>`).join("");
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ask]");if(b)askChat(b.dataset.ask);});
-$("#chatForm").addEventListener("submit",e=>{e.preventDefault();const t=$("#chatIn").value;$("#chatIn").value="";grow();askChat(t);});
+$("#chatForm").addEventListener("submit",e=>{e.preventDefault();ttsUnlock();const t=$("#chatIn").value;$("#chatIn").value="";grow();askChat(t);});
 $("#chatNew").addEventListener("click",()=>{talkStop();Q.imgs=[];attRender();});
 $("#chatClose").addEventListener("click",()=>talkStop());
 $("#chatIn").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#chatForm").requestSubmit();}});
@@ -240,19 +240,45 @@ function pickVoice(){if(!TTS)return null;const vs=TTS.getVoices().filter(v=>/^it
 if(TTS&&TTS.addEventListener)TTS.addEventListener("voiceschanged",()=>{});
 /* testo da leggere: senza grassetti ed elenchi, segni detti a parole */
 function plain(t){return String(t||"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/^\s*[-*•]\s+/gm,"").replace(/[#_`>]/g,"").replace(/−/g,"meno ").replace(/(\d)\s?%/g,"$1 per cento").replace(/€/g," euro").replace(/\s+/g," ").trim();}
-/* legge un testo a pezzi di frasi (Chrome si ferma sui testi lunghi); i = risposta della chat che si sta leggendo, done = cosa fare dopo */
-function speakText(text,i=null,done=null){
-  if(!TTS){if(done)done();return;}TTS.cancel();
-  const parts=(plain(text).match(/[^.!?;:]+[.!?;:]*/g)||[]).reduce((a,x)=>{const t=x.trim();if(!t)return a;if(a.length&&a[a.length-1].length+t.length<180)a[a.length-1]+=" "+t;else a.push(t);return a;},[]);
-  if(!parts.length){if(done)done();return;}const voice=pickVoice(),tok={};Q.speaking=i;Q.tok=tok;speakUi(true);renderChat();barUi();
+/* ---------- voce: prima quella naturale online (Gemini TTS da /api/assistant?modo=voce), se non risponde quella del dispositivo ----------
+   L'audio arriva a pezzi di frasi: il primo suona mentre si prepara il secondo. Se la voce online fallisce, per 5 minuti si usa quella del dispositivo. */
+const VOX={ctx:null,src:null,off:0,cache:new Map()};
+const splitParts=(t,max)=>(t.match(/[^.!?;:]+[.!?;:]*/g)||[]).reduce((a,x)=>{const s=x.trim();if(!s)return a;if(a.length&&a[a.length-1].length+s.length<max)a[a.length-1]+=" "+s;else a.push(s.slice(0,max));return a;},[]);
+function audioCtx(){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;if(!VOX.ctx){try{VOX.ctx=new C();}catch{return null;}}if(VOX.ctx.state==="suspended")VOX.ctx.resume().catch(()=>{});return VOX.ctx;}
+const cloudOn=()=>Date.now()>VOX.off&&!!(window.AudioContext||window.webkitAudioContext);
+const voceScelta=()=>{try{return localStorage.getItem("pos-quanta-voce-v1")||undefined;}catch{return undefined;}};
+async function cloudAudio(text){
+  const k=(voceScelta()||"")+"|"+text;if(VOX.cache.has(k))return VOX.cache.get(k);
+  const r=await fetch("/api/assistant?modo=voce",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({testo:text,voce:voceScelta()}),signal:AbortSignal.timeout(30000)});
+  const j=await r.json().catch(()=>({}));if(!r.ok||!j.audio)throw new Error(j.error||"voce online non disponibile");
+  const bin=atob(j.audio),u8=new Uint8Array(bin.length);for(let n=0;n<bin.length;n++)u8[n]=bin.charCodeAt(n);
+  if(VOX.cache.size>24)VOX.cache.delete(VOX.cache.keys().next().value);VOX.cache.set(k,u8.buffer);return u8.buffer;
+}
+async function playBuf(buf,tok){
+  const ctx=audioCtx();if(!ctx)throw new Error("audio non disponibile");if(ctx.state!=="running"){await ctx.resume().catch(()=>{});if(ctx.state!=="running")throw new Error("audio bloccato dal browser");}
+  const ab=await ctx.decodeAudioData(buf.slice(0));if(Q.tok!==tok)return false;
+  return new Promise(res=>{const s=ctx.createBufferSource();s.buffer=ab;s.connect(ctx.destination);VOX.src=s;s.onended=()=>{if(VOX.src===s)VOX.src=null;res(true);};s.start();});
+}
+function browserSpeak(t,end){const parts=splitParts(t,180),voice=pickVoice();if(!parts.length){end(true);return;}
+  parts.forEach((x,k)=>{const u=new SpeechSynthesisUtterance(x);u.lang="it-IT";if(voice)u.voice=voice;u.rate=1.03;u.pitch=1;if(k===parts.length-1)u.onend=()=>end(true);u.onerror=()=>end(false);TTS.speak(u);});}
+/* legge un testo; i = risposta della chat che si sta leggendo, done = cosa fare dopo */
+async function speakText(text,i=null,done=null){
+  hush();const t=plain(text),tok={};if(!t||(!TTS&&!cloudOn())){if(done)done();return;}
+  Q.speaking=i;Q.tok=tok;speakUi(true);renderChat();barUi();
   const end=ok=>{if(Q.tok!==tok)return;Q.tok=null;Q.speaking=null;speakUi(false);renderChat();barUi();if(ok&&done)done();};
-  parts.forEach((t,k)=>{const u=new SpeechSynthesisUtterance(t);u.lang="it-IT";if(voice)u.voice=voice;u.rate=1.03;u.pitch=1;
-    if(k===parts.length-1)u.onend=()=>end(true);u.onerror=()=>end(false);TTS.speak(u);});
+  let rest=t;
+  if(cloudOn()){const parts=splitParts(t,450);let k=0;
+    try{let next=cloudAudio(parts[0]);
+      for(;k<parts.length;k++){const buf=await next;if(Q.tok!==tok)return;next=k+1<parts.length?cloudAudio(parts[k+1]):null;if(next)next.catch(()=>{});
+        if(!await playBuf(buf,tok)||Q.tok!==tok)return;}
+      end(true);return;
+    }catch(e){if(Q.tok!==tok)return;VOX.off=Date.now()+5*60e3;rest=parts.slice(k).join(" ");}}
+  if(!TTS){end(true);return;}browserSpeak(rest,end);
 }
 function speakAt(i,done){const v=S.chatView[i];if(v&&v.k==="ai")speakText(v.t,i,done);}
-function hush(){if(TTS)TTS.cancel();Q.tok=null;Q.speaking=null;speakUi(false);}
-/* Safari su iPhone parla solo se la prima lettura parte da un tocco: una frase vuota al primo tocco sblocca le successive */
-let ttsOk=false;function ttsUnlock(){if(!TTS||ttsOk)return;ttsOk=true;try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;TTS.speak(u);}catch{}}
+function hush(){if(TTS)TTS.cancel();if(VOX.src){const s=VOX.src;VOX.src=null;try{s.stop();}catch{}}Q.tok=null;Q.speaking=null;speakUi(false);}
+/* audio e voce del dispositivo partono solo dopo un tocco (Safari su iPhone): al primo tocco si sbloccano entrambi */
+let ttsOk=false;function ttsUnlock(){audioCtx();if(!TTS||ttsOk)return;ttsOk=true;try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;TTS.speak(u);}catch{}}
 function speakUi(on){document.querySelectorAll(".orb").forEach(o=>o.classList.toggle("speaking",on));}
 document.addEventListener("click",e=>{const sb=e.target.closest("[data-say]");if(!sb)return;ttsUnlock();const i=+sb.dataset.say;if(Q.speaking===i){hush();renderChat();barUi();}else speakAt(i);});
 
