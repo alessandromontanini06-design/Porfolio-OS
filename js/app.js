@@ -11,6 +11,7 @@ import { pmHas, pmRender } from "./ui/patrimonio.js";
 import "./ui/screenshot.js";
 import "./ui/ruolo.js";
 import "./ui/vetrina.js";
+import "./ui/costibanca.js";
 
 /* ---------- Avvio ---------- */
 load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);/* subito qualcosa da mostrare, poi il portafoglio di esempio vero */

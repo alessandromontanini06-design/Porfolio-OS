@@ -41,6 +41,7 @@
 <link rel="modulepreload" href="/js/ui/archivio.js">
 <link rel="modulepreload" href="/js/ui/btp.js">
 <link rel="modulepreload" href="/js/ui/core.js">
+<link rel="modulepreload" href="/js/ui/costibanca.js">
 <link rel="modulepreload" href="/js/ui/home.js">
 <link rel="modulepreload" href="/js/ui/importa.js">
 <link rel="modulepreload" href="/js/ui/laboratorio.js">
@@ -118,6 +119,7 @@
             </div>
             <button type="button" class="opt" id="shotBtn"><span><b>Carica uno screenshot</b><small>una o più foto dell'app della banca o del broker: l'IA legge titoli e quantità, tu controlli</small></span><em aria-hidden="true">→</em></button>
             <button type="button" class="opt" id="builderBtn"><span><b>Non ho un file</b><small>crea un portafoglio scegliendo ETF e pesi</small></span><em aria-hidden="true">→</em></button>
+            <button type="button" class="opt" data-cbopen="1"><span><b>Quanto mi costa la banca?</b><small>scrivi i numeri del rendiconto costi e oneri: costi in euro, in 10 e 20 anni, confronto con gli ETF</small></span><em aria-hidden="true">→</em></button>
             <button type="button" class="opt" id="sampleBtn"><span><b>Fammi vedere un esempio</b><small>7 ETF, 355 movimenti dal 2019</small></span><em aria-hidden="true">→</em></button>
           </div>
           <p class="fine hm-fine">Il file viene letto nel tuo browser e non lo salviamo su nessun server. Per capire un file nuovo all'IA mandiamo solo un estratto, e puoi spegnerla. <a href="/privacy.html">Come trattiamo i tuoi dati</a></p>
@@ -234,6 +236,12 @@
       <div class="scene-title"><div><span class="idx">Strumenti</span><h2>Gli <em>strumenti</em></h2></div><p id="toolsSrc">Le analisi del portafoglio che hai nel laboratorio.</p></div>
       <div class="tools-lock" id="toolsLock" hidden></div>
       <div class="tools-grid" id="toolsGrid"></div>
+      <section class="cb-box" id="cbBox" aria-labelledby="cbTitle">
+        <div class="cb-head"><span class="eyebrow">Senza file · dal rendiconto della banca</span><h3 id="cbTitle">Quanto ti costa la tua banca</h3>
+          <p>Ogni anno la banca deve mandarti il <b>rendiconto costi e oneri</b> dell'anno prima (lo trovi nei documenti dell'home banking). Scrivi qui i suoi numeri, in euro o in percentuale: vedi quanto paghi davvero e quanto pesa in 10 e 20 anni. Restano solo in questo browser.</p></div>
+        <form class="cb-form" id="cbForm" autocomplete="off"></form>
+        <div class="cb-out" id="cbOut" aria-live="polite"></div>
+      </section>
     </div>
   </section>
 

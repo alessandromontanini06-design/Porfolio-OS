@@ -1112,6 +1112,28 @@ body[data-ruolo="priv"] #presentBtn,body[data-ruolo="priv"] [data-rpw="client"],
 /* l'archivio di un consulente contiene i clienti: niente «Nel patrimonio» */
 body[data-ruolo="pro"] .ar-topm{display:none}
 
+/* ---------- Strumenti: quanto ti costa la tua banca ---------- */
+.cb-box{margin-top:clamp(28px,5vw,56px);padding-top:clamp(24px,4vw,40px);border-top:1px solid var(--line)}
+.cb-head h3{font-family:var(--f-display);font-weight:800;font-size:clamp(1.7rem,3.4vw,2.6rem);letter-spacing:-.04em;line-height:1.02;margin:6px 0 10px}
+.cb-head p{color:var(--muted);max-width:70ch;margin:0 0 18px}
+.cb-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.cb-f{display:flex;flex-direction:column;gap:5px;margin:0}.cb-f span{font-weight:700;font-size:.9rem}
+.cb-f input{font:inherit;font-size:1.05rem;font-variant-numeric:tabular-nums;background:var(--raise);border:1px solid transparent;border-radius:12px;padding:11px 13px;color:var(--fg)}
+.cb-f input:focus{outline:none;border-color:var(--fg);background:var(--bg)}.cb-f small{font-size:.76rem;color:var(--muted);line-height:1.35}
+.cb-out{margin-top:22px}.cb-hint{color:var(--muted);margin:0}
+.cb-hero{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}.cb-hero span{color:var(--muted);width:100%}
+.cb-hero b{font-family:var(--f-display);font-weight:800;font-size:clamp(2.4rem,6vw,4rem);letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums}
+.cb-hero small{font-size:1rem;color:var(--muted)}
+.cb-lv{font-style:normal;font-size:.8rem;font-weight:700;padding:5px 11px;border-radius:999px;background:var(--raise)}.cb-lv.basso{background:#E3F7EA;color:#0B7A3E}.cb-lv.medio{background:#FFF3D6;color:#8A5A00}.cb-lv.alto{background:#FDE4E7;color:#C2263F}
+.cb-bar{display:flex;gap:4px;margin:16px 0 18px;min-height:46px}.cb-seg{display:flex;flex-direction:column;justify-content:center;padding:6px 12px;border-radius:10px;font-size:.84rem;font-variant-numeric:tabular-nums;min-width:max-content}
+.cb-seg b{font-size:.74rem;font-weight:700}.cb-seg.s{background:#161616;color:#fff}.cb-seg.p{background:#C9F24A;color:#161616}
+.cb-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.cb-k>div{border-top:3px solid var(--fg);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.cb-k span{font-size:.86rem;color:var(--muted)}.cb-k b{font-family:var(--f-display);font-size:1.7rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}.cb-k b.dn{color:var(--bad)}.cb-k small{font-size:.8rem;color:var(--muted);line-height:1.4}
+.cb-inc{margin:18px 0 0;padding:14px 16px;border-radius:14px;background:var(--raise);max-width:80ch}
+.cb-note{font-size:.84rem;color:var(--muted);max-width:86ch;margin:14px 0 0}.cb-act{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+@media (max-width:860px){.cb-form{grid-template-columns:repeat(2,minmax(0,1fr))}.cb-k{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.cb-form{grid-template-columns:minmax(0,1fr)}.cb-seg{min-width:0}}
+
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
 .scene-title h2 em{color:var(--lime-text)}
