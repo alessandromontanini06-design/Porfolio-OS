@@ -1,6 +1,6 @@
 /* Portfolio OS · interfaccia · il tuo portafoglio: pesi, ribilanciamento, confronto allocazioni, proposta, profilo, costi.
    Parte di app.js divisa in moduli: il codice è lo stesso, cambiano solo import ed export. */
-import { $, P, S, esc, fmtDate, fmtN, fmtPct } from "./core.js";
+import { $, P, S, esc, fmtDate, fmtN, fmtPct, loadXLSX } from "./core.js";
 import { current, go } from "./scene.js";
 import { ISIN_RX, bondsHTML, isSim, track, trackOnce } from "./importa.js";
 import { svFileName, svKeep } from "./archivio.js";
@@ -138,8 +138,8 @@ function cmpMovesHTML(R){
     <tr class="pf"><td><b>Totale</b></td><td class="mono">${fmtEur(M.V)}</td><td class="mono">${fmtEur(M.V)}</td><td class="mono">vendite ${fmtEur(M.sell)} · acquisti ${fmtEur(M.buy)}</td><td class="mono"><b>${M.tax>0.5?fmtEur(M.tax):"—"}</b></td></tr></tbody></table></div>
     <p class="caption">Importi sul valore di oggi (${fmtEur(M.V)}), senza nuovi versamenti. Le imposte sono una stima: sulle vendite si realizza la parte di guadagno latente in proporzione a quanto si vende, al 26% o al 12,5% per i titoli di Stato; non considera minusvalenze da compensare, commissioni e spread.${Number.isFinite(M.ta)&&Number.isFinite(M.tb)?` Costo annuo: ${fmtPct(M.ta,2)} oggi, ${fmtPct(M.tb,2)} con la proposta (${fmtEur(Math.abs(M.tb-M.ta)*M.V)} l'anno ${M.tb<M.ta?"in meno":"in più"}).`:""}</p></div>`;
 }
-function cmpExport(){
-  if(typeof XLSX==="undefined")return;
+async function cmpExport(){
+  await loadXLSX().catch(()=>{});if(typeof XLSX==="undefined"){alert("Il lettore Excel non si è caricato: controlla la connessione e riprova.");return;}
   const R=cmpCalc(),M=cmpMoves(R);if(!M)return;const ds=S.ds,f=ds.freq.f,B=rpBrand(),today=new Date().toLocaleDateString("it-IT");
   const r2=v=>Math.round(v*100)/100,p4=v=>Math.round(v*1e4)/1e4;
   const s1=[["Strumento","Nome","ISIN",`Peso ${M.A.name}`,`Peso ${M.B.name}`,`Valore ${M.A.name} (€)`,`Valore ${M.B.name} (€)`,"Operazione","Importo (€)","Imposte stimate (€)"],

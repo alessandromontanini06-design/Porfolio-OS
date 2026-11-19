@@ -34,6 +34,25 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800;900&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/css/app.css">
 <link rel="stylesheet" href="/css/v2.css">
+<!-- tutti i moduli del sito insieme, invece che uno dopo l'altro man mano che il browser trova gli import (sul telefono fa la differenza) -->
+<link rel="modulepreload" href="/js/app.js">
+<link rel="modulepreload" href="/js/engine.js">
+<link rel="modulepreload" href="/js/ui/analisi.js">
+<link rel="modulepreload" href="/js/ui/archivio.js">
+<link rel="modulepreload" href="/js/ui/btp.js">
+<link rel="modulepreload" href="/js/ui/core.js">
+<link rel="modulepreload" href="/js/ui/home.js">
+<link rel="modulepreload" href="/js/ui/importa.js">
+<link rel="modulepreload" href="/js/ui/laboratorio.js">
+<link rel="modulepreload" href="/js/ui/patrimonio.js">
+<link rel="modulepreload" href="/js/ui/portafoglio.js">
+<link rel="modulepreload" href="/js/ui/quanta.js">
+<link rel="modulepreload" href="/js/ui/rendimento.js">
+<link rel="modulepreload" href="/js/ui/report.js">
+<link rel="modulepreload" href="/js/ui/ruolo.js">
+<link rel="modulepreload" href="/js/ui/scene.js">
+<link rel="modulepreload" href="/js/ui/screenshot.js">
+<link rel="modulepreload" href="/js/ui/vetrina.js">
 </head>
 <body data-scene="home">
 
@@ -662,7 +681,6 @@
     <div class="rp-df"><button type="submit" class="btn lime">Crea il PDF</button><span class="rp-hint">Si apre la finestra di stampa: scegli «Salva come PDF».</span></div>
   </form>
 </div>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/split-type@0.3.4/umd/index.min.js"></script>

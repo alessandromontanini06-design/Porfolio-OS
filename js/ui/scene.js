@@ -112,18 +112,35 @@ function renderPager(name){
   nav.innerHTML=card(pv,"pv","←")+`<div class="pg-dots" aria-hidden="true">${SCENES.map(s=>`<i class="${s===name?"on":avail(s)?"":"off"}" style="--t:${ACC[s]}"></i>`).join("")}</div>`
     +(nx?card(nx,"nx","→"):lockNext?`<span class="pg nx locked"><span>${String(SCENES.indexOf(lockNext)+1).padStart(2,"0")} ${LOCK}</span><b>${SCENE_L[lockNext]}</b><small>si sblocca costruendo il laboratorio</small></span>`:`<span class="pg nx none"></span>`);
 }
+/* pagine di analisi: si ricalcolano solo se è cambiato qualcosa da quando sono state disegnate
+   (dati del file, pesi scelti, scelte della pagina, dati macro, larghezza dello schermo). Tornarci è immediato.
+   Le modifiche fatte dentro la pagina ridisegnano subito come prima: qui conta solo l'ingresso. */
+let DSV=0;const dsVer=()=>{const d=S.ds;if(!d||!d.ok)return 0;if(!d.__v)Object.defineProperty(d,"__v",{value:++DSV});return d.__v;};
+const SIG_OF={
+  risk:()=>[S.riskW,S.optW&&S.optW.label],
+  sim:()=>[S.riskW,S.optW&&S.optW.label,S.mcIn,S.mcOb,S.svSaved||""],
+  fire:()=>[S.riskW,S.optW&&S.optW.label,S.fi&&S.fi.in,S.mcIn],
+  stress:()=>[S.riskW,S.optW&&S.optW.label,S.st],
+  opt:()=>[S.opIn],
+  bench:()=>[S.riskW,S.optW&&S.optW.label,S.bn&&{p:S.bn.pick,c:S.bn.ccy,s:S.bn.sym,n:S.bn.series&&Object.keys(S.bn.series).length},!!S.bnRes]
+};
+const lastSig={};
+const sigOf=name=>{try{return JSON.stringify([dsVer(),S.space||"",S.rfSrc||"",!!(S.macro&&S.macro.status==="ready"),Math.round(innerWidth/40),S.portfolio?S.portfolio.positions.map(p=>[p.valore,p.pesoTarget]):null,S.cmp||null,...SIG_OF[name]()]);}catch{return null;}};
+/* il ricordo si prende dopo il disegno: al primo ingresso ogni pagina sistema le sue scelte iniziali */
+function needRender(name){if(!SIG_OF[name])return true;const sig=sigOf(name);return !(sig&&lastSig[name]===sig&&$("#scene-"+name).querySelector("svg, table, .kpi"));}
+function rendered(name){if(SIG_OF[name])lastSig[name]=sigOf(name);}
 function onEnter(name){
   quantaScene(name);
   if(name==="scan"&&!S.scanPlayed)setTimeout(playScan,HAS_G?450:0);
-  if(name==="risk")renderRisk();
-  if(name==="sim")renderSim();
+  if(name==="risk"&&needRender("risk")){renderRisk();rendered("risk");}
+  if(name==="sim"&&needRender("sim")){renderSim();rendered("sim");}
   if(name==="home")svHome();
   if(name==="patrimonio")pmEnter();
   if(name==="strumenti")renderTools();
-  if(name==="fire")renderFI();
-  if(name==="stress")renderStress();
-  if(name==="opt")renderOpt();
-  if(name==="bench")renderBench();
+  if(name==="fire"&&needRender("fire")){renderFI();rendered("fire");}
+  if(name==="stress"&&needRender("stress")){renderStress();rendered("stress");}
+  if(name==="opt"&&needRender("opt")){renderOpt();rendered("opt");}
+  if(name==="bench"&&needRender("bench")){renderBench();rendered("bench");}
   if(name==="lab"&&S.lab&&!S.labFx.done){S.labFx.done=true;setTimeout(()=>{if(!S.lab)return;countAll();drawChart(true);if(S.corrView==="net")buildNet();},HAS_G?380:0);}
 }
 document.addEventListener("click",e=>{const n=e.target.closest("[data-nav]");if(n){go(n.dataset.nav==="lab"?labTarget():"strumenti");return;}const b=e.target.closest("[data-go]");if(!b||b.disabled||b.classList.contains("off"))return;go(b.dataset.go);});

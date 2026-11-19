@@ -2,7 +2,7 @@
    Si salvano solo strumenti e operazioni (localStorage «pos-patrimonio-v1»); tutto il resto lo calcola il motore (POS.ledger).
    Le operazioni non si cancellano: un errore si annulla con un'operazione nuova, così lo storico resta affidabile.
    Si riempie a mano oppure da un file caricato (movimenti o posizioni), e porta al laboratorio con un clic. */
-import { $, P, S, esc, fmtN, fmtPct } from "./core.js";
+import { $, P, S, esc, fmtN, fmtPct, loadXLSX } from "./core.js";
 import { getJSON, fmtEur, obLoad } from "./analisi.js";
 import { BD, POPULAR, bdBtpMeta, bdGo, bondInfo, bondYtm, guessSymbol, isBondPos, isExample, trackOnce } from "./importa.js";
 import { btpLista, btpNota, btpPrezzi, btpSym, isBtpSym } from "./btp.js";
@@ -30,6 +30,11 @@ const RING = ["#C9F24A", "#8F3BFF", "#2E6FD1", "#D4572E", "#C99A00", "#1D9A8A", 
 function pmLoad() { try { const x = JSON.parse(localStorage.getItem(PM_KEY) || "null"); if (x && x.v === 1 && x.strumenti && Array.isArray(x.operazioni)) return x; } catch {} return null; }
 const PM = { db: pmLoad(), px: {}, fx: {}, tipo: "acquisto", R: null, res: null, loading: false, beneId: "", group: "strumenti", sel: null, pending: false };
 const pmHas = () => !!(PM.db && PM.db.operazioni.some(o => o.tipo !== "annulla"));
+/* prezzi ricordati nel browser (pos-pm-px-v1): il patrimonio si apre subito con gli ultimi prezzi noti e si aggiorna in sottofondo.
+   Sono prezzi di fine giornata: se sono di meno di 3 ore fa non si richiedono. Se una richiesta fallisce resta l'ultimo prezzo noto. */
+const PM_PX_KEY = "pos-pm-px-v1", PM_PX_FRESH = 3 * 3600e3;
+function pmPxSave() { try { const px = {}; for (const [id, j] of Object.entries(PM.px)) if (j && !j.error && j.points) px[id] = j; localStorage.setItem(PM_PX_KEY, JSON.stringify({ v: 1, t: PM.pxT || Date.now(), px, fx: PM.fx })); } catch {} }
+(() => { try { const c = JSON.parse(localStorage.getItem(PM_PX_KEY) || "null"); if (c && c.v === 1 && c.px) { PM.px = c.px; PM.fx = c.fx || {}; PM.pxT = c.t; } } catch {} })();
 function pmSave() {
   PM.db.aggiornato = new Date().toISOString();
   try { localStorage.setItem(PM_KEY, JSON.stringify(PM.db)); return true; }
@@ -50,9 +55,10 @@ async function pmPrices(force) {
   const db = pmDb(), ids = Object.keys(db.strumenti).filter(id => (db.strumenti[id].simbolo || pmBtpSym(db.strumenti[id])) && (force || !PM.px[id]));
   const q = ids.slice();
   await Promise.all([0, 1, 2].map(async () => { while (q.length) { const id = q.shift(), s = db.strumenti[id], bs = !s.simbolo && pmBtpSym(s);
-    if (bs) { const j = await btpPrezzi(bs, pmAncora(id)); PM.px[id] = j && !j.error ? j : { error: (j && j.error) || "prezzo stimato non disponibile" }; continue; }
+    const old = PM.px[id] && PM.px[id].points && PM.px[id].symbol === (s.simbolo || bs) ? PM.px[id] : null;
+    if (bs) { const j = await btpPrezzi(bs, pmAncora(id)); PM.px[id] = j && !j.error ? j : old || { error: (j && j.error) || "prezzo stimato non disponibile" }; continue; }
     const j = await getJSON(`/api/prices?symbol=${encodeURIComponent(s.simbolo)}&v=6`);
-    PM.px[id] = j && !j.error && j.points ? j : { error: (j && j.error) || "prezzi non disponibili" }; } }));
+    PM.px[id] = j && !j.error && j.points ? j : old || { error: (j && j.error) || "prezzi non disponibili" }; } }));
   await pmFx(force);
 }
 async function pmFx(force) {
@@ -583,9 +589,14 @@ function pmRender() {
 }
 async function pmRefresh(force) {
   if (!pmHas()) { pmRender(); return; }
-  PM.loading = true; pmRender();
-  try { await pmPrices(force); } finally { PM.loading = false; }
-  pmRender();
+  /* prezzi ricordati di uno strumento che nel frattempo ha cambiato simbolo (o BTP con un prezzo nuovo): si richiedono */
+  for (const [id, j] of Object.entries(PM.px)) { const s = PM.db.strumenti[id]; if (!s || (j && j.symbol && j.symbol !== (s.simbolo || pmBtpSym(s)))) delete PM.px[id]; }
+  const fresh = PM.pxT && Date.now() - PM.pxT < PM_PX_FRESH, missing = Object.entries(PM.db.strumenti).some(([id, s]) => (s.simbolo || pmBtpSym(s)) && !PM.px[id]);
+  if (fresh && !missing && !force) { pmRender(); return; }
+  PM.loading = true; pmRender(); /* con i prezzi ricordati la pagina ha già i valori: intanto si aggiornano */
+  try { await pmPrices(force || !fresh); } finally { PM.loading = false; }
+  if (force || !fresh) PM.pxT = Date.now();
+  pmPxSave(); pmRender();
 }
 /* entrata nella sezione (dal menu, dalla home o all'avvio) */
 function pmEnter() { trackOnce("feature", "patrimonio", { name: "patrimonio" }); pmDb(); if (!$("#pmForm").children.length) pmRenderForm(); pmRefresh(false); }
@@ -775,9 +786,10 @@ document.addEventListener("click", e => { const el = e.target.closest("#pmGoals"
 
 /* ---------- il patrimonio in Excel: da leggere (o da dare al commercialista), non da reimportare ----------
    Riepilogo, Posizioni, Operazioni, Andamento (fine mese), Proventi in arrivo, Tasse, Leggimi. Numeri veri con i formati € e %. */
-function pmExcel() {
+async function pmExcel() {
   if (!pmHas()) return false;
-  if (!window.XLSX) { pmMsg("Il lettore Excel non si è caricato: ricarica la pagina e riprova.", "err"); return false; }
+  await loadXLSX().catch(() => {});
+  if (!window.XLSX) { pmMsg("Il lettore Excel non si è caricato: controlla la connessione e riprova.", "err", "#pmTopMsg"); return false; }
   const db = PM.db, R = PM.R || pmCalc(), T = R.totale, F = PM.fisc || P.fisco(R, pmFiscStrumenti(), { oggi: pmToday() }), inc = PM.inc || [];
   const r2 = v => v == null || !isFinite(v) ? null : Math.round(v * 100) / 100, pc = v => v == null || !isFinite(v) ? null : Math.round(v * 10000) / 10000, dd = s => s ? new Date(s + "T12:00:00Z") : null;
   const tipoL = { acquisto: "Acquisto", vendita: "Vendita", dividendo: "Dividendo", cedola: "Cedola", valutazione: "Nuovo prezzo o stima", commissione: "Commissione", tassa: "Tassa", frazionamento: "Frazionamento" };

@@ -1,6 +1,6 @@
 /* Portfolio OS · interfaccia · caricamento dei file, lettura con l'IA, crea il portafoglio, import, correzioni, ricostruzione con i prezzi, controlli, modelli, tracker, obbligazioni.
    Parte di app.js divisa in moduli: il codice è lo stesso, cambiano solo import ed export. */
-import { $, CONF_L, G, HAS_G, P, REDUCE, ROLES, ROLE_COLOR, ROLE_TAG, S, esc, fmtDate, fmtN, fmtPct, fmtSize } from "./core.js";
+import { $, CONF_L, G, HAS_G, P, REDUCE, ROLES, ROLE_COLOR, ROLE_TAG, S, esc, fmtDate, fmtN, fmtPct, fmtSize, loadXLSX } from "./core.js";
 import { current, go, morphData, renderTicker } from "./scene.js";
 import { hideLab } from "./portafoglio.js";
 import { showLab } from "./archivio.js";
@@ -164,7 +164,7 @@ async function handleFile(file){
       if(text.includes(String.fromCharCode(0xFFFD)))text=new TextDecoder("windows-1252").decode(buf);
       sheets=[{name:file.name.replace(/\.[^.]+$/,""),aoa:P.parseCSV(text)}];
     }else if(["xlsx","xls","xlsm","ods"].includes(ext)){
-      if(!window.XLSX)throw new Error("noxlsx");
+      await loadXLSX();
       const buf=await file.arrayBuffer();
       const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
       sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));
@@ -191,8 +191,7 @@ async function loadExample(fromUser){
   if(fromUser&&isSim()){spaceSwitch("real",{stay:true});if(isExample()&&S.source&&S.source.kind==="rebuilt"){go("scan",{force:true});return;}}
   if(fromUser&&isExample()&&S.source.kind==="rebuilt"){go("scan",{force:true});return;}
   try{
-    for(let k=0;!window.XLSX&&k<50;k++)await new Promise(r=>setTimeout(r,100));
-    if(!window.XLSX)throw new Error("noxlsx");
+    await loadXLSX();
     const buf=await (await fetch(EXAMPLE.url)).arrayBuffer();
     const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:false,cellHTML:false,bookVBA:false});
     const sheets=wb.SheetNames.map(n=>({name:n,aoa:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true})}));

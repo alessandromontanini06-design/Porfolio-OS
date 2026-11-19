@@ -11,10 +11,12 @@ const saved = () => { try { const j = JSON.parse(localStorage.getItem(BDI_KEY) |
 /* curva una volta per visita; se la Banca d'Italia non risponde si usa l'ultima copia salvata nel browser */
 function btpCurva() {
   if (CURVA) return Promise.resolve(CURVA);
+  /* copia di meno di 12 ore fa: la Banca d'Italia pubblica una volta al giorno, non serve richiederla */
+  const c0 = saved(); if (c0 && c0._t && Date.now() - c0._t < 12 * 3600e3) { CURVA = c0; return Promise.resolve(c0); }
   return CURVA_P ||= fetch("/api/rates?serie=btp", { signal: AbortSignal.timeout(30000) })
     .then(r => r.json().catch(() => ({ error: `errore ${r.status}` })))
     .then(j => { CURVA_P = null; if (!j || j.error || !j.mesi) throw new Error((j && j.error) || "curva non disponibile");
-      CURVA = j; try { localStorage.setItem(BDI_KEY, JSON.stringify(j)); } catch {} return j; })
+      CURVA = j; try { localStorage.setItem(BDI_KEY, JSON.stringify({ ...j, _t: Date.now() })); } catch {} return j; })
     .catch(e => { CURVA_P = null; const c = saved(); if (c) { CURVA = { ...c, copia: true }; return CURVA; } throw e; });
 }
 const isBtpSym = s => /^BTP:\d/.test(String(s || "").toUpperCase());

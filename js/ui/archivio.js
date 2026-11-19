@@ -1,6 +1,6 @@
 /* Portfolio OS · interfaccia · archivio dei portafogli (IndexedDB), cosa è cambiato, pagina Archivio.
    Parte di app.js divisa in moduli: il codice è lo stesso, cambiano solo import ed export. */
-import { $, G, HAS_G, P, REDUCE, S, esc, fmtDate, fmtN, fmtPct } from "./core.js";
+import { $, G, HAS_G, P, REDUCE, S, esc, fmtDate, fmtN, fmtPct, loadXLSX } from "./core.js";
 import { current, go, renderPager, reveal } from "./scene.js";
 import { isExample, isSim, load, rbAoa, renderImport, spaceSwitch, trackOnce } from "./importa.js";
 import { PZ } from "./report.js";
@@ -216,7 +216,7 @@ function arDetail(r){
 /* esporta in Excel: un file da leggere (e da passare al commercialista o al gestionale), non una copia tecnica.
    Fogli: Clienti (una riga per portafoglio), Pesi, Revisioni, Leggimi. Per rimettere l'archivio in un altro browser c'è la copia di sicurezza (JSON). */
 async function arExcel(){
-  if(!window.XLSX){alert("Il lettore Excel non si è caricato: ricarica la pagina e riprova.");return;}
+  await loadXLSX().catch(()=>{});if(!window.XLSX){alert("Il lettore Excel non si è caricato: controlla la connessione e riprova.");return;}
   const L=(await svList()).sort((a,b)=>String(a.name).localeCompare(String(b.name),"it"));if(!L.length)return;
   const r2=v=>v==null||!isFinite(v)?null:Math.round(v*100)/100,pc=v=>v==null||!isFinite(v)?null:Math.round(v*10000)/10000,day=t=>t?new Date(t):null,now=Date.now();
   const cli=[["Cliente / portafoglio","File","Valore (€)","Investito (€)","Guadagno (€)","Rendimento annuo (TIR)","Crescita annua storica","Volatilità annua","Perdita massima","Strumenti","Periodo dei dati","Creato il","Ultima revisione","Giorni dall'ultima revisione","Revisioni","Note"]];

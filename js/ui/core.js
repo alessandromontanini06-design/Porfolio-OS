@@ -22,4 +22,15 @@ const color=i=>COLORS[i%COLORS.length];
 const fmtSize=b=>b<1024?b+" B":b<1048576?fmtN(b/1024,0)+" KB":fmtN(b/1048576,1)+" MB";
 const S={source:null,raw:[],sheets:[],sheetIdx:0,roles:{},touched:{},ds:null,lab:null,corrView:"mat",scanPlayed:false,labFx:{},ai:null,aiLog:[],aiRoles:{},rawOrig:null,macro:null,rfSrc:"ecb"};
 
-export { $, CALM, COLORS, CONF_L, FINE, G, HAS_G, NET_COLORS, P, POS, REDUCE, ROLES, ROLE_COLOR, ROLE_SHORT, ROLE_TAG, S, ST, color, esc, fmtDate, fmtN, fmtPct, fmtSize };
+/* lettore Excel (SheetJS, 197 KB): non all'apertura, ma quando serve (file, esempio, esportazioni) o quando il sito è libero */
+const XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+let xlsxP = null;
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return xlsxP ||= new Promise((ok, ko) => { const s = document.createElement("script"); s.src = XLSX_URL; s.async = true; s.crossOrigin = "anonymous";
+    s.onload = () => window.XLSX ? ok(window.XLSX) : ko(new Error("noxlsx")); s.onerror = () => { xlsxP = null; s.remove(); ko(new Error("noxlsx")); }; document.head.appendChild(s); });
+}
+/* lavori non urgenti: quando il browser è libero (o al massimo dopo qualche secondo) */
+const whenIdle = (cb, max = 4000) => ("requestIdleCallback" in window ? requestIdleCallback(() => cb(), { timeout: max }) : setTimeout(cb, Math.min(max, 1500)));
+
+export { loadXLSX, whenIdle, $, CALM, COLORS, CONF_L, FINE, G, HAS_G, NET_COLORS, P, POS, REDUCE, ROLES, ROLE_COLOR, ROLE_SHORT, ROLE_TAG, S, ST, color, esc, fmtDate, fmtN, fmtPct, fmtSize };
