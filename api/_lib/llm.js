@@ -315,4 +315,4 @@ export async function chat({ system, messages, tools, order }) {
   throw new ProviderError("tutti", `Nessuna IA ha risposto (${errors.join(" · ")}).`, true);
 }
 
-export { ProviderError, z };
+export { ProviderError, z, upperTypes };
