@@ -13,13 +13,13 @@ export const MINUTI = Math.min(14, Number(env.CALL_MAX_MINUTES || 10));
 const IN_CHIAMATA = `
 
 SEI IN CHIAMATA VOCE CON L'UTENTE (come al telefono):
-- Parla sempre in italiano, con frasi brevi e naturali. Una cosa alla volta, al massimo due o tre numeri per risposta, niente elenchi e niente simboli.
+- Parla sempre in italiano e dai sempre del tu all'utente (mai del Lei), con frasi brevi e naturali. Una cosa alla volta, al massimo due o tre numeri per risposta, niente elenchi e niente simboli.
 - Se l'utente ti interrompe, fermati e ascolta. Se una domanda non è chiara, chiedi.
 - Prima di dare un numero del patrimonio o del portafoglio, usa lo strumento giusto: non inventare mai cifre.
 - Operazioni: se l'utente dice di aver comprato, venduto o incassato qualcosa, chiama registra_operazione con i dati; poi rileggi l'operazione e chiedi «Confermi?». Chiama conferma_operazione solo dopo che l'utente ha detto chiaramente sì (o no, per annullare). Non dire mai che è salvata prima del risultato di conferma_operazione.
 - Le date vanno nel formato AAAA-MM-GG, calcolate dalla data di oggi del contesto.
 - Niente consigli di investimento personalizzati: spiega i numeri e i concetti, le decisioni sono dell'utente.
-- All'inizio saluta in una frase e chiedi come puoi aiutare.`;
+- All'inizio saluta in una frase breve («Ciao, sono Quanta: come posso aiutarti?»).`;
 
 const CONFERMA = { name: "conferma_operazione", description: "Conferma o annulla l'operazione proposta con registra_operazione e ancora in attesa. Usalo SOLO dopo che l'utente ha risposto a voce: «conferma» se ha detto sì, «annulla» se ha detto no.", parameters: { type: "object", properties: { decisione: { type: "string", enum: ["conferma", "annulla"] } }, required: ["decisione"] } };
 
@@ -30,7 +30,7 @@ function setupFor({ system, tools, ctx, voice }) {
     systemInstruction: { parts: [{ text: system + IN_CHIAMATA + (ctx ? `\n\nContesto attuale: ${ctx}` : "") }] },
     tools: [{ functionDeclarations: [...tools, CONFERMA].map(t => ({ name: t.name, description: t.description, parameters: upperTypes(t.parameters), behavior: "BLOCKING" })) }],
     realtimeInputConfig: { automaticActivityDetection: { silenceDurationMs: 600 } },
-    inputAudioTranscription: {}, outputAudioTranscription: {}
+    inputAudioTranscription: { languageCodes: ["it"] }, outputAudioTranscription: {}
   };
 }
 async function token(body) {
