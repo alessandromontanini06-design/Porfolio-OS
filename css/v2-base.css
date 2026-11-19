@@ -27,8 +27,9 @@ h1,h2,h3{font-family:var(--f-display);letter-spacing:-.03em}
 /* ---------- barra in alto: marchio a sinistra, sezioni al centro, spazi e stato a destra ---------- */
 .topbar{background:rgba(255,255,255,.86);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--line);padding:10px max(20px,calc((100vw - 1360px)/2 + 20px));height:60px}
 .brand{color:var(--fg);font-family:var(--f-display);font-weight:800;letter-spacing:-.025em;text-transform:none}
-.brand .mk{background:var(--lime)!important;border-radius:8px;box-shadow:none}
-.brand .mk svg path{stroke:#111}
+.brand .mk{width:34px;height:34px;background:none!important;border-radius:0;box-shadow:none;display:block;color:var(--fg)}
+.brand .mk svg{width:100%;height:100%;overflow:visible;display:block}
+.pz-brand .mk{width:28px;height:28px;background:none!important;border-radius:0;display:block;color:currentColor}.pz-brand .mk svg{width:100%;height:100%;overflow:visible}
 .status .chip.live{display:none}
 #sceneChip{display:none}
 .chip{font-family:var(--f-body);letter-spacing:0;text-transform:none;font-size:.78rem;border-color:var(--line);color:var(--muted);background:var(--bg)}

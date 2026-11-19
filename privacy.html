@@ -17,7 +17,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 Inter,system-ui
 a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--lime);text-decoration-thickness:2px;text-underline-offset:3px}
 .top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:14px;height:60px;padding:0 max(16px,calc((100vw - 860px)/2));background:rgba(255,255,255,.9);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:9px;font:800 1rem/1 "Inter Tight",Inter,sans-serif;letter-spacing:-.02em;text-decoration:none}
-.brand i{width:28px;height:28px;border-radius:8px;background:var(--lime);display:grid;place-items:center}
+.brand i{width:34px;height:34px;display:block;color:currentColor}.brand i svg{width:100%;height:100%;overflow:visible}
 .back{margin-left:auto;font-size:.9rem;font-weight:600;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:7px 12px}
 main{max-width:860px;margin:0 auto;padding:40px 16px 80px}
 .kick{color:var(--muted);margin:0 0 8px}
@@ -58,7 +58,7 @@ button.del:hover{background:#fff4f5}
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/"><i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span class="bw"><b class="bw1">Quanta</b> <span class="bw2">Portfolio</span></span></a>
+  <a class="brand" href="/"><i aria-hidden="true"><svg viewBox="0 0 100 100" fill="none"><path d="M6.25 66.21A46 13 -18 0 1 93.75 37.79" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="52" r="27" fill="#C9F24A"/><path d="M93.75 37.79A46 13 -18 0 1 6.25 66.21" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/></svg></i><span class="bw"><b class="bw1">quanta</b> <span class="bw2">portfolio</span></span></a>
   <a class="back" href="/">← Torna al sito</a>
 </header>
 <main>
