@@ -1134,6 +1134,16 @@ body[data-ruolo="pro"] .ar-topm{display:none}
 @media (max-width:860px){.cb-form{grid-template-columns:repeat(2,minmax(0,1fr))}.cb-k{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:520px){.cb-form{grid-template-columns:minmax(0,1fr)}.cb-seg{min-width:0}}
 
+/* ---------- Patrimonio: se arriva una crisi ---------- */
+.pm-rk{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.pm-rk>div{border-top:3px solid var(--fg);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.pm-rk span{font-size:.86rem;color:var(--muted)}.pm-rk b{font-family:var(--f-display);font-size:1.75rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}.pm-rk b.dn{color:var(--bad)}
+.pm-rk small{font-size:.8rem;color:var(--muted);line-height:1.4}
+.pm-rk-c{list-style:none;padding:0;margin:18px 0 6px;display:flex;flex-direction:column}
+.pm-rk-c li{display:grid;grid-template-columns:minmax(0,1fr) auto 60px;gap:14px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.pm-rk-c li span{font-weight:600}.pm-rk-c li small{display:block;font-weight:400;font-size:.78rem;color:var(--muted)}
+.pm-rk-c li b{font-variant-numeric:tabular-nums;font-size:1.05rem}.pm-rk-c li b.dn{color:var(--bad)}.pm-rk-c li b.up{color:var(--good)}.pm-rk-c li em{font-style:normal;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:720px){.pm-rk{grid-template-columns:minmax(0,1fr)}}
+
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}
 .scene-title h2 em{color:var(--lime-text)}

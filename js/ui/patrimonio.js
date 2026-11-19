@@ -582,6 +582,7 @@ function pmRender() {
   pacRenderDue(); pacRenderList();
   pmTax(R);
   pmIncome(R);
+  pmRisk(R);
   pmGoals(R);
   const quoted = R.posizioni.some(p => { const s = PM.db.strumenti[p.id]; return p.aperta && !s.manuale && (!s.per100 || pmBtpSym(s)); });
   $("#pmLab").disabled = !quoted; $("#pmExport").disabled = !has;
@@ -730,11 +731,11 @@ function pmGoalReturns(R) {
   const fxMap = c => { const m = new Map(); (PM.fx[c] || []).forEach(x => m.set(String(x.p || x.d).slice(0, 7), +x.v)); return m; };
   const ser = open.map(p => { const s = PM.db.strumenti[p.id], j = PM.px[p.id], c0 = String(j.currency || s.valuta || "EUR").toUpperCase(), c = c0 === "GBX" ? "GBP" : c0, k = c0 === "GBX" ? 100 : 1, fx = c === "EUR" ? null : fxMap(c), m = new Map();
     j.points.forEach(x => { const ym = String(x.d).slice(0, 7), r = fx ? fx.get(ym) : 1; if (+x.v > 0 && r > 0) m.set(ym, +x.v / k / r); }); return { w: p.valore / tot, m }; });
-  const months = [...new Set(ser.flatMap(s => [...s.m.keys()]))].sort(), ret = [];
+  const months = [...new Set(ser.flatMap(s => [...s.m.keys()]))].sort(), ret = [], mesi = [];
   for (let i = 1; i < months.length; i++) { const a = months[i - 1], b = months[i]; let sw = 0, sr = 0;
     for (const s of ser) { const pa = s.m.get(a), pb = s.m.get(b); if (pa > 0 && pb > 0) { sw += s.w; sr += s.w * (pb / pa - 1); } }
-    if (sw >= 0.6) ret.push(sr / sw); }
-  return { ret: ret.slice(-240), base: tot, n: open.length };
+    if (sw >= 0.6) { ret.push(sr / sw); mesi.push(b); } }
+  return { ret: ret.slice(-240), mesi: mesi.slice(-240), base: tot, n: open.length };
 }
 function pmVersa(R) {
   try { const v = localStorage.getItem(PM_VERSA_KEY); if (v != null && v !== "" && isFinite(+v)) return { v: +v, da: "tu" }; } catch {}
@@ -786,6 +787,35 @@ document.addEventListener("click", e => { const el = e.target.closest("#pmGoals"
   if (e.target.closest("[data-pmgadd]")) { const L = pmGoalsFromDom(); L.push({ nome: "", importo: 0, anno: 5 }); pmObSave(L); pmGoals(PM.R || pmCalc()); const ins = document.querySelectorAll('#pmGoals [data-pmgf="nome"]'); if (ins.length) ins[ins.length - 1].focus(); return; }
   const x = e.target.closest("[data-pmgex]"); if (x) { const [n, a, y] = PM_OB_ESEMPI[+x.dataset.pmgex], L = obLoad(); L.push({ nome: n, importo: a, anno: y }); pmObSave(L); pmGoals(PM.R || pmCalc()); return; }
   const d = e.target.closest("[data-pmgdel]"); if (d) { const L = pmGoalsFromDom(); L.splice(+d.dataset.pmgdel, 1); pmObSave(L); pmGoals(PM.R || pmCalc()); } });
+
+/* ---------- Se arriva una crisi: quanto si è mosso in passato il patrimonio di oggi, in euro ----------
+   Stessa storia ricostruita degli obiettivi (titoli quotati di oggi, pesi di oggi). Anno peggiore e «1 anno su 20» sui 12 mesi mobili,
+   calo massimo e tempo per recuperarlo, crisi vere coperte dai dati (POS.CRISES). Non è una previsione. */
+const ymIt = m => { const [y, mo] = m.split("-"); return `${["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"][+mo - 1]} ${y}`; };
+function pmRiskCalc(G) {
+  const r = G.ret, m = G.mesi, n = r.length; if (n < 36) return null;
+  const y12 = []; for (let i = 11; i < n; i++) { let g = 1; for (let k = i - 11; k <= i; k++) g *= 1 + r[k]; y12.push({ v: g - 1, fino: m[i] }); }
+  const worst = y12.reduce((a, b) => (b.v < a.v ? b : a)), so = y12.map(x => x.v).sort((a, b) => a - b), p5 = so[Math.floor(so.length * 0.05)];
+  let idx = 1, peak = 1, pk = -1, dd = 0, ddPk = -1, ddTr = -1; const I = [];
+  for (let i = 0; i < n; i++) { idx *= 1 + r[i]; I.push(idx); if (idx >= peak) { peak = idx; pk = i; } const d = idx / peak - 1; if (d < dd) { dd = d; ddPk = pk; ddTr = i; } }
+  let rec = null; if (ddTr >= 0) { const lvl = ddPk >= 0 ? I[ddPk] : 1; for (let i = ddTr + 1; i < n; i++) if (I[i] >= lvl) { rec = i - ddTr; break; } }
+  const crisi = P.CRISES.map(c => { const ks = m.map((x, i) => [x, i]).filter(([x]) => x >= c.m0 && x <= c.m1); const want = (+c.m1.slice(0, 4) - +c.m0.slice(0, 4)) * 12 + (+c.m1.slice(5) - +c.m0.slice(5)) + 1;
+    if (ks.length < want) return null; const g = ks.reduce((a, [, i]) => a * (1 + r[i]), 1) - 1; return { nome: c.name, v: g, m0: c.m0, m1: c.m1 }; }).filter(Boolean);
+  return { worst, p5, dd, ddDa: ddPk >= 0 ? m[ddPk] : m[0], ddA: m[ddTr] || null, rec, crisi, anni: n / 12, da: m[0] };
+}
+function pmRisk(R) {
+  const box = $("#pmRiskBox"); if (!box) return;
+  const G = pmGoalReturns(R), C = G && pmRiskCalc(G); if (!C) { box.hidden = true; return; }
+  box.hidden = false; const b = G.base, e = v => (v < 0 ? "−" : "+") + fmtEur(Math.abs(v)), pc = v => (v < 0 ? "−" : v > 0 ? "+" : "") + fmtPct(Math.abs(v), 0);
+  $("#pmRiskSub").textContent = `sui ${fmtEur(b)} che hai oggi in titoli quotati`;
+  $("#pmRisk").innerHTML = `<div class="pm-rk">
+      <div><span>In un anno brutto (1 su 20)</span><b class="${C.p5 < 0 ? "dn" : ""}">${e(b * C.p5)}</b><small>${pc(C.p5)} in 12 mesi: capita circa un anno ogni venti</small></div>
+      <div><span>L'anno peggiore</span><b class="dn">${e(b * C.worst.v)}</b><small>${pc(C.worst.v)} nei 12 mesi fino a ${ymIt(C.worst.fino)}</small></div>
+      <div><span>Il calo più grande</span><b class="dn">${e(b * C.dd)}</b><small>${pc(C.dd)} da ${ymIt(C.ddDa)} a ${C.ddA ? ymIt(C.ddA) : "—"}${C.rec != null ? `, recuperato in ${C.rec} ${C.rec === 1 ? "mese" : "mesi"}` : ", non ancora recuperato"}</small></div>
+    </div>
+    ${C.crisi.length ? `<ul class="pm-rk-c">${C.crisi.map(c => `<li><span>${esc(c.nome)}<small>${ymIt(c.m0)} – ${ymIt(c.m1)}</small></span><b class="${c.v < 0 ? "dn" : "up"}">${e(b * c.v)}</b><em>${pc(c.v)}</em></li>`).join("")}</ul>` : ""}
+    <p class="caption">Come si sarebbero mossi i titoli che hai oggi, con i pesi di oggi, negli ultimi ${fmtN(C.anni, 0)} anni di prezzi (dal ${ymIt(C.da)}). Case e beni senza quotazione non sono inclusi. Non è una previsione: mostra quanto si è mosso in passato, per capire se ti va bene vederlo succedere.</p>`;
+}
 
 /* ---------- il patrimonio in Excel: da leggere (o da dare al commercialista), non da reimportare ----------
    Riepilogo, Posizioni, Operazioni, Andamento (fine mese), Proventi in arrivo, Tasse, Leggimi. Numeri veri con i formati € e %. */
