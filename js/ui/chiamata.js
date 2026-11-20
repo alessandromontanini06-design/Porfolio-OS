@@ -158,9 +158,11 @@ export async function callStart() {
   catch (e) { fail(e && e.name === "NotAllowedError" ? "Per chiamare Quanta permetti l'uso del microfono nelle impostazioni del browser." : "Non riesco ad aprire il microfono.", false); return; }
   if (!C.on) return;
   let j;
-  try { const r = await fetch("/api/assistant?modo=chiamata", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context: chatContext() }), signal: AbortSignal.timeout(15000) });
+  /* il biglietto per la chiamata: se la richiesta si interrompe per strada (Safari: «Load failed», Chrome: «Failed to fetch») si riprova una volta */
+  const biglietto = () => fetch("/api/assistant?modo=chiamata", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context: chatContext() }), signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined });
+  try { let r; try { r = await biglietto(); } catch (e) { if (e.name !== "TypeError" || !C.on) throw e; await new Promise(ok => setTimeout(ok, 1200)); if (!C.on) return; r = await biglietto(); }
     j = await r.json().catch(() => ({})); if (!r.ok || !j.token) throw new Error(j.error || "La chiamata non è disponibile ora."); }
-  catch (e) { if (C.on) fail(e.name === "TimeoutError" ? "Il server non ha risposto in tempo." : String(e.message || e), true); return; }
+  catch (e) { if (C.on) fail(e.name === "TimeoutError" ? "Il server non ha risposto in tempo." : e.name === "TypeError" ? "Non riesco a raggiungere il server: controlla la connessione e riprova tra qualche secondo." : String(e.message || e), true); return; }
   if (!C.on) return;
   C.max = j.minuti || 10;
   const ws = new WebSocket(WSS + encodeURIComponent(j.token)); C.ws = ws;
