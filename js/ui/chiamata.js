@@ -117,7 +117,7 @@ async function onMsg(ev) {
   let m; try { m = JSON.parse(typeof ev.data === "string" ? ev.data : await ev.data.text()); } catch { return; }
   if (m.setupComplete) { C.ready = true; state("listening"); send({ realtimeInput: { text: "(La chiamata è appena iniziata: saluta in una frase breve e chiedi come puoi aiutare.)" } }); return; }
   if (m.toolCall) { onTool(m.toolCall); return; }
-  if (m.goAway) { $("#qcNote").textContent = "La chiamata sta per chiudersi."; return; }
+  if (m.goAway) { C.goAway = true; $("#qcNote").textContent = "La chiamata sta per chiudersi."; return; }
   const sc = m.serverContent; if (!sc) return;
   if (sc.inputTranscription && sc.inputTranscription.text) { C.user += sc.inputTranscription.text; caption(); }
   if (sc.interrupted) { flush(); commitAi(true); state("listening"); caption(); }
@@ -141,6 +141,14 @@ function cleanup() {
   flush(); if (C.ctx) { C.ctx.close().catch(() => {}); C.ctx = null; }
 }
 
+/* perché Google ha chiuso la chiamata: il motivo resta nella chat (prima si perdeva) */
+function perche(e) {
+  const r = String((e && e.reason) || ""), c = e && e.code;
+  if (/quota|exhaust|rate.?limit|exceed|429/i.test(r)) return "la quota gratuita di Google per le chiamate è finita per ora: riprova tra qualche minuto, oppure usa la voce semplice";
+  if (C.goAway) return "Google ha chiuso la sessione al termine del tempo disponibile";
+  if (c === 1006 || !c) return "la connessione si è interrotta (rete instabile, oppure lo schermo si è spento)";
+  return `la chiamata si è interrotta (codice ${c}${r ? `: ${r.slice(0, 140)}` : ""})`;
+}
 export async function callStart() {
   if (C.on) return;
   if (!callSupported()) { talkStart(); return; }
@@ -152,7 +160,7 @@ export async function callStart() {
   /* l'audio va creato subito, dentro il tocco (Safari su iPhone) */
   const AC = window.AudioContext || window.webkitAudioContext; C.ctx = new AC(); C.ctx.resume().catch(() => {});
   C.gain = C.ctx.createGain(); C.outAn = C.ctx.createAnalyser(); C.outAn.fftSize = 512; C.gain.connect(C.outAn); C.outAn.connect(C.ctx.destination);
-  C.on = true; C.muted = false; C.user = ""; C.ai = ""; C.lastUser = ""; C.warned = false; C.ang = 0; C.vel = SPIN.connecting; C.last = 0; ccUi(); muteUi(); state("connecting"); $("#qcEnd").focus();
+  C.on = true; C.goAway = false; C.muted = false; C.user = ""; C.ai = ""; C.lastUser = ""; C.warned = false; C.ang = 0; C.vel = SPIN.connecting; C.last = 0; ccUi(); muteUi(); state("connecting"); $("#qcEnd").focus();
   trackOnce("feature", "quanta_chiamata", { name: "quanta_chiamata" });
   try { await micStart(); }
   catch (e) { fail(e && e.name === "NotAllowedError" ? "Per chiamare Quanta permetti l'uso del microfono nelle impostazioni del browser." : "Non riesco ad aprire il microfono.", false); return; }
@@ -169,7 +177,7 @@ export async function callStart() {
   ws.onopen = () => send({ setup: j.setup });
   ws.onmessage = onMsg;
   ws.onerror = () => {};
-  ws.onclose = e => { if (!C.on) return; if (!C.ready) fail(`La chiamata non si è aperta${e.reason ? ` (${String(e.reason).slice(0, 120)})` : ""}.`, true); else callEnd("La chiamata si è interrotta."); };
+  ws.onclose = e => { if (!C.on) return; if (!C.ready) fail(`La chiamata non si è aperta${e.reason ? ` (${String(e.reason).slice(0, 120)})` : ""}.`, true); else callEnd(perche(e)); };
   C.t0 = Date.now(); C.timer = setInterval(clock, 1000);
   if (!REDUCE) C.raf = requestAnimationFrame(level);
 }
