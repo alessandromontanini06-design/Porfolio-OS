@@ -1,0 +1,338 @@
+678	Ejemplos
+679	Evolución
+680	Interpretación
+681	Fiabilidad
+682	Motivo
+683	Control de calidad
+684	Lo que puedo construir
+685	con estos datos
+686	Construir el laboratorio
+687	¿Tu archivo no se ha leído bien? Avísanos
+688	Qué falla (opcional)
+689	Enviar también la estructura del archivo: nombres de las hojas y de las columnas,
+690	sin ningún valor
+691	Enviar el aviso
+692	Sirve para mejorar la lectura de archivos. No se envía ningún número de tu archivo, ni el nombre del archivo.
+693	Descargando el histórico de mercado de {0} instrumentos y reconstruyendo el archivo…
+694	Buscando los símbolos bursátiles de los ISIN…
+695	Descargando tipos e inflación oficiales para el periodo del conjunto de datos…
+696	Introduce el coste anual de cada instrumento: para los ETF lo leo yo, para los fondos está en el KID en «Costes corrientes».
+697	Xetra-Gold ETC (oro físico) · DE{0}A{1}S{2}GB{3}
+698	Usar estos pesos en los demás análisis
+699	¿Tu asignación es coherente contigo?
+700	Primero confirma el mapa
+701	El laboratorio se construye a partir de los datos que has confirmado: métricas, gráficos, correlaciones, contexto macro y tu cartera.
+702	Pestañas del laboratorio
+703	Dato histórico
+704	Haz clic en cualquier número para ver fórmula, datos e hipótesis.
+705	Presentar al cliente
+706	Descargar el informe PDF
+707	Qué muestra el gráfico
+708	{0} € invertidos
+709	Tu dinero
+710	Cómo les ha ido a los
+711	: {0} € invertidos al principio en cada uno, sin aportaciones, rentabilidades compuestas periodo a periodo. Tu rentabilidad con las aportaciones reales está en el recuadro «Tu rentabilidad real», si el archivo contiene las transacciones.
+712	Contexto macro
+713	Oficial
+714	Mapa de correlaciones
+715	Vista de correlaciones
+716	Red {0}D
+717	Matriz
+718	Arrastra para girar · pasa por encima de un activo · haz clic para ver el recibo
+719	se mueven juntos
+720	en direcciones opuestas
+721	Cuanto más correlacionados están dos activos, más cerca están y más brilla el hilo. La esfera es tan grande como la volatilidad.
+722	Métricas por activo
+723	composición de los fondos · justETF
+724	Clientes, perfiles, idoneidad y carteras modelo. Todo se queda en este navegador.
+725	Otros países desarrollados
+726	Acciones, Global · MSCI World
+727	{0} · prudente
+728	Fuera de los datos
+729	igual que antes
+730	no está en tu archivo
+731	Sube un archivo
+732	El análisis de riesgo parte de los datos confirmados: sube un archivo, confirma el mapa y construye el laboratorio.
+733	Distribución de las rentabilidades
+734	Quién aporta el riesgo
+735	peso frente a riesgo
+736	Drawdown en el tiempo
+737	distancia desde el máximo anterior
+738	Desglose del riesgo
+739	Riesgo por activo
+740	Las simulaciones parten de las rentabilidades históricas confirmadas: sube un archivo, confirma el mapa y construye el laboratorio.
+741	Capital inicial (€)
+742	Aportación mensual (€)
+743	negativo = retirada
+744	Años
+745	Objetivo (€)
+746	Inflación anual (%)
+747	Costes anuales (%)
+748	comisiones y TER
+749	Rentabilidad anual supuesta (%)
+750	histórica
+751	Método
+752	Método de simulación
+753	Por bloques
+754	Trayectorias simuladas
+755	Número de simulaciones
+756	Independencia financiera · FIRE
+757	Edad, gasto, pensión y ahorros: la respuesta según las rentabilidades de tu cartera.
+758	El abanico de futuros
+759	Valores nominales o reales
+760	Descontada la inflación
+761	Dónde terminas
+762	Percentiles
+763	Tu edad, cuánto gastas, cuánto ahorras: la respuesta según las rentabilidades reales de tu cartera.
+764	El cálculo usa las rentabilidades históricas de tu cartera: sube un archivo o crea una cartera, luego confirma el mapa.
+765	Tus números
+766	Dinero
+767	Capital invertido hoy
+768	de tu cartera
+769	Pensión
+770	neta, en euros de hoy
+771	Seguridad
+772	Probabilidad de que el dinero alcance
+773	de los futuros simulados en los que el dinero alcanza hasta el final
+774	¿Quieres dejarlo antes?
+775	Tu vida financiera
+776	capital en euros de hoy, por edad
+777	Lo que más te acerca
+778	edad a la que puedes dejarlo
+779	Los tipos de FIRE
+780	mismos futuros, decisiones distintas
+781	La regla del {0}% en tu cartera
+782	retirada anual y probabilidad de que alcance
+783	Las pruebas de estrés parten de los datos confirmados: sube un archivo, confirma el mapa y construye el laboratorio.
+784	Las crisis comparadas
+785	solo las que están en los datos
+786	Tu choque
+787	Escenarios listos
+788	Todo −{0}%
+789	Caída de {0}σ
+790	Repetir la peor crisis
+791	Restablecer
+792	Escribe el choque de uno o más activos. Con
+793	propagar
+794	activado, los activos vacíos se mueven como lo hicieron históricamente junto con los afectados.
+795	Propagar con las correlaciones históricas
+796	Capital (€)
+797	La frontera necesita al menos dos activos con datos confirmados: sube un archivo, confirma el mapa y construye el laboratorio.
+798	Objetivo
+799	Objetivo de la optimización
+800	Máximo Sharpe
+801	Mínima volatilidad
+802	Volatilidad objetivo
+803	Rentabilidad objetivo
+804	Objetivo (%)
+805	Peso mínimo (%)
+806	Peso máximo (%)
+807	límite de concentración
+808	Ventas en corto
+809	Rentabilidades esperadas prudentes
+810	Riesgo frente a rentabilidad
+811	datos históricos anualizados
+812	Antes y después
+813	Pesos comparados
+814	La comparación parte de los datos confirmados: sube un archivo, confirma el mapa y construye el laboratorio.
+815	Índice
+816	Columna de tu archivo
+817	o
+818	Símbolo Alpha Vantage
+819	p. ej. VT, IWDA.LON
+820	Cargar
+821	Divisa del benchmark
+822	En euros (tipo del BCE)
+823	Divisa original
+824	Crecimiento de {0}
+825	Por encima o por debajo del mercado
+826	Medidas comparadas
+827	El mercado en las crisis
+828	archivo
+829	+ Nueva cartera
+830	Por revisar
+831	Interpretación de Operación
+832	Interpretación de Instrumento
+833	Interpretación de Ticker
+834	Interpretación de ISIN
+835	Interpretación de Cantidad
+836	Interpretación de Precio
+837	Interpretación de Importe
+838	Muchas fechas se repiten: el archivo podría tener una fila por activo y fecha (formato largo). Esta versión lee un activo por columna.
+839	{0} huecos en el calendario: faltan periodos respecto a la frecuencia mensual.
+840	Las fechas no estaban en orden cronológico: las he ordenado.
+841	menos de {0} años de historia: resultados poco fiables
+842	ninguna crisis en los datos: solo choques hipotéticos
+843	La IA está leyendo la estructura de {0} hoja: mientras tanto, mira la lectura automática
+844	El servidor ha respondido con un error ({0}).: se mantiene la lectura automática
+845	ISIN buscado en OpenFIGI: S&P {0}: IE{1}B{2}BMR{3} → CSPX.AMS
+846	ISIN buscado en OpenFIGI: Nasdaq {0}: IE{1}B{2}SZB{3} → CNDX.AMS
+847	Divisas de cotización: CSPX desconocida, CSNDX desconocida.
+848	Divisa no determinada para CSPX.AMS, CNDX.AMS: se deja como está, comprueba el símbolo.
+849	Observaciones
+850	Periodo
+851	ene {0} – oct {1}
+852	mensual
+853	Revive crisis reales con tu capital y descubre la pérdida que de verdad aguantas, medida por cómo reaccionas y no por un cuestionario.
+854	Haz el test · {0} minutos
+855	mismos meses · {0} meses
+856	Peso %
+857	Quitar la cartera B
+858	+ Añadir C
+859	B con pesos iguales
+860	Si una cartera no suma {0}% la reescalo. Para comparar instrumentos que no están en el archivo usa «Crea tu cartera» en el inicio.
+861	Crisis: caída COVID-{0}
+862	Crisis: choque de inflación {0}
+863	Para pasar de A a B
+864	Descargar la propuesta en Excel
+865	Hoy (A)
+866	Con la propuesta (B)
+867	Impuestos estimados
+868	ventas {0} € · compras {1} €
+869	Importes sobre el valor de hoy ({0} €), sin nuevas aportaciones. Los impuestos son una estimación: en las ventas se realiza la parte de ganancia latente en proporción a lo vendido, al {1}% o al {2}% para la deuda pública; no tiene en cuenta minusvalías compensables, comisiones ni spreads.
+870	Comparación sobre {0} meses comunes (ene {1} – oct {2}): solo los meses en que tienen precio todos los instrumentos usados por al menos una cartera, así ninguna sale favorecida por una historia más larga. Carteras reequilibradas cada mes a los pesos indicados, sin costes ni impuestos; se resalta el mejor valor de cada fila. Las crisis aparecen solo si caen por completo en los meses comunes. Es el pasado, no una previsión.
+871	Análisis de riesgo
+872	VaR y CVaR históricos, Sortino, contribución de cada activo al riesgo, concentraciones.
+873	Monte Carlo
+874	Miles de trayectorias remuestreadas de tus rentabilidades, con aportaciones y retiradas.
+875	Réplica histórica donde los datos lo permiten, choques hipotéticos declarados en los demás casos.
+876	Markowitz con tus datos: máximo Sharpe, mínima volatilidad, risk parity, objetivo de riesgo o de rentabilidad, con límites de peso.
+877	{0} activos para combinar
+878	Comparación con el S&P {0}, Nasdaq-{1}, MSCI World, Euro Stoxx {2} o un índice tuyo: beta, alfa, tracking error, crisis del mercado.
+879	históricos mensuales vía ETF, convertidos a euros con el tipo del BCE
+880	S&P {0} · IE{1}B{2}BMR{3}
+881	sin coste: CSPX, CSNDX
+882	Tipo libre de riesgo e inflación
+883	Fuente del tipo libre de riesgo
+884	BCE · Euríbor {0} meses
+885	Ninguno ({0}%)
+886	Tipo libre de riesgo medio
+887	Euríbor {0} meses (media mensual)
+888	Inflación media anual
+889	IAPC zona euro, índice general
+890	BCE · data-api.ecb.europa.eu
+891	{0} meses · {1}-{2} – {3}-{4}
+892	Sharpe con un tipo libre de riesgo medio del {0}% (Euríbor {1} meses (media mensual)). Rentabilidad real descontada la inflación media del {2}%.
+894	Tus
+895	por fin claras.
+896	Llamada con Quanta
+897	Valor (€)
+898	Clase
+899	Privacidad
+900	Renta variable mundial
+901	Núcleo y satélites
+902	Francia
+903	Alemania
+904	Italia
+905	Bonos, EUR, Global, Aggregate, Todos los vencimientos, Sociales/Medioambientales · Bloomberg MSCI Euro Aggregate and Green Bond ESG SRI
+906	ETF y fondos
+907	Acciones, ETC y otros valores
+908	Deuda pública
+909	Cupón
+910	se desbloquea al construir el laboratorio
+911	Clientes
+912	moderado
+913	equilibrado
+914	{0} · dinámico
+915	Cuándo
+916	Caída COVID-{0}
+917	Guardar en el archivo
+918	Guarda esta cartera en tu patrimonio
+919	La encontrarás actualizada cada día, sin volver a subir el archivo: {0} movimientos.
+920	Añadir a mi patrimonio
+921	Peso de CSPX en la cartera A
+922	Peso de CSPX en la cartera B
+923	Peso de CSNDX en la cartera A
+924	Peso de CSNDX en la cartera B
+925	Nombre
+926	Quanta Portfolio, volver al inicio
+927	Espacio de trabajo
+928	Mi cartera
+929	Mío
+930	Pruebas y comparaciones
+931	Pruebas
+932	Cálculos en el navegador
+933	valor, ganancia, posiciones
+934	Añadir una operación
+935	Excel o export del banco y del bróker
+936	Abrir el archivo de carteras guardadas
+937	los análisis guardados, los clientes, las revisiones
+938	descarga tu patrimonio en un archivo
+939	Privacidad y ajustes
+940	lo que se queda en este navegador
+941	Mi
+942	Agrupar el gráfico
+943	Importar desde un archivo
+944	el Excel o el export del bróker
+945	Analizar en el laboratorio
+946	riesgo, crisis, simulaciones, frontera
+947	Descargar en Excel
+948	posiciones, operaciones, impuestos
+949	Si llega una crisis
+950	Tus objetivos
+951	Tus posiciones
+952	Tus impuestos
+953	estimación: los impuestos reales los calcula el banco o tu gestor
+954	Rendimientos por cobrar
+955	cupones y dividendos de los próximos {0} meses
+956	Planes de ahorro
+957	el día del plan te recuerdo registrarlo: escribe solo las participaciones reales del bróker
+958	una compra, una venta, un dividendo o un bien sin cotización
+959	Tipo de operación
+960	Venta
+961	Dividendo o cupón
+962	BTP y bonos
+963	Casa, seguro, otro
+964	Plan de ahorro
+965	Historial de operaciones
+966	nada se borra: una operación equivocada se anula
+967	Tu patrimonio está guardado
+968	solo en este navegador
+969	, en este dispositivo: no va a ningún servidor. Descarga una copia de vez en cuando para no perderlo. Los precios son de cierre (Yahoo Finance), orientativos, no en tiempo real. No es una recomendación de inversión.
+970	Descargar la copia de seguridad
+971	Restaurar desde una copia
+972	Empezar de cero
+973	Las
+974	Los análisis de la cartera que tienes en el laboratorio.
+975	Sin archivo · desde el informe del banco
+976	Cuánto te cuesta tu banco
+977	Cada año el banco debe enviarte el
+978	informe de costes y gastos
+979	del año anterior (lo encontrarás en los documentos de tu banca online). Escribe aquí sus números, en euros o en porcentaje: verás cuánto pagas de verdad y cuánto pesa en {0} y {1} años. Se quedan solo en este navegador.
+980	Qué hay en el
+981	Cada columna,
+982	Confirma el mapa de datos para construirlo.
+983	Cuánto puedes
+984	Riesgo histórico de la cartera y de cada activo, calculado sobre los datos confirmados.
+985	Medidas históricas: describen el pasado y no predicen las pérdidas futuras. VaR y CVaR al {0}% sobre las rentabilidades del periodo, sin suponer una distribución normal.
+986	Cuánto podrías
+987	Miles de futuros posibles, construidos remuestreando las rentabilidades de tu archivo.
+988	vacío = el histórico de la cartera
+989	Cuándo puedes
+990	Si llega la
+991	Las crisis reales, revividas con los datos de tu archivo. Y los choques que quieras probar tú.
+992	La cartera
+993	La frontera eficiente de Markowitz con tus datos: la máxima rentabilidad histórica para cada nivel de riesgo.
+994	¿Has batido al
+995	Tu cartera frente a los índices de referencia, en los mismos meses y en la misma divisa.
+996	Secciones
+997	Abrir Quanta, el analista con IA
+998	Pregunta a
+999	Quanta, analista con IA
+1000	Analista con IA
+1001	Nuevo chat
+1002	¿Enviar una foto a Quanta?
+1003	La foto va a la IA de un proveedor externo (Google Gemini) solo para leerla: no la guardamos. Si aparecen tu nombre, dirección o números de cuenta y no hacen falta, tápalos antes.
+1004	Entendido, elige la foto
+1005	Pregunta para Quanta
+1006	Habla con Quanta por voz
+1007	Quanta usa IA de proveedores externos: recibe los resultados de los cálculos, nunca el archivo, y las fotos solo si las envías tú.
+1008	Detalles
+1009	Ocultar los subtítulos
+1010	Subtítulos
+1011	Conectando…
+1012	Habla con Quanta como por teléfono
+1013	Durante la llamada tu voz va a Google (Gemini Live), en tiempo real, solo para entenderte y responderte: no grabamos el audio. Al final queda el texto en el chat. Puedes interrumpir a Quanta cuando quieras.
+1014	Empezar la llamada
+1015	Ahora no
+1016	Escribe a Quanta…

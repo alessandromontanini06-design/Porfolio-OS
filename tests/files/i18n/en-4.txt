@@ -1,0 +1,337 @@
+1017	Write to Quanta during the call
+1018	Send
+1019	Turn off the microphone
+1020	End the call
+1021	Your risk profile
+1022	Upload a screenshot of your portfolio
+1023	From a screenshot
+1024	From your phone
+1025	Your portfolio from a
+1026	screenshot
+1027	Take a screenshot of the portfolio page in your bank's or broker's app (Trade Republic, Fineco, Directa, Scalable…). If it's long, take more than one: repeated positions are counted only once.
+1028	{0} · The images
+1029	up to {0} · JPG, PNG or WEBP
+1030	Choose the screenshots
+1031	or drag them here
+1032	{0} · Permission
+1033	To read them,
+1034	the images are sent to the AI
+1035	(Google Gemini, or Anthropic's Claude if Gemini doesn't respond). We don't save them. Before sending them you can cover your name, account number and anything not needed: security names, quantities and values are enough.
+1036	Got it: send the images to the AI to read them
+1037	Read the screenshots
+1038	{0} · Check
+1039	fix anything the AI misread
+1040	Security
+1041	+ Add a row
+1042	The name (or the ISIN, or the ticker) and the quantity or the value are needed. The ISIN helps find the right quote: if it's missing, I'll look it up from the name.
+1043	Screenshot summary
+1044	No positions read yet.
+1045	Only today's situation: without the transactions I can't calculate the annual return (IRR).
+1046	The confirmed positions go through the lab like a file: market prices, risk, crises, simulations.
+1047	Analyze these positions →
+1048	No Excel needed
+1049	Build your
+1050	Start from a model or search any security: ETFs, stocks from every exchange, mutual funds, crypto. I download market prices and analyze the portfolio as if it were your Excel: return, risk, past crises and simulations.
+1051	Portfolios
+1052	Portfolios to compare
+1053	Start from a model
+1054	or enter the instruments below
+1055	Instruments and weights
+1056	Back to {0}%
+1057	Clear
+1058	+ Add instrument
+1059	Search any security above, or type a ticker (VWCE) or an ISIN (IE{0}BK{1}BQT{2}) directly in a row. ISINs are verified on OpenFIGI before downloading prices.
+1060	Portfolio summary
+1061	Capital to analyze (€)
+1062	Analyze the portfolio →
+1063	Calculation receipt
+1064	Portfolio archive
+1065	A readable Excel: clients, values, returns, risk, reviews
+1066	A file to restore the archive in another browser
+1067	Restore a backup copy
+1068	Import the copy
+1069	Search by client, file or instrument
+1070	Search the archive
+1071	Filter
+1072	All
+1073	Sort by
+1074	last review
+1075	name
+1076	value
+1077	The archive stays in this browser, on this computer: it doesn't go to any server. To avoid losing it (new computer, browser cleanup) use
+1078	now and then and keep the file.
+1079	is meant to be read instead: clients, values, returns, reviews.
+1080	Prepare the report
+1081	Who the report is for
+1082	For me
+1083	For a client
+1084	The report will carry your name and logo instead of Quanta Portfolio. Firm, contacts and logo stay saved in this browser for next time; client name and notes don't.
+1085	Firm or advisor
+1086	e.g. Smith Financial Advisory
+1087	Contacts
+1088	email, phone or website
+1089	Logo
+1090	Choose an image
+1091	remove
+1092	client name (optional)
+1093	Your notes for the client
+1094	Add the proposal: comparison between the current portfolio (A) and the proposed one (B)
+1095	To add the proposal, first prepare the comparison in the lab's «Compare allocations» tab: A = current portfolio, B = your proposal.
+1096	Create the PDF
+1097	The print window opens: choose «Save as PDF».
+1098	Automatic
+1099	Light
+1100	Dark
+1101	«Automatic» follows your phone or computer.
+1102	Privacy and data saved in this browser
+1103	Downloading the history of EUNL (IWDA.AMS) · {0} of {1}…
+1104	Downloading the history of IEAG (IEAG.AMS) · {0} of {1}…
+1105	Downloading the history of CSSPX (CSPX.AMS) · {0} of {1}…
+1106	Downloading the history of IS{0}N (EMIM.AMS) · {1} of {2}…
+1107	Downloading the history of IBGS (IBGS.AMS) · {0} of {1}…
+1108	Downloading the history of IUSN (IUSN.DEX) · {0} of {1}…
+1109	Downloading the history of {0}GLD ({1}GLD.DEX) · {2} of {3}…
+1110	exposed to other currencies
+1111	Sell {0} €
+1112	Spain
+1113	Taiwan
+1114	South Korea
+1115	China
+1116	Stocks, Emerging markets · MSCI Emerging Markets Investable Market (IMI)
+1117	Shares
+1118	My net worth · {0} €
+1119	Upload a client's file
+1120	Build a portfolio
+1121	Assets under advice
+1122	at each client's last save
+1123	{0} with a completed profile
+1124	Reviews due
+1125	overdue or within {0} days
+1126	Off profile or model
+1127	to contact
+1128	Model portfolios
+1129	the firm's models: they open in the builder and are assigned to clients
+1130	Save the builder's portfolio
+1131	Start from an example
+1132	Start from an example…
+1133	Cautious
+1134	Three ETFs
+1135	Permanent
+1136	All Weather
+1137	Golden Butterfly
+1138	Dividends
+1139	No models: save the one in the builder, start from an example, or from a client's Results with «Save as model portfolio».
+1140	Risk from {0} to {1} from historical volatility; deviation by instrument class. Clients are the analyses saved in this browser: make a backup copy from the archive.
+1141	Gold and commodities
+1142	Area
+1143	Theme
+1144	Sector
+1145	Country
+1146	VaR {0}%
+1147	CVaR {0}%
+1148	Sortino
+1149	Longest drawdown
+1150	It's not a forecast
+1151	you could
+1152	{0} times
+1153	Save {0} € more a month
+1154	-{0} years
+1155	Dot-com bubble
+1156	Financial crisis {0}
+1157	Euro debt crisis
+1158	maximum portfolio loss
+1159	In the data
+1160	reaches
+1161	Expected return
+1162	Historical max drawdown
+1163	before
+1164	optimized
+1165	Tracking error
+1166	Information ratio
+1167	Crisis
+1168	Did you
+1169	beat
+1170	Keep it in the archive?
+1171	It stays only in this browser, on this computer: you'll find it next time, with the review history. No server.
+1172	e.g. the client's name
+1173	always save
+1174	No, thanks
+1175	Your net worth, always here: add what you own or import a file. No account.
+1176	Your net worth
+1177	add your first investment
+1178	Start here.
+1179	Add what you own: ETFs, stocks, funds, but also your home, policies and other assets. Or import the Excel or the broker's export. Every time you come back you'll find the updated value, how much you've gained and how the last session went.
+1180	Nothing yet. Add your first purchase below (for example
+1181	, {0} shares at {1} €) or
+1182	import the file
+1183	from your bank or broker.
+1184	The transactions you add or import appear here, most recent first.
+1185	{0} particles · they transform in each section · data from «Portfolio_OS_esempio · rebuilt»
+1186	ISIN looked up on OpenFIGI: iShares Core MSCI World UCITS ETF USD (Acc): IE{0}B{1}L{2}Y{3} → IWDA.AMS
+1187	ISIN looked up on OpenFIGI: iShares € Aggregate Bond ESG SRI UCITS ETF EUR (Dist): IE{0}B{1}DKXQ{2} → IEAG.AMS
+1188	ISIN looked up on OpenFIGI: iShares Core S&P {0} UCITS ETF USD (Acc): IE{1}B{2}BMR{3} → CSPX.AMS
+1189	ISIN looked up on OpenFIGI: iShares Core MSCI EM IMI UCITS ETF USD (Acc): IE{0}BKM{1}GZ{2} → EMIM.AMS
+1190	ISIN looked up on OpenFIGI: iShares € Govt Bond {0}-{1}yr UCITS ETF EUR (Dist): IE{2}B{3}X{4}Q{5} → IBGS.AMS
+1191	ISIN looked up on OpenFIGI: iShares MSCI World Small Cap UCITS ETF USD (Acc): IE{0}BF{1}RFH{2} → IUSN.DEX
+1192	ISIN looked up on OpenFIGI: Xetra-Gold ETC (physical gold): DE{0}A{1}S{2}GB{3} → {4}GLD.DEX
+1193	Quote currencies: EUNL unknown, IEAG unknown, CSSPX unknown, IS{0}N unknown, IBGS unknown, IUSN unknown, {1}GLD unknown.
+1194	Currency not determined for IWDA.AMS, IEAG.AMS, CSPX.AMS, EMIM.AMS, IBGS.AMS, IUSN.DEX, {0}GLD.DEX: left as is, check the symbol.
+1196	Sharpe with a risk-free rate of {0}%.
+1197	TER not available
+1198	Look-through composition: country weight = Σ fund weight × country share in the fund. Source: justETF, factsheets read on —.
+1199	Reading the fund factsheets on justETF…
+1201	This month
+1202	Buy / sell
+1203	Purchases only
+1204	From your {0} transactions · sheet «Movimenti» · since Jan {1}
+1205	sum of purchases, minus sales
+1206	The value follows the returns of the instruments in the data and adds each contribution at month-end: the file has no quantities, so it's an estimate. Returns are market returns converted into euro at the ECB month-end rate; the value may differ a little from your broker's (month-end prices, different exchange). Unlinked transactions (instrument not in the data): Annual securities account stamp duty. IRR and time-weighted return over less than a year or two can change a lot: they are not forecasts.
+1207	Bonds, EUR, Europe, Government, {0}-{1} · Bloomberg Euro Government Bond {2}-{3}
+1208	No area (commodities)
+1209	Chart period
+1210	Max
+1211	Scroll the chart with the arrow keys to see the values day by day
+1212	Type
+1213	gain +{0} €
+1214	Upload the client's file
+1215	the export from the client's bank or broker (Excel or CSV) · or drag it here
+1216	Your studio is empty
+1217	Upload a client's bank file, or build a portfolio, then save it from the Results: it will appear here with profile, risk and reviews.
+1218	Suitability for the client's profile
+1219	Portfolio {0}
+1220	Risk number
+1221	Moderate · volatility {0}% a year
+1222	{0} worst months
+1223	in historical data, with today's weights
+1224	Composition
+1225	Save as model portfolio
+1226	Support tool for the suitability assessment: risk from the historical volatility of monthly prices, historical losses with today's weights. The final assessment is up to the advisor according to their firm's procedures.
+1227	USA ({0})
+1228	Italy ({0})
+1229	Technology ({0})
+1230	Health care ({0})
+1231	Financials ({0})
+1232	Energy ({0})
+1233	Consumer discretionary ({0})
+1234	Consumer staples ({0})
+1235	Materials ({0})
+1236	Utilities ({0})
+1237	Real estate ({0})
+1238	{0} results
+1239	Show {0} more of {1}
+1240	Shock on CSPX in percent
+1241	Shock on CSNDX in percent
+1242	+ Add a goal
+1243	Home · {0} € in {1} years
+1244	Children's education · {0} € in {1} years
+1245	saved analyses and reviews
+1246	Downloading the history of CSPX (CSPX.AMS) · {0} of {1}…
+1247	Downloading the history of CSNDX (CNDX.AMS) · {0} of {1}…
+1248	{0} particles · they transform in each section · data from «PAC_due_fogli_righe_vuote · rebuilt»
+1249	no cost: CSNDX
+1250	Canada
+1251	Stocks, Global, Small cap · MSCI World Small Cap
+1252	Want to know which asset makes you riskiest?
+1253	Ask me →
+1254	{0} investments
+1255	Last session
+1256	+{0}% on investments ({1} € contributed)
+1257	Return (IRR)
+1258	a year · since {0}/{1}/{2}
+1259	Dividends and coupons
+1260	fees and taxes: {0} €
+1261	Since the start
+1262	Return since the start without counting the money contributed; the line rises when you invest too.
+1263	Value · weight
+1264	unlisted asset
+1265	estimate of {0}/{1}/{2}
+1266	Update estimate
+1267	face value
+1268	Update price
+1269	Unlisted assets are worth the last estimate you entered and are not included in the lab's analyses.
+1270	Detail
+1271	Dividend
+1272	{0} € face value at {1}
+1273	value {0} €
+1274	You have {0} transactions to record
+1275	Check the amount in your online banking and record it.
+1276	Estimated stamp duty, {0}
+1277	{0}% of {1} € in securities
+1278	If you sold everything today
+1279	in taxes · you would receive {0} €
+1280	Capital losses to recover
+1281	the «tax backpack» is empty
+1282	Position by position and how it's calculated
+1283	Tax category
+1284	Gain if you sell today
+1285	Tax
+1286	{0}%, no offsetting
+1287	Tax category of iShares Core MSCI World
+1288	Tax category of BTP {0}% {1}/{2}/{3}
+1289	ETFs and funds: gains are taxed at {0}% and can't be offset against capital losses. Their losses, however, go into the backpack.
+1290	Stocks, ETCs and bonds: {0}%, and gains are offset against capital losses, starting from the oldest. Government bonds: {1}%. Crypto: {2}% from {3}.
+1291	Capital losses can be used until {0} December of the fourth year after the one in which they arose.
+1292	It's an estimate using the weighted average cost. The actual taxes are withheld by the bank (administered regime) or calculated by your accountant (declarative regime). Italian tax rules. It is not tax advice.
+1293	Next {0} months, net
+1294	The next
+1295	BTP {0}% {1}/{2}/{3} · {4} €
+1296	Gross
+1297	Net
+1298	Coupons are calculated from the security's rate and maturity, net at {0}% for government bonds and {1}% for other bonds.
+1299	Open your net worth: {0} €
+1300	gain
+1301	· IRR
+1302	Price per share
+1303	my
+1304	Open the archive
+1305	Ticker or ISIN
+1306	Instrument {0}
+1307	Weight of instrument {0} in percent
+1308	Remove instrument {0}
+1309	Area: all
+1310	World ({0})
+1311	Europe ({0})
+1312	Emerging ({0})
+1313	Asia and Pacific ({0})
+1314	Theme: all
+1315	General ({0})
+1316	Factors ({0})
+1317	Dividends ({0})
+1318	Small companies ({0})
+1319	Sustainable (ESG) ({0})
+1320	Industrials ({0})
+1321	Artificial intelligence ({0})
+1322	Telecommunications ({0})
+1323	Semiconductors ({0})
+1324	Robotics ({0})
+1325	Cybersecurity ({0})
+1326	Electric vehicles ({0})
+1327	Defense ({0})
+1328	Clean energy ({0})
+1329	Water ({0})
+1330	VWRL · World · General · IE{0}B{1}RBWM{2}
+1331	XDWD · World · General · IE{0}BJ{1}KDQ{2}
+1332	SSAC · World · General · IE{0}B{1}R{2}
+1333	SPYI · World · General · IE{0}B{1}YLTY{2}
+1334	IUSN · World · Small companies · IE{0}BF{1}RFH{2}
+1335	IWQU · World · Factors · IE{0}BP{1}QZ{2}
+1336	IWMO · World · Factors · IE{0}BP{1}QZ{2}
+1337	IWVL · World · Factors · IE{0}BP{1}QZB{2}
+1338	MVOL · World · Factors · IE{0}B{1}FHGS{2}
+1339	VHYL · World · Dividends · IE{0}B{1}GKDB{2}
+1340	TDIV · World · Dividends · NL{0}
+1341	ISPA · World · Dividends · DE{0}A{1}F{2}UH{3}
+1342	SUSW · World · Sustainable (ESG) · IE{0}BYX{1}JD{2}
+1343	WSRI · World · Sustainable (ESG) · IE{0}Y{1}LGG{2}
+1344	XDWT · World · Technology · IE{0}BM{1}HT{2}
+1345	XDWH · World · Health care · IE{0}BM{1}HK{2}
+1346	XDWF · World · Financials · IE{0}BM{1}HL{2}
+1347	XDW{0} · World · Energy · IE{1}BM{2}HM{3}
+1348	XDWC · World · Consumer discretionary · IE{0}BM{1}HP{2}
+1349	XDWS · World · Consumer staples · IE{0}BM{1}HN{2}
+1350	XDWI · World · Industrials · IE{0}BM{1}HV{2}
+1351	XDWM · World · Materials · IE{0}BM{1}HS{2}
+1352	XDWU · World · Utilities · IE{0}BM{1}HQ{2}
+1353	XWTS · World · Telecommunications · IE{0}BM{1}HR{2}
+1354	IWDP · World · Real estate · IE{0}B{1}FZS{2}
+1355	SMH · World · Semiconductors · IE{0}BMC{1}

@@ -169,7 +169,7 @@ function renderLab(){
   const ds=S.ds,L=S.lab,f=ds.freq.f;
   const starts=ds.assets.map(a=>({n:a.name,k:Math.max(0,a.first-1)})),late=starts.filter(s=>s.k>Math.min(...starts.map(x=>x.k))+1),gc=$("#growthNote");
   if(gc)gc.textContent=late.length?`Le linee partono quando inizia lo storico di ciascuno strumento: ${starts.map(s=>`${s.n} da ${fmtDate(ds.dates[s.k],f)}`).join(", ")}. Per confrontarle sullo stesso periodo usa le sezioni Rischio e Frontiera, che lavorano sui mesi comuni.`:"";
-  $("#labSource").textContent=`${S.source.name} · foglio «${an().name}» · ${ds.assets.length} asset dal ${fmtDate(ds.dates[0],f)} al ${fmtDate(ds.dates[ds.dates.length-1],f)}.`;
+  $("#labSource").textContent=`«${S.source.name}» · foglio «${an().name}» · ${ds.assets.length} asset dal ${fmtDate(ds.dates[0],f)} al ${fmtDate(ds.dates[ds.dates.length-1],f)}.`;
   $("#kpis").innerHTML=[
     ["Asset",ds.assets.length,true],["Osservazioni",ds.nObs,true],
     ["Periodo",`${fmtDate(ds.dates[0],f)} – ${fmtDate(ds.dates[ds.dates.length-1],f)}`],["Frequenza",ds.freq.label]

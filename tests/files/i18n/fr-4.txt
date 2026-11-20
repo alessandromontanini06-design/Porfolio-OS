@@ -1,0 +1,337 @@
+1017	Écrire à Quanta pendant l'appel
+1018	Envoyer
+1019	Couper le micro
+1020	Raccrocher
+1021	Votre profil de risque
+1022	Importer une capture du portefeuille
+1023	Depuis une capture d'écran
+1024	Depuis le téléphone
+1025	Votre portefeuille depuis une
+1026	capture d'écran
+1027	Faites une capture de la page du portefeuille dans l'app de votre banque ou de votre courtier (Trade Republic, Fineco, Directa, Scalable…). Si elle est longue, faites-en plusieurs : les positions répétées ne sont comptées qu'une fois.
+1028	{0} · Les images
+1029	jusqu'à {0} · JPG, PNG ou WEBP
+1030	Choisir les captures
+1031	ou glissez-les ici
+1032	{0} · L'autorisation
+1033	Pour les lire,
+1034	les images sont envoyées à l'IA
+1035	(Google Gemini, ou Claude d'Anthropic si Gemini ne répond pas). Nous ne les enregistrons pas. Avant de les envoyer, vous pouvez masquer votre nom, votre numéro de compte et tout ce qui est inutile : les noms des titres, les quantités et les valeurs suffisent.
+1036	J'ai compris : envoyer les images à l'IA pour les lire
+1037	Lire les captures
+1038	{0} · Vérifiez
+1039	corrigez ce que l'IA a mal lu
+1040	Titre
+1041	+ Ajouter une ligne
+1042	Il faut le nom (ou l'ISIN, ou le ticker) et la quantité ou la valeur. L'ISIN aide à trouver la bonne cotation : s'il manque, je le cherche à partir du nom.
+1043	Synthèse de la capture
+1044	Aucune position lue pour l'instant.
+1045	Seulement la situation d'aujourd'hui : sans les mouvements, je ne peux pas calculer le rendement annuel (TRI).
+1046	Les positions confirmées passent par le laboratoire comme un fichier : prix de marché, risque, crises, simulations.
+1047	Analyser ces positions →
+1048	Sans Excel
+1049	Construisez votre
+1050	Partez d'un modèle ou cherchez n'importe quel titre : ETF, actions de toutes les places, fonds communs, cryptos. Je télécharge les prix de marché et j'analyse le portefeuille comme si c'était votre Excel : rendement, risque, crises passées et simulations.
+1051	Portefeuilles
+1052	Portefeuilles à comparer
+1053	Partir d'un modèle
+1054	ou saisissez les instruments ci-dessous
+1055	Instruments et poids
+1056	Ramener à {0}%
+1057	Vider
+1058	+ Ajouter un instrument
+1059	Cherchez ci-dessus n'importe quel titre, ou saisissez directement un ticker (VWCE) ou un ISIN (IE{0}BK{1}BQT{2}) sur une ligne. Les ISIN sont vérifiés sur OpenFIGI avant le téléchargement des prix.
+1060	Synthèse du portefeuille
+1061	Capital à analyser (€)
+1062	Analyser le portefeuille →
+1063	Reçu du calcul
+1064	Archives des portefeuilles
+1065	Un Excel lisible : clients, valeurs, rendements, risque, revues
+1066	Un fichier pour remettre les archives dans un autre navigateur
+1067	Restaurer une copie de sauvegarde
+1068	Importer la copie
+1069	Rechercher par client, fichier ou instrument
+1070	Rechercher dans les archives
+1071	Filtre
+1072	Tous
+1073	Trier par
+1074	dernière revue
+1075	nom
+1076	valeur
+1077	Les archives restent dans ce navigateur, sur cet ordinateur : elles ne vont sur aucun serveur. Pour ne pas les perdre (changement d'ordinateur, nettoyage du navigateur), utilisez
+1078	de temps en temps et gardez le fichier.
+1079	sert en revanche à être lu : clients, valeurs, rendements, revues.
+1080	Préparer le rapport
+1081	Pour qui est le rapport
+1082	Pour moi
+1083	Pour un client
+1084	Le rapport portera votre nom et votre logo à la place de Quanta Portfolio. Cabinet, coordonnées et logo restent enregistrés dans ce navigateur pour la prochaine fois ; le nom du client et les notes non.
+1085	Cabinet ou conseiller
+1086	ex. Cabinet Martin Conseil Financier
+1087	Coordonnées
+1088	e-mail, téléphone ou site
+1089	Logo
+1090	Choisir une image
+1091	retirer
+1092	nom du client (facultatif)
+1093	Vos notes pour le client
+1094	Ajouter la proposition : comparaison entre le portefeuille actuel (A) et le portefeuille proposé (B)
+1095	Pour ajouter la proposition, préparez d'abord la comparaison dans l'onglet «Comparer les allocations» du laboratoire : A = portefeuille actuel, B = votre proposition.
+1096	Créer le PDF
+1097	La fenêtre d'impression s'ouvre : choisissez «Enregistrer au format PDF».
+1098	Automatique
+1099	Clair
+1100	Sombre
+1101	«Automatique» suit votre téléphone ou votre ordinateur.
+1102	Confidentialité et données enregistrées dans ce navigateur
+1103	Téléchargement de l'historique de EUNL (IWDA.AMS) · {0} sur {1}…
+1104	Téléchargement de l'historique de IEAG (IEAG.AMS) · {0} sur {1}…
+1105	Téléchargement de l'historique de CSSPX (CSPX.AMS) · {0} sur {1}…
+1106	Téléchargement de l'historique de IS{0}N (EMIM.AMS) · {1} sur {2}…
+1107	Téléchargement de l'historique de IBGS (IBGS.AMS) · {0} sur {1}…
+1108	Téléchargement de l'historique de IUSN (IUSN.DEX) · {0} sur {1}…
+1109	Téléchargement de l'historique de {0}GLD ({1}GLD.DEX) · {2} sur {3}…
+1110	exposé à d'autres devises
+1111	Vendre {0} €
+1112	Espagne
+1113	Taïwan
+1114	Corée du Sud
+1115	Chine
+1116	Actions, Marchés émergents · MSCI Emerging Markets Investable Market (IMI)
+1117	Parts
+1118	Mon patrimoine · {0} €
+1119	Importer le fichier d'un client
+1120	Construire un portefeuille
+1121	Patrimoine suivi
+1122	au dernier enregistrement de chaque client
+1123	{0} avec le profil rempli
+1124	Revues à faire
+1125	en retard ou sous {0} jours
+1126	Hors profil ou hors modèle
+1127	à contacter
+1128	Portefeuilles modèles
+1129	les modèles du cabinet : ils s'ouvrent dans le constructeur et s'attribuent aux clients
+1130	Enregistrer le portefeuille du constructeur
+1131	Partir d'un exemple
+1132	Partir d'un exemple…
+1133	Prudent
+1134	Trois ETF
+1135	Permanent
+1136	All Weather
+1137	Golden Butterfly
+1138	Dividendes
+1139	Aucun modèle : enregistrez celui du constructeur, partez d'un exemple, ou des Résultats d'un client avec «Enregistrer comme portefeuille modèle».
+1140	Risque de {0} à {1} à partir de la volatilité historique ; écart par classe d'instruments. Les clients sont les analyses enregistrées dans ce navigateur : faites-en une copie de sauvegarde depuis les archives.
+1141	Or et matières premières
+1142	Région
+1143	Thème
+1144	Secteur
+1145	Pays
+1146	VaR {0}%
+1147	CVaR {0}%
+1148	Sortino
+1149	Drawdown le plus long
+1150	Ce n'est pas une prévision
+1151	vous pourriez
+1152	{0} fois
+1153	Épargnez {0} € de plus par mois
+1154	-{0} ans
+1155	Bulle Internet
+1156	Crise financière {0}
+1157	Crise de la dette de la zone euro
+1158	perte maximale du portefeuille
+1159	Dans les données
+1160	atteint
+1161	Rendement attendu
+1162	Max drawdown historique
+1163	avant
+1164	optimisé
+1165	Tracking error
+1166	Ratio d'information
+1167	Crise
+1168	Avez-vous
+1169	battu
+1170	Le garder dans les archives ?
+1171	Il reste seulement dans ce navigateur, sur cet ordinateur : vous le retrouverez la prochaine fois, avec l'historique des revues. Aucun serveur.
+1172	ex. le nom du client
+1173	toujours enregistrer
+1174	Non, merci
+1175	Votre patrimoine, toujours ici : ajoutez ce que vous possédez ou importez un fichier. Sans compte.
+1176	Votre patrimoine
+1177	ajoutez votre premier investissement
+1178	Commencez ici.
+1179	Ajoutez ce que vous possédez : ETF, actions, fonds, mais aussi maison, assurances et autres biens. Ou importez l'Excel ou l'export du courtier. À chaque visite, vous retrouvez la valeur à jour, ce que vous avez gagné et comment s'est passée la dernière séance.
+1180	Rien pour l'instant. Ajoutez ci-dessous votre premier achat (par exemple
+1181	, {0} parts à {1} €) ou
+1182	importez le fichier
+1183	de votre banque ou de votre courtier.
+1184	Les opérations que vous ajoutez ou importez apparaissent ici, de la plus récente à la plus ancienne.
+1185	{0} particules · elles se transforment à chaque section · données de «Portfolio_OS_esempio · reconstitué»
+1186	ISIN recherché sur OpenFIGI : iShares Core MSCI World UCITS ETF USD (Acc) : IE{0}B{1}L{2}Y{3} → IWDA.AMS
+1187	ISIN recherché sur OpenFIGI : iShares € Aggregate Bond ESG SRI UCITS ETF EUR (Dist) : IE{0}B{1}DKXQ{2} → IEAG.AMS
+1188	ISIN recherché sur OpenFIGI : iShares Core S&P {0} UCITS ETF USD (Acc) : IE{1}B{2}BMR{3} → CSPX.AMS
+1189	ISIN recherché sur OpenFIGI : iShares Core MSCI EM IMI UCITS ETF USD (Acc) : IE{0}BKM{1}GZ{2} → EMIM.AMS
+1190	ISIN recherché sur OpenFIGI : iShares € Govt Bond {0}-{1}yr UCITS ETF EUR (Dist) : IE{2}B{3}X{4}Q{5} → IBGS.AMS
+1191	ISIN recherché sur OpenFIGI : iShares MSCI World Small Cap UCITS ETF USD (Acc) : IE{0}BF{1}RFH{2} → IUSN.DEX
+1192	ISIN recherché sur OpenFIGI : Xetra-Gold ETC (or physique) : DE{0}A{1}S{2}GB{3} → {4}GLD.DEX
+1193	Devises de cotation : EUNL inconnue, IEAG inconnue, CSSPX inconnue, IS{0}N inconnue, IBGS inconnue, IUSN inconnue, {1}GLD inconnue.
+1194	Devise non déterminée pour IWDA.AMS, IEAG.AMS, CSPX.AMS, EMIM.AMS, IBGS.AMS, IUSN.DEX, {0}GLD.DEX : laissée telle quelle, vérifiez le symbole.
+1196	Sharpe avec un taux sans risque de {0}%.
+1197	TER non disponible
+1198	Composition par transparence : poids du pays = Σ poids du fonds × part du pays dans le fonds. Source : justETF, fiches lues le —.
+1199	Lecture des fiches des fonds sur justETF…
+1201	Ce mois-ci
+1202	Acheter / vendre
+1203	Achats seulement
+1204	De vos {0} transactions · feuille «Movimenti» · depuis janv. {1}
+1205	somme des achats, moins les ventes
+1206	La valeur suit les rendements des instruments des données et ajoute chaque versement en fin de mois : le fichier ne contient pas les parts, c'est donc une estimation. Les rendements sont ceux du marché convertis en euros au taux BCE de fin de mois ; la valeur peut différer un peu de celle de votre courtier (prix de fin de mois, place différente). Transactions non rattachées (instrument absent des données) : Imposta di bollo annuale conto titoli. Le TRI et le rendement pondéré sur moins d'un ou deux ans peuvent beaucoup varier : ce ne sont pas des prévisions.
+1207	Obligations, EUR, Europe, États, {0}-{1} · Bloomberg Euro Government Bond {2}-{3}
+1208	Sans région (matières premières)
+1209	Période du graphique
+1210	Max
+1211	Parcourez le graphique avec les flèches pour voir les valeurs jour par jour
+1212	Type
+1213	gain +{0} €
+1214	Importer le fichier du client
+1215	l'export de la banque ou du courtier du client (Excel ou CSV) · ou glissez-le ici
+1216	Votre cabinet est vide
+1217	Importez le fichier de la banque d'un client, ou construisez un portefeuille, puis enregistrez-le depuis les Résultats : il apparaîtra ici avec profil, risque et revues.
+1218	Adéquation au profil du client
+1219	Portefeuille {0}
+1220	Indice de risque
+1221	Modéré · volatilité de {0}% par an
+1222	{0} pires mois
+1223	dans les données historiques, avec les poids d'aujourd'hui
+1224	Composition
+1225	Enregistrer comme portefeuille modèle
+1226	Outil d'aide à l'évaluation de l'adéquation : risque tiré de la volatilité historique des prix mensuels, pertes historiques avec les poids d'aujourd'hui. L'évaluation finale revient au conseiller selon les procédures de son cabinet.
+1227	États-Unis ({0})
+1228	Italie ({0})
+1229	Technologie ({0})
+1230	Santé ({0})
+1231	Finance ({0})
+1232	Énergie ({0})
+1233	Consommation discrétionnaire ({0})
+1234	Consommation de base ({0})
+1235	Matériaux ({0})
+1236	Services publics ({0})
+1237	Immobilier ({0})
+1238	{0} résultats
+1239	Afficher {0} de plus sur {1}
+1240	Choc sur CSPX en pourcentage
+1241	Choc sur CSNDX en pourcentage
+1242	+ Ajouter un objectif
+1243	Maison · {0} € dans {1} ans
+1244	Études des enfants · {0} € dans {1} ans
+1245	les analyses enregistrées et les revues
+1246	Téléchargement de l'historique de CSPX (CSPX.AMS) · {0} sur {1}…
+1247	Téléchargement de l'historique de CSNDX (CNDX.AMS) · {0} sur {1}…
+1248	{0} particules · elles se transforment à chaque section · données de «PAC_due_fogli_righe_vuote · reconstitué»
+1249	sans coût : CSNDX
+1250	Canada
+1251	Actions, Monde, Petites capitalisations · MSCI World Small Cap
+1252	Vous voulez savoir quel actif vous fait prendre le plus de risque ?
+1253	Demandez-le-moi →
+1254	{0} investissements
+1255	Dernière séance
+1256	+{0}% sur les investissements ({1} € versés)
+1257	Rendement (TRI)
+1258	par an · depuis le {0}/{1}/{2}
+1259	Dividendes et coupons
+1260	frais et impôts : {0} €
+1261	Depuis le début
+1262	Rendement depuis le début sans compter l'argent versé ; la courbe monte aussi quand vous investissez.
+1263	Valeur · poids
+1264	bien non coté
+1265	estimation du {0}/{1}/{2}
+1266	Mettre à jour l'estimation
+1267	nominal
+1268	Mettre à jour le prix
+1269	Les biens non cotés valent la dernière estimation que vous avez saisie et n'entrent pas dans les analyses du laboratoire.
+1270	Détail
+1271	Dividende
+1272	{0} € nominal à {1}
+1273	valeur {0} €
+1274	Vous avez {0} mouvements à enregistrer
+1275	Vérifiez le montant dans votre banque en ligne et enregistrez-le.
+1276	Droit de timbre estimé, {0}
+1277	{0}% de {1} € en titres
+1278	Si vous vendiez tout aujourd'hui
+1279	d'impôts · vous encaisseriez {0} €
+1280	Moins-values à récupérer
+1281	le «sac à dos fiscal» est vide
+1282	Position par position et méthode de calcul
+1283	Catégorie fiscale
+1284	Gain si vous vendez aujourd'hui
+1285	Impôt
+1286	{0}%, sans compensation
+1287	Catégorie fiscale de iShares Core MSCI World
+1288	Catégorie fiscale de BTP {0}% {1}/{2}/{3}
+1289	ETF et fonds : les gains sont imposés à {0}% et ne peuvent pas être compensés avec les moins-values. Leurs pertes, en revanche, vont dans le sac à dos.
+1290	Actions, ETC et obligations : {0}%, et les gains se compensent avec les moins-values, en commençant par les plus anciennes. Obligations d'État : {1}%. Cryptos : {2}% à partir de {3}.
+1291	Les moins-values peuvent être utilisées jusqu'au {0} décembre de la quatrième année suivant celle où elles sont nées.
+1292	C'est une estimation au coût moyen pondéré. Les impôts réels sont prélevés par la banque (régime administré) ou calculés par votre comptable (régime déclaratif). Fiscalité italienne. Ce n'est pas un conseil fiscal.
+1293	{0} prochains mois, nets
+1294	Le prochain
+1295	BTP {0}% {1}/{2}/{3} · {4} €
+1296	Brut
+1297	Net
+1298	Les coupons sont calculés à partir du taux et de l'échéance du titre, nets à {0}% pour les obligations d'État et à {1}% pour les autres obligations.
+1299	Ouvrir le patrimoine : {0} €
+1300	gain
+1301	· TRI
+1302	Prix par part
+1303	mon
+1304	Ouvrir les archives
+1305	Ticker ou ISIN
+1306	Instrument {0}
+1307	Poids de l'instrument {0} en pourcentage
+1308	Retirer l'instrument {0}
+1309	Région : toutes
+1310	Monde ({0})
+1311	Europe ({0})
+1312	Émergents ({0})
+1313	Asie et Pacifique ({0})
+1314	Thème : tous
+1315	Général ({0})
+1316	Facteurs ({0})
+1317	Dividendes ({0})
+1318	Petites entreprises ({0})
+1319	Durables (ESG) ({0})
+1320	Industrie ({0})
+1321	Intelligence artificielle ({0})
+1322	Télécommunications ({0})
+1323	Semi-conducteurs ({0})
+1324	Robotique ({0})
+1325	Cybersécurité ({0})
+1326	Voitures électriques ({0})
+1327	Défense ({0})
+1328	Énergie propre ({0})
+1329	Eau ({0})
+1330	VWRL · Monde · Général · IE{0}B{1}RBWM{2}
+1331	XDWD · Monde · Général · IE{0}BJ{1}KDQ{2}
+1332	SSAC · Monde · Général · IE{0}B{1}R{2}
+1333	SPYI · Monde · Général · IE{0}B{1}YLTY{2}
+1334	IUSN · Monde · Petites entreprises · IE{0}BF{1}RFH{2}
+1335	IWQU · Monde · Facteurs · IE{0}BP{1}QZ{2}
+1336	IWMO · Monde · Facteurs · IE{0}BP{1}QZ{2}
+1337	IWVL · Monde · Facteurs · IE{0}BP{1}QZB{2}
+1338	MVOL · Monde · Facteurs · IE{0}B{1}FHGS{2}
+1339	VHYL · Monde · Dividendes · IE{0}B{1}GKDB{2}
+1340	TDIV · Monde · Dividendes · NL{0}
+1341	ISPA · Monde · Dividendes · DE{0}A{1}F{2}UH{3}
+1342	SUSW · Monde · Durables (ESG) · IE{0}BYX{1}JD{2}
+1343	WSRI · Monde · Durables (ESG) · IE{0}Y{1}LGG{2}
+1344	XDWT · Monde · Technologie · IE{0}BM{1}HT{2}
+1345	XDWH · Monde · Santé · IE{0}BM{1}HK{2}
+1346	XDWF · Monde · Finance · IE{0}BM{1}HL{2}
+1347	XDW{0} · Monde · Énergie · IE{1}BM{2}HM{3}
+1348	XDWC · Monde · Consommation discrétionnaire · IE{0}BM{1}HP{2}
+1349	XDWS · Monde · Consommation de base · IE{0}BM{1}HN{2}
+1350	XDWI · Monde · Industrie · IE{0}BM{1}HV{2}
+1351	XDWM · Monde · Matériaux · IE{0}BM{1}HS{2}
+1352	XDWU · Monde · Services publics · IE{0}BM{1}HQ{2}
+1353	XWTS · Monde · Télécommunications · IE{0}BM{1}HR{2}
+1354	IWDP · Monde · Immobilier · IE{0}B{1}FZS{2}
+1355	SMH · Monde · Semi-conducteurs · IE{0}BMC{1}

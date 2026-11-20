@@ -1,0 +1,332 @@
+0	Quanta Portfolio · Vos investissements, enfin clairs
+1	Date
+2	MAX DD
+3	Ignorer
+4	Prix / valeur
+5	Rendement (décimal)
+6	Rendement (en %)
+7	Élevée
+8	automatique
+10	Achat
+11	prix
+12	Instrument
+14	prêt · importez un fichier
+15	Lecture par IA
+16	Claude · propositions à confirmer
+18	{0} observations mensuelles
+19	prix de marché
+20	{0} ACTIFS · {1} OBSERVATIONS MENSUELLES
+21	{0} VALEURS MANQUANTES · AUCUNE ESTIMÉE
+22	Carte
+23	{0} ans
+24	Gain
+25	{0} mois
+26	Indice de référence
+27	Fréquence mensuelle · intervalle médian {0} jours
+28	analyse en {0} ms
+29	ignorer
+30	Analyse
+31	Total
+32	Jusqu'à {0}%
+33	Stress test
+34	En-têtes à la ligne {0}
+35	Contrôle qualité : {0} erreurs, {1} avertissements
+36	Les analyses utiliseront les prix de marché de chaque instrument, pas les valeurs de votre Excel.
+37	Risque
+38	Actions
+39	Outils
+40	Aperçu des premières lignes de la feuille avec les colonnes reconnues
+41	date
+42	J'ai trouvé
+43	{0} actifs
+44	justETF
+45	oct. {0}
+46	Dans {0} ans
+47	Simulations
+48	Coûts
+49	Valeur
+50	Section précédente et suivante
+51	Agrandir le graphique
+52	Agrandir
+53	col. A · {0} valeurs
+54	{0}% des valeurs sont des dates valides
+55	col. B · {0} valeurs
+56	col. C · {0} valeurs
+57	{0} erreurs · {1} avertissements · {2} notes
+58	Statistiques descriptives et rendements annualisés
+59	{0} observations
+60	Volatilité, Sharpe, Sortino et drawdown
+61	Matrice de corrélation
+62	Comparaison des allocations et rééquilibrage
+63	Monte-Carlo avec rééchantillonnage historique
+64	{0} ans d'historique à rééchantillonner
+65	Stress test : crises historiques
+66	Avant de construire le laboratoire
+67	Aucune vérification nécessaire : lecture confirmée et données sans anomalie.
+68	Aperçu : ce qui entre dans le laboratoire ({0} séries, {1} dates, fréquence mensuelle)
+69	févr. {0}
+70	mars {0}
+71	avr. {0}
+72	Patrimoine
+73	{0} colonnes analysées · toutes interprétées
+74	Frontière
+75	sept. {0}
+76	Analyse du fichier
+77	Résultats
+78	Mon patrimoine →
+79	d'historique.
+80	votre
+81	août {0}
+82	Encore vide
+83	Aller à la carte
+84	USD · capitalisation
+85	De {0} à {1} ans
+86	Indépendance
+87	Accueil
+88	Non classé
+89	Interprétation de Date
+90	dans les données : krach COVID-{0}, choc d'inflation {1}
+91	simulation
+92	Act. Monde (EUR)
+93	Act. Émergents
+94	Oblig. Euro
+95	Or - rend. mensuel
+96	Rendement du mois %
+97	De {0} à {1} mois
+98	De {0} à {1}%
+99	, de janv. {0} à oct. {1} :
+100	Rendements par période calculés par le moteur après vos choix.
+101	col. D · {0} valeurs
+102	col. E · {0} valeurs
+103	Cliquez sur un chiffre pour voir le reçu
+104	chargement…
+105	recherche…
+106	Construisez d'abord le laboratoire
+107	argent versé
+108	Toujours positifs (de {0} à {1}) et variant peu d'une période à l'autre (médiane {2}%) : prix ou valeurs
+109	Laboratoire
+110	Texte : notes ou libellés, pas une série numérique
+111	{0} actifs, {1} paires
+112	portefeuilles combinant {0} actifs
+113	valeur de votre portefeuille
+114	Portfolio Intelligence
+115	Indicateurs, risque, contributions, indice de référence et votre rendement réel.
+116	Simulation Lab
+117	Monte-Carlo avec versements, retraits, inflation et probabilité d'atteindre l'objectif.
+118	Crisis Room
+119	Dot-com, {0}, dette de la zone euro, COVID, inflation {1} et vos propres chocs.
+120	Quant Lab
+121	Frontière efficiente, optimiseurs, VaR selon trois méthodes, tests statistiques.
+122	AI Research
+123	Quanta : posez vos questions, elle demande les chiffres au moteur et vous les explique.
+124	ouvrir le chat →
+125	Où vous êtes investi
+126	Patrimoine total
+127	Volatilité
+128	Sharpe
+129	Votre profil
+130	Comparer les allocations
+131	L'IA relit le fichier : elle corrige les colonnes douteuses et les fautes de frappe, ou le reconstruit en ne gardant que les actifs, avec leurs prix et leur évolution. Vous confirmez d'un clic.
+132	Reconstruire le fichier avec l'IA
+133	Corriger seulement les erreurs
+134	Lancer l'IA quand j'importe un fichier
+135	Versements, quantités ou gains : ce ne sont ni des prix ni des rendements de marché
+136	il faut au moins un deuxième actif
+137	Annuler
+138	Poids du portefeuille
+139	Hypothèses et limites
+140	à lire avant les chiffres
+141	Disponible
+142	Ouvrir l'analyse →
+143	Prêt :
+144	{0} séries
+145	· {0} dates · {1} avertissements
+146	Poids
+147	+{0} € aujourd'hui · +{1}%
+148	Date réf.
+149	Flux nets (M)
+150	Notes
+151	rééquilibrage annuel
+152	Valeur du portefeuille
+153	Versé cumulé
+154	Apparence
+155	Poids égaux
+156	Étapes du laboratoire
+157	Créez votre patrimoine
+158	fichier
+159	col. F · {0} valeurs
+160	col. G · {0} valeurs
+161	Mon patrimoine
+162	Opération
+163	Prix
+164	Autres, non détaillés
+165	Combien coûte le portefeuille
+166	TER et frais annuels
+167	Coût annuel
+168	TER moyen pondéré
+169	Cette année
+170	payés même quand le marché baisse
+171	de capital en moins, effet composé
+172	Avec des instruments à
+173	TER de comparaison en pourcentage
+174	Coût annuel (TER)
+175	Par an
+176	Écart avec {0}%
+177	Autres frais annuels sur le patrimoine
+178	frais de gestion ou de conseil de la banque, droits de garde
+179	«Dans {0} ans» est le capital perdu à cause des frais, sans nouveaux versements, si les instruments rapportaient {1}% par an brut : V · [({2} + {3}%)ⁿ − ({4} + {5}% − frais)ⁿ] ; cela compte aussi le rendement perdu sur les frais payés. «Écart» compare chaque instrument à un autre qui coûte {6}% par an et rapporte autant en brut. Ne comprend pas les frais d'entrée et de sortie, les spreads, les droits de timbre ni les impôts. Le TER est déjà déduit des prix, donc les rendements et le risque du site l'incluent. Pour les fonds de la banque, le coût figure dans le DIC, à la rubrique «Frais courants» ou «Frais de gestion et autres frais» : les valeurs que vous saisissez restent dans ce navigateur.
+180	Aller à
+181	Rendement réel
+182	Croissance
+183	Portefeuille et rééquilibrage
+184	Corrélations
+185	Indicateurs
+186	investissements
+187	Fiabilité : moyenne · lecture non vérifiée par une seconde source
+188	RENDEMENT DU MOIS %
+189	Client
+190	Par catégorie
+191	Par instrument
+192	Exemple · portefeuille de démonstration
+193	Concentration
+194	Max drawdown
+195	ans
+196	Prix de marché de CSPX.AMS (simulation), clôtures ajustées des dividendes et divisions, en euros, {0} mois depuis {1}-{2}
+197	Fiabilité : élevée · prix de marché téléchargés pour chaque instrument
+198	Aucun problème détecté : dates ordonnées, aucune valeur manquante, aucun rendement anormal.
+199	Poids actuel
+200	Portefeuille
+201	Bonjour ! Je suis
+202	Lire la photo du relevé de la banque
+203	Appeler Quanta : parlez-lui comme au téléphone
+204	Ticker
+205	Quantité
+206	Indépendance financière
+207	laboratoire
+208	Obligations
+209	Importez votre Excel
+210	Coût annuel moyen (TER)
+211	Hors euro
+212	Marchés émergents
+213	du portefeuille
+214	Couverture des données
+215	Vue de la composition
+216	Régions et pays
+217	Devises
+218	Classes et style
+219	Secteurs
+220	Régions
+221	Développés et émergents
+222	Pays
+223	Les parts «Autres» de chaque fonds ne sont attribuées à une région que si le fonds la déclare : les «Autres» d'un ETF marchés émergents vont aux Émergents, ceux d'un ETF MSCI World aux autres pays développés. Le reste reste «non détaillé».
+224	Exposition
+225	Devise · type
+226	Actif
+227	, votre analyste IA. Vous pouvez me demander tout de suite comment fonctionne le site ou ce que signifie un terme (TRI, volatilité, drawdown…). Pour les chiffres de votre
+228	portefeuille, importez le fichier ou ouvrez l'exemple et construisez le laboratoire.
+229	Comment fonctionne Quanta Portfolio ?
+230	Qu'est-ce que le TRI ?
+231	Avertissement
+232	Synthèse du portefeuille
+233	feuille «»
+234	Les {0} mouvements du fichier donnent {1} positions ouvertes, valorisées au dernier prix payé : environ {2} €. Avec l'historique des prix de marché, les analyses utilisent de nombreuses années de données, même si vous avez commencé récemment.
+235	Symbole pour les prix
+236	Poids cible
+237	Le symbole est proposé par l'IA (format TICKER.BOURSE : .LON Londres, .DEX Xetra). Corrigez-le si besoin : l'historique vient de Yahoo Finance (Alpha Vantage en secours) et il est converti en euros au taux BCE de fin de mois.
+238	Télécharger l'historique et reconstruire le fichier
+239	Fermer
+240	ACT. MONDE (EUR)
+241	ACT. ÉMERGENTS
+242	OBLIG. EURO
+243	OR - REND. MENSUEL
+244	Or physique
+245	{0} colonnes analysées · {1} à confirmer
+246	Moins de {0} ans
+247	Plus de {0} ans
+248	Poids actuels
+249	expliquée
+250	Rend. annuel
+251	Rend. réel
+252	Cabinet
+253	exemple
+256	{0} € nominal
+257	Prix aujourd'hui
+258	Rendement à l'échéance
+259	{0}% brut
+260	{0} mars {1}
+261	Paramètres
+262	rend.
+263	Rapport de portefeuille · extrait interne
+264	Avant de continuer, dites-moi comment interpréter une colonne : elles sont surlignées sur la carte.
+265	Choisir…
+266	À confirmer
+267	{0} colonne à confirmer
+268	avant le laboratoire.
+269	Montrez-moi laquelle
+270	Ce que
+271	dans le
+272	Compte de dépôt
+274	Profil du client · {0} sur {1}
+275	Le profil de risque du client
+276	Huit questions sur le modèle du questionnaire MiFID : connaissances et expérience, objectifs, tolérance et capacité à supporter des pertes. À remplir avec le client.
+277	Prénom et nom
+278	{0}. Dans combien de temps cet argent pourrait-il être nécessaire ?
+279	{0}. Quel est l'objectif principal ?
+280	Protéger le capital
+281	Un revenu régulier
+282	Croissance avec des variations limitées
+283	Croissance maximale à long terme
+284	{0}. Combien pourrait-il perdre en un an sans changer de stratégie ?
+285	Plus de {0}%
+286	{0}. Si le portefeuille perdait {1}% en quelques mois, que ferait-il ?
+287	Je vends tout
+288	Je vends une partie
+289	J'investis davantage
+290	{0}. Dans quels instruments a-t-il déjà investi ?
+291	Seulement des comptes et des obligations d'État
+292	Aussi des fonds et des obligations
+293	Aussi des actions et des ETF
+294	Aussi du levier, des dérivés ou des cryptos
+295	{0}. Comment évalue-t-il sa connaissance des marchés financiers ?
+296	De base
+297	Correcte
+298	Bonne
+299	Professionnelle
+300	{0}. En dehors de ce portefeuille, combien de mois de dépenses a-t-il de côté ?
+301	Moins de {0} mois
+302	Plus d'un an
+303	{0}. Quelle part de son patrimoine représente ce portefeuille ?
+304	Plus de {0}%
+305	Moins de {0}%
+306	Enregistrer le profil
+307	Le score pondère à {0}% la tolérance au risque (objectif, perte acceptée, réaction à une baisse) et à {1}% la capacité à le supporter (horizon, réserve, poids dans le patrimoine). Un horizon court ou une perte acceptée faible fixent un plafond. Outil d'aide : l'évaluation reste celle du conseiller.
+309	Lu «PAC_due_fogli_righe_vuote · ricostruito» · {0} feuille
+310	Valeur aujourd'hui
+311	Part du gain
+312	Le portefeuille coûte
+313	par an : environ
+314	de capital en moins.
+315	Amérique du Nord
+316	Europe
+317	Développés
+318	États-Unis
+319	Actions, États-Unis · S&P {0}®
+320	Composition par transparence : poids du pays = Σ poids du fonds × part du pays dans le fonds. Source : justETF, fiches lues le {0}/{1}/{2}.
+321	Montant net encaissé (€)
+322	← Outils
+323	Historique
+324	Montant
+325	Nasdaq {0}
+326	ajoutez ce que vous possédez : vous le retrouverez ici chaque jour, à jour
+327	col. H · {0} valeurs
+328	Votre rendement réel
+329	versements réels
+330	Rendement annuel (TRI)
+331	tient compte du moment où vous avez versé chaque euro
+332	Valeur estimée aujourd'hui
+333	à oct. {0}
+334	Versé
+335	+{0}% sur le versé
+336	Après impôts
+337	TRI si vous vendiez tout aujourd'hui : impôts estimés {0} €, il vous resterait {1} €
+338	Rendement pondéré dans le temps

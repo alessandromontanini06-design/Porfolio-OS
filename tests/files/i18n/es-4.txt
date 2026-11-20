@@ -1,0 +1,337 @@
+1017	Escribe a Quanta durante la llamada
+1018	Enviar
+1019	Apagar el micrófono
+1020	Colgar la llamada
+1021	Tu perfil de riesgo
+1022	Sube una captura de tu cartera
+1023	Desde una captura
+1024	Desde el móvil
+1025	Tu cartera desde una
+1026	captura de pantalla
+1027	Haz una captura de la página de la cartera en la app de tu banco o bróker (Trade Republic, Fineco, Directa, Scalable…). Si es larga, haz más de una: las posiciones repetidas las cuento una sola vez.
+1028	{0} · Las imágenes
+1029	hasta {0} · JPG, PNG o WEBP
+1030	Elegir las capturas
+1031	o arrástralas aquí
+1032	{0} · El permiso
+1033	Para leerlas,
+1034	las imágenes se envían a la IA
+1035	(Google Gemini, o Claude de Anthropic si Gemini no responde). No las guardamos. Antes de enviarlas puedes tapar nombre, número de cuenta y todo lo que no haga falta: bastan nombres de los valores, cantidades y valores.
+1036	Entendido: enviar las imágenes a la IA para leerlas
+1037	Leer las capturas
+1038	{0} · Comprueba
+1039	corrige lo que la IA haya leído mal
+1040	Valor
+1041	+ Añadir una fila
+1042	Hacen falta el nombre (o el ISIN, o el ticker) y la cantidad o el valor. El ISIN ayuda a encontrar la cotización correcta: si falta, lo busco yo por el nombre.
+1043	Resumen de la captura
+1044	Todavía no se ha leído ninguna posición.
+1045	Solo la situación de hoy: sin los movimientos no puedo calcular la rentabilidad anual (TIR).
+1046	Las posiciones confirmadas pasan por el laboratorio como un archivo: precios de mercado, riesgo, crisis, simulaciones.
+1047	Analizar estas posiciones →
+1048	Sin Excel
+1049	Construye tu
+1050	Parte de un modelo o busca cualquier valor: ETF, acciones de todas las bolsas, fondos de inversión, cripto. Descargo los precios de mercado y analizo la cartera como si fuera tu Excel: rentabilidad, riesgo, crisis pasadas y simulaciones.
+1051	Carteras
+1052	Carteras para comparar
+1053	Parte de un modelo
+1054	o escribe los instrumentos abajo
+1055	Instrumentos y pesos
+1056	Volver a {0}%
+1057	Vaciar
+1058	+ Añadir instrumento
+1059	Busca arriba cualquier valor, o escribe directamente un ticker (VWCE) o un ISIN (IE{0}BK{1}BQT{2}) en una fila. Los ISIN se verifican en OpenFIGI antes de descargar los precios.
+1060	Resumen de la cartera
+1061	Capital a analizar (€)
+1062	Analizar la cartera →
+1063	Recibo del cálculo
+1064	Archivo de carteras
+1065	Un Excel para leer: clientes, valores, rentabilidades, riesgo, revisiones
+1066	Un archivo para restaurar el archivo de carteras en otro navegador
+1067	Restaurar una copia de seguridad
+1068	Importar la copia
+1069	Buscar por cliente, archivo o instrumento
+1070	Buscar en el archivo
+1071	Filtro
+1072	Todos
+1073	Ordenar por
+1074	última revisión
+1075	nombre
+1076	valor
+1077	El archivo se queda en este navegador, en este ordenador: no va a ningún servidor. Para no perderlo (cambio de ordenador, limpieza del navegador) usa
+1078	de vez en cuando y guarda el archivo.
+1079	sirve en cambio para leer: clientes, valores, rentabilidades, revisiones.
+1080	Preparar el informe
+1081	Para quién es el informe
+1082	Para mí
+1083	Para un cliente
+1084	El informe llevará tu nombre y tu logo en lugar de Quanta Portfolio. Despacho, contactos y logo quedan guardados en este navegador para la próxima vez; el nombre del cliente y las notas no.
+1085	Despacho o asesor
+1086	p. ej. García Asesores Financieros
+1087	Contactos
+1088	email, teléfono o web
+1089	Logo
+1090	Elegir una imagen
+1091	quitar
+1092	nombre del cliente (opcional)
+1093	Tus notas para el cliente
+1094	Añadir la propuesta: comparación entre la cartera actual (A) y la propuesta (B)
+1095	Para añadir la propuesta, prepara antes la comparación en la pestaña «Comparar asignaciones» del laboratorio: A = cartera actual, B = tu propuesta.
+1096	Crear el PDF
+1097	Se abre la ventana de impresión: elige «Guardar como PDF».
+1098	Automático
+1099	Claro
+1100	Oscuro
+1101	«Automático» sigue a tu móvil u ordenador.
+1102	Privacidad y datos guardados en este navegador
+1103	Descargando el histórico de EUNL (IWDA.AMS) · {0} de {1}…
+1104	Descargando el histórico de IEAG (IEAG.AMS) · {0} de {1}…
+1105	Descargando el histórico de CSSPX (CSPX.AMS) · {0} de {1}…
+1106	Descargando el histórico de IS{0}N (EMIM.AMS) · {1} de {2}…
+1107	Descargando el histórico de IBGS (IBGS.AMS) · {0} de {1}…
+1108	Descargando el histórico de IUSN (IUSN.DEX) · {0} de {1}…
+1109	Descargando el histórico de {0}GLD ({1}GLD.DEX) · {2} de {3}…
+1110	expuesto a otras divisas
+1111	Vender {0} €
+1112	España
+1113	Taiwán
+1114	Corea del Sur
+1115	China
+1116	Acciones, Mercados emergentes · MSCI Emerging Markets Investable Market (IMI)
+1117	Participaciones
+1118	Mi patrimonio · {0} €
+1119	Sube el archivo de un cliente
+1120	Construye una cartera
+1121	Patrimonio asesorado
+1122	en el último guardado de cada cliente
+1123	{0} con el perfil completado
+1124	Revisiones pendientes
+1125	vencidas o en {0} días
+1126	Fuera de perfil o de modelo
+1127	por contactar
+1128	Carteras modelo
+1129	los modelos del despacho: se abren en el constructor y se asignan a los clientes
+1130	Guardar la cartera del constructor
+1131	Partir de un ejemplo
+1132	Partir de un ejemplo…
+1133	Prudente
+1134	Tres ETF
+1135	Permanente
+1136	All Weather
+1137	Golden Butterfly
+1138	Dividendos
+1139	Ningún modelo: guarda el que tienes en el constructor, parte de un ejemplo, o desde los Resultados de un cliente con «Guardar como cartera modelo».
+1140	Riesgo de {0} a {1} a partir de la volatilidad histórica; desviación por clase de instrumento. Los clientes son los análisis guardados en este navegador: haz una copia de seguridad desde el archivo.
+1141	Oro y materias primas
+1142	Área
+1143	Tema
+1144	Sector
+1145	País
+1146	VaR {0}%
+1147	CVaR {0}%
+1148	Sortino
+1149	Drawdown más largo
+1150	No es una previsión
+1151	podrías
+1152	{0} veces
+1153	Ahorra {0} € más al mes
+1154	-{0} años
+1155	Burbuja puntocom
+1156	Crisis financiera {0}
+1157	Crisis de la deuda del euro
+1158	pérdida máxima de la cartera
+1159	En los datos
+1160	llega
+1161	Rentabilidad esperada
+1162	Max drawdown histórico
+1163	antes
+1164	optimizada
+1165	Tracking error
+1166	Information ratio
+1167	Crisis
+1168	¿Has
+1169	batido
+1170	¿Quieres guardarla en el archivo?
+1171	Se queda solo en este navegador, en este ordenador: la encontrarás la próxima vez, con el historial de revisiones. Sin servidor.
+1172	p. ej. el nombre del cliente
+1173	guardar siempre
+1174	No, gracias
+1175	Tu patrimonio, siempre aquí: añade lo que tienes o importa un archivo. Sin cuenta.
+1176	Tu patrimonio
+1177	añade tu primera inversión
+1178	Empieza aquí.
+1179	Añade lo que tienes: ETF, acciones, fondos, pero también casa, seguros y otros bienes. O importa el Excel o el export del bróker. Cada vez que vuelvas encontrarás el valor actualizado, cuánto has ganado y cómo fue la última sesión.
+1180	Todavía nada. Añade abajo tu primera compra (por ejemplo
+1181	, {0} participaciones a {1} €) o
+1182	importa el archivo
+1183	de tu banco o bróker.
+1184	Las operaciones que añadas o importes aparecen aquí, de la más reciente a la más antigua.
+1185	{0} partículas · se transforman en cada sección · datos de «Portfolio_OS_esempio · reconstruido»
+1186	ISIN buscado en OpenFIGI: iShares Core MSCI World UCITS ETF USD (Acc): IE{0}B{1}L{2}Y{3} → IWDA.AMS
+1187	ISIN buscado en OpenFIGI: iShares € Aggregate Bond ESG SRI UCITS ETF EUR (Dist): IE{0}B{1}DKXQ{2} → IEAG.AMS
+1188	ISIN buscado en OpenFIGI: iShares Core S&P {0} UCITS ETF USD (Acc): IE{1}B{2}BMR{3} → CSPX.AMS
+1189	ISIN buscado en OpenFIGI: iShares Core MSCI EM IMI UCITS ETF USD (Acc): IE{0}BKM{1}GZ{2} → EMIM.AMS
+1190	ISIN buscado en OpenFIGI: iShares € Govt Bond {0}-{1}yr UCITS ETF EUR (Dist): IE{2}B{3}X{4}Q{5} → IBGS.AMS
+1191	ISIN buscado en OpenFIGI: iShares MSCI World Small Cap UCITS ETF USD (Acc): IE{0}BF{1}RFH{2} → IUSN.DEX
+1192	ISIN buscado en OpenFIGI: Xetra-Gold ETC (oro físico): DE{0}A{1}S{2}GB{3} → {4}GLD.DEX
+1193	Divisas de cotización: EUNL desconocida, IEAG desconocida, CSSPX desconocida, IS{0}N desconocida, IBGS desconocida, IUSN desconocida, {1}GLD desconocida.
+1194	Divisa no determinada para IWDA.AMS, IEAG.AMS, CSPX.AMS, EMIM.AMS, IBGS.AMS, IUSN.DEX, {0}GLD.DEX: se deja como está, comprueba el símbolo.
+1196	Sharpe con un tipo libre de riesgo del {0}%.
+1197	TER no disponible
+1198	Composición look-through: peso del país = Σ peso del fondo × cuota del país en el fondo. Fuente: justETF, fichas leídas el —.
+1199	Leyendo las fichas de los fondos en justETF…
+1201	Este mes
+1202	Comprar / vender
+1203	Solo compras
+1204	De tus {0} transacciones · hoja «Movimenti» · desde ene {1}
+1205	suma de las compras, menos las ventas
+1206	El valor sigue las rentabilidades de los instrumentos de los datos y añade cada aportación a fin de mes: en el archivo faltan las participaciones, así que es una estimación. Las rentabilidades son las de mercado convertidas a euros con el tipo del BCE de fin de mes; el valor puede diferir un poco del de tu bróker (precios de fin de mes, bolsa distinta). Transacciones no vinculadas (instrumento fuera de los datos): Imposta di bollo annuale conto titoli. La TIR y la rentabilidad ponderada en menos de uno o dos años pueden cambiar mucho: no son previsiones.
+1207	Bonos, EUR, Europa, Deuda pública, {0}-{1} · Bloomberg Euro Government Bond {2}-{3}
+1208	Sin área (materias primas)
+1209	Periodo del gráfico
+1210	Máx
+1211	Recorre el gráfico con las flechas para ver los valores día a día
+1212	Tipo
+1213	ganancia +{0} €
+1214	Sube el archivo del cliente
+1215	el export del banco o del bróker del cliente (Excel o CSV) · o arrástralo aquí
+1216	Tu estudio está vacío
+1217	Sube el archivo del banco de un cliente, o construye una cartera, y guárdala desde los Resultados: aparecerá aquí con perfil, riesgo y revisiones.
+1218	Idoneidad respecto al perfil del cliente
+1219	Cartera {0}
+1220	Número de riesgo
+1221	Moderado · volatilidad del {0}% anual
+1222	{0} peores meses
+1223	en los datos históricos, con los pesos de hoy
+1224	Composición
+1225	Guardar como cartera modelo
+1226	Herramienta de apoyo a la evaluación de idoneidad: riesgo a partir de la volatilidad histórica de los precios mensuales, pérdidas históricas con los pesos de hoy. La valoración final corresponde al asesor según los procedimientos de su despacho.
+1227	EE. UU. ({0})
+1228	Italia ({0})
+1229	Tecnología ({0})
+1230	Salud ({0})
+1231	Finanzas ({0})
+1232	Energía ({0})
+1233	Consumo discrecional ({0})
+1234	Consumo básico ({0})
+1235	Materiales ({0})
+1236	Servicios públicos ({0})
+1237	Inmobiliario ({0})
+1238	{0} resultados
+1239	Mostrar {0} más de {1}
+1240	Choque sobre CSPX en porcentaje
+1241	Choque sobre CSNDX en porcentaje
+1242	+ Añadir un objetivo
+1243	Casa · {0} € en {1} años
+1244	Estudios de los hijos · {0} € en {1} años
+1245	los análisis guardados y las revisiones
+1246	Descargando el histórico de CSPX (CSPX.AMS) · {0} de {1}…
+1247	Descargando el histórico de CSNDX (CNDX.AMS) · {0} de {1}…
+1248	{0} partículas · se transforman en cada sección · datos de «PAC_due_fogli_righe_vuote · reconstruido»
+1249	sin coste: CSNDX
+1250	Canadá
+1251	Acciones, Global, Baja capitalización · MSCI World Small Cap
+1252	¿Quieres saber qué activo te hace arriesgar más?
+1253	Pregúntamelo →
+1254	{0} inversiones
+1255	Última sesión
+1256	+{0}% sobre las inversiones ({1} € aportados)
+1257	Rentabilidad (TIR)
+1258	al año · desde el {0}/{1}/{2}
+1259	Dividendos y cupones
+1260	gastos e impuestos: {0} €
+1261	Desde el inicio
+1262	Rentabilidad desde el inicio sin contar el dinero aportado; la línea sube también cuando inviertes.
+1263	Valor · peso
+1264	bien sin cotización
+1265	estimación del {0}/{1}/{2}
+1266	Actualizar estimación
+1267	nominales
+1268	Actualizar precio
+1269	Los bienes sin cotización valen la última estimación que introdujiste y no entran en los análisis del laboratorio.
+1270	Detalle
+1271	Dividendo
+1272	{0} € nominales a {1}
+1273	valor {0} €
+1274	Tienes {0} movimientos por registrar
+1275	Comprueba el importe en tu banca online y regístralo.
+1276	Impuesto de timbre estimado, {0}
+1277	{0}% de {1} € en valores
+1278	Si lo vendieras todo hoy
+1279	de impuestos · cobrarías {0} €
+1280	Minusvalías por recuperar
+1281	la «mochila fiscal» está vacía
+1282	Posición por posición y cómo se calcula
+1283	Categoría fiscal
+1284	Ganancia si vendes hoy
+1285	Impuesto
+1286	{0}%, sin compensar
+1287	Categoría fiscal de iShares Core MSCI World
+1288	Categoría fiscal de BTP {0}% {1}/{2}/{3}
+1289	ETF y fondos: las ganancias pagan el {0}% y no se pueden compensar con minusvalías. Sus pérdidas, en cambio, van a la mochila.
+1290	Acciones, ETC y bonos: {0}%, y las ganancias se compensan con las minusvalías, empezando por las más antiguas. Deuda pública: {1}%. Cripto: {2}% desde {3}.
+1291	Las minusvalías se pueden usar hasta el {0} de diciembre del cuarto año posterior a aquel en que se generaron.
+1292	Es una estimación con el coste medio ponderado. Los impuestos reales los retiene el banco (régimen administrado) o los calcula tu gestor (régimen declarativo). Fiscalidad italiana. No es asesoramiento fiscal.
+1293	Próximos {0} meses, netos
+1294	El próximo
+1295	BTP {0}% {1}/{2}/{3} · {4} €
+1296	Bruto
+1297	Neto
+1298	Los cupones se calculan a partir del tipo y el vencimiento del valor, netos al {0}% para la deuda pública y al {1}% para los demás bonos.
+1299	Abrir el patrimonio: {0} €
+1300	ganancia
+1301	· TIR
+1302	Precio por participación
+1303	mío
+1304	Abrir el archivo
+1305	Ticker o ISIN
+1306	Instrumento {0}
+1307	Peso del instrumento {0} en porcentaje
+1308	Quitar el instrumento {0}
+1309	Área: todas
+1310	Mundo ({0})
+1311	Europa ({0})
+1312	Emergentes ({0})
+1313	Asia y Pacífico ({0})
+1314	Tema: todos
+1315	General ({0})
+1316	Factores ({0})
+1317	Dividendos ({0})
+1318	Pequeñas empresas ({0})
+1319	Sostenibles (ESG) ({0})
+1320	Industria ({0})
+1321	Inteligencia artificial ({0})
+1322	Telecomunicaciones ({0})
+1323	Semiconductores ({0})
+1324	Robótica ({0})
+1325	Ciberseguridad ({0})
+1326	Coches eléctricos ({0})
+1327	Defensa ({0})
+1328	Energía limpia ({0})
+1329	Agua ({0})
+1330	VWRL · Mundo · General · IE{0}B{1}RBWM{2}
+1331	XDWD · Mundo · General · IE{0}BJ{1}KDQ{2}
+1332	SSAC · Mundo · General · IE{0}B{1}R{2}
+1333	SPYI · Mundo · General · IE{0}B{1}YLTY{2}
+1334	IUSN · Mundo · Pequeñas empresas · IE{0}BF{1}RFH{2}
+1335	IWQU · Mundo · Factores · IE{0}BP{1}QZ{2}
+1336	IWMO · Mundo · Factores · IE{0}BP{1}QZ{2}
+1337	IWVL · Mundo · Factores · IE{0}BP{1}QZB{2}
+1338	MVOL · Mundo · Factores · IE{0}B{1}FHGS{2}
+1339	VHYL · Mundo · Dividendos · IE{0}B{1}GKDB{2}
+1340	TDIV · Mundo · Dividendos · NL{0}
+1341	ISPA · Mundo · Dividendos · DE{0}A{1}F{2}UH{3}
+1342	SUSW · Mundo · Sostenibles (ESG) · IE{0}BYX{1}JD{2}
+1343	WSRI · Mundo · Sostenibles (ESG) · IE{0}Y{1}LGG{2}
+1344	XDWT · Mundo · Tecnología · IE{0}BM{1}HT{2}
+1345	XDWH · Mundo · Salud · IE{0}BM{1}HK{2}
+1346	XDWF · Mundo · Finanzas · IE{0}BM{1}HL{2}
+1347	XDW{0} · Mundo · Energía · IE{1}BM{2}HM{3}
+1348	XDWC · Mundo · Consumo discrecional · IE{0}BM{1}HP{2}
+1349	XDWS · Mundo · Consumo básico · IE{0}BM{1}HN{2}
+1350	XDWI · Mundo · Industria · IE{0}BM{1}HV{2}
+1351	XDWM · Mundo · Materiales · IE{0}BM{1}HS{2}
+1352	XDWU · Mundo · Servicios públicos · IE{0}BM{1}HQ{2}
+1353	XWTS · Mundo · Telecomunicaciones · IE{0}BM{1}HR{2}
+1354	IWDP · Mundo · Inmobiliario · IE{0}B{1}FZS{2}
+1355	SMH · Mundo · Semiconductores · IE{0}BMC{1}

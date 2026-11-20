@@ -178,7 +178,7 @@ async function renderArchive(){
     kp.innerHTML=`<div><span>${pro?"Patrimonio seguito":"Valore in archivio"}</span><b>${tot>0?fmtEur(tot):"—"}</b><small>${all.length} ${all.length===1?(pro?"cliente":"portafoglio"):pro?"clienti":"portafogli"}</small></div>`+
       `<div><span>Rendimento medio (TIR)</span><b class="${tir>=0?"up":"dn"}">${Number.isFinite(tir)?fmtPct(tir,1,true):"—"}</b><small>${wv.length?`pesato sul valore · ${wv.length} con i movimenti`:"servono i movimenti nel file"}</small></div>`+
       `<div><span>Da rivedere</span><b class="${due?"dn":""}">${due}</b><small>${due?"revisione oltre i tempi":"tutto in ordine"}</small></div>`+
-      `<div><span>Ultima revisione</span><b>${arAgo(Math.max(...all.map(r=>r.reviewedAt||0)))}</b><small>${new Date(Math.max(...all.map(r=>r.reviewedAt||0))).toLocaleDateString("it-IT",{day:"numeric",month:"long"})}</small></div>`;}
+      (()=>{const ult=Math.max(0,...all.map(r=>r.reviewedAt||0));return `<div><span>Ultima revisione</span><b>${ult?arAgo(ult):"—"}</b><small>${ult?new Date(ult).toLocaleDateString("it-IT",{day:"numeric",month:"long"}):""}</small></div>`;})();}
   const tt=$("#arTitle");if(tt)tt.innerHTML=document.body.dataset.ruolo==="pro"?"I tuoi <em>clienti</em>":"Il tuo <em>archivio</em>";
   {const pro=document.body.dataset.ruolo==="pro",cr=document.querySelector("#archive .bd-crumb"),nb=$("#arNew");
     if(cr)cr.innerHTML=`Quanta Portfolio <i>/</i> ${pro?"Clienti":"Archivio"}`;if(nb)nb.textContent=pro?"+ Nuovo cliente":"+ Nuovo portafoglio";

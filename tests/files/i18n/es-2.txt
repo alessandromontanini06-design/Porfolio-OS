@@ -1,0 +1,331 @@
+339	+{0}% al año · como los instrumentos, sin el efecto de las aportaciones
+340	Cuánto ha rendido cada instrumento
+341	Compras
+342	Ventas
+343	Dividendos cobrados
+344	ha aportado la mayor ganancia (+{0} €),
+345	la menor (+{0} €). Ganancia = valor hoy − compras + ventas + dividendos cobrados: la suma por instrumento es exactamente la ganancia total. Los precios están ajustados, así que los dividendos reinvertidos ya están en el valor; los cobrados (ETF de distribución) cuentan como dinero que sale de la cartera, pero que has ganado. No se incluyen comisiones ni impuestos no asociados a un instrumento.
+346	dic {0}
+347	expuesto a otras divisas · rango para las cuotas sin detallar
+348	Cupón · BTP {0}% {1}/{2}/{3}
+349	del {0}/{1}/{2} · {3} € brutos, impuesto {4}%
+350	Registrar
+351	Saltar
+352	Faltan {0} respuestas para calcular el perfil.
+353	Coste anual de CSPX en porcentaje
+354	Coste anual de CSNDX en porcentaje
+355	¿Cuándo puedes dejar de trabajar?
+356	Fuente
+357	Rentabilidad anual
+358	Tu
+359	, de ene {0} a dic {1}:
+360	Nota
+361	nov {0}
+362	tus
+363	por fin
+364	claras.
+365	abrir →
+366	ningún instrumento cuesta más
+367	Reconocido sin IA: «★ Movimenti dei piani di accumulo ({0} fogli)»: lista de compras y ventas
+368	Menú
+369	Crecimiento de {0} €
+370	Copia de seguridad
+371	← Atrás
+372	Uso el sitio
+373	Reconstruido con los precios de mercado
+374	qué instrumentos
+375	tienes y
+376	cuánto
+377	: {0} instrumentos. Los precios de abajo son los de mercado de cada instrumento, en euros: aquí ves los últimos {1} meses. El detalle de las fuentes está en el mapa.
+378	Reino Unido
+379	estudio
+380	Liquidez
+381	De tus {0} transacciones · hoja «★ Movimenti dei piani di accumulo ({1} fogli)» · desde ene {2}
+382	suma de las compras
+383	El valor sigue las rentabilidades de los instrumentos de los datos y añade cada aportación a fin de mes: en el archivo faltan las participaciones, así que es una estimación. Las rentabilidades son las de mercado convertidas a euros con el tipo del BCE de fin de mes; el valor puede diferir un poco del de tu bróker (precios de fin de mes, bolsa distinta). La TIR y la rentabilidad ponderada en menos de uno o dos años pueden cambiar mucho: no son previsiones.
+384	mismas aportaciones en el S&P {0}
+385	Archivo
+386	Eres asesor
+387	El cliente, en minutos.
+388	Del export del banco del cliente a una propuesta clara, lista para mostrar.
+389	Propuesta A/B con las operaciones y los impuestos estimados
+390	Presentación al cliente a pantalla completa
+391	Informe PDF con el nombre de tu despacho
+392	Qué ha cambiado desde la última revisión
+393	El archivo del cliente se queda en tu navegador: sin cuenta, sin servidor para los datos, sin productos que vender.
+394	Analiza un cliente
+395	Construye una propuesta
+396	Irlanda
+397	Xetra-Gold ETC (oro físico)
+398	Leído «Portfolio_OS_esempio · ricostruito» · {0} hoja
+399	Japón
+400	ninguna
+401	Construcción en curso
+402	Labora­torio
+403	Las primeras filas de la hoja tal como las leyó el motor: títulos descartados, encabezado encontrado, cada columna etiquetada.
+404	Vista previa de la hoja
+405	Lo que he encontrado
+406	Ir al mapa →
+407	Registro del motor
+408	falta · del KID
+409	con ficha del fondo leída · cargando
+410	Idoneidad
+411	Pesos objetivo
+412	Tu cartera
+413	Edad hoy
+414	El dinero debe durar hasta
+415	Ahorras cada mes
+416	Gasto mensual a cubrir
+417	Pensión mensual
+418	Desde qué edad
+419	Quiero dejarlo a los
+420	Frontera eficiente
+421	Llamar a Quanta
+422	Todos los valores de este archivo aparecen vendidos
+423	He leído las compras y las ventas, pero al final del periodo no queda ningún valor en cartera: no hay una cartera actual que analizar. Si la cuenta tiene valores comprados antes del inicio del archivo, descarga la lista de movimientos desde la apertura de la cuenta, o la situación actual de la cartera.
+424	Símbolo de S&P {0}
+425	Símbolo de Nasdaq {0}
+426	Interpretación de CSPX
+427	Interpretación de CSNDX
+428	Precio de mercado de CNDX.AMS (simulación), cierres ajustados por dividendos y splits, en euros, {0} meses desde {1}-{2}
+429	Cada
+430	columna,
+431	tu hoja, el export del bróker o los movimientos de valores del banco (Excel o CSV) · o arrástralo aquí
+432	instrumentos
+434	Interpretación de EUNL
+435	Precio de mercado de IWDA.AMS (simulación), cierres ajustados por dividendos y splits, en euros, {0} meses desde {1}-{2}
+436	Interpretación de IEAG
+437	Precio de mercado de IEAG.AMS (simulación), cierres ajustados por dividendos y splits, en euros, {0} meses desde {1}-{2}
+438	Interpretación de CSSPX
+439	Interpretación de IS{0}N
+440	Precio de mercado de EMIM.AMS (simulación), cierres ajustados por dividendos y splits, en euros, {0} meses desde {1}-{2}
+441	Interpretación de IBGS
+442	Precio de mercado de IBGS.AMS (simulación), cierres ajustados por dividendos y splits, en euros, {0} meses desde {1}-{2}
+443	Interpretación de IUSN
+444	Precio de mercado de IUSN.DEX (simulación), cierres ajustados por dividendos y splits, en euros, {0} meses desde {1}-{2}
+445	Interpretación de {0}GLD
+446	Precio de mercado de {0}GLD.DEX (simulación), cierres ajustados por dividendos y splits, en euros, {1} meses desde {2}-{3}
+447	Rentabilidades por periodo calculadas por el motor tras tus elecciones · primeras {0} series.
+448	activos
+449	fechas
+450	correlaciones
+451	métricas
+452	Ejemplo · datos sintéticos
+453	Dicta el mensaje
+454	Dictar
+455	en {0} años, con la misma rentabilidad bruta
+456	¿Desde dónde empiezas?
+457	Cinco caminos, el mismo resultado: tu patrimonio claro, con los precios de mercado.
+458	En uso:
+459	Sube una captura de pantalla
+460	una o más fotos de la app del banco o del bróker: la IA lee valores y cantidades, tú lo compruebas
+461	No tengo un archivo
+462	crea una cartera eligiendo ETF y pesos
+463	¿Cuánto me cuesta el banco?
+464	escribe los números del informe de costes y gastos: costes en euros, en {0} y {1} años, comparación con los ETF
+465	Enséñame un ejemplo
+466	{0} ETF, {1} movimientos desde {2}
+467	El archivo se lee en tu navegador y no lo guardamos en ningún servidor. Para entender un archivo nuevo enviamos a la IA solo un extracto, y puedes desactivarla.
+468	Cómo tratamos tus datos
+469	Un día de tu patrimonio,
+470	sin hacer nada.
+471	Después del cierre
+472	Precios actualizados
+473	Cada instrumento con su precio de cierre, los tipos de cambio oficiales del BCE, la variación respecto a ayer.
+474	El día del plan de ahorro
+475	El recordatorio
+476	Importe ya escrito: tú introduces las participaciones que ves en la app del bróker. Nada de estimaciones inventadas.
+477	Participaciones compradas
+478	Precio pagado
+479	El día del cupón
+480	El cupón, neto
+481	Al {0}% para la deuda pública, al {1}% para los demás bonos. Un toque y pasa a tus rendimientos.
+482	BTP {0}% {1} · {2} de marzo
+483	Bruto
+484	Impuesto {0}%
+485	Neto
+486	Datos de ejemplo
+487	Las preguntas que importan.
+488	Seis herramientas de análisis sobre tu cartera. Cada número tiene su recibo: fórmula, datos usados, hipótesis.
+489	¿Cuánto puedes perder en un mal año?
+490	¿Y si volviera {0}, {1}, {2}?
+491	¿Cuánto tendrás dentro de veinte años, con qué probabilidad?
+492	a los {0} años
+493	¿Existen pesos más eficientes que los tuyos?
+494	Sharpe {0}
+495	¿Has batido al MSCI World?
+496	+{0}% al año
+497	Resultados de ejemplo
+498	Prueba con el ejemplo completo →
+499	Inviertes por tu cuenta
+500	Entiende de verdad tu dinero.
+501	Cuánto has ganado después de impuestos, cuánto te cuestan los fondos en euros, cuándo podrás dejar de trabajar.
+502	Patrimonio siempre actualizado
+503	Rentabilidad real, también después de impuestos
+504	Costes de los fondos en {0} años
+505	Gratis, sin cuenta
+506	Tu patrimonio,
+507	por fin claro.
+508	Empieza gratis, sin cuenta →
+509	Reconocido sin IA: «Movimenti»: lista de compras y ventas
+510	Reconocido sin IA: «Posizioni»: resumen de {0} posiciones sin histórico
+511	Elegida la hoja «Andamento mensile»: es la que tiene más series numéricas
+512	patrimonio
+513	Acciones tecnológicas
+514	Prueba en tu choque ↓
+515	perder
+516	tener
+517	dejarlo
+518	tormenta
+519	mejor
+520	mercado
+521	Medida
+522	Cripto
+523	Archivo reconstruido con los precios de mercado, no con los valores de tu Excel (que incluyen aportaciones, ventas y movimientos de liquidez): {0} instrumentos, {1} meses de precios de mercado de simulación (cierres ajustados por dividendos y splits), todo convertido a euros con el tipo del BCE de fin de mes.
+524	Precios de mercado
+525	de dónde salen los números
+526	Los análisis usan los precios de mercado de cada instrumento, no los valores de tu archivo: aportaciones, ventas y movimientos de liquidez no distorsionan riesgo ni rentabilidades. Tu rentabilidad personal (TIR) se calcula aparte, a partir de tus transacciones.
+527	Símbolo
+528	Divisa de cotización
+529	Volver al archivo original
+530	Peor periodo
+531	Obs.
+532	precios · col. B
+533	precios · col. C
+534	Prueba una variante
+535	Hipótesis: cartera reequilibrada cada mes a los pesos indicados, sobre un histórico de {0} meses. Precios de mercado convertidos a euros con el tipo del BCE de fin de mes.
+536	Reequilibrio
+537	con ficha del fondo leída
+538	este año. En {0} años, con una rentabilidad bruta del {1}%, son
+539	≈ {0} € al año
+540	compra, venta, dividendo, casa
+541	ETF, bonos, cuentas, oro y casa en un solo lugar.
+542	Vuelves mañana, y ya está todo actualizado.
+543	Crea tu patrimonio →
+544	Sube el archivo del banco
+545	Ninguna cuenta
+546	que crear
+547	Ningún banco
+548	que conectar
+549	Los datos
+550	se quedan en tu navegador
+551	Ejemplo de patrimonio
+552	Agrupar
+553	Hoy
+554	Próximo cupón · {0} de marzo
+555	{0} € netos
+556	‹ Patrimonio
+557	Deuda pública
+558	Vencimiento
+559	{0} de marzo de {1}
+560	Fiscalidad
+561	Próximos cupones
+562	{0} sep {1}
+563	Cada inversión es una porción.
+564	Tocas la porción y el centro te dice cuánto vale, cuánto pesa y cuánto te ha hecho ganar. Tocas otra vez y vuelve el total.
+565	Acciones, bonos, liquidez, oro.
+566	Con un gesto ves el patrimonio por categoría. El fondo de emergencia es liquidez, el oro de la abuela es oro: cada cosa en su sitio.
+567	La ganancia en porcentaje se calcula sobre las inversiones: el dinero en la cuenta no está «invertido en bolsa».
+568	Los BTP, como los lleva un italiano.
+569	Valor nominal y precio sobre {0}, cupón y vencimiento sacados del nombre. El día del cupón el sitio te lo recuerda, con el importe neto ya calculado.
+570	Deuda pública · ejemplo
+571	Próximo cupón
+572	{0} mar {1} · {2} €
+573	Para quién es
+574	Datos de mercado oficiales del BCE
+575	Terminal · BCE
+576	datos oficiales
+577	{0} números inventados: tipos, inflación y cambio vienen del Banco Central Europeo.
+578	Métricas del conjunto de datos cargado
+579	Los laboratorios de Quanta Portfolio
+580	Financial Intelligence Terminal
+581	Los laboratorios.
+582	Una sola cartera.
+583	Cargas los datos una vez: cada laboratorio los usa, la IA los interpreta, el motor hace las cuentas.
+584	Guardado solo en este navegador
+585	Añadir
+586	Añadir una foto
+587	Resumen
+588	Solo un análisis de datos históricos: no es una recomendación de inversión.
+589	Crea tu cartera
+590	Exportar a Excel
+591	por mi cuenta
+592	como asesor
+593	Idioma
+594	Oro
+595	Elegida la hoja «Rendimenti ETF»: es la que tiene más series numéricas
+596	Encabezados en la fila {0} (saltadas {1} filas de título)
+597	Control de calidad: {0} errores, {1} aviso
+598	de historia. Faltan {0} valores en «Az. Emergenti».
+599	Rentabilidades ETF
+600	Leyenda · sin series
+601	Interpretación de Data rif.
+602	Interpretación de Az. Globale (EUR)
+603	Interpretación de Az. Emergenti
+604	Interpretación de Obblig. Euro
+605	Interpretación de Oro - rend. mensile
+606	Valores con el símbolo % (de -{0}% a {1}%): rentabilidades, convertidas a decimales
+607	Interpretación de Flussi netti (mln)
+608	Números de -{0} a {1} que no se parecen ni a precios ni a rentabilidades: dime tú qué representan
+609	Interpretación de Note
+610	«Az. Emergenti»: {0} valores ausentes (jun {1}, nov {2}). Excluidos de los cálculos, no estimados.
+611	{0} fila sin una fecha válida se ha excluido (por ejemplo totales o medias al final de la hoja).
+612	en los datos: crisis de la deuda del euro, caída COVID-{0}, choque de inflación {1}
+613	Movimientos
+614	Posiciones
+615	Evolución mensual
+616	Info · sin series
+617	Interpretación de Valore portafoglio
+618	Valor de la cartera que incluye las aportaciones: las rentabilidades quedarían infladas por el dinero añadido. Hacen falta los precios de los instrumentos
+619	Interpretación de Versato cumulato
+620	Interpretación de Guadagno
+621	Interpretación de Rendimento del mese %
+622	Positivos y negativos, cercanos a cero (de -{0} a {1}): rentabilidades en forma decimal
+623	Símbolo de iShares Core MSCI World UCITS ETF USD (Acc)
+624	Símbolo de iShares € Aggregate Bond ESG SRI UCITS ETF EUR (Dist)
+625	Símbolo de iShares Core S&P {0} UCITS ETF USD (Acc)
+626	Símbolo de iShares Core MSCI EM IMI UCITS ETF USD (Acc)
+627	Símbolo de iShares € Govt Bond {0}-{1}yr UCITS ETF EUR (Dist)
+628	Símbolo de iShares MSCI World Small Cap UCITS ETF USD (Acc)
+629	Símbolo de Xetra-Gold ETC (oro físico)
+630	Comparación con el índice
+631	Descargando el histórico de SPY…
+632	Acciones {0}%
+639	Coste anual de EUNL en porcentaje
+640	Coste anual de IEAG en porcentaje
+641	Coste anual de CSSPX en porcentaje
+642	Coste anual de IS{0}N en porcentaje
+643	Coste anual de IBGS en porcentaje
+644	Coste anual de IUSN en porcentaje
+645	Coste anual de {0}GLD en porcentaje
+646	EUR · distribución
+647	Emergentes
+648	Choque de inflación {0}
+649	cartera
+651	Para el asesor
+652	este año sobre la parte con coste conocido ({0}%). En {1} años, con una rentabilidad bruta del {2}%, son
+653	≈ {0} € al año · conocido para el {1}%
+654	Cuánto
+655	puedes
+656	-{0} año
+657	¿Qué probabilidad tienes?
+658	Normal
+659	Nominal
+660	Risk parity
+661	Divisa
+662	Frecuencia
+663	Pérdida máxima
+664	Peores {0} meses
+665	VaR {0}% en un mes
+666	En el archivo no hay pesos objetivo. Escríbelos abajo, o parte de los pesos actuales y modifícalos.
+667	Usar los pesos actuales como objetivo
+668	Sin detallar
+669	Países Bajos
+670	Acciones, Estados Unidos · Nasdaq {0}®
+671	Con las mismas aportaciones en el S&P {0}
+672	Has obtenido
+673	más que el índice, con TIR +{0}% frente a +{1}%. Mismos euros, mismas fechas: solo cambia dónde los pusiste.
+674	Cambia el índice en la sección
+675	Lo que he entendido, qué seguro estoy y por qué. Si me equivoco corrige desde el menú, o deja que la IA reconstruya el archivo.
+676	A la IA solo le llega un extracto de la estructura (encabezados, títulos de sección, primeras y últimas filas), nunca el archivo entero. Los cálculos se quedan en tu navegador y un modelo ya confirmado no se vuelve a enviar. El sitio recoge estadísticas de uso anónimas (qué secciones se usan, si la importación funciona), sin cookies y sin ningún dato de tus archivos.
+677	Columna

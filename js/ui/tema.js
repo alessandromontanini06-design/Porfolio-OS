@@ -4,6 +4,7 @@
    - il tema si applica già nell'<head> (script in index.html) per non far lampeggiare la pagina: qui si cambia e si segue il sistema;
    - la lingua per ora è solo l'italiano: la riga c'è perché le traduzioni arriveranno qui. */
 import { $ } from "./core.js";
+import { LINGUE, lingua, linguaImposta } from "./lingua.js";
 
 export const TEMA_KEY = "pos-tema-v1";
 const mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
@@ -45,14 +46,16 @@ function monta() {
         </div>
         <small class="set-n">«Automatico» segue il tuo telefono o computer.</small>
       </div>
-      <div class="set-row set-line"><span class="set-l">Lingua</span><span class="set-v">Italiano</span></div>
+      <div class="set-row"><span class="set-l">Lingua</span>
+        <div class="set-seg set-lang" role="radiogroup" aria-label="Lingua">${Object.entries(LINGUE).map(([k, v]) => `<button type="button" role="radio" data-lingua="${k}" aria-checked="${lingua() === k}" translate="no"><span>${v}</span></button>`).join("")}</div>
+      </div>
       <a class="set-link" href="/privacy.html">Privacy e dati salvati in questo browser<span aria-hidden="true">→</span></a>
     </div>`;
   mnu.parentNode.insertBefore(box, mnu);
   const pop = $("#setPop"), btn = $("#setBtn");
   const apri = on => { pop.hidden = !on; btn.setAttribute("aria-expanded", String(on)); document.body.classList.toggle("set-on", !!on); if (on) { const f = pop.querySelector('[aria-checked="true"]') || pop.querySelector("button"); f && f.focus({ preventScroll: true }); } };
   btn.addEventListener("click", e => { e.stopPropagation(); const mp = $("#mnuPop"); if (mp && !mp.hidden) $("#mnuBtn").click(); apri(pop.hidden); });
-  pop.addEventListener("click", e => { e.stopPropagation(); const b = e.target.closest("[data-tema]"); if (b) temaImposta(b.dataset.tema); });
+  pop.addEventListener("click", e => { e.stopPropagation(); const b = e.target.closest("[data-tema]"); if (b) temaImposta(b.dataset.tema); const lg = e.target.closest("[data-lingua]"); if (lg && lg.dataset.lingua !== lingua()) linguaImposta(lg.dataset.lingua); });
   pop.addEventListener("keydown", e => {
     const bs = [...pop.querySelectorAll("[data-tema]")], i = bs.indexOf(document.activeElement);
     if (i >= 0 && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { e.preventDefault(); const n = bs[(i + (e.key === "ArrowRight" ? 1 : bs.length - 1)) % bs.length]; n.focus(); temaImposta(n.dataset.tema); }

@@ -2,6 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
+<script>(function(){try{var l=localStorage.getItem("pos-lingua-v1");if(l==="en"||l==="es"||l==="fr"){document.documentElement.classList.add("i18n-wait");document.documentElement.lang=l}}catch(e){}})()</script><style>.i18n-wait body{visibility:hidden}</style>
 <script>(function(){var t="auto";try{t=localStorage.getItem("pos-tema-v1")||"auto"}catch(e){}var d=t==="scuro"||(t!=="chiaro"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})()</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quanta Portfolio · Come trattiamo i tuoi dati</title>
@@ -61,7 +62,7 @@ button.del:hover{background:#fff4f5}
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/"><i aria-hidden="true"><svg viewBox="0 0 100 100" fill="none"><path d="M6.25 66.21A46 13 -18 0 1 93.75 37.79" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="52" r="27" fill="#C9F24A"/><path d="M93.75 37.79A46 13 -18 0 1 6.25 66.21" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/></svg></i><span class="bw"><b class="bw1">Quanta</b> <span class="bw2">Portfolio</span></span></a>
+  <a class="brand" href="/"><i aria-hidden="true"><svg viewBox="0 0 100 100" fill="none"><path d="M6.25 66.21A46 13 -18 0 1 93.75 37.79" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="52" r="27" fill="#C9F24A"/><path d="M93.75 37.79A46 13 -18 0 1 6.25 66.21" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/></svg></i><span class="bw" translate="no"><b class="bw1">Quanta</b> <span class="bw2">Portfolio</span></span></a>
   <a class="back" href="/">← Torna al sito</a>
 </header>
 <main>
@@ -169,5 +170,6 @@ button.del:hover{background:#fff4f5}
       $("setAi").checked=true;$("setSave").checked=false;info();msg("Fatto: il sito non ricorda più niente su questo computer.");});});
 })();
 </script>
+<script type="module" src="/js/ui/lingua.js"></script>
 </body>
 </html>

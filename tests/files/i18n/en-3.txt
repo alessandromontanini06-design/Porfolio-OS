@@ -1,0 +1,339 @@
+678	Examples
+679	Trend
+680	Interpretation
+681	Reliability
+682	Reason
+683	Quality check
+684	What I can build
+685	with this data
+686	Build the lab
+687	Your file wasn't read correctly? Let us know
+688	What's wrong (optional)
+689	Also send the file structure: sheet and column names,
+690	without any values
+691	Send the report
+692	It helps improve file reading. No numbers from your file are sent, nor the file name.
+693	Downloading the market history of {0} instruments and rebuilding the file…
+694	Looking up the exchange symbols of the ISINs…
+695	Downloading official rates and inflation for the dataset period…
+696	Enter the annual cost of each instrument: for ETFs I read it myself, for funds it's in the KID under «Ongoing costs».
+697	Xetra-Gold ETC (physical gold) · DE{0}A{1}S{2}GB{3}
+698	Use these weights in the other analyses
+699	Is your allocation consistent with you?
+700	Confirm the map first
+701	The lab is built from the data you confirmed: metrics, charts, correlations, macro context and your portfolio.
+702	Lab tabs
+703	Historical data
+704	Click any number to see formula, data and assumptions.
+705	Present to the client
+706	Download the PDF report
+707	What the chart shows
+708	{0} € invested
+709	Your money
+710	How the
+711	performed: {0} € invested at the start in each, no contributions, returns compounded period by period. Your return with your actual contributions is in the «Your real return» box, if the file contains the transactions.
+712	Macro context
+713	Official
+714	Correlation map
+715	Correlation view
+716	{0}D network
+717	Matrix
+718	Drag to rotate · hover an asset · click for the receipt
+719	move together
+720	in opposite directions
+721	The more correlated two assets are, the closer they are and the brighter the thread. The sphere is as big as the volatility.
+722	Metrics by asset
+723	fund composition · justETF
+724	Clients, profiles, suitability and model portfolios. Everything stays in this browser.
+725	Other developed countries
+726	Stocks, Global · MSCI World
+727	{0} · cautious
+728	Outside the data
+729	same as before
+730	not in your file
+731	Upload a file
+732	The risk analysis starts from the confirmed data: upload a file, confirm the map and build the lab.
+733	Return distribution
+734	Who carries the risk
+735	weight vs risk
+736	Drawdown over time
+737	distance from the previous peak
+738	Risk breakdown
+739	Risk by asset
+740	The simulations start from the confirmed historical returns: upload a file, confirm the map and build the lab.
+741	Initial capital (€)
+742	Monthly contribution (€)
+743	negative = withdrawal
+744	Years
+745	Goal (€)
+746	Annual inflation (%)
+747	Annual costs (%)
+748	fees and TER
+749	Assumed annual return (%)
+750	historical
+751	Method
+752	Simulation method
+753	In blocks
+754	Simulated paths
+755	Number of simulations
+756	Financial independence · FIRE
+757	Age, spending, pension and savings: the answer based on your portfolio's returns.
+758	The fan of futures
+759	Nominal or real values
+760	After inflation
+761	Where you end up
+762	Percentiles
+763	Your age, how much you spend, how much you save: the answer based on your portfolio's actual returns.
+764	The calculation uses your portfolio's historical returns: upload a file or create a portfolio, then confirm the map.
+765	Your numbers
+766	Money
+767	Capital invested today
+768	from your portfolio
+769	Pension
+770	net, in today's euros
+771	Safety
+772	Probability the money lasts
+773	of the simulated futures in which the money lasts until the end
+774	Want to stop earlier?
+775	Your financial life
+776	capital in today's euros, by age
+777	What brings you closest
+778	age at which you can stop
+779	The types of FIRE
+780	same futures, different choices
+781	The {0}% rule on your portfolio
+782	annual withdrawal and probability it lasts
+783	The stress tests start from the confirmed data: upload a file, confirm the map and build the lab.
+784	Crises compared
+785	only those in the data
+786	Your shock
+787	Ready-made scenarios
+788	Everything −{0}%
+789	{0}σ crash
+790	Repeat the worst crisis
+791	Reset
+792	Enter the shock for one or more assets. With
+793	propagate
+794	on, the assets left empty move as they historically did together with those hit.
+795	Propagate with historical correlations
+796	Capital (€)
+797	The frontier needs at least two assets with confirmed data: upload a file, confirm the map and build the lab.
+798	Goal
+799	Optimization goal
+800	Maximum Sharpe
+801	Minimum volatility
+802	Target volatility
+803	Target return
+804	Target (%)
+805	Minimum weight (%)
+806	Maximum weight (%)
+807	concentration limit
+808	Short selling
+809	Conservative expected returns
+810	Risk vs return
+811	annualized historical data
+812	Before and after
+813	Weights compared
+814	The comparison starts from the confirmed data: upload a file, confirm the map and build the lab.
+815	Index
+816	Column of your file
+817	or
+818	Alpha Vantage symbol
+819	e.g. VT, IWDA.LON
+820	Load
+821	Benchmark currency
+822	In euro (ECB rate)
+823	Original currency
+824	Growth of {0}
+825	Above or below the market
+826	Measures compared
+827	The market in crises
+828	archive
+829	+ New portfolio
+830	To review
+831	Interpretation of Transaction
+832	Interpretation of Instrument
+833	Interpretation of Ticker
+834	Interpretation of ISIN
+835	Interpretation of Quantity
+836	Interpretation of Price
+837	Interpretation of Amount
+838	Many dates repeat: the file may have one row per asset and date (long format). This version reads one asset per column.
+839	{0} gaps in the calendar: some periods are missing for a monthly frequency.
+840	The dates were not in chronological order: I sorted them.
+841	less than {0} years of history: unreliable results
+842	no crises in the data: only hypothetical shocks
+843	The AI is reading the structure of {0} sheet: meanwhile, see the automatic reading
+844	The server responded with an error ({0}).: the automatic reading stays
+845	ISIN looked up on OpenFIGI: S&P {0}: IE{1}B{2}BMR{3} → CSPX.AMS
+846	ISIN looked up on OpenFIGI: Nasdaq {0}: IE{1}B{2}SZB{3} → CNDX.AMS
+847	Quote currencies: CSPX unknown, CSNDX unknown.
+848	Currency not determined for CSPX.AMS, CNDX.AMS: left as is, check the symbol.
+849	Observations
+850	Period
+851	Jan {0} – Oct {1}
+852	monthly
+853	Relive real crises with your capital and discover the loss you can really stand, measured by how you react and not by a questionnaire.
+854	Take the test · {0} minutes
+855	same months · {0} months
+856	Weight %
+857	Remove portfolio B
+858	+ Add C
+859	B with equal weights
+860	If a portfolio doesn't add up to {0}% I rescale it. To compare instruments that aren't in the file, use «Create your portfolio» on the home page.
+861	Crisis: COVID-{0} crash
+862	Crisis: inflation shock {0}
+863	To go from A to B
+864	Download the proposal in Excel
+865	Today (A)
+866	With the proposal (B)
+867	Estimated taxes
+868	sales {0} € · purchases {1} €
+869	Amounts on today's value ({0} €), with no new contributions. Taxes are an estimate: on sales, the share of unrealized gain is realized in proportion to how much is sold, at {1}% or {2}% for government bonds; it doesn't consider capital losses to offset, fees and spreads.
+870	Comparison over {0} common months (Jan {1} – Oct {2}): only the months in which all instruments used by at least one portfolio have a price, so none is favored by a longer history. Portfolios rebalanced every month to the given weights, with no costs or taxes; the best value of each row is highlighted. Crises appear only if they fall entirely within the common months. It's the past, not a forecast.
+871	Risk analysis
+872	Historical VaR and CVaR, Sortino, each asset's contribution to risk, concentrations.
+873	Monte Carlo
+874	Thousands of paths resampled from your returns, with contributions and withdrawals.
+875	Historical replay where the data allows, declared hypothetical shocks otherwise.
+876	Markowitz on your data: maximum Sharpe, minimum volatility, risk parity, risk or return target, with weight constraints.
+877	{0} assets to combine
+878	Comparison with the S&P {0}, Nasdaq-{1}, MSCI World, Euro Stoxx {2} or your own index: beta, alpha, tracking error, market crises.
+879	monthly history via ETFs, converted into euro at the ECB rate
+880	S&P {0} · IE{1}B{2}BMR{3}
+881	no cost: CSPX, CSNDX
+882	Risk-free rate and inflation
+883	Source of the risk-free rate
+884	ECB · Euribor {0} months
+885	None ({0}%)
+886	Average risk-free rate
+887	Euribor {0} months (monthly average)
+888	Average annual inflation
+889	Euro area HICP, all items
+890	ECB · data-api.ecb.europa.eu
+891	{0} months · {1}-{2} – {3}-{4}
+892	Sharpe with an average risk-free rate of {0}% (Euribor {1} months (monthly average)). Real return after average inflation of {2}%.
+893	Portfolio
+894	Your
+895	finally clear.
+896	Call with Quanta
+897	Value (€)
+898	Class
+899	Privacy
+900	Global equity
+901	Core and satellites
+902	France
+903	Germany
+904	Italy
+905	Bonds, EUR, Global, Aggregate, All maturities, Social/Environmental · Bloomberg MSCI Euro Aggregate and Green Bond ESG SRI
+906	ETFs and funds
+907	Stocks, ETCs and other securities
+908	Government bonds
+909	Coupon
+910	unlocks when you build the lab
+911	Clients
+912	moderate
+913	balanced
+914	{0} · dynamic
+915	When
+916	COVID-{0} crash
+917	Save to the archive
+918	Keep this portfolio in your net worth
+919	You'll find it updated every day, without reloading the file: {0} transactions.
+920	Add to my net worth
+921	Weight of CSPX in portfolio A
+922	Weight of CSPX in portfolio B
+923	Weight of CSNDX in portfolio A
+924	Weight of CSNDX in portfolio B
+925	Name
+926	Quanta Portfolio, back to home
+927	Workspace
+928	My portfolio
+929	Mine
+930	Tests and comparisons
+931	Tests
+932	Calculations in the browser
+933	value, gain, positions
+934	Add a transaction
+935	Excel or bank and broker export
+936	Open the archive of saved portfolios
+937	saved analyses, clients, reviews
+938	download your net worth to a file
+939	Privacy and settings
+940	what stays in this browser
+941	My
+942	Group the chart
+943	Import from a file
+944	the Excel or the broker's export
+945	Analyze in the lab
+946	risk, crises, simulations, frontier
+947	Download to Excel
+948	positions, transactions, taxes
+949	If a crisis hits
+950	Your goals
+951	Your positions
+952	Your taxes
+953	estimate: the actual taxes are calculated by the bank or your accountant
+954	Upcoming income
+955	coupons and dividends in the next {0} months
+956	Savings plans
+957	on savings plan day I'll remind you to record it: enter only the actual shares from your broker
+958	a purchase, a sale, a dividend or an unlisted asset
+959	Transaction type
+960	Sale
+961	Dividend or coupon
+962	BTPs and bonds
+963	Home, policy, other
+964	Savings plan
+965	Transaction history
+966	nothing is deleted: a wrong transaction is canceled
+967	Your net worth is saved
+968	only in this browser
+969	, on this device: it doesn't go to any server. Download a copy now and then so you don't lose it. Prices are end-of-day (Yahoo Finance), indicative, not real-time. It is not investment advice.
+970	Download the backup copy
+971	Restore from a copy
+972	Start from scratch
+973	The
+974	The analyses of the portfolio you have in the lab.
+975	No file · from your bank statement
+976	What your bank costs you
+977	Every year the bank must send you the
+978	costs and charges statement
+979	for the previous year (you'll find it in your online banking documents). Enter its figures here, in euro or in percent: see how much you really pay and how much it weighs over {0} and {1} years. They stay only in this browser.
+980	What's in the
+981	Every column,
+982	Confirm the data map to build it.
+983	How much can you
+984	Historical risk of the portfolio and of each asset, calculated on the confirmed data.
+985	Historical measures: they describe the past and don't predict future losses. VaR and CVaR at {0}% on period returns, with no normal-distribution assumption.
+986	How much could you
+987	Thousands of possible futures, built by resampling the returns in your file.
+988	empty = the portfolio's historical one
+989	When can you
+990	If the
+991	Real crises, relived with the data from your file. And the shocks you want to try.
+992	The portfolio
+993	The Markowitz efficient frontier on your data: the highest historical return for each level of risk.
+994	Did you beat the
+995	Your portfolio against the benchmark indices, over the same months and in the same currency.
+996	Sections
+997	Open Quanta, the AI analyst
+998	Ask
+999	Quanta, AI analyst
+1000	AI analyst
+1001	New chat
+1002	Send a photo to Quanta?
+1003	The photo goes to an external provider's AI (Google Gemini) only to be read: we don't save it. If it shows your name, address or account numbers and they're not needed, cover them first.
+1004	Got it, choose the photo
+1005	Question for Quanta
+1006	Talk to Quanta by voice
+1007	Quanta uses AI from external providers: it receives the results of the calculations, never the file, and photos only if you send them.
+1008	Details
+1009	Hide subtitles
+1010	Subtitles
+1011	Connecting…
+1012	Talk to Quanta like on the phone
+1013	During the call your voice goes to Google (Gemini Live), in real time, only to understand and answer you: we don't record the audio. At the end the text stays in the chat. You can interrupt Quanta whenever you want.
+1014	Start the call
+1015	Not now
+1016	Write to Quanta…

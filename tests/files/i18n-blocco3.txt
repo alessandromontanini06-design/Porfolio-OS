@@ -1,0 +1,339 @@
+678	Esempi
+679	Andamento
+680	Interpretazione
+681	Affidabilità
+682	Motivo
+683	Controllo qualità
+684	Cosa posso costruire
+685	con questi dati
+686	Costruisci il laboratorio
+687	Il tuo file non è stato letto bene? Segnalalo
+688	Cosa non va (facoltativo)
+689	Invia anche la struttura del file: nomi dei fogli e delle colonne,
+690	senza nessun valore
+691	Invia la segnalazione
+692	Serve a migliorare la lettura dei file. Nessun numero del tuo file viene inviato, né il nome del file.
+693	Scarico lo storico di mercato di {0} strumenti e ricostruisco il file…
+694	Cerco i simboli di borsa degli ISIN…
+695	Scarico tassi e inflazione ufficiali per il periodo del dataset…
+696	Inserisci il costo annuo di ogni strumento: per gli ETF lo leggo da solo, per i fondi è nel KID alla voce «Costi correnti».
+697	Xetra-Gold ETC (oro fisico) · DE{0}A{1}S{2}GB{3}
+698	Usa questi pesi nelle altre analisi
+699	La tua allocazione è coerente con te?
+700	Prima conferma la mappa
+701	Il laboratorio si costruisce dai dati che hai confermato: metriche, grafici, correlazioni, contesto macro e il tuo portafoglio.
+702	Schede del laboratorio
+703	Dato storico
+704	Clicca qualsiasi numero per vedere formula, dati e ipotesi.
+705	Presenta al cliente
+706	Scarica il report PDF
+707	Cosa mostra il grafico
+708	{0} € investiti
+709	I tuoi soldi
+710	Come sono andati gli
+711	: {0} € investiti all'inizio in ciascuno, senza versamenti, rendimenti composti periodo per periodo. Il tuo rendimento con i versamenti veri è nel riquadro «Il tuo rendimento reale», se il file contiene le transazioni.
+712	Contesto macro
+713	Ufficiale
+714	Mappa delle correlazioni
+715	Vista correlazioni
+716	Rete {0}D
+717	Matrice
+718	Trascina per ruotare · passa su un asset · clicca per la ricevuta
+719	si muovono insieme
+720	in direzioni opposte
+721	Più due asset sono correlati, più sono vicini e più il filo è luminoso. La sfera è grande quanto la volatilità.
+722	Metriche per asset
+723	composizione dei fondi · justETF
+724	Clienti, profili, adeguatezza e portafogli modello. Tutto resta in questo browser.
+725	Altri paesi sviluppati
+726	Azioni, Globale · MSCI World
+727	{0} · prudente
+728	Fuori dai dati
+729	uguale a prima
+730	non nel tuo file
+731	Carica un file
+732	L'analisi del rischio parte dai dati confermati: carica un file, conferma la mappa e costruisci il laboratorio.
+733	Distribuzione dei rendimenti
+734	Chi porta il rischio
+735	peso contro rischio
+736	Drawdown nel tempo
+737	distanza dal massimo precedente
+738	Scomposizione del rischio
+739	Rischio per asset
+740	Le simulazioni partono dai rendimenti storici confermati: carica un file, conferma la mappa e costruisci il laboratorio.
+741	Capitale iniziale (€)
+742	Versamento mensile (€)
+743	negativo = prelievo
+744	Anni
+745	Obiettivo (€)
+746	Inflazione annua (%)
+747	Costi annui (%)
+748	commissioni e TER
+749	Rendimento annuo ipotizzato (%)
+750	storico
+751	Metodo
+752	Metodo di simulazione
+753	A blocchi
+754	Percorsi simulati
+755	Numero di simulazioni
+756	Indipendenza finanziaria · FIRE
+757	Età, spesa, pensione e risparmi: la risposta sui rendimenti del tuo portafoglio.
+758	Il ventaglio dei futuri
+759	Valori nominali o reali
+760	Al netto dell'inflazione
+761	Dove finisci
+762	Percentili
+763	La tua età, quanto spendi, quanto risparmi: la risposta sui rendimenti veri del tuo portafoglio.
+764	Il calcolo usa i rendimenti storici del tuo portafoglio: carica un file o crea un portafoglio, poi conferma la mappa.
+765	I tuoi numeri
+766	Soldi
+767	Capitale investito oggi
+768	dal tuo portafoglio
+769	Pensione
+770	netta, in euro di oggi
+771	Sicurezza
+772	Probabilità che i soldi bastino
+773	dei futuri simulati in cui i soldi bastano fino alla fine
+774	Vuoi smettere prima?
+775	La tua vita finanziaria
+776	capitale in euro di oggi, per età
+777	Cosa ti avvicina di più
+778	età in cui puoi smettere
+779	I tipi di FIRE
+780	stessi futuri, scelte diverse
+781	La regola del {0}% sul tuo portafoglio
+782	prelievo annuo e probabilità che basti
+783	Gli stress test partono dai dati confermati: carica un file, conferma la mappa e costruisci il laboratorio.
+784	Le crisi a confronto
+785	solo quelle presenti nei dati
+786	Il tuo shock
+787	Scenari pronti
+788	Tutto −{0}%
+789	Crollo di {0}σ
+790	Ripeti la crisi peggiore
+791	Azzera
+792	Scrivi lo shock di uno o più asset. Con
+793	propaga
+794	attivo, gli asset lasciati vuoti si muovono come hanno fatto storicamente insieme a quelli colpiti.
+795	Propaga con le correlazioni storiche
+796	Capitale (€)
+797	La frontiera serve almeno due asset con dati confermati: carica un file, conferma la mappa e costruisci il laboratorio.
+798	Obiettivo
+799	Obiettivo dell'ottimizzazione
+800	Massimo Sharpe
+801	Minima volatilità
+802	Volatilità target
+803	Rendimento target
+804	Target (%)
+805	Peso minimo (%)
+806	Peso massimo (%)
+807	limite di concentrazione
+808	Vendite allo scoperto
+809	Rendimenti attesi prudenti
+810	Rischio contro rendimento
+811	dati storici annualizzati
+812	Prima e dopo
+813	Pesi a confronto
+814	Il confronto parte dai dati confermati: carica un file, conferma la mappa e costruisci il laboratorio.
+815	Indice
+816	Colonna del tuo file
+817	oppure
+818	Simbolo Alpha Vantage
+819	es. VT, IWDA.LON
+820	Carica
+821	Valuta del benchmark
+822	In euro (cambio BCE)
+823	Valuta originale
+824	Crescita di {0}
+825	Sopra o sotto il mercato
+826	Misure a confronto
+827	Il mercato nelle crisi
+828	archivio
+829	+ Nuovo portafoglio
+830	Da rivedere
+831	Interpretazione di Operazione
+832	Interpretazione di Strumento
+833	Interpretazione di Ticker
+834	Interpretazione di ISIN
+835	Interpretazione di Quantità
+836	Interpretazione di Prezzo
+837	Interpretazione di Importo
+838	Molte date si ripetono: il file potrebbe avere una riga per asset e per data (formato lungo). Questa versione legge un asset per colonna.
+839	{0} buchi nel calendario: mancano dei periodi rispetto alla frequenza mensile.
+840	Le date non erano in ordine cronologico: le ho ordinate.
+841	meno di {0} anni di storia: risultati poco affidabili
+842	nessuna crisi nei dati: solo shock ipotetici
+843	L'IA sta leggendo la struttura di {0} foglio: intanto vedi la lettura automatica
+844	Il server ha risposto con un errore ({0}).: resta la lettura automatica
+845	ISIN cercato su OpenFIGI: S&P {0}: IE{1}B{2}BMR{3} → CSPX.AMS
+846	ISIN cercato su OpenFIGI: Nasdaq {0}: IE{1}B{2}SZB{3} → CNDX.AMS
+847	Valute di quotazione: CSPX sconosciuta, CSNDX sconosciuta.
+848	Valuta non determinata per CSPX.AMS, CNDX.AMS: lasciata com'è, verifica il simbolo.
+849	Osservazioni
+850	Periodo
+851	gen {0} – ott {1}
+852	mensile
+853	Rivivi crisi vere con il tuo capitale e scopri la perdita che reggi davvero, misurata da come reagisci e non da un questionario.
+854	Fai il test · {0} minuti
+855	stessi mesi · {0} mesi
+856	Peso %
+857	Togli il portafoglio B
+858	+ Aggiungi C
+859	B a pesi uguali
+860	Se un portafoglio non somma a {0}% lo riproporziono. Per confrontare strumenti che non sono nel file usa «Crea il tuo portafoglio» in home.
+861	Crisi: Crollo COVID-{0}
+862	Crisi: Shock inflazione {0}
+863	Per passare da A a B
+864	Scarica la proposta in Excel
+865	Oggi (A)
+866	Con la proposta (B)
+867	Imposte stimate
+868	vendite {0} € · acquisti {1} €
+869	Importi sul valore di oggi ({0} €), senza nuovi versamenti. Le imposte sono una stima: sulle vendite si realizza la parte di guadagno latente in proporzione a quanto si vende, al {1}% o al {2}% per i titoli di Stato; non considera minusvalenze da compensare, commissioni e spread.
+870	Confronto su {0} mesi comuni (gen {1} – ott {2}): solo i mesi in cui hanno un prezzo tutti gli strumenti usati da almeno un portafoglio, così nessuno è avvantaggiato da una storia più lunga. Portafogli ribilanciati ogni mese ai pesi indicati, senza costi né tasse; in evidenza il valore migliore di ogni riga. Le crisi compaiono solo se cadono per intero nei mesi comuni. È il passato, non una previsione.
+871	Analisi del rischio
+872	VaR e CVaR storici, Sortino, contributo di ogni asset al rischio, concentrazioni.
+873	Monte Carlo
+874	Migliaia di percorsi ricampionati dai tuoi rendimenti, con versamenti e prelievi.
+875	Replica storica dove i dati lo permettono, shock ipotetici dichiarati negli altri casi.
+876	Markowitz sui tuoi dati: massimo Sharpe, minima volatilità, risk parity, target di rischio o rendimento, con vincoli di peso.
+877	{0} asset da combinare
+878	Confronto con S&P {0}, Nasdaq-{1}, MSCI World, Euro Stoxx {2} o un indice tuo: beta, alpha, tracking error, crisi del mercato.
+879	storici mensili via ETF, convertiti in euro con il cambio BCE
+880	S&P {0} · IE{1}B{2}BMR{3}
+881	senza costo: CSPX, CSNDX
+882	Tasso privo di rischio e inflazione
+883	Fonte del tasso privo di rischio
+884	BCE · Euribor {0} mesi
+885	Nessuno ({0}%)
+886	Tasso privo di rischio medio
+887	Euribor {0} mesi (media mensile)
+888	Inflazione media annua
+889	HICP area euro, indice generale
+890	BCE · data-api.ecb.europa.eu
+891	{0} mesi · {1}-{2} – {3}-{4}
+892	Sharpe con tasso privo di rischio medio {0}% (Euribor {1} mesi (media mensile)). Rendimento reale al netto dell'inflazione media {2}%.
+893	Portfolio
+894	I tuoi
+895	finalmente chiari.
+896	Chiamata con Quanta
+897	Valore (€)
+898	Classe
+899	Privacy
+900	Azionario mondo
+901	Core e satelliti
+902	Francia
+903	Germania
+904	Italia
+905	Obbligazioni, EUR, Globale, Aggregate, Tutte le scadenze, Sociali/Ambientali · Bloomberg MSCI Euro Aggregate and Green Bond ESG SRI
+906	ETF e fondi
+907	Azioni, ETC e altri titoli
+908	Titoli di Stato
+909	Cedola
+910	si sblocca costruendo il laboratorio
+911	Clienti
+912	moderato
+913	bilanciato
+914	{0} · dinamico
+915	Quando
+916	Crollo COVID-{0}
+917	Salva nell'archivio
+918	Tieni questo portafoglio nel tuo patrimonio
+919	Lo ritrovi ogni giorno aggiornato, senza ricaricare il file: {0} movimenti.
+920	Metti nel mio patrimonio
+921	Peso di CSPX nel portafoglio A
+922	Peso di CSPX nel portafoglio B
+923	Peso di CSNDX nel portafoglio A
+924	Peso di CSNDX nel portafoglio B
+925	Nome
+926	Quanta Portfolio, torna alla home
+927	Spazio di lavoro
+928	Il mio portafoglio
+929	Mio
+930	Prove e confronti
+931	Prove
+932	Calcoli nel browser
+933	valore, guadagno, posizioni
+934	Aggiungi un'operazione
+935	Excel o export della banca e del broker
+936	Apri l'archivio dei portafogli salvati
+937	le analisi salvate, i clienti, le revisioni
+938	scarica il patrimonio in un file
+939	Privacy e impostazioni
+940	cosa resta in questo browser
+941	Il mio
+942	Raggruppa il grafico
+943	Importa da un file
+944	l'Excel o l'export del broker
+945	Analizza nel laboratorio
+946	rischio, crisi, simulazioni, frontiera
+947	Scarica in Excel
+948	posizioni, operazioni, tasse
+949	Se arriva una crisi
+950	I tuoi obiettivi
+951	Le tue posizioni
+952	Le tue tasse
+953	stima: le imposte vere le calcola la banca o il commercialista
+954	Proventi in arrivo
+955	cedole e dividendi dei prossimi {0} mesi
+956	Piani di accumulo
+957	il giorno del PAC ti ricordo di registrarlo: scrivi solo le quote vere del broker
+958	un acquisto, una vendita, un dividendo o un bene senza quotazione
+959	Tipo di operazione
+960	Vendita
+961	Dividendo o cedola
+962	BTP e obbligazioni
+963	Casa, polizza, altro
+964	Piano di accumulo
+965	Storico delle operazioni
+966	niente si cancella: un'operazione sbagliata si annulla
+967	Il patrimonio è salvato
+968	solo in questo browser
+969	, su questo dispositivo: non va su nessun server. Scarica ogni tanto una copia per non perderlo. I prezzi sono di fine giornata (Yahoo Finance), indicativi, non in tempo reale. Non è un consiglio di investimento.
+970	Scarica la copia di sicurezza
+971	Ripristina da una copia
+972	Ricomincia da zero
+973	Gli
+974	Le analisi del portafoglio che hai nel laboratorio.
+975	Senza file · dal rendiconto della banca
+976	Quanto ti costa la tua banca
+977	Ogni anno la banca deve mandarti il
+978	rendiconto costi e oneri
+979	dell'anno prima (lo trovi nei documenti dell'home banking). Scrivi qui i suoi numeri, in euro o in percentuale: vedi quanto paghi davvero e quanto pesa in {0} e {1} anni. Restano solo in questo browser.
+980	Cosa c'è nel
+981	Ogni colonna,
+982	Conferma la mappa dei dati per costruirlo.
+983	Quanto puoi
+984	Rischio storico del portafoglio e di ogni asset, calcolato sui dati confermati.
+985	Misure storiche: descrivono il passato e non prevedono le perdite future. VaR e CVaR al {0}% sui rendimenti di periodo, senza ipotesi di distribuzione normale.
+986	Quanto potresti
+987	Migliaia di futuri possibili, costruiti ricampionando i rendimenti del tuo file.
+988	vuoto = quello storico del portafoglio
+989	Quando puoi
+990	Se arriva la
+991	Le crisi vere, rivissute con i dati del tuo file. E gli shock che vuoi provare tu.
+992	Il portafoglio
+993	La frontiera efficiente di Markowitz sui tuoi dati: il massimo rendimento storico per ogni livello di rischio.
+994	Hai battuto il
+995	Il tuo portafoglio contro gli indici di riferimento, sugli stessi mesi e nella stessa valuta.
+996	Sezioni
+997	Apri Quanta, l'analista IA
+998	Chiedi a
+999	Quanta, analista IA
+1000	Analista IA
+1001	Nuova chat
+1002	Mandare una foto a Quanta?
+1003	La foto va all'IA di un fornitore esterno (Google Gemini) solo per essere letta: non la salviamo. Se ci sono nome, indirizzo o numeri di conto e non servono, coprili prima.
+1004	Ho capito, scegli la foto
+1005	Domanda per Quanta
+1006	Parla con Quanta a voce
+1007	Quanta usa IA di fornitori esterni: riceve i risultati dei calcoli, mai il file, e le foto solo se le mandi tu.
+1008	Dettagli
+1009	Nascondi i sottotitoli
+1010	Sottotitoli
+1011	Mi collego…
+1012	Parli con Quanta come al telefono
+1013	Durante la chiamata la tua voce va a Google (Gemini Live), in tempo reale, solo per capirti e risponderti: non registriamo l'audio. Alla fine resta il testo nella chat. Puoi interrompere Quanta quando vuoi.
+1014	Inizia la chiamata
+1015	Non ora
+1016	Scrivi a Quanta…

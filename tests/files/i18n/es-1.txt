@@ -1,0 +1,332 @@
+0	Quanta Portfolio · Tus inversiones, por fin claras
+1	Fecha
+2	MAX DD
+3	Ignorar
+4	Precio / valor
+5	Rentabilidad (decimal)
+6	Rentabilidad (en %)
+7	Alta
+8	automática
+10	Compra
+11	precio
+12	Instrumento
+14	listo · sube un archivo
+15	Lectura con IA
+16	Claude · propuestas por confirmar
+18	{0} observaciones mensuales
+19	precios de mercado
+20	{0} ACTIVOS · {1} OBSERVACIONES MENSUALES
+21	{0} VALORES QUE FALTAN · NINGUNO ESTIMADO
+22	Mapa
+23	{0} años
+24	Ganancia
+25	{0} meses
+26	Benchmark
+27	Frecuencia mensual · intervalo mediano {0} días
+28	análisis en {0} ms
+29	ignorar
+30	Escaneo
+31	Total
+32	Hasta el {0}%
+33	Prueba de estrés
+34	Encabezados en la fila {0}
+35	Control de calidad: {0} errores, {1} avisos
+36	Los análisis usarán los precios de mercado de cada instrumento, no los valores de tu Excel.
+37	Riesgo
+38	Acciones
+39	Herramientas
+40	Vista previa de las primeras filas de la hoja con las columnas reconocidas
+41	fecha
+42	He encontrado
+43	{0} activos
+44	justETF
+45	oct {0}
+46	En {0} años
+47	Simulaciones
+48	Costes
+49	Valor
+50	Sección anterior y siguiente
+51	Ampliar el gráfico
+52	Ampliar
+53	col. A · {0} valores
+54	El {0}% de los valores es una fecha válida
+55	col. B · {0} valores
+56	col. C · {0} valores
+57	{0} errores · {1} avisos · {2} notas
+58	Estadísticas descriptivas y rentabilidades anualizadas
+59	{0} observaciones
+60	Volatilidad, Sharpe, Sortino y drawdown
+61	Matriz de correlación
+62	Comparación de asignaciones y reequilibrio
+63	Monte Carlo con remuestreo histórico
+64	{0} años de historia para remuestrear
+65	Prueba de estrés: crisis históricas
+66	Antes de construir el laboratorio
+67	No hace falta ninguna comprobación: lectura confirmada y datos sin anomalías.
+68	Vista previa: qué entra en el laboratorio ({0} series, {1} fechas, frecuencia mensual)
+69	feb {0}
+70	mar {0}
+71	abr {0}
+72	Patrimonio
+73	{0} columnas analizadas · todas interpretadas
+74	Frontera
+75	sep {0}
+76	Análisis del archivo
+77	Resultados
+78	Mi patrimonio →
+79	de historia.
+80	tu
+81	ago {0}
+82	Todavía vacío
+83	Ir al mapa
+84	USD · acumulación
+85	De {0} a {1} años
+86	Independencia
+87	Inicio
+88	Sin clasificar
+89	Interpretación de Fecha
+90	en los datos: caída COVID-{0}, choque de inflación {1}
+91	simulación
+92	Acc. Global (EUR)
+93	Acc. Emergentes
+94	Bonos Euro
+95	Oro - rent. mensual
+96	Rentabilidad del mes %
+97	De {0} a {1} meses
+98	Del {0} al {1}%
+99	, de ene {0} a oct {1}:
+100	Rentabilidades por periodo calculadas por el motor tras tus elecciones.
+101	col. D · {0} valores
+102	col. E · {0} valores
+103	Haz clic en un número para ver el recibo
+104	cargando…
+105	buscando…
+106	Primero construye el laboratorio
+107	dinero aportado
+108	Siempre positivos (de {0} a {1}) y varían poco de un periodo a otro (mediana {2}%): precios o valores
+109	Laboratorio
+110	Texto: notas o etiquetas, no una serie numérica
+111	{0} activos, {1} pares
+112	carteras combinando {0} activos
+113	valor de tu cartera
+114	Portfolio Intelligence
+115	Métricas, riesgo, contribuciones, benchmark y tu rentabilidad real.
+116	Simulation Lab
+117	Monte Carlo con aportaciones, retiradas, inflación y probabilidad de objetivo.
+118	Crisis Room
+119	Puntocom, {0}, deuda del euro, COVID, inflación {1} y tus propios choques.
+120	Quant Lab
+121	Frontera eficiente, optimizadores, VaR con tres métodos, pruebas estadísticas.
+122	AI Research
+123	Quanta: haz preguntas, ella pide los números al motor y te los explica.
+124	abrir el chat →
+125	Dónde estás invertido
+126	Patrimonio total
+127	Volatilidad
+128	Sharpe
+129	Tu perfil
+130	Comparar asignaciones
+131	La IA relee el archivo: corrige columnas dudosas y errores de escritura, o lo reconstruye quedándose solo con los activos, con sus precios y su evolución. Tú confirmas con un clic.
+132	Reconstruir el archivo con IA
+133	Corregir solo los errores
+134	Activar la IA cuando suba un archivo
+135	Aportaciones, cantidades o ganancias: no son precios ni rentabilidades de mercado
+136	hace falta al menos un segundo activo
+137	Cancelar
+138	Pesos de la cartera
+139	Hipótesis y límites
+140	léelos antes de los números
+141	Disponible
+142	Abrir el análisis →
+143	Listo:
+144	{0} series
+145	· {0} fechas · {1} avisos
+146	Peso
+147	+{0} € hoy · +{1}%
+148	Fecha ref.
+149	Flujos netos (mill.)
+150	Notas
+151	reequilibrio anual
+152	Valor de la cartera
+153	Aportado acumulado
+154	Apariencia
+155	Pesos iguales
+156	Pasos del laboratorio
+157	Crea tu patrimonio
+158	archivo
+159	col. F · {0} valores
+160	col. G · {0} valores
+161	Mi patrimonio
+162	Operación
+163	Precio
+164	Otros, sin detallar
+165	Cuánto cuesta la cartera
+166	TER y costes anuales
+167	Coste anual
+168	TER medio ponderado
+169	Este año
+170	pagados incluso cuando el mercado baja
+171	capital de menos, efecto compuesto
+172	Con instrumentos al
+173	TER de comparación en porcentaje
+174	Coste anual (TER)
+175	Al año
+176	Diferencia con {0}%
+177	Otros costes anuales sobre el patrimonio
+178	gestión o asesoramiento del banco, custodia de valores
+179	«En {0} años» es el capital de menos por culpa de los costes, sin nuevas aportaciones, si los instrumentos rindieran un {1}% anual bruto: V · [({2} + {3}%)ⁿ − ({4} + {5}% − coste)ⁿ]; también cuenta la rentabilidad perdida sobre los costes pagados. «Diferencia» compara cada instrumento con uno que cuesta un {6}% anual y rinde lo mismo en bruto. No incluye comisiones de entrada y salida, spreads, impuestos ni timbres. El TER ya está descontado de los precios, así que las rentabilidades y el riesgo del sitio lo incluyen. Para los fondos del banco el coste está en el KID, en «Costes corrientes» o «Comisiones de gestión y otros costes»: los valores que introduces se quedan en este navegador.
+180	Ir a
+181	Rentabilidad real
+182	Crecimiento
+183	Cartera y reequilibrio
+184	Correlaciones
+185	Métricas
+186	inversiones
+187	Fiabilidad: Media · lectura no verificada por una segunda fuente
+188	RENTABILIDAD DEL MES %
+189	Cliente
+190	Por categoría
+191	Por instrumento
+192	Ejemplo · cartera de demostración
+193	Concentración
+194	Max drawdown
+195	años
+196	Precio de mercado de CSPX.AMS (simulación), cierres ajustados por dividendos y splits, en euros, {0} meses desde {1}-{2}
+197	Fiabilidad: Alta · precios de mercado descargados para cada instrumento
+198	No se han detectado problemas: fechas ordenadas, ningún valor ausente, ninguna rentabilidad anómala.
+199	Peso actual
+200	Cartera
+201	¡Hola! Soy
+202	Lee la foto del extracto del banco
+203	Llama a Quanta: háblale como por teléfono
+204	Ticker
+205	Cantidad
+206	Independencia financiera
+207	laboratorio
+208	Bonos
+209	Sube tu Excel
+210	Coste anual medio (TER)
+211	Fuera del euro
+212	Mercados emergentes
+213	de la cartera
+214	Cobertura de los datos
+215	Vista de la composición
+216	Áreas y países
+217	Divisas
+218	Clases y estilo
+219	Sectores
+220	Áreas
+221	Desarrollados y emergentes
+222	Países
+223	Las cuotas «Otros» de cada fondo se asignan a un área solo cuando el fondo la declara: los «Otros» de un ETF de mercados emergentes van a Emergentes, los de un ETF MSCI World a otros países desarrollados. El resto queda «sin detallar».
+224	Exposición
+225	Divisa · tipo
+226	Activo
+227	, tu analista con IA. Puedes preguntarme ya cómo funciona el sitio o qué significa un término (TIR, volatilidad, drawdown…). Para los números de tu
+228	cartera sube el archivo o abre el ejemplo y construye el laboratorio.
+229	¿Cómo funciona Quanta Portfolio?
+230	¿Qué es la TIR?
+231	Aviso
+232	Resumen de la cartera
+233	hoja «»
+234	De los {0} movimientos del archivo resultan {1} posiciones abiertas, valoradas al último precio pagado: unos {2} €. Con el histórico de precios de mercado los análisis usan muchos años de datos, aunque hayas empezado hace poco.
+235	Símbolo para los precios
+236	Peso objetivo
+237	El símbolo lo propone la IA (formato TICKER.BOLSA: .LON Londres, .DEX Xetra). Corrígelo si hace falta: el histórico viene de Yahoo Finance (Alpha Vantage de reserva) y se convierte a euros con el tipo de cambio del BCE de fin de mes.
+238	Descargar el histórico y reconstruir el archivo
+239	Cerrar
+240	ACC. GLOBAL (EUR)
+241	ACC. EMERGENTES
+242	BONOS EURO
+243	ORO - RENT. MENSUAL
+244	Oro físico
+245	{0} columnas analizadas · {1} por confirmar
+246	Menos de {0} años
+247	Más de {0} años
+248	Pesos actuales
+249	explicada
+250	Rent. anual
+251	Rent. real
+252	Estudio
+253	ejemplo
+256	{0} € nominales
+257	Precio hoy
+258	Rentabilidad al vencimiento
+259	{0}% bruto
+260	{0} mar {1}
+261	Ajustes
+262	rent.
+263	Informe de cartera · extracto interno
+264	Antes de seguir, dime cómo interpretar una columna: las encontrarás resaltadas en el mapa.
+265	Elige…
+266	Por confirmar
+267	{0} columna por confirmar
+268	antes del laboratorio.
+269	Muéstrame cuál
+270	Qué
+271	en el
+272	Cuenta de depósito
+274	Perfil del cliente · {0} de {1}
+275	El perfil de riesgo del cliente
+276	Ocho preguntas basadas en el cuestionario MiFID: conocimientos y experiencia, objetivos, tolerancia y capacidad para soportar pérdidas. Para rellenar con el cliente.
+277	Nombre y apellidos
+278	{0}. ¿Dentro de cuánto tiempo podría necesitar este dinero?
+279	{0}. ¿Cuál es el objetivo principal?
+280	Proteger el capital
+281	Una renta regular
+282	Crecimiento con oscilaciones contenidas
+283	Máximo crecimiento a largo plazo
+284	{0}. ¿Cuánto podría perder en un año sin cambiar de estrategia?
+285	Más del {0}%
+286	{0}. Si la cartera perdiera un {1}% en pocos meses, ¿qué haría?
+287	Vendo todo
+288	Vendo una parte
+289	Invierto más
+290	{0}. ¿En qué instrumentos ha invertido ya?
+291	Solo cuentas y deuda pública
+292	También fondos y bonos
+293	También acciones y ETF
+294	También apalancamiento, derivados o cripto
+295	{0}. ¿Cómo valora su conocimiento de los mercados financieros?
+296	Básico
+297	Aceptable
+298	Bueno
+299	Profesional
+300	{0}. Fuera de esta cartera, ¿cuántos meses de gastos tiene ahorrados?
+301	Menos de {0} meses
+302	Más de un año
+303	{0}. ¿Qué parte de su patrimonio es esta cartera?
+304	Más del {0}%
+305	Menos del {0}%
+306	Guardar el perfil
+307	La puntuación pondera en un {0}% la tolerancia al riesgo (objetivo, pérdida aceptada, reacción a una caída) y en un {1}% la capacidad de soportarlo (horizonte, reserva, peso sobre el patrimonio). Un horizonte corto o una pérdida aceptada baja ponen un tope. Herramienta de apoyo: la valoración sigue siendo del asesor.
+309	Leído «PAC_due_fogli_righe_vuote · ricostruito» · {0} hoja
+310	Valor hoy
+311	Parte de la ganancia
+312	La cartera cuesta
+313	al año: unos
+314	de capital de menos.
+315	Norteamérica
+316	Europa
+317	Desarrollados
+318	Estados Unidos
+319	Acciones, Estados Unidos · S&P {0}®
+320	Composición look-through: peso del país = Σ peso del fondo × cuota del país en el fondo. Fuente: justETF, fichas leídas el {0}/{1}/{2}.
+321	Importe neto cobrado (€)
+322	← Herramientas
+323	Histórico
+324	Importe
+325	Nasdaq {0}
+326	añade lo que tienes: lo encontrarás aquí cada día, actualizado
+327	col. H · {0} valores
+328	Tu rentabilidad real
+329	aportaciones reales
+330	Rentabilidad anual (TIR)
+331	tiene en cuenta cuándo aportaste cada euro
+332	Valor estimado hoy
+333	a oct {0}
+334	Aportado
+335	+{0}% sobre lo aportado
+336	Después de impuestos
+337	TIR si lo vendieras todo hoy: impuestos estimados {0} €, te quedarían {1} €
+338	Rentabilidad ponderada en el tiempo

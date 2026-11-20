@@ -1,0 +1,331 @@
+0	Quanta Portfolio · Your investments, finally clear
+1	Date
+2	MAX DD
+3	Ignore
+4	Price / value
+5	Return (decimal)
+6	Return (in %)
+7	High
+8	automatic
+10	Buy
+11	price
+12	Instrument
+14	ready · upload a file
+15	AI reading
+16	Claude · suggestions to confirm
+18	{0} monthly observations
+19	market prices
+20	{0} ASSETS · {1} MONTHLY OBSERVATIONS
+21	{0} MISSING VALUES · NONE ESTIMATED
+22	Map
+23	{0} years
+24	Gain
+25	{0} months
+26	Benchmark
+27	Monthly frequency · median interval {0} days
+28	analyzed in {0} ms
+29	ignore
+30	Scan
+31	Total
+32	Up to {0}%
+33	Stress test
+34	Headers in row {0}
+35	Quality check: {0} errors, {1} warnings
+36	The analysis will use the market prices of each instrument, not the values in your Excel file.
+37	Risk
+38	Stocks
+39	Tools
+40	Preview of the first rows of the sheet with the recognized columns
+41	date
+42	I found
+43	{0} assets
+44	justETF
+45	Oct {0}
+46	In {0} years
+47	Simulations
+48	Costs
+49	Value
+50	Previous and next section
+51	Enlarge the chart
+52	Enlarge
+53	col. A · {0} values
+54	{0}% of the values are valid dates
+55	col. B · {0} values
+56	col. C · {0} values
+57	{0} errors · {1} warnings · {2} notes
+58	Descriptive statistics and annualized returns
+59	{0} observations
+60	Volatility, Sharpe, Sortino and drawdown
+61	Correlation matrix
+62	Allocation comparison and rebalancing
+63	Monte Carlo with historical resampling
+64	{0} years of history to resample
+65	Stress test: historical crises
+66	Before building the lab
+67	No checks needed: reading confirmed and data without anomalies.
+68	Preview: what goes into the lab ({0} series, {1} dates, monthly frequency)
+69	Feb {0}
+70	Mar {0}
+71	Apr {0}
+72	Net worth
+73	{0} columns analyzed · all interpreted
+74	Frontier
+75	Sep {0}
+76	File analysis
+77	Results
+78	My net worth →
+79	of history.
+80	your
+81	Aug {0}
+82	Still empty
+83	Go to the map
+84	USD · accumulating
+85	From {0} to {1} years
+86	Independence
+87	Home
+88	Unclassified
+89	Interpretation of Date
+90	in the data: COVID-{0} crash, inflation shock {1}
+91	simulation
+92	Global eq. (EUR)
+93	Emerging eq.
+94	Euro bonds
+95	Gold - monthly return
+96	Monthly return %
+97	From {0} to {1} months
+98	From {0} to {1}%
+99	, from Jan {0} to Oct {1}:
+100	Returns per period calculated by the engine after your choices.
+101	col. D · {0} values
+102	col. E · {0} values
+103	Click a number for the receipt
+104	loading…
+105	searching…
+106	Build the lab first
+107	money invested
+108	Always positive (from {0} to {1}) and changing little from one period to the next (median {2}%): prices or values
+109	Lab
+110	Text: notes or labels, not a numeric series
+111	{0} assets, {1} pairs
+112	portfolios combining {0} assets
+113	value of your portfolio
+114	Portfolio Intelligence
+115	Metrics, risk, contributions, benchmark and your real return.
+116	Simulation Lab
+117	Monte Carlo with contributions, withdrawals, inflation and goal probability.
+118	Crisis Room
+119	Dot-com, {0}, euro debt, COVID, inflation {1} and your own shocks.
+120	Quant Lab
+121	Efficient frontier, optimizers, three-method VaR, statistical tests.
+122	AI Research
+123	Quanta: ask questions, she gets the numbers from the engine and explains them.
+124	open the chat →
+125	Where you are invested
+126	Total net worth
+127	Volatility
+128	Sharpe
+129	Your profile
+130	Compare allocations
+131	The AI rereads the file: it fixes doubtful columns and typos, or rebuilds it keeping only the assets, with their prices and performance. You confirm with one click.
+132	Rebuild the file with AI
+133	Fix only the errors
+134	Start the AI when I upload a file
+135	Contributions, quantities or gains: they are not market prices or returns
+136	at least a second asset is needed
+137	Cancel
+138	Portfolio weights
+139	Assumptions and limits
+140	read them before the numbers
+141	Available
+142	Open the analysis →
+143	Ready:
+144	{0} series
+145	· {0} dates · {1} warnings
+146	Weight
+147	+{0} € today · +{1}%
+148	Ref. date
+149	Net flows (mln)
+150	Notes
+151	annual rebalancing
+152	Portfolio value
+153	Cumulative invested
+154	Appearance
+155	Equal weights
+156	Lab steps
+157	Create your net worth
+158	file
+159	col. F · {0} values
+160	col. G · {0} values
+161	My net worth
+162	Transaction
+163	Price
+164	Others, not detailed
+165	What the portfolio costs
+166	TER and annual costs
+167	Annual cost
+168	Weighted average TER
+169	This year
+170	paid even when the market falls
+171	less capital, compounding effect
+172	With instruments at
+173	Comparison TER in percent
+174	Annual cost (TER)
+175	Per year
+176	Difference vs {0}%
+177	Other annual costs on assets
+178	bank management or advisory fees, custody
+179	«In {0} years» is the capital lost to costs, with no new contributions, if the instruments returned {1}% a year gross: V · [({2} + {3}%)ⁿ − ({4} + {5}% − cost)ⁿ]; it also counts the return lost on the costs paid. «Difference» compares each instrument with one costing {6}% a year and returning the same gross. It does not include entry and exit fees, spreads, stamp duty and taxes. The TER is already deducted from prices, so the site's returns and risk include it. For bank funds the cost is in the KID, under «Ongoing costs» or «Management fees and other costs»: the values you enter stay in this browser.
+180	Go to
+181	Real return
+182	Growth
+183	Portfolio and rebalancing
+184	Correlations
+185	Metrics
+186	investments
+187	Reliability: Medium · reading not verified by a second source
+188	MONTHLY RETURN %
+189	Client
+190	By category
+191	By instrument
+192	Example · demo portfolio
+193	Concentration
+194	Max drawdown
+195	years
+196	Market price of CSPX.AMS (simulation), closes adjusted for dividends and splits, in euro, {0} months from {1}-{2}
+197	Reliability: High · market prices downloaded for each instrument
+198	No problems found: dates in order, no missing values, no abnormal returns.
+199	Current weight
+200	Portfolio
+201	Hi! I'm
+202	Read the photo of your bank statement
+203	Call Quanta: talk to her like on the phone
+204	Ticker
+205	Quantity
+206	Financial independence
+207	lab
+208	Bonds
+209	Upload your Excel
+210	Average annual cost (TER)
+211	Outside the euro
+212	Emerging markets
+213	of the portfolio
+214	Data coverage
+215	Composition view
+216	Regions and countries
+217	Currencies
+218	Classes and style
+219	Sectors
+220	Regions
+221	Developed and emerging
+222	Countries
+223	Each fund's «Other» shares are assigned to a region only when the fund declares it: the «Other» of an emerging-markets ETF goes to Emerging, that of an MSCI World ETF to other developed countries. The rest stays «not detailed».
+224	Exposure
+225	Currency · type
+226	Asset
+227	, your AI analyst. You can ask me right away how the site works or what a term means (IRR, volatility, drawdown…). For the numbers of your
+228	portfolio, upload the file or open the example and build the lab.
+229	How does Quanta Portfolio work?
+230	What is the IRR?
+231	Warning
+232	Portfolio summary
+233	sheet «»
+234	The {0} transactions in the file give {1} open positions, valued at the last price paid: about {2} €. With the market price history, the analysis uses many years of data, even if you started recently.
+235	Symbol for prices
+236	Target weight
+237	The symbol is suggested by the AI (format TICKER.EXCHANGE: .LON London, .DEX Xetra). Correct it if needed: the history comes from Yahoo Finance (Alpha Vantage as backup) and is converted into euro at the ECB month-end rate.
+238	Download the history and rebuild the file
+239	Close
+240	GLOBAL EQ. (EUR)
+241	EMERGING EQ.
+242	EURO BONDS
+243	GOLD - MONTHLY RETURN
+244	Physical gold
+245	{0} columns analyzed · {1} to confirm
+246	Less than {0} years
+247	Over {0} years
+248	Current weights
+249	explained
+250	Ann. return
+251	Real return
+252	Studio
+253	example
+256	{0} € face value
+257	Price today
+258	Yield to maturity
+259	{0}% gross
+260	{0} Mar {1}
+261	Settings
+262	ret.
+263	Portfolio report · internal extract
+264	Before going on, tell me how to interpret a column: you'll find them highlighted on the map.
+265	Choose…
+266	To confirm
+267	{0} column to confirm
+268	before the lab.
+269	Show me which
+270	What
+271	in the
+272	Savings account
+274	Client profile · {0} of {1}
+275	The client's risk profile
+276	Eight questions based on the MiFID questionnaire: knowledge and experience, goals, tolerance and capacity to bear losses. To be filled in with the client.
+277	First and last name
+278	{0}. When might this money be needed?
+279	{0}. What is the main goal?
+280	Protect the capital
+281	A regular income
+282	Growth with limited swings
+283	Maximum long-term growth
+284	{0}. How much could they lose in a year without changing strategy?
+285	Over {0}%
+286	{0}. If the portfolio lost {1}% in a few months, what would they do?
+287	Sell everything
+288	Sell part of it
+289	Invest more
+290	{0}. Which instruments have they already invested in?
+291	Only accounts and government bonds
+292	Also funds and bonds
+293	Also stocks and ETFs
+294	Also leverage, derivatives or crypto
+295	{0}. How do they rate their knowledge of financial markets?
+296	Basic
+297	Fair
+298	Good
+299	Professional
+300	{0}. Outside this portfolio, how many months of expenses do they have set aside?
+301	Less than {0} months
+302	More than a year
+303	{0}. How much of their wealth is this portfolio?
+304	More than {0}%
+305	Less than {0}%
+306	Save the profile
+307	The score weighs risk tolerance (goal, accepted loss, reaction to a fall) at {0}% and the capacity to bear it (horizon, reserve, share of wealth) at {1}%. A short horizon or a low accepted loss sets a cap. A support tool: the assessment remains the advisor's.
+310	Value today
+311	Share of gain
+312	The portfolio costs
+313	a year: about
+314	less capital.
+315	North America
+316	Europe
+317	Developed
+318	United States
+319	Stocks, United States · S&P {0}®
+320	Look-through composition: country weight = Σ fund weight × country share in the fund. Source: justETF, factsheets read on {0}/{1}/{2}.
+321	Net amount received (€)
+322	← Tools
+323	History
+324	Amount
+325	Nasdaq {0}
+326	add what you own: you'll find it here every day, updated
+327	col. H · {0} values
+328	Your real return
+329	actual contributions
+330	Annual return (IRR)
+331	accounts for when you invested each euro
+332	Estimated value today
+333	as of Oct {0}
+334	Invested
+335	+{0}% on invested
+336	After taxes
+337	IRR if you sold everything today: estimated taxes {0} €, you would keep {1} €
+338	Time-weighted return

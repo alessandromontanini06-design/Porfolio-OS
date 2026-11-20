@@ -25,7 +25,8 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<script>/* lingua scelta (js/ui/lingua.js): la pagina resta nascosta finché il dizionario non è arrivato, al massimo 2,5 s */(function(){try{var l=localStorage.getItem("pos-lingua-v1");if(l==="en"||l==="es"||l==="fr"){document.documentElement.classList.add("i18n-wait");document.documentElement.lang=l}}catch(e){}})()</script>
+<style>.i18n-wait body{visibility:hidden}:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Quanta Portfolio · I tuoi investimenti finalmente chiari</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,6 +38,7 @@
 <link rel="stylesheet" href="/css/v2.css">
 <!-- tutti i moduli del sito insieme, invece che uno dopo l'altro man mano che il browser trova gli import (sul telefono fa la differenza) -->
 <link rel="modulepreload" href="/js/app.js">
+<link rel="modulepreload" href="/js/ui/lingua.js">
 <link rel="modulepreload" href="/js/engine.js">
 <link rel="modulepreload" href="/js/ui/analisi.js">
 <link rel="modulepreload" href="/js/ui/tema.js">
@@ -66,7 +68,7 @@
 <div class="cur" id="cur" aria-hidden="true"><div class="r"></div><div class="d"></div></div>
 
 <header class="topbar">
-  <button type="button" class="brand" data-go="home" aria-label="Quanta Portfolio, torna alla home"><span class="mk" aria-hidden="true"><svg viewBox="0 0 100 100" fill="none"><path d="M6.25 66.21A46 13 -18 0 1 93.75 37.79" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="52" r="27" fill="#C9F24A"/><path d="M93.75 37.79A46 13 -18 0 1 6.25 66.21" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/></svg></span><span class="bw"><b class="bw1">Quanta</b> <span class="bw2">Portfolio</span></span></button>
+  <button type="button" class="brand" data-go="home" aria-label="Quanta Portfolio, torna alla home"><span class="mk" aria-hidden="true"><svg viewBox="0 0 100 100" fill="none"><path d="M6.25 66.21A46 13 -18 0 1 93.75 37.79" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="52" r="27" fill="#C9F24A"/><path d="M93.75 37.79A46 13 -18 0 1 6.25 66.21" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/></svg></span><span class="bw" translate="no"><b class="bw1">Quanta</b> <span class="bw2">Portfolio</span></span></button>
   <div class="status">
     <span class="space-sw" id="spaceSw" role="tablist" aria-label="Spazio di lavoro" hidden><button type="button" data-space="real" title="Il mio portafoglio">Mio</button><button type="button" data-space="sim" title="Prove e confronti">Prove</button></span><span class="chip live"><i></i>Calcoli nel browser</span><span class="chip" id="sceneChip">Home</span>
     <div class="mnu" id="mnu">

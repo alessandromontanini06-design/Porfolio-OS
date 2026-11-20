@@ -1,0 +1,339 @@
+1356	XAIX · Mondo · Intelligenza artificiale · IE{0}BGV{1}VN{2}
+1357	WTAI · Mondo · Intelligenza artificiale · IE{0}BDVPNG{1}
+1358	RBOT · Mondo · Robotica · IE{0}BYZK{1}
+1359	ISPY · Mondo · Sicurezza informatica · IE{0}BYPLS{1}
+1360	ECAR · Mondo · Auto elettriche · IE{0}BGL{1}Z{2}
+1361	DFNS · Mondo · Difesa · IE{0}YYE{1}WK{2}
+1362	IQQH · Mondo · Energia pulita · IE{0}B{1}XNHC{2}
+1363	IH{0}O · Mondo · Acqua · IE{1}B{2}TXK{3}
+1364	HEAL · Mondo · Salute · IE{0}BYZK{1}
+1365	CSSPX · USA · Generale · IE{0}B{1}BMR{2}
+1366	VUAA · USA · Generale · IE{0}BFMXXD{1}
+1367	VUSA · USA · Generale · IE{0}B{1}XXRP{2}
+1368	Settore: tutti
+1369	Paese: tutti
+1370	Portafoglio con pesi attuali, ribilanciato ogni periodo, su {0} mesi di dati confermati.
+1371	la perdita in un mese superata solo {0} volta su {1}
+1372	la perdita media in quei casi peggiori
+1373	rendimento per unità di rischio al ribasso
+1374	sotto il massimo, poi recuperato
+1375	rendimenti mensili · {0} osservazioni
+1376	In rosso i mesi peggiori: {0}, il {1}% del totale. Asimmetria {2}, curtosi in eccesso -{3}: code vicine a quelle di una distribuzione normale.
+1377	peso nel portafoglio
+1378	quota del rischio
+1379	volatilità del portafoglio
+1380	asset effettivi su {0}
+1381	rapporto di diversificazione
+1382	Calo peggiore: inizio giu {0}, punto più basso feb {1}, recuperato apr {2}.
+1383	Cosa stava succedendo sui mercati?
+1384	Volatilità da solo
+1385	Contributo marginale
+1386	Contributo al rischio
+1387	Quota del rischio
+1388	Rischio / peso
+1389	media ponderata
+1390	La somma dei contributi è la volatilità del portafoglio ({0}%). Se ogni asset si muovesse sempre insieme agli altri sarebbe {1}%: la diversificazione toglie
+1391	{0} punti
+1392	di volatilità. Il contributo marginale è la sensibilità della volatilità al peso dell'asset; nella ricevuta trovi l'effetto di spostare {0} punto su quell'asset togliendolo dagli altri in proporzione.
+1393	Calmar
+1394	Periodi positivi
+1395	Asimmetria
+1396	Curtosi
+1397	Misure storiche: descrivono il passato e non prevedono le perdite future. VaR e CVaR al {0}% sui rendimenti di periodo, senza ipotesi di distribuzione normale. Il portafoglio usa i {1} mesi in cui ci sono tutti gli asset; ogni asset usa tutto il suo storico.
+1398	Portafoglio · pesi attuali
+1399	Quanto sono affidabili questi numeri
+1400	statistica
+1401	Sharpe e incertezza
+1402	Scala da −{0} a {1}: la riga sottile è lo zero, la barra viola l'intervallo di confidenza, il segno lime lo Sharpe stimato
+1403	Su {0} mesi lo Sharpe è
+1404	positivo con il {0}% di confidenza
+1405	. Probabilità che sia davvero sopra zero:
+1406	VaR {0}% · tre metodi
+1407	Cornish-Fisher
+1408	Le tre stime sono vicine: la distribuzione è poco lontana da una normale.
+1409	Il VaR ha funzionato? · Kupiec
+1410	superamenti, attesi {0}
+1411	✗ Modello rifiutato (p = {0})
+1412	VaR stimato ogni mese sui {0} mesi precedenti e confrontato con la perdita successiva, fuori campione.
+1413	Drawdown in profondità
+1414	Ulcer index
+1415	Tempo sott'acqua
+1416	Calo medio
+1417	Omega
+1418	media HICP area euro, indice generale
+1419	uso lo storico: +{0}% l'anno ({1} mesi)
+1420	{0} percorsi di {1} anni con pesi attuali, ricampionando {2} rendimenti mensili del file.
+1421	Mediana dopo {0} anni
+1422	metà dei percorsi finisce sopra
+1423	di arrivare a {0} € · ±{1} punti di errore di simulazione
+1424	Probabilità di perdita
+1425	di finire sotto i {0} € versati
+1426	Scenario sfavorevole
+1427	{0} percorsi su {1} finiscono più in basso
+1428	mediana
+1429	metà centrale ({0}–{1})
+1430	obiettivo
+1431	Dopo {0} anni, {1} percorsi su {2} finiscono tra {3} € e {4} €. La forma del ventaglio dipende dai rendimenti del file: un passato diverso darebbe un ventaglio diverso.
+1432	capitale finale · nominale
+1433	In lime i percorsi che arrivano all'obiettivo: {0}%, cioè circa {1} su {2}. L'{3}% di percorsi più alti è raccolto nell'ultima barra.
+1434	Percentile
+1435	Euro di oggi
+1436	{0}° · mediana
+1437	Storico (bootstrap)
+1438	: ogni mese futuro pesca a caso uno dei {0} rendimenti reali del portafoglio, dal feb {1} al ott {2}. Conserva code e asimmetrie vere, ma tratta ogni periodo come indipendente dagli altri.
+1439	Il passato si ripete
+1440	: tutti i metodi assumono che il futuro somigli al periodo nel file. Con {0} anni di storia, il campione contiene più fasi di mercato, ma non tutte quelle possibili.
+1441	: pesi attuali, CSPX {0}%, CSNDX {1}%, ribilanciato a ogni periodo.
+1442	Flussi
+1443	: versamento di {0} € al mese, applicato a fine periodo ({1} € in un mese). Costi del {2}% l'anno tolti ogni periodo.
+1444	Inflazione
+1445	: costante al {0}% l'anno, usata solo per riportare i valori in euro di oggi. Le tasse non sono modellate.
+1446	Riproducibile
+1447	: {0} percorsi con seme fisso {1}: con gli stessi dati e parametri ottieni sempre gli stessi numeri.
+1448	Drawdown simulato
+1449	: nel percorso mediano il portafoglio perde fino al {0}% dal massimo; in {1} percorso su {2} oltre il {3}%.
+1450	: è una mappa di possibilità coerenti con i dati storici, non una promessa di rendimento né un consiglio d'investimento.
+1451	Obiettivi nel tempo
+1452	in euro di oggi · stessi futuri del ventaglio
+1453	Casa tra {0} anni, studi dei figli tra {1}, un'auto: aggiungi gli obiettivi e per ognuno vedi la probabilità di raggiungerlo, uno dopo l'altro.
+1454	Auto · {0} € tra {1} anni
+1455	Con il tuo portafoglio e i tuoi numeri
+1456	Puoi smettere di lavorare a
+1457	nel {0}, tra {1} anni: con {2} € al mese fino a {3} anni, i soldi bastano nel {4}% dei futuri simulati.
+1458	Con un po' di fortuna sui mercati anche prima: in {0} futuro su {1} a
+1459	, in metà dei futuri a
+1460	Oggi hai il
+1461	del capitale che avrai quando smetti
+1462	{0} → {1} anni
+1463	Il tuo numero FIRE
+1464	{0} volte la spesa di un anno · senza contare la pensione
+1465	Capitale quando smetti
+1466	a {0} anni, scenario mediano · sfavorevole {1} €
+1467	Prelievo sostenibile
+1468	{0}% l'anno
+1469	per {0} anni · la regola del {1}% qui riesce nel {2}% dei casi
+1470	Se smettessi oggi
+1471	{0} €/mese
+1472	quanto potresti prelevare dal capitale di oggi
+1473	Per smettere a
+1474	devi risparmiare
+1475	{0} € al mese
+1476	cioè
+1477	in più di oggi
+1478	Con il risparmio di oggi ({0} € al mese), smettendo a {1} anni i soldi basterebbero nel
+1479	dei futuri e, quando non bastano, finiscono verso i {0} anni.
+1480	scenario mediano
+1481	scenario sfavorevole ({0} futuri su {1} vanno peggio)
+1482	metà centrale dei futuri
+1483	{0} futuri su {1}
+1484	Nei futuri in cui i soldi finiscono prima dei {0} anni, succede in media verso i {1} anni.
+1485	(Financial Independence, Retire Early) vuol dire mettere da parte abbastanza da vivere dei propri investimenti, senza dipendere dallo stipendio.
+1486	regola del {0}%
+1487	(Bengen, {0}) dice che prelevando ogni anno il {1}% del capitale iniziale, aggiornato all'inflazione, i soldi sono durati {2} anni in quasi tutti i periodi storici americani: da qui l'idea di mettere da parte
+1488	la spesa di un anno. Sul tuo portafoglio, per {0} anni, il prelievo più alto che regge nel {1}% dei futuri è il
+1489	: ti servono
+1490	la spesa annua.
+1491	Asse orizzontale: prelievo annuo in % del capitale al momento dello stop. Asse verticale: quota di futuri in cui i soldi bastano.
+1492	Tutto è in
+1493	euro di oggi
+1494	: spesa, pensione e prelievi crescono con l'inflazione ({0}% l'anno, dalla sezione Simulazioni).
+1495	I rendimenti sono quelli storici del portafoglio (pesi attuali, {0} mesi), ricampionati in {1} futuri e al netto dei costi ({2}% l'anno). Il futuro può essere diverso dal passato.
+1496	Non ci sono le tasse: sui prelievi si paga il {0}% ({1}% sui titoli di Stato) solo sulla parte di guadagno. Alzano un po' la spesa da coprire.
+1497	La pensione è quella che scrivi tu: il sito non la stima. Per una stima puoi usare il simulatore dell'INPS.
+1498	Il portafoglio resta lo stesso per tutta la vita. Molti riducono le azioni avvicinandosi allo stop: cambia rischio e risultati.
+1499	Non è una previsione né un consiglio: serve a capire quali scelte contano di più.
+1500	Smetti a
+1501	· nel {0}
+1502	Spendi {0} € in meno al mese
+1503	Pensione più alta di {0} € al mese (dai {1} anni)
+1504	Fondi con costi più bassi (−{0}% l'anno)
+1505	I soldi devono durare {0} anni in meno
+1506	Ogni riga cambia una sola cosa rispetto ai tuoi numeri, sugli stessi futuri simulati.
+1507	Lean FIRE
+1508	vivere con il {0}% in meno
+1509	FIRE classico
+1510	la tua spesa di oggi
+1511	Fat FIRE
+1512	{0}% di spesa in più
+1513	Coast FIRE
+1514	smetti di risparmiare da oggi
+1515	Barista FIRE
+1516	part-time da {0} € al mese fino alla pensione
+1517	{0} crisi su {1} sono nei dati del file (gen {2} – ott {3}). Portafoglio con pesi attuali.
+1518	Il file non copre apr {0} – set {1}: nessuna stima inventata. Clicca per vedere S&P {2}.
+1519	Il file non copre nov {0} – feb {1}: nessuna stima inventata. Clicca per vedere S&P {2}.
+1520	Il file non copre mag {0} – set {1}: nessuna stima inventata. Clicca per vedere S&P {2}.
+1521	gen {0} – set {1} · {2} mesi
+1522	Inflazione alta e rialzo rapido dei tassi: azioni e obbligazioni in calo insieme.
+1523	Rendimento nella crisi
+1524	Tempo per toccare il fondo
+1525	Recupero dal minimo
+1526	{0} mese
+1527	Nella crisi
+1528	Contributo
+1529	Il più colpito è stato
+1530	(+{0}%), il più resistente
+1531	(+{0}%). Il contributo è la parte della perdita del portafoglio dovuta a ogni asset: la somma dà il rendimento nella crisi.
+1532	Durante la crisi la correlazione media tra i tuoi asset è stata
+1533	, contro
+1534	sull'intero periodo.
+1535	Barra rossa: perdita massima del portafoglio. Linea lime: rendimento a fine crisi. Pallini: rendimento di ogni asset nella stessa finestra. La crisi peggiore per questo portafoglio è
+1536	Scenari estremi ipotetici
+1537	E se arrivasse un cigno nero?
+1538	cigno nero
+1539	, nel senso di Nassim Taleb, è un evento raro, quasi impossibile da prevedere e con conseguenze enormi: per definizione non è nei dati del passato. Questi cinque scenari sono
+1540	inventati apposta
+1541	, più duri delle crisi vere, per chiederti: «se succedesse domani, quanto perderei, e lo reggerei?».
+1542	Crollo azionario profondo
+1543	Le borse perdono quanto nel {0}–{1}, ma tutto insieme. I titoli di Stato fanno da rifugio.
+1544	Stagflazione
+1545	Inflazione alta e economia ferma, come negli anni '{0}: scendono sia azioni sia obbligazioni, sale l'oro.
+1546	Tutto giù insieme
+1547	Panico e corsa alla liquidità: per qualche settimana si vende tutto, anche i rifugi (marzo {0}, ma peggio).
+1548	Crisi del debito pubblico
+1549	Gli investitori smettono di fidarsi degli Stati: crollano i titoli di Stato e con loro le banche e le borse.
+1550	Scoppia la bolla tecnologica
+1551	Come nel {0}–{1} ma più concentrato: le grandi aziende tecnologiche USA perdono tre quarti del valore.
+1552	Classe di ogni strumento: CSPX = azioni · CSNDX = azioni tecnologiche. Shock istantanei, senza recupero e senza ribilanciamento: è il colpo del primo momento. Il peggiore per questo portafoglio è
+1553	crollo azionario profondo
+1554	Impatto sul portafoglio
+1555	Scrivi uno shock, per esempio
+1556	accanto a un asset azionario, oppure scegli uno scenario pronto.
+1557	Crisi storiche
+1558	: finestre dal massimo al minimo dell'azionario globale (date indicative). I numeri usano solo i rendimenti del tuo file in quelle date; le crisi fuori dai dati non vengono stimate.
+1559	Crisi fuori dal file
+1560	: le schede mostrano anche S&P {0} su tutta la sua storia (cambia indice nella sezione Benchmark). Cliccando una crisi che il file non copre vedi solo il mercato, mai un portafoglio ricostruito.
+1561	: con dati mensili la finestra comprende mesi interi, quindi il minimo può differire da quello giornaliero.
+1562	Pesi di oggi applicati al passato
+1563	: il portafoglio è ribilanciato a ogni periodo con i pesi scelti. Nella realtà allora avresti potuto avere altri asset o altri pesi.
+1564	Contributo alla perdita
+1565	: cᵢ = Σ wᵢ · rᵢ,ₜ · Vₜ₋₁; la somma dei contributi è il rendimento del portafoglio nella crisi.
+1566	Shock ipotetico istantaneo
+1567	: applicato tutto in un colpo, senza ribilanciamento né recupero.
+1568	Propagazione
+1569	: gli asset senza shock si muovono di r = Σ_UK · Σ_KK⁻¹ · s (attesa condizionata con la covarianza dell'intero periodo). Nelle crisi le correlazioni di solito salgono: la stima può essere ottimista.
+1570	Tassi, inflazione, cambio
+1571	: servono sensibilità che il file non contiene (duration, esposizione valutaria). Puoi tradurli tu in shock per asset: per esempio obbligazioni con duration {0} e tassi +{1}% ≈ −{2}%.
+1572	: mostra come il portafoglio ha reagito o reagirebbe a eventi estremi, non cosa succederà.
+1573	{0} asset, {1} periodi comuni. Rendimenti attesi prudenti (Bayes-Stein, avvicinati del {2}% alla media {3}%). Obiettivo: massimo Sharpe, pesi tra {4}% e {5}%, tasso privo di rischio {6}%.
+1574	incertezza ±{0} punti al {1}% ({2} anni di dati)
+1575	+{0} punti
+1576	rispetto a prima
+1577	frontiera efficiente
+1578	portafogli casuali
+1579	linea di allocazione del capitale
+1580	Ogni punto della linea continua è il massimo rendimento storico ottenibile per quel livello di volatilità, con i vincoli scelti. I puntini sono {0} portafogli casuali: nessuno sta sopra la frontiera. La linea tratteggiata parte dal tasso privo di rischio ({1}%, a volatilità zero, fuori dal riquadro ingrandito) e tocca la frontiera nel portafoglio a massimo Sharpe (stella).
+1581	Prima
+1582	Ottimizzato
+1583	Differenza
+1584	CAGR storico
+1585	pesi attuali → massimo Sharpe
+1586	Rendimenti attesi prudenti (Bayes-Stein, Jorion {0})
+1587	: ogni media storica dei {0} periodi comuni viene avvicinata del {1}% alla media del portafoglio a minima varianza ({2}% l'anno). Quanto avvicinarla lo decidono i dati: pochi anni o differenze piccole rispetto al rumore → più prudenza. Così l'ottimizzatore non si concentra su chi è andato meglio per caso. Puoi tornare alle medie storiche con l'interruttore.
+1588	: covarianza campionaria sugli stessi periodi, annualizzata (Σ × {0}).
+1589	Problema risolto
+1590	: min wᵀΣw − λ·μᵀw con Σw = {0} e limiti di peso, per {1} valori di λ (gradiente proiettato accelerato). Massimo Sharpe: ricerca a sezione aurea lungo la frontiera. Target: bisezione su λ.
+1591	Minima volatilità e minima varianza
+1592	coincidono: minimizzare σ o σ² dà gli stessi pesi.
+1593	: ogni asset porta la stessa quota di rischio (contributi uguali). Non usa i rendimenti attesi.
+1594	Vincoli
+1595	: peso minimo, peso massimo e vendite allo scoperto. Limiti per categoria (azioni, obbligazioni, aree) richiedono una classificazione degli asset che il file non contiene.
+1596	Confronto con prima
+1597	: rendimento, volatilità e Sharpe sono quelli del modello; CAGR, drawdown e VaR vengono dal portafoglio ottimizzato applicato agli stessi dati storici. È un confronto nel campione: l'ottimizzatore ha già "visto" questi dati, quindi il miglioramento è sovrastimato.
+1598	Non è una previsione né un consiglio
+1599	: mostra l'allocazione che sarebbe stata efficiente nel passato del file, senza costi né tasse.
+1600	Nasdaq-{0}
+1601	MSCI World
+1602	Euro Stoxx {0}
+1603	Personalizzato
+1604	— scegli —
+1605	ETF SPDR S&P {0} (SPY): {1} grandi aziende USA · dati {2}-{3} – {4}-{5} · convertito in euro con il cambio BCE di fine mese · fonte simulazione locale.
+1606	S&P {0} contro il portafoglio con pesi attuali, su {1} mesi in comune ({2}-{3} – {4}-{5}).
+1607	Rendimento annuo in più
+1608	+{0}% contro +{1}% del benchmark
+1609	Beta
+1610	meno reattivo del mercato
+1611	quanto ti discosti dal benchmark ogni anno
+1612	extra-rendimento per unità di scostamento
+1613	Portafoglio (pesi attuali)
+1614	base {0} · {1}-{2} – {3}-{4}
+1615	finestre mobili di {0} mesi
+1616	Ogni barra è quanto il portafoglio ha fatto meglio (verde) o peggio (rosso) del benchmark negli ultimi {0} mesi. Sopra in {1} finestre su {2} ({3}%).
+1617	Rendimento totale
+1618	Beta (IC {0}%)
+1619	Alpha di Jensen (annuo)
+1620	+{0}% · significativo (p {1})
+1621	R² (quanto spiega il mercato)
+1622	Cattura nei rialzi
+1623	Cattura nei ribassi
+1624	Periodi sopra il benchmark
+1625	S&P {0} su tutta la sua storia
+1626	S&P {0}: perdita massima
+1627	Tempo per il fondo
+1628	Recupero
+1629	Il benchmark copre {0} crisi su {1}, il tuo file {2}. Per le crisi che il file non contiene vedi come si è comportato il mercato, non il tuo portafoglio: non lo ricostruisco con dati inventati. Le perdite del benchmark compaiono anche nelle schede dello Stress test.
+1630	Indice tramite ETF
+1631	: ETF SPDR S&P {0} (SPY): {1} grandi aziende USA. Prezzi rettificati per dividendi e frazionamenti (rendimento totale), al netto dei costi dell'ETF.
+1632	: prezzi in dollari convertiti in euro con il cambio BCE di fine mese, così il confronto include l'effetto del cambio come per un investitore europeo.
+1633	Stessi periodi
+1634	: solo i {0} mesi in cui ci sono sia il portafoglio sia il benchmark.
+1635	Beta e alpha
+1636	: regressione dei rendimenti di periodo sul benchmark. Alpha di Jensen = (r̄ₚ − rf/f − β·(r̄ᵦ − rf/f))·f, con rf {0}% (Euribor {1} mesi (media mensile)).
+1637	Tracking error e information ratio
+1638	: deviazione standard e media della differenza di rendimento, annualizzate.
+1639	: il benchmark è analizzato su tutta la sua storia con le stesse finestre dello Stress test (dati mensili).
+1640	Fonte e limiti
+1641	: Alpha Vantage, piano gratuito con poche richieste al giorno; ogni serie resta in memoria {0} ore per tutti i visitatori.
+1642	Storico, non previsione
+1643	: battere o no il benchmark in passato non dice cosa succederà.
+1644	Passo {0} di {1}
+1645	Ciao, sono
+1646	! Carica un file e chiedimi qualsiasi cosa sui tuoi investimenti.
+1647	prezzi · col. D
+1648	prezzi · col. E
+1649	lug {0}
+1650	prezzi · col. F
+1651	prezzi · col. G
+1652	prezzi · col. H
+1653	Versamento di questo mese (€)
+1654	Banda di tolleranza (± punti)
+1655	{0} strumenti fuori dalla banda
+1656	con {0} € al mese rientri in
+1657	senza vendere
+1658	Target %
+1659	Scostamento
+1660	Peso dopo
+1661	Peso target di EUNL in percentuale
+1662	Peso target di IEAG in percentuale
+1663	Peso target di CSSPX in percentuale
+1664	Peso target di IS{0}N in percentuale
+1665	Peso target di IBGS in percentuale
+1666	Peso target di IUSN in percentuale
+1667	Peso target di {0}GLD in percentuale
+1668	: il versamento va agli strumenti più sottopesati, portandoli insieme verso il target (acquisti bᵢ = max({0}, tᵢ·K − vᵢ), con K tale che Σ bᵢ = versamento).
+1669	: riporta oggi ai target senza aggiungere soldi.
+1670	: quanto versare per arrivarci senza vendere. I mesi necessari sono calcolati a prezzi fermi, senza commissioni né tasse: vendere può generare plusvalenze tassate al {0}% ({1}% sui titoli di Stato).
+1671	Compra {0} €
+1672	senza costo: EUNL, IEAG, CSSPX, IS{0}N, IBGS, IUSN, {1}GLD
+1673	Xetra-Gold · DE{0}A{1}S{2}GB{3}
+1674	Xetra-Gold
+1675	Metalli preziosi, Gold · Gold
+1676	EUR · accumulazione
+1677	Materie prime
+1678	Aggiornato al {0}/{1}/{2} · salvato solo in questo browser
+1679	il tuo prezzo del {0}/{1}/{2}
+1680	il tuo prezzo del {0}/{1}/{2} · scade il {3}/{4}/{5} · rend. a scadenza {6}% lordo
+1681	Le altre obbligazioni (BTP indicizzati, CCT, titoli esteri o societari) valgono l'ultimo prezzo che hai scritto, su {0} di nominale. Con «Aggiorna prezzo» scrivi il prezzo del tuo home banking.
+1682	valori di fine giornata
+1683	Ticker, ISIN o nome: VWCE, IE{0}BK{1}BQT{2}…
+1684	Spese (€, facoltative)
+1685	Salva l'acquisto
+1686	I tuoi clienti
+1687	analisi salvate, note, revisioni
+1688	Una colonna non ti è chiara? Te la spiego io.
+1689	Portafoglio {0} su {1}
+1690	Manca il profilo del cliente: con {0} domande controllo rischio, perdita sopportabile, orizzonte, concentrazione e strumenti complessi.
+1691	Compila il profilo del cliente · {0} domande
+1692	Profilo del cliente
+1693	Numero di rischio del profilo
+1694	Prudente · perdita accettata fino al {0}% in un anno · orizzonte {1}-{2} anni

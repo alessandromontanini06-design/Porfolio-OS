@@ -1,4 +1,5 @@
 /* Portfolio OS · interfaccia: punto di partenza. Il codice è diviso in moduli nella cartella ui/ (vedi ui/LEGGIMI.md). */
+import "./ui/lingua.js";
 import { $, CALM, HAS_G, P, S, loadXLSX, whenIdle } from "./ui/core.js";
 import { go, heroIntro, morphInit, movePill, renderPager } from "./ui/scene.js";
 import { TPL_KEY, an, load, loadExample } from "./ui/importa.js";

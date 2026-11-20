@@ -1,0 +1,339 @@
+1356	XAIX · World · Artificial intelligence · IE{0}BGV{1}VN{2}
+1357	WTAI · World · Artificial intelligence · IE{0}BDVPNG{1}
+1358	RBOT · World · Robotics · IE{0}BYZK{1}
+1359	ISPY · World · Cybersecurity · IE{0}BYPLS{1}
+1360	ECAR · World · Electric vehicles · IE{0}BGL{1}Z{2}
+1361	DFNS · World · Defense · IE{0}YYE{1}WK{2}
+1362	IQQH · World · Clean energy · IE{0}B{1}XNHC{2}
+1363	IH{0}O · World · Water · IE{1}B{2}TXK{3}
+1364	HEAL · World · Health care · IE{0}BYZK{1}
+1365	CSSPX · USA · General · IE{0}B{1}BMR{2}
+1366	VUAA · USA · General · IE{0}BFMXXD{1}
+1367	VUSA · USA · General · IE{0}B{1}XXRP{2}
+1368	Sector: all
+1369	Country: all
+1370	Portfolio with current weights, rebalanced every period, over {0} months of confirmed data.
+1371	the monthly loss exceeded only {0} time in {1}
+1372	the average loss in those worst cases
+1373	return per unit of downside risk
+1374	below the peak, then recovered
+1375	monthly returns · {0} observations
+1376	In red the worst months: {0}, {1}% of the total. Skewness {2}, excess kurtosis -{3}: tails close to those of a normal distribution.
+1377	weight in the portfolio
+1378	share of risk
+1379	portfolio volatility
+1380	effective assets out of {0}
+1381	diversification ratio
+1382	Worst fall: started Jun {0}, lowest point Feb {1}, recovered Apr {2}.
+1383	What was happening in the markets?
+1384	Standalone volatility
+1385	Marginal contribution
+1386	Risk contribution
+1387	Share of risk
+1388	Risk / weight
+1389	weighted average
+1390	The sum of the contributions is the portfolio volatility ({0}%). If every asset always moved together with the others it would be {1}%: diversification removes
+1391	{0} points
+1392	of volatility. The marginal contribution is the sensitivity of volatility to the asset's weight; in the receipt you'll find the effect of moving {0} point to that asset, taking it from the others proportionally.
+1393	Calmar
+1394	Positive periods
+1395	Skewness
+1396	Kurtosis
+1397	Historical measures: they describe the past and don't predict future losses. VaR and CVaR at {0}% on period returns, with no normal-distribution assumption. The portfolio uses the {1} months in which all assets are present; each asset uses its full history.
+1398	Portfolio · current weights
+1399	How reliable these numbers are
+1400	statistics
+1401	Sharpe and uncertainty
+1402	Scale from −{0} to {1}: the thin line is zero, the purple bar the confidence interval, the lime mark the estimated Sharpe
+1403	Over {0} months the Sharpe is
+1404	positive with {0}% confidence
+1405	. Probability that it's really above zero:
+1406	VaR {0}% · three methods
+1407	Cornish-Fisher
+1408	The three estimates are close: the distribution is not far from a normal one.
+1409	Did the VaR work? · Kupiec
+1410	breaches, expected {0}
+1411	✗ Model rejected (p = {0})
+1412	VaR estimated each month on the previous {0} months and compared with the following loss, out of sample.
+1413	Drawdown in depth
+1414	Ulcer index
+1415	Time underwater
+1416	Average fall
+1417	Omega
+1418	euro area HICP average, all items
+1419	using history: +{0}% a year ({1} months)
+1420	{0} paths of {1} years with current weights, resampling {2} monthly returns from the file.
+1421	Median after {0} years
+1422	half of the paths end above
+1423	of reaching {0} € · ±{1} points of simulation error
+1424	Probability of loss
+1425	of ending below the {0} € contributed
+1426	Unfavorable scenario
+1427	{0} paths out of {1} end lower
+1428	median
+1429	middle half ({0}–{1})
+1430	goal
+1431	After {0} years, {1} paths out of {2} end between {3} € and {4} €. The shape of the fan depends on the file's returns: a different past would give a different fan.
+1432	final capital · nominal
+1433	In lime the paths that reach the goal: {0}%, that is about {1} out of {2}. The highest {3}% of paths is gathered in the last bar.
+1434	Percentile
+1435	Today's euros
+1436	{0}th · median
+1437	Historical (bootstrap)
+1438	: each future month randomly draws one of the portfolio's {0} actual returns, from Feb {1} to Oct {2}. It keeps real tails and skewness, but treats each period as independent of the others.
+1439	The past repeats itself
+1440	: all methods assume the future resembles the period in the file. With {0} years of history, the sample contains several market phases, but not all possible ones.
+1441	: current weights, CSPX {0}%, CSNDX {1}%, rebalanced every period.
+1442	Flows
+1443	: contribution of {0} € a month, applied at the end of the period ({1} € in a month). Costs of {2}% a year deducted every period.
+1444	Inflation
+1445	: constant at {0}% a year, used only to express values in today's euros. Taxes are not modeled.
+1446	Reproducible
+1447	: {0} paths with fixed seed {1}: with the same data and parameters you always get the same numbers.
+1448	Simulated drawdown
+1449	: in the median path the portfolio loses up to {0}% from the peak; in {1} path out of {2} more than {3}%.
+1450	: it's a map of possibilities consistent with historical data, not a promise of return nor investment advice.
+1451	Goals over time
+1452	in today's euros · same futures as the fan
+1453	A home in {0} years, children's education in {1}, a car: add your goals and for each one see the probability of reaching it, one after the other.
+1454	Car · {0} € in {1} years
+1455	With your portfolio and your numbers
+1456	You can stop working at
+1457	in {0}, in {1} years: with {2} € a month until age {3}, the money lasts in {4}% of the simulated futures.
+1458	With some luck in the markets even earlier: in {0} future out of {1} at
+1459	, in half of the futures at
+1460	Today you have
+1461	of the capital you'll have when you stop
+1462	{0} → {1} years
+1463	Your FIRE number
+1464	{0} times one year's spending · without counting the pension
+1465	Capital when you stop
+1466	at age {0}, median scenario · unfavorable {1} €
+1467	Sustainable withdrawal
+1468	{0}% a year
+1469	for {0} years · the {1}% rule succeeds here in {2}% of cases
+1470	If you stopped today
+1471	{0} €/month
+1472	how much you could withdraw from today's capital
+1473	To stop at
+1474	you need to save
+1475	{0} € a month
+1476	that is
+1477	more than today
+1478	With today's savings ({0} € a month), stopping at {1} the money would last in
+1479	of the futures and, when it doesn't, it runs out around age {0}.
+1480	median scenario
+1481	unfavorable scenario ({0} futures out of {1} go worse)
+1482	middle half of the futures
+1483	{0} futures out of {1}
+1484	In the futures where the money runs out before age {0}, it happens on average around age {1}.
+1485	(Financial Independence, Retire Early) means putting aside enough to live off your investments, without depending on a salary.
+1486	{0}% rule
+1487	(Bengen, {0}) says that by withdrawing each year {1}% of the initial capital, adjusted for inflation, the money lasted {2} years in almost all US historical periods: hence the idea of putting aside
+1488	one year's spending. On your portfolio, for {0} years, the highest withdrawal that holds in {1}% of the futures is
+1489	: you need
+1490	your annual spending.
+1491	Horizontal axis: annual withdrawal as % of capital when you stop. Vertical axis: share of futures in which the money lasts.
+1492	Everything is in
+1493	today's euros
+1494	: spending, pension and withdrawals grow with inflation ({0}% a year, from the Simulations section).
+1495	Returns are the portfolio's historical ones (current weights, {0} months), resampled into {1} futures and net of costs ({2}% a year). The future may differ from the past.
+1496	Taxes are not included: withdrawals pay {0}% ({1}% on government bonds) only on the gain portion. They raise the spending to cover a little.
+1497	The pension is the one you enter: the site doesn't estimate it. For an estimate you can use your pension provider's simulator.
+1498	The portfolio stays the same for life. Many reduce stocks as they approach stopping: that changes risk and results.
+1499	It's neither a forecast nor advice: it helps you understand which choices matter most.
+1500	Stop at
+1501	· in {0}
+1502	Spend {0} € less a month
+1503	Pension higher by {0} € a month (from age {1})
+1504	Lower-cost funds (−{0}% a year)
+1505	The money must last {0} fewer years
+1506	Each row changes just one thing compared with your numbers, on the same simulated futures.
+1507	Lean FIRE
+1508	living on {0}% less
+1509	Classic FIRE
+1510	your spending today
+1511	Fat FIRE
+1512	{0}% more spending
+1513	Coast FIRE
+1514	stop saving from today
+1515	Barista FIRE
+1516	part-time at {0} € a month until retirement
+1517	{0} crises out of {1} are in the file's data (Jan {2} – Oct {3}). Portfolio with current weights.
+1518	The file doesn't cover Apr {0} – Sep {1}: no made-up estimate. Click to see the S&P {2}.
+1519	The file doesn't cover Nov {0} – Feb {1}: no made-up estimate. Click to see the S&P {2}.
+1520	The file doesn't cover May {0} – Sep {1}: no made-up estimate. Click to see the S&P {2}.
+1521	Jan {0} – Sep {1} · {2} months
+1522	High inflation and a rapid rise in rates: stocks and bonds falling together.
+1523	Return in the crisis
+1524	Time to hit bottom
+1525	Recovery from the low
+1526	{0} month
+1527	In the crisis
+1528	Contribution
+1529	The hardest hit was
+1530	(+{0}%), the most resilient
+1531	(+{0}%). The contribution is the part of the portfolio's loss due to each asset: the sum gives the return in the crisis.
+1532	During the crisis the average correlation among your assets was
+1533	, versus
+1534	over the whole period.
+1535	Red bar: maximum portfolio loss. Lime line: return at the end of the crisis. Dots: return of each asset in the same window. The worst crisis for this portfolio is
+1536	Hypothetical extreme scenarios
+1537	What if a black swan arrived?
+1538	black swan
+1539	, in Nassim Taleb's sense, is a rare event, almost impossible to predict and with huge consequences: by definition it's not in past data. These five scenarios are
+1540	made up on purpose
+1541	, harsher than real crises, to ask you: «if it happened tomorrow, how much would I lose, and could I take it?».
+1542	Deep stock market crash
+1543	Markets lose as much as in {0}–{1}, but all at once. Government bonds act as a safe haven.
+1544	Stagflation
+1545	High inflation and a stalled economy, like in the '{0}s: both stocks and bonds fall, gold rises.
+1546	Everything down together
+1547	Panic and a rush to cash: for a few weeks everything is sold, even safe havens (March {0}, but worse).
+1548	Sovereign debt crisis
+1549	Investors stop trusting governments: government bonds collapse and with them banks and stock markets.
+1550	The tech bubble bursts
+1551	Like in {0}–{1} but more concentrated: the big US tech companies lose three quarters of their value.
+1552	Class of each instrument: CSPX = stocks · CSNDX = tech stocks. Instant shocks, with no recovery and no rebalancing: it's the initial blow. The worst for this portfolio is
+1553	deep stock market crash
+1554	Impact on the portfolio
+1555	Enter a shock, for example
+1556	next to an equity asset, or choose a ready-made scenario.
+1557	Historical crises
+1558	: windows from the peak to the low of global equities (indicative dates). The numbers use only your file's returns on those dates; crises outside the data are not estimated.
+1559	Crises outside the file
+1560	: the cards also show the S&P {0} over its whole history (change index in the Benchmark section). Clicking a crisis the file doesn't cover you see only the market, never a rebuilt portfolio.
+1561	: with monthly data the window includes whole months, so the low may differ from the daily one.
+1562	Today's weights applied to the past
+1563	: the portfolio is rebalanced every period to the chosen weights. In reality you might have had other assets or other weights back then.
+1564	Contribution to the loss
+1565	: cᵢ = Σ wᵢ · rᵢ,ₜ · Vₜ₋₁; the sum of the contributions is the portfolio's return in the crisis.
+1566	Instant hypothetical shock
+1567	: applied all at once, with no rebalancing or recovery.
+1568	Propagation
+1569	: assets without a shock move by r = Σ_UK · Σ_KK⁻¹ · s (conditional expectation with the covariance of the whole period). In crises correlations usually rise: the estimate may be optimistic.
+1570	Rates, inflation, exchange rate
+1571	: they require sensitivities the file doesn't contain (duration, currency exposure). You can translate them yourself into asset shocks: for example bonds with duration {0} and rates +{1}% ≈ −{2}%.
+1572	: shows how the portfolio reacted or would react to extreme events, not what will happen.
+1573	{0} assets, {1} common periods. Conservative expected returns (Bayes-Stein, shrunk {2}% toward the mean {3}%). Goal: maximum Sharpe, weights between {4}% and {5}%, risk-free rate {6}%.
+1574	uncertainty ±{0} points at {1}% ({2} years of data)
+1575	+{0} points
+1576	compared to before
+1577	efficient frontier
+1578	random portfolios
+1579	capital allocation line
+1580	Each point of the solid line is the highest historical return achievable for that level of volatility, with the chosen constraints. The dots are {0} random portfolios: none is above the frontier. The dashed line starts from the risk-free rate ({1}%, at zero volatility, outside the zoomed box) and touches the frontier at the maximum-Sharpe portfolio (star).
+1581	Before
+1582	Optimized
+1583	Difference
+1584	Historical CAGR
+1585	current weights → maximum Sharpe
+1586	Conservative expected returns (Bayes-Stein, Jorion {0})
+1587	: each historical mean of the {0} common periods is shrunk {1}% toward the mean of the minimum-variance portfolio ({2}% a year). How much to shrink is decided by the data: few years or small differences relative to noise → more caution. This way the optimizer doesn't concentrate on whoever did best by chance. You can go back to historical means with the switch.
+1588	: sample covariance over the same periods, annualized (Σ × {0}).
+1589	Problem solved
+1590	: min wᵀΣw − λ·μᵀw with Σw = {0} and weight limits, for {1} values of λ (accelerated projected gradient). Maximum Sharpe: golden-section search along the frontier. Target: bisection on λ.
+1591	Minimum volatility and minimum variance
+1592	coincide: minimizing σ or σ² gives the same weights.
+1593	: each asset carries the same share of risk (equal contributions). It doesn't use expected returns.
+1594	Constraints
+1595	: minimum weight, maximum weight and short selling. Limits by category (stocks, bonds, regions) require an asset classification the file doesn't contain.
+1596	Comparison with before
+1597	: return, volatility and Sharpe are the model's; CAGR, drawdown and VaR come from the optimized portfolio applied to the same historical data. It's an in-sample comparison: the optimizer has already "seen" this data, so the improvement is overstated.
+1598	It's neither a forecast nor advice
+1599	: shows the allocation that would have been efficient in the file's past, without costs or taxes.
+1600	Nasdaq-{0}
+1601	MSCI World
+1602	Euro Stoxx {0}
+1603	Custom
+1604	— choose —
+1605	SPDR S&P {0} ETF (SPY): {1} large US companies · data {2}-{3} – {4}-{5} · converted into euro at the ECB month-end rate · source local simulation.
+1606	S&P {0} versus the portfolio with current weights, over {1} common months ({2}-{3} – {4}-{5}).
+1607	Extra annual return
+1608	+{0}% versus +{1}% for the benchmark
+1609	Beta
+1610	less reactive than the market
+1611	how much you deviate from the benchmark each year
+1612	extra return per unit of deviation
+1613	Portfolio (current weights)
+1614	base {0} · {1}-{2} – {3}-{4}
+1615	rolling {0}-month windows
+1616	Each bar is how much the portfolio did better (green) or worse (red) than the benchmark over the last {0} months. Above in {1} windows out of {2} ({3}%).
+1617	Total return
+1618	Beta (CI {0}%)
+1619	Jensen's alpha (annual)
+1620	+{0}% · significant (p {1})
+1621	R² (how much the market explains)
+1622	Upside capture
+1623	Downside capture
+1624	Periods above the benchmark
+1625	S&P {0} over its whole history
+1626	S&P {0}: maximum loss
+1627	Time to bottom
+1628	Recovery
+1629	The benchmark covers {0} crises out of {1}, your file {2}. For the crises the file doesn't contain you see how the market behaved, not your portfolio: I don't rebuild it with made-up data. The benchmark's losses also appear in the Stress test cards.
+1630	Index via ETF
+1631	: SPDR S&P {0} ETF (SPY): {1} large US companies. Prices adjusted for dividends and splits (total return), net of the ETF's costs.
+1632	: prices in dollars converted into euro at the ECB month-end rate, so the comparison includes the currency effect as for a European investor.
+1633	Same periods
+1634	: only the {0} months in which both the portfolio and the benchmark are present.
+1635	Beta and alpha
+1636	: regression of period returns on the benchmark. Jensen's alpha = (r̄ₚ − rf/f − β·(r̄ᵦ − rf/f))·f, with rf {0}% (Euribor {1} months (monthly average)).
+1637	Tracking error and information ratio
+1638	: standard deviation and mean of the return difference, annualized.
+1639	: the benchmark is analyzed over its whole history with the same windows as the Stress test (monthly data).
+1640	Source and limits
+1641	: Alpha Vantage, free plan with few requests a day; each series stays in memory {0} hours for all visitors.
+1642	Historical, not a forecast
+1643	: beating the benchmark or not in the past doesn't say what will happen.
+1644	Step {0} of {1}
+1645	Hi, I'm
+1646	! Upload a file and ask me anything about your investments.
+1647	prices · col. D
+1648	prices · col. E
+1649	Jul {0}
+1650	prices · col. F
+1651	prices · col. G
+1652	prices · col. H
+1653	This month's contribution (€)
+1654	Tolerance band (± points)
+1655	{0} instruments outside the band
+1656	with {0} € a month you're back within
+1657	without selling
+1658	Target %
+1659	Deviation
+1660	Weight after
+1661	Target weight of EUNL in percent
+1662	Target weight of IEAG in percent
+1663	Target weight of CSSPX in percent
+1664	Target weight of IS{0}N in percent
+1665	Target weight of IBGS in percent
+1666	Target weight of IUSN in percent
+1667	Target weight of {0}GLD in percent
+1668	: the contribution goes to the most underweight instruments, bringing them together toward the target (purchases bᵢ = max({0}, tᵢ·K − vᵢ), with K such that Σ bᵢ = contribution).
+1669	: brings back to the targets today without adding money.
+1670	: how much to contribute to get there without selling. The months needed are calculated at fixed prices, with no fees or taxes: selling can generate capital gains taxed at {0}% ({1}% on government bonds).
+1671	Buy {0} €
+1672	no cost: EUNL, IEAG, CSSPX, IS{0}N, IBGS, IUSN, {1}GLD
+1673	Xetra-Gold · DE{0}A{1}S{2}GB{3}
+1674	Xetra-Gold
+1675	Precious metals, Gold · Gold
+1676	EUR · accumulating
+1677	Commodities
+1678	Updated on {0}/{1}/{2} · saved only in this browser
+1679	your price of {0}/{1}/{2}
+1680	your price of {0}/{1}/{2} · matures {3}/{4}/{5} · yield to maturity {6}% gross
+1681	Other bonds (inflation-linked BTPs, CCTs, foreign or corporate bonds) are worth the last price you entered, per {0} face value. With «Update price» enter the price from your online banking.
+1682	end-of-day values
+1683	Ticker, ISIN or name: VWCE, IE{0}BK{1}BQT{2}…
+1684	Fees (€, optional)
+1685	Save the purchase
+1686	Your clients
+1687	saved analyses, notes, reviews
+1688	A column isn't clear to you? I'll explain it.
+1689	Portfolio {0} of {1}
+1690	The client's profile is missing: with {0} questions I check risk, bearable loss, horizon, concentration and complex instruments.
+1691	Fill in the client's profile · {0} questions
+1692	Client profile
+1693	Profile risk number
+1694	Cautious · accepted loss up to {0}% in a year · horizon {1}-{2} years

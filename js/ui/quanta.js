@@ -21,7 +21,7 @@ $("#chatClose").addEventListener("click",closeChat);
 $("#chatNew").addEventListener("click",()=>{if(chatBusy)return;S.chat=[];S.chatView=[];renderChat();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#chat").classList.contains("open"))closeChat();});
 function chatContext(){
-  const oggi=oggiLoc(),pm=pmHas()?"l'utente ha un patrimonio salvato (strumento patrimonio)":"nessun patrimonio salvato",extra=`oggi è il ${oggi}; ${pm}${Q.lastSaved?`; appena salvato: ${Q.lastSaved}`:""}${Q.fromVoice?"; l'utente sta parlando a voce: rispondi breve e naturale":""}; l'utente ora è nella pagina «${SCENE_L[current]||current}»${document.body.dataset.ruolo==="pro"?" e usa il sito da consulente (c'è la pagina Studio)":""}`;
+  const oggi=oggiLoc(),pm=pmHas()?"l'utente ha un patrimonio salvato (strumento patrimonio)":"nessun patrimonio salvato",extra=`oggi è il ${oggi}; ${pm}${Q.lastSaved?`; appena salvato: ${Q.lastSaved}`:""}${Q.fromVoice?"; l'utente sta parlando a voce: rispondi breve e naturale":""}; l'utente ora è nella pagina «${SCENE_L[current]||current}»${document.body.dataset.ruolo==="pro"?" e usa il sito da consulente (c'è la pagina Studio)":""}${({en:"; IMPORTANTE: l'utente usa il sito in inglese: rispondi sempre in inglese",es:"; IMPORTANTE: l'utente usa il sito in spagnolo: rispondi sempre in spagnolo",fr:"; IMPORTANTE: l'utente usa il sito in francese: rispondi sempre in francese"})[document.documentElement.lang]||""}`;
   if(!S.lab||!S.ds||!S.ds.ok)return `${extra}; nessun laboratorio costruito: rispondi a domande generali sul sito e sui concetti, senza inventare numeri del portafoglio dell'utente (quelli del patrimonio si leggono con lo strumento patrimonio)`;
   return extra+"; "+chatContextLab();
 }
@@ -238,7 +238,7 @@ async function askChat(text,opt={}){
    Foto: rimpicciolite nel browser e mandate all'IA solo dopo il permesso (pos-quanta-foto-ok). */
 const TTS=("speechSynthesis" in window)&&window.SpeechSynthesisUtterance?window.speechSynthesis:null,SR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
 const Q={speaking:null,rec:null,listening:false,auto:false,talk:false,imgs:[],fromVoice:false,lastSaved:""};
-function pickVoice(){if(!TTS)return null;const vs=TTS.getVoices().filter(v=>/^it([-_]|$)/i.test(v.lang));for(const re of [/natural|neural|online|premium|enhanced/i,/google/i,/alice|federica|elsa|isabella|paola|emma|diego|luca/i]){const v=vs.find(x=>re.test(x.name));if(v)return v;}return vs[0]||null;}
+function pickVoice(){if(!TTS)return null;const lg=document.documentElement.lang||"it",vs=TTS.getVoices().filter(v=>new RegExp("^"+lg+"([-_]|$)","i").test(v.lang));for(const re of [/natural|neural|online|premium|enhanced/i,/google/i,/alice|federica|elsa|isabella|paola|emma|diego|luca/i]){const v=vs.find(x=>re.test(x.name));if(v)return v;}return vs[0]||null;}
 if(TTS&&TTS.addEventListener)TTS.addEventListener("voiceschanged",()=>{});
 /* testo da leggere: senza grassetti ed elenchi, segni detti a parole */
 function plain(t){return String(t||"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/^\s*[-*•]\s+/gm,"").replace(/[#_`>]/g,"").replace(/−/g,"meno ").replace(/(\d)\s?%/g,"$1 per cento").replace(/€/g," euro").replace(/\s+/g," ").trim();}
@@ -268,7 +268,7 @@ async function playBuf(buf,tok){
 function cloudParts(t){const sent=sentences(t).flatMap(s=>cutLong(s,450));let n=1;while(n<sent.length&&sent.slice(0,n).join(" ").length<25)n++;
   return [sent.slice(0,n).join(" "),...splitParts(sent.slice(n).join(" "),450)].filter(Boolean);}
 function browserSpeak(t,end){const parts=splitParts(t,180),voice=pickVoice();if(!parts.length){end(true);return;}
-  parts.forEach((x,k)=>{const u=new SpeechSynthesisUtterance(x);u.lang="it-IT";if(voice)u.voice=voice;u.rate=1.03;u.pitch=1;if(k===parts.length-1)u.onend=()=>end(true);u.onerror=()=>end(false);TTS.speak(u);});}
+  parts.forEach((x,k)=>{const u=new SpeechSynthesisUtterance(x);u.lang=({en:"en-US",es:"es-ES",fr:"fr-FR"})[document.documentElement.lang]||"it-IT";if(voice)u.voice=voice;u.rate=1.03;u.pitch=1;if(k===parts.length-1)u.onend=()=>end(true);u.onerror=()=>end(false);TTS.speak(u);});}
 /* legge un testo; i = risposta della chat che si sta leggendo, done = cosa fare dopo */
 async function speakText(text,i=null,done=null){
   hush();const t=plain(text),tok={};if(!t||(!TTS&&!cloudOn())){if(done)done();return;}
@@ -308,7 +308,7 @@ function voiceStart(){if(callSupported())callStart();else talkStart();}
 /* ascolto: auto = conversazione a voce (manda da solo), altrimenti dettatura (il testo resta nella barra da controllare) */
 function listen(auto){
   if(!SR||Q.listening||(auto&&(chatBusy||!Q.talk)))return;hush();
-  const r=new SR();r.lang="it-IT";r.interimResults=true;r.continuous=false;r.maxAlternatives=1;let heard="",err="";const pre=auto?"":$("#chatIn").value.trim();
+  const r=new SR();r.lang=({en:"en-US",es:"es-ES",fr:"fr-FR"})[document.documentElement.lang]||"it-IT";r.interimResults=true;r.continuous=false;r.maxAlternatives=1;let heard="",err="";const pre=auto?"":$("#chatIn").value.trim();
   r.onresult=e=>{let t="";for(let k=0;k<e.results.length;k++)t+=e.results[k][0].transcript;heard=t;$("#chatIn").value=(pre?pre+" ":"")+t;grow();};
   r.onerror=e=>{err=e.error||"errore";};
   r.onend=()=>{Q.listening=false;Q.rec=null;const t=heard.trim();

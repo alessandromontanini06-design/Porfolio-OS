@@ -1,0 +1,295 @@
+1695	profil {0} sur {1}
+1696	profil {0}
+1697	Pour le conseiller · PAC_due_fogli_righe_vuote
+1698	Non adéquat
+1699	Profil {0}, Portefeuille {1} sur {2}
+1700	Profil {0}
+1701	Indice de risque du portefeuille {0} (modéré) contre {1} pour le profil (prudent).
+1702	à justifier
+1703	Perte supportable
+1704	Sur les {0} pires mois des données, le portefeuille a perdu {1}% ; le client accepte jusqu'à {2}% sur un an.
+1705	Horizon
+1706	Actions et cryptos à {0}% avec un horizon de {1}-{2} ans : au-dessus des {3}% indicatifs pour cet horizon.
+1707	non adéquat
+1708	L'instrument le plus lourd (S&P {0}) est à {1}%.
+1709	Instruments complexes
+1710	Aucun instrument à effet de levier, inverse ou crypto.
+1711	Modifier le profil
+1712	Déclaration d'adéquation (PDF)
+1713	✓ Enregistré dans les archives sous
+1714	Ouvrir
+1715	Seulement si vous appuyez sur le bouton
+1716	Quanta Portfolio · Comment nous traitons vos données
+1717	Portefeuille A
+1718	+ Comparer avec B
+1719	Un seul ETF sur le monde entier, marchés développés et émergents. Simple et très diversifié.
+1720	Le classique équilibré : {0}% d'actions mondiales, {1}% d'obligations mondiales couvertes contre le change.
+1721	Une base sur le monde développé, plus les émergents, les petites entreprises et la tech américaine.
+1722	{0} autres modèles : trois ETF, permanent, All Weather…
+1723	Cherchez actions, ETF, obligations, cryptos : nom, ticker ou ISIN
+1724	Chercher un instrument à ajouter
+1725	Type d'instrument
+1726	Les poids totalisent {0}%
+1727	{0} instruments reconnus
+1728	{0} instruments, {1} classe d'actifs
+1729	Chargement des actions…
+1730	Industrie et défense ({0})
+1731	Télécommunications et médias ({0})
+1732	Royaume-Uni ({0})
+1733	Allemagne ({0})
+1734	France ({0})
+1735	Espagne ({0})
+1736	Pays-Bas ({0})
+1737	Suisse ({0})
+1738	Belgique ({0})
+1739	Finlande ({0})
+1741	NVDA · États-Unis · Technologie
+1743	AAPL · États-Unis · Technologie
+1745	MSFT · États-Unis · Technologie
+1747	AMZN · États-Unis · Consommation discrétionnaire
+1749	GOOGL · États-Unis · Télécommunications et médias
+1751	META · États-Unis · Télécommunications et médias
+1753	TSLA · États-Unis · Consommation discrétionnaire
+1755	BRK-B · États-Unis · Finance
+1757	AVGO · États-Unis · Technologie
+1759	ALV.DEX · Allemagne · Finance
+1761	RHM.DEX · Allemagne · Industrie et défense
+1762	SAP.DEX · Allemagne · Technologie
+1764	ASML.AMS · Pays-Bas · Technologie
+1765	MC.PAR · France · Consommation discrétionnaire
+1767	KO · États-Unis · Consommation de base
+1770	V · États-Unis · Finance
+1772	MA · États-Unis · Finance
+1774	NFLX · États-Unis · Télécommunications et médias
+1776	AMD · États-Unis · Technologie
+1778	PLTR · États-Unis · Technologie
+1780	LLY · États-Unis · Santé
+1782	JNJ · États-Unis · Santé
+1784	PG · États-Unis · Consommation de base
+1786	MCD · États-Unis · Consommation discrétionnaire
+1788	DIS · États-Unis · Télécommunications et médias
+1790	XOM · États-Unis · Énergie
+1792	WMT · États-Unis · Consommation de base
+1794	COST · États-Unis · Consommation de base
+1796	INTC · États-Unis · Technologie
+1798	ENEL.MIL · Italie · Services publics
+1800	ENI.MIL · Italie · Énergie
+1802	ISP.MIL · Italie · Finance
+1804	UCG.MIL · Italie · Finance
+1806	RACE.MIL · Italie · Consommation discrétionnaire
+1808	STLAM.MIL · Italie · Consommation discrétionnaire
+1810	LDO.MIL · Italie · Industrie et défense
+1812	G.MIL · Italie · Finance
+1814	PST.MIL · Italie · Finance
+1816	MONC.MIL · Italie · Consommation discrétionnaire
+1817	Trois questions sur vous, puis revivez les crises avec votre capital d'aujourd'hui ({0} €) et choisissez ce que vous auriez fait. À la fin, je compare la perte que vous supportez avec celle que votre portefeuille a vraiment subie.
+1818	Les données de votre portefeuille ne contiennent aucune crise complète avec une baisse d'au moins {0}% : le test se limite aux trois questions et aux pertes historiques.
+1819	Outil pédagogique, pas un conseil : je ne vous dis pas quoi acheter. Il utilise seulement les prix historiques de votre portefeuille.
+1820	Commencer · {0} minutes
+1821	Dans combien de temps aurez-vous besoin de cet argent ?
+1822	Vous trouvez ici les portefeuilles que vous enregistrez : par client, avec notes et historique des revues.
+1823	Valeur dans les archives
+1824	{0} portefeuilles
+1825	Rendement moyen (TRI)
+1826	il faut les mouvements dans le fichier
+1827	tout est en ordre
+1828	Dernière revue
+1831	Les archives sont vides
+1832	Importez un fichier (l'Excel du client ou le relevé du courtier), construisez le laboratoire et choisissez
+1833	Je regarde votre fichier avec le moteur. Si quelque chose ne colle pas, demandez-moi.
+1834	Portfolio_OS_esempio · reconstitué · feuille «Prezzi mensili» · {0} actifs de janv. {1} à oct. {2}.
+1835	Poids de EUNL dans le portefeuille A
+1836	Poids de EUNL dans le portefeuille B
+1837	Poids de IEAG dans le portefeuille A
+1838	Poids de IEAG dans le portefeuille B
+1839	Poids de CSSPX dans le portefeuille A
+1840	Poids de CSSPX dans le portefeuille B
+1841	Poids de IS{0}N dans le portefeuille A
+1842	Poids de IS{0}N dans le portefeuille B
+1843	Poids de IBGS dans le portefeuille A
+1844	Poids de IBGS dans le portefeuille B
+1845	Poids de IUSN dans le portefeuille A
+1846	Poids de IUSN dans le portefeuille B
+1847	Poids de {0}GLD dans le portefeuille A
+1848	Poids de {0}GLD dans le portefeuille B
+1849	sans coût : EUNL, IEAG, IS{0}N, IBGS, IUSN, {1}GLD
+1850	sans coût : IEAG, IS{0}N, IBGS, IUSN, {1}GLD
+1851	sans coût : IS{0}N, IBGS, IUSN, {1}GLD
+1852	sans coût : IBGS, IUSN, {0}GLD
+1853	sans coût : IUSN, {0}GLD
+1854	sans coût : {0}GLD
+1855	Par classe d'actifs
+1856	Versé net
+1857	et je connais votre
+1858	. Demandez-moi vos gains, impôts et coupons, ou dites-moi ce que vous avez acheté : je prépare l'opération et vous l'enregistrez avec «Confirmer».
+1859	Combien ai-je gagné au total ?
+1860	Combien d'impôts paierais-je si je vendais aujourd'hui ?
+1861	aucune cotation du jour
+1862	Mise à jour des prix du jour…
+1863	mise à jour des prix…
+1864	· ven. {0}/{1}, par rapport à jeu. {2}/{3}
+1865	prix au {0}/{1}/{2}
+1866	estimé avec les taux du {0}/{1}/{2} (Banque d'Italie) · échéance le {3}/{4}/{5} · rend. à l'échéance {6}% brut
+1867	BTP à taux fixe : le prix est
+1868	estimé
+1869	chaque jour à partir des rendements des BTP de référence publiés par la Banque d'Italie (données au {0}/{1}/{2}), aligné sur le dernier prix que vous avez saisi : il suit les taux, mais le prix réel peut s'en écarter de quelques dixièmes. Source : Banque d'Italie. Avec «Mettre à jour le prix», saisissez le prix de votre banque en ligne.
+1870	sur les {0} € que vous détenez aujourd'hui en titres cotés
+1871	Lors d'une mauvaise année ({0} sur {1})
+1872	−{0}% en {1} mois : cela arrive environ une année sur vingt
+1873	La pire année
+1874	−{0}% sur les {1} mois jusqu'en juin {2}
+1875	La plus forte baisse
+1876	−{0}% de juil. {1} à janv. {2}, récupérée en {3} mois
+1877	févr. {0} – mars {1}
+1878	janv. {0} – sept. {1}
+1879	Comment les titres que vous détenez aujourd'hui, avec les poids d'aujourd'hui, auraient évolué sur les {0} dernières années de prix (depuis févr. {1}). Les maisons et biens non cotés ne sont pas inclus. Ce n'est pas une prévision : cela montre l'ampleur des mouvements passés, pour savoir si vous êtes prêt à les revivre.
+1880	avec {0} € investis aujourd'hui et {1} € par mois (moyenne des {2} derniers mois)
+1881	Maison, études des enfants, retraite : écrivez vos objectifs et voyez ce que vous avez déjà, vos chances d'y arriver avec ce que vous versez et combien mettre de côté en plus.
+1882	Retraite complémentaire · {0} € dans {1} ans
+1883	Je verse par mois
+1884	Combien vous versez par mois
+1885	ven. {0}/{1}
+1886	ven. {0}/{1} +{2} € (+{3}%) · gain +{4} €
+1887	Vous possédez {0} parts
+1888	Parts vendues
+1890	Frais et impôts (€)
+1891	Enregistrer la vente
+1892	Enregistrer le revenu
+1893	Bien
+1894	Nouveau bien (maison, assurance, or physique, participation…)
+1895	Compte de dépôt, or physique, appartement…
+1896	Je le déduis du nom
+1897	Liquidités et comptes
+1898	Or et métaux
+1899	Maison et immobilier
+1900	Assurances et retraite
+1901	Autre
+1902	Ajouter le bien
+1903	Montant par mois (€)
+1904	Jour du mois
+1905	Enregistrer le plan
+1906	Le jour du plan, je vous rappelle de l'enregistrer, avec le montant déjà saisi : vous saisissez seulement les parts réelles du courtier.
+1907	Sur la dernière semaine
+1908	Rendement de la dernière semaine sans compter l'argent versé ; la courbe monte aussi quand vous investissez.
+1909	Reprendre où vous en étiez
+1910	{0} instruments · {1} € · revu le {2} nov.
+1911	Supprimer Mario Rossi
+1912	Revenir aux résultats ouverts
+1913	Qui contacter
+1914	{0} chose à faire, les plus urgentes d'abord
+1915	risque au-dessus du profil
+1916	Indice de risque {0} contre {1} pour le profil prudent.
+1917	du plus grand · risque de {0} à {1}
+1918	Rendement
+1919	Profil
+1920	Modèle
+1921	Revue
+1922	Modèle de Mario Rossi
+1923	aucun modèle
+1924	aujourd'hui
+1925	← Retour au site
+1926	Comment nous traitons vos
+1927	données
+1928	En bref : votre navigateur lit le fichier et nous ne l'enregistrons sur aucun serveur. Pour comprendre un nouveau fichier, nous n'envoyons à l'IA qu'un extrait, et vous pouvez la désactiver. Vous trouverez tout le détail ci-dessous, et tout en bas les paramètres pour modifier ou tout effacer.
+1929	Le fichier reste à vous
+1930	Il est lu dans le navigateur. Aucun serveur n'en garde de copie.
+1931	L'IA ne voit que des extraits
+1932	Seulement les parties nécessaires, seulement pour les fonctions qui l'utilisent. Elle peut être désactivée.
+1933	Statistiques anonymes
+1934	Pas de cookies, pas d'adresse IP enregistrée, aucune valeur de vos fichiers.
+1935	{0}. Votre fichier
+1936	Quand vous importez un Excel ou un CSV, le fichier est ouvert et lu
+1937	par votre navigateur
+1938	, sur votre ordinateur. Le moteur de calcul (rendements, risque, simulations, stress tests, FIRE) tourne lui aussi dans le navigateur. Nous ne téléversons pas le fichier sur un serveur et n'en gardons aucune copie.
+1939	{0}. Quand l'IA intervient
+1940	Certaines fonctions utilisent un modèle d'intelligence artificielle d'un fournisseur externe (selon la disponibilité : Google Gemini, Groq ou Anthropic Claude). Notre serveur transmet la demande et ne la conserve pas. Voici ce qui est envoyé :
+1941	Fonction
+1942	Ce qui est envoyé
+1943	Lecture du fichier
+1944	Quand vous importez un nouveau type de fichier. Si vous avez déjà confirmé ce type de fichier, l'IA n'est pas appelée. Elle peut être désactivée, voir ci-dessous.
+1945	Un extrait pour en comprendre la structure : nom du fichier, noms des feuilles, en-têtes et quelques lignes d'exemple, avec les valeurs coupées à {0} caractères. Pas le fichier entier.
+1946	Reconstruction avec les prix de marché
+1947	Quand le fichier est une synthèse ou une liste de mouvements à interpréter
+1948	Les premières lignes de chaque feuille (une trentaine au maximum), pour reconnaître instruments et quantités.
+1949	«Importer une capture d'écran»
+1950	Seulement si vous choisissez les images et cochez «J'ai compris : envoyer les images à l'IA»
+1951	Les images entières, réduites par le navigateur, pour lire titres, quantités et valeurs. Nous ne les enregistrons pas. Avant de les envoyer, vous pouvez masquer ce qui est inutile (nom, numéro de compte). Pour les titres qui n'ont qu'un nom, nous envoyons aussi le nom à l'IA pour trouver l'ISIN, vérifié ensuite sur OpenFIGI.
+1952	«Corriger avec l'IA»
+1953	Les en-têtes et les lignes présentant un problème possible ({0} au maximum), pour proposer une correction.
+1954	Recherche des ISIN manquants
+1955	Quand le fichier ne contient pas les ISIN
+1956	Nom et ticker des instruments sans ISIN. Aucune quantité ni valeur.
+1957	Quanta, l'analyste IA
+1958	Seulement quand vous lui écrivez ou lui parlez
+1959	Vos messages et les résultats des calculs nécessaires pour répondre (par exemple rendement, risque ou valeurs en euros). Si vous l'interrogez sur votre patrimoine, aussi sa synthèse : instruments, parts, valeurs, gains, impôts estimés et objectifs. Pas le fichier. Les opérations que vous lui dictez ne sont enregistrées que lorsque vous appuyez sur «Confirmer».
+1960	Photos envoyées à Quanta
+1961	Seulement si vous choisissez une photo, après autorisation («J'ai compris, choisir la photo»)
+1962	La photo, réduite par le navigateur, uniquement à Google Gemini, pour la lire et vous répondre. Nous ne l'enregistrons pas. Vous pouvez d'abord masquer nom, adresse ou numéro de compte.
+1963	Seulement si vous démarrez l'appel, après autorisation («Démarrer l'appel»)
+1964	Votre voix est envoyée à Google (Gemini Live) en temps réel pour vous comprendre et vous répondre, avec un résumé du contexte (par exemple si vous avez un patrimoine) et les résultats des calculs que Quanta demande. Nous n'enregistrons pas l'audio ; à la fin, seul le texte reste dans le chat. Une opération n'est enregistrée que si vous dites «oui» ou appuyez sur «Confirmer».
+1965	Voix de Quanta
+1966	Quand Quanta lit une réponse («Écouter» ou en conversation)
+1967	Le texte de la réponse est envoyé à Google (Gemini TTS) pour devenir une voix. Si le service ne répond pas, c'est la voix de votre appareil qui lit.
+1968	Voix et dictée de Quanta
+1969	Seulement si vous appuyez sur le micro ou activez «Voix»
+1970	Aucun audio chez nous : la dictée est celle de votre navigateur (Chrome la confie aux serveurs de Google, Safari à ceux d'Apple, selon leurs règles) et arrive à Quanta sous forme de texte. La lecture à voix haute est faite par votre appareil.
+1971	«Que se passait-il sur les marchés ?»
+1972	Les noms des instruments, la période et la perte de la pire baisse.
+1973	Les fournisseurs d'IA traitent ces données selon leurs conditions pour les développeurs. Si vous préférez ne rien envoyer à l'IA, désactivez la lecture automatique ci-dessous et n'utilisez ni Quanta ni les boutons avec l'IA : le reste du site fonctionne quand même.
+1974	{0}. Prix et données de marché
+1975	Pour calculer les rendements, nous téléchargeons des données publiques. Aux sources, nous envoyons
+1976	seulement le symbole ou l'ISIN
+1977	de l'instrument, jamais les quantités, les valeurs ou le nom de votre fichier.
+1978	Yahoo Finance
+1979	 : prix historiques des ETF et des indices.
+1980	Banque centrale européenne
+1981	 : taux, inflation et taux de change.
+1982	 : fiches des fonds (pays, secteurs, frais), recherchées par ISIN.
+1983	OpenFIGI
+1984	 : vérifie qu'un ISIN correspond au bon instrument (pour les obligations d'État : coupon et échéance).
+1985	Banque d'Italie
+1986	 : rendements des BTP à {0}, {1}, {2} et {3} ans, utilisés pour
+1987	estimer
+1988	le prix des BTP à taux fixe. Elle ne reçoit rien de vous : la courbe est la même pour tous.
+1989	Ministère italien de l'Économie et des Finances
+1990	 : liste des BTP en circulation (copiée dans le site, aucune requête depuis votre navigateur).
+1991	{0}. Statistiques d'utilisation anonymes
+1992	Pour savoir comment améliorer le site, nous comptons quelques événements : visite, section ouverte, type de fichier importé (exemple, votre fichier, portefeuille créé), fonctions utilisées, erreurs. Chaque visite a un code aléatoire qui ne dit pas qui vous êtes.
+1993	Pas de cookies, pas d'adresse IP enregistrée, ni valeurs, ni noms de titres, ni noms de vos fichiers.
+1994	Les signalements «le fichier a été mal lu» contiennent le texte que vous écrivez et, seulement si vous cochez la case, les noms des feuilles et des en-têtes (jamais les valeurs). Nous gardons les {0} derniers.
+1995	Le détail par jour des sessions expire après {0} jours.
+1996	{0}. Ce qui reste dans ce navigateur
+1997	Certaines choses sont mémorisées
+1998	seulement sur cet ordinateur
+1999	, dans la mémoire du navigateur, pour vous faire gagner du temps :
+2000	la carte des colonnes que vous avez confirmée pour un type de fichier, pour ne pas avoir à la refaire la prochaine fois ;
+2001	vos préférences (lecture par l'IA, enregistrement) et les données de la section Indépendance (âge, dépenses, épargne, pension) ;
+2002	frais des fonds
+2003	que vous saisissez à la main (par ISIN) et les autres frais annuels ;
+2004	le nom du cabinet, les coordonnées et le logo utilisés dans le rapport ;
+2005	analyses enregistrées
+2006	, seulement si vous choisissez de les enregistrer : le contenu du fichier lu, le nom, les notes et l'historique des revues ;
+2007	votre
+2008	, si vous le créez : les instruments, les biens ajoutés à la main et les opérations (achats, ventes, dividendes, estimations). Pour mettre à jour les prix, le site demande les cotations par le symbole de l'instrument, jamais vos quantités ni vos montants.
+2009	Elles ne quittent pas votre ordinateur. Vous pouvez les effacer ci-dessous ou en supprimant les données du site dans les paramètres du navigateur.
+2010	{0}. Hébergement
+2011	Le site est hébergé sur
+2012	Vercel
+2013	. Comme tout service d'hébergement, il enregistre des données techniques des requêtes (par exemple l'adresse IP et l'heure) pour la sécurité et le fonctionnement, selon ses conditions.
+2014	{0}. Ce que nous ne faisons pas
+2015	Nous ne vendons pas de données et ne les utilisons pas pour de la publicité.
+2016	Nous ne créons pas de profils des personnes.
+2017	Nous ne donnons pas de conseil financier : le site analyse des données historiques et montre comment les chiffres sont calculés ; les décisions vous appartiennent.
+2018	Vos paramètres sur ce navigateur
+2019	Lecture automatique par l'IA
+2020	Quand vous importez un nouveau type de fichier, elle en envoie un extrait à l'IA pour le comprendre. Désactivée : le fichier n'est lu que par les outils de reconnaissance du site et, si besoin, vous l'associez à la main.
+2021	Toujours enregistrer les analyses sur cet ordinateur
+2022	Désactivé : le site vous le demande à chaque fois (ou ne vous le demande plus, si vous l'avez dit).
+2023	Analyses enregistrées
+2024	Vérification…
+2025	Effacer les analyses
+2026	Tout ce que le site mémorise
+2027	Analyses, patrimoine, cartes des fichiers, préférences et données de la section Indépendance.
+2028	Tout effacer
+2029	Dernière mise à jour : {0} novembre {1}. Quanta Portfolio (anciennement Portfolio OS) est un projet en version bêta. Si quelque chose n'est pas clair ou si vous voulez en savoir plus sur une donnée, écrivez-nous depuis le site avec «Votre fichier a été mal lu ? Signalez-le» ou contactez-nous sur LinkedIn.
+2030	{0} analyse enregistrée sur cet ordinateur.

@@ -1,0 +1,325 @@
+339	+{0}% a year · like the instruments, without the effect of contributions
+340	What each instrument returned
+341	Purchases
+342	Sales
+343	Dividends received
+344	brought the largest gain (+{0} €),
+345	the smallest (+{0} €). Gain = value today − purchases + sales + dividends received: the sum per instrument is exactly the total gain. Prices are adjusted, so reinvested dividends are already in the value; dividends received (distributing ETFs) count as money that left the portfolio, but that you earned. Fees and stamp duty not linked to an instrument are not included.
+346	Dec {0}
+347	exposed to other currencies · range for undetailed shares
+348	Coupon · BTP {0}% {1}/{2}/{3}
+349	on {0}/{1}/{2} · {3} € gross, tax {4}%
+350	Record
+351	Skip
+352	{0} answers missing to calculate the profile.
+353	Annual cost of CSPX in percent
+354	Annual cost of CSNDX in percent
+355	When can you stop working?
+356	Source
+357	Annual return
+358	Your
+359	, from Jan {0} to Dec {1}:
+360	Note
+361	Nov {0}
+362	your
+363	finally
+364	clear.
+365	open →
+366	no instrument costs more
+367	Recognized without AI: «★ Savings plan transactions ({0} sheets)»: list of purchases and sales
+368	Menu
+369	Growth of {0} €
+370	Backup copy
+371	← Back
+372	I use the site
+373	Rebuilt with market prices
+374	which instruments
+375	you hold and
+376	how many
+377	: {0} instruments. The prices below are each instrument's market prices, in euro: here you see the last {1} months. The sources are detailed on the map.
+378	United Kingdom
+379	advisor
+380	Cash
+381	From your {0} transactions · sheet «★ Savings plan transactions ({1} sheets)» · since Jan {2}
+382	sum of purchases
+383	The value follows the instruments' returns in the data and adds each contribution at month end: the file has no quantities, so it is an estimate. Returns are market returns converted into euro at the ECB month-end rate; the value may differ slightly from your broker's (month-end prices, different exchange). IRR and time-weighted return over less than a year or two can change a lot: they are not forecasts.
+384	same contributions in the S&P {0}
+385	Archive
+386	Are you an advisor
+387	The client, in minutes.
+388	From the client's bank export to a clear proposal, ready to show.
+389	A/B proposal with the trades and estimated taxes
+390	Full-screen client presentation
+391	PDF report with your firm's name
+392	What has changed since the last review
+393	The client's file stays in your browser: no account, no data servers, no products to sell.
+394	Analyze a client
+395	Build a proposal
+396	Ireland
+397	Xetra-Gold ETC (physical gold)
+399	Japan
+400	none
+401	Building
+402	Lab
+403	The first rows of the sheet as the engine read them: titles discarded, header found, every column labeled.
+404	Sheet preview
+405	What I found
+406	Go to the map →
+407	Engine log
+408	missing · from the KID
+409	with fund factsheet read · loading
+410	Suitability
+411	Target weights
+412	Your portfolio
+413	Age today
+414	The money must last until
+415	You save every month
+416	Monthly spending to cover
+417	Monthly pension
+418	From age
+419	I want to stop at
+420	Efficient frontier
+421	Call Quanta
+422	All the securities in this file appear to have been sold
+423	I read the purchases and sales, but at the end of the period no security is left in the portfolio: there is no current portfolio to analyze. If the account holds securities bought before the start of the file, download the list of transactions since the account was opened, or the current portfolio position.
+424	S&P {0} symbol
+425	Nasdaq {0} symbol
+426	Interpretation of CSPX
+427	Interpretation of CSNDX
+428	Market price of CNDX.AMS (simulation), closes adjusted for dividends and splits, in euro, {0} months from {1}-{2}
+429	Every
+430	column,
+431	your sheet, the broker's export or the bank's securities transactions (Excel or CSV) · or drag it here
+432	instruments
+434	Interpretation of EUNL
+435	Market price of IWDA.AMS (simulation), closes adjusted for dividends and splits, in euro, {0} months from {1}-{2}
+436	Interpretation of IEAG
+437	Market price of IEAG.AMS (simulation), closes adjusted for dividends and splits, in euro, {0} months from {1}-{2}
+438	Interpretation of CSSPX
+440	Market price of EMIM.AMS (simulation), closes adjusted for dividends and splits, in euro, {0} months from {1}-{2}
+441	Interpretation of IBGS
+442	Market price of IBGS.AMS (simulation), closes adjusted for dividends and splits, in euro, {0} months from {1}-{2}
+443	Interpretation of IUSN
+444	Market price of IUSN.DEX (simulation), closes adjusted for dividends and splits, in euro, {0} months from {1}-{2}
+447	Returns per period calculated by the engine after your choices · first {0} series.
+448	assets
+449	dates
+450	correlations
+451	metrics
+452	Example · synthetic data
+453	Dictate the message
+454	Dictate
+455	in {0} years, with the same gross return
+456	Where do you start?
+457	Five paths, one result: your wealth made clear, with market prices.
+458	In use:
+459	Upload a screenshot
+460	one or more photos of your bank or broker app: the AI reads securities and quantities, you check
+461	I don't have a file
+462	create a portfolio by choosing ETFs and weights
+463	How much does my bank cost me?
+464	enter the figures from your costs and charges statement: costs in euro, over {0} and {1} years, compared with ETFs
+465	Show me an example
+466	{0} ETFs, {1} transactions since {2}
+467	The file is read in your browser and we don't save it on any server. To understand a new file we send the AI only an extract, and you can switch it off.
+468	How we handle your data
+469	A day of your wealth,
+470	without lifting a finger.
+471	After the close
+472	Updated prices
+473	Every instrument with its closing price, the official ECB exchange rates, the change from yesterday.
+474	Savings plan day
+475	The reminder
+476	Amount already filled in: you enter the shares you see in your broker's app. No invented estimates.
+477	Shares bought
+478	Price paid
+479	Coupon day
+480	The coupon, net
+481	At {0}% for government bonds, {1}% for other bonds. One tap and it goes into your income.
+482	BTP {0}% {1} · {2} March
+483	Gross
+484	Tax {0}%
+485	Net
+486	Sample data
+487	The questions that matter.
+488	Six analysis tools for your portfolio. Every number has its receipt: formula, data used, assumptions.
+489	How much can you lose in a bad year?
+490	What if {0}, {1}, {2} came back?
+491	How much will you have in twenty years, and how likely is it?
+492	at {0} years
+493	Are there more efficient weights than yours?
+494	Sharpe {0}
+495	Did you beat the MSCI World?
+496	+{0}% a year
+497	Sample results
+498	Try the full example →
+499	You invest on your own
+500	Truly understand your money.
+501	How much you've earned after taxes, what your funds cost you in euro, when you'll be able to stop working.
+502	Net worth always up to date
+503	True return, even after taxes
+504	Fund costs over {0} years
+505	Free, no account
+506	Your wealth,
+507	finally clear.
+508	Start free, no account →
+509	Recognized without AI: «Transactions»: list of purchases and sales
+510	Recognized without AI: «Positions»: summary of {0} positions without history
+511	Chose the sheet «Monthly performance»: it has the most numeric series
+512	net worth
+513	Tech stocks
+514	Try your own shock ↓
+515	lose
+516	have
+517	stop
+518	storm
+519	best
+520	market
+521	Measure
+522	Crypto
+523	File rebuilt with market prices, not with the values in your Excel (which include contributions, sales and cash movements): {0} instruments, {1} months of simulated market prices (closes adjusted for dividends and splits), all converted into euro at the ECB month-end rate.
+524	Market prices
+525	where the numbers come from
+526	The analysis uses each instrument's market prices, not the values in your file: contributions, sales and cash movements don't distort risk and returns. Your personal return (IRR) is calculated separately, from your transactions.
+527	Symbol
+528	Quote currency
+529	Back to the original file
+530	Worst period
+531	Obs.
+532	prices · col. B
+533	prices · col. C
+534	Try a variant
+535	Assumption: portfolio rebalanced every month to the given weights, over {0} months of history. Market prices converted into euro at the ECB month-end rate.
+536	Rebalancing
+537	with fund factsheet read
+538	this year. In {0} years, with a gross return of {1}%, that's
+539	≈ {0} € a year
+540	purchase, sale, dividend, home
+541	ETFs, BTPs, accounts, gold and home in one place.
+542	Come back tomorrow, and it's all up to date.
+543	Create your net worth →
+544	Upload your bank file
+545	No account
+546	to create
+547	No bank
+548	to connect
+549	Your data
+550	stays in your browser
+551	Sample net worth
+552	Group
+553	Today
+554	Next coupon · {0} March
+555	{0} € net
+556	‹ Net worth
+557	Government bond
+558	Maturity
+559	{0} March {1}
+560	Taxation
+561	Upcoming coupons
+562	{0} Sep {1}
+563	Every investment is a slice.
+564	Tap a slice and the center tells you what it's worth, how much it weighs and how much it has earned you. Tap again and the total comes back.
+565	Stocks, bonds, cash, gold.
+566	With one gesture you see your wealth by category. The emergency fund is cash, grandma's gold is gold: everything in its place.
+567	The percentage gain is calculated on investments: money in the account isn't «invested in the market».
+568	BTPs, the way an Italian holds them.
+569	Face value and price per {0}, coupon and maturity understood from the name. On coupon day the site reminds you, with the net amount already calculated.
+570	Government bond · example
+571	Next coupon
+572	{0} Mar {1} · {2} €
+573	Who it's for
+574	Official ECB market data
+575	Terminal · ECB
+576	official data
+577	{0} invented numbers: rates, inflation and exchange rates come from the European Central Bank.
+578	Metrics of the uploaded dataset
+579	The Quanta Portfolio labs
+580	Financial Intelligence Terminal
+581	The labs.
+582	One portfolio.
+583	You load the data once: every lab uses it, the AI interprets it, the engine does the math.
+584	Saved only in this browser
+585	Add
+586	Add a photo
+587	Summary
+588	Only an analysis of historical data: it is not investment advice.
+589	Create your portfolio
+590	Export to Excel
+591	on my own
+592	as an advisor
+593	Language
+594	Gold
+595	Chose the sheet «ETF returns»: it has the most numeric series
+596	Headers in row {0} ({1} title rows skipped)
+597	Quality check: {0} errors, {1} warning
+598	of history. {0} values missing in «Emerging eq.».
+599	ETF returns
+600	Legend · no series
+601	Interpretation of Ref. date
+602	Interpretation of Global eq. (EUR)
+603	Interpretation of Emerging eq.
+604	Interpretation of Euro bonds
+605	Interpretation of Gold - monthly return
+606	Values with the % sign (from -{0}% to {1}%): returns, converted to decimals
+607	Interpretation of Net flows (mln)
+608	Numbers from -{0} to {1} that look like neither prices nor returns: tell me what they represent
+609	Interpretation of Notes
+610	«Emerging eq.»: {0} missing values (Jun {1}, Nov {2}). Excluded from calculations, not estimated.
+611	{0} row without a valid date was excluded (for example totals or averages at the bottom of the sheet).
+612	in the data: euro debt crisis, COVID-{0} crash, inflation shock {1}
+613	Transactions
+614	Positions
+615	Monthly performance
+616	Info · no series
+617	Interpretation of Portfolio value
+618	Portfolio value including contributions: returns would be inflated by the money added. The instruments' prices are needed
+619	Interpretation of Cumulative invested
+620	Interpretation of Gain
+621	Interpretation of Monthly return %
+622	Positive and negative, close to zero (from -{0} to {1}): returns in decimal form
+623	Symbol of iShares Core MSCI World UCITS ETF USD (Acc)
+624	Symbol of iShares € Aggregate Bond ESG SRI UCITS ETF EUR (Dist)
+625	Symbol of iShares Core S&P {0} UCITS ETF USD (Acc)
+626	Symbol of iShares Core MSCI EM IMI UCITS ETF USD (Acc)
+627	Symbol of iShares € Govt Bond {0}-{1}yr UCITS ETF EUR (Dist)
+628	Symbol of iShares MSCI World Small Cap UCITS ETF USD (Acc)
+629	Symbol of Xetra-Gold ETC (physical gold)
+630	Comparison with the index
+631	Downloading the SPY history…
+632	Stocks {0}%
+639	Annual cost of EUNL in percent
+640	Annual cost of IEAG in percent
+641	Annual cost of CSSPX in percent
+643	Annual cost of IBGS in percent
+644	Annual cost of IUSN in percent
+646	EUR · distributing
+647	Emerging
+648	Inflation shock {0}
+649	portfolio
+651	For the advisor
+652	this year on the part with known costs ({0}%). In {1} years, with a gross return of {2}%, that's
+653	≈ {0} € a year · known for {1}%
+654	How much
+655	can you
+656	-{0} year
+657	What are your chances?
+658	Normal
+659	Nominal
+660	Risk parity
+661	Currency
+662	Frequency
+663	Maximum loss
+664	Worst {0} months
+665	VaR {0}% in one month
+666	The file has no target weights. Enter them below, or start from the current weights and change them.
+667	Use the current weights as target
+668	Not detailed
+669	Netherlands
+670	Stocks, United States · Nasdaq {0}®
+671	With the same contributions in the S&P {0}
+672	You made
+673	more than the index, with an IRR of +{0}% vs +{1}%. Same euros, same dates: only where you put them changes.
+674	Change the index in the section
+675	What I understood, how sure I am and why. If I'm wrong, correct it from the menu, or let the AI rebuild the file.
+676	The AI receives only an extract of the structure (headers, section titles, first and last rows), never the whole file. The calculations stay in your browser and a template already confirmed is no longer sent. The site collects anonymous usage statistics (which sections are used, whether the import succeeds), without cookies and without any data from your files.
+677	Column

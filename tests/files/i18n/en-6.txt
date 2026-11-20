@@ -1,0 +1,295 @@
+1695	profile {0} of {1}
+1696	profile {0}
+1697	For the advisor · PAC_due_fogli_righe_vuote
+1698	Not suitable
+1699	Profile {0}, Portfolio {1} of {2}
+1700	Profile {0}
+1701	Portfolio risk number {0} (moderate) versus {1} for the profile (cautious).
+1702	needs justification
+1703	Bearable loss
+1704	In the worst {0} months of the data the portfolio lost {1}%; the client accepts up to {2}% in a year.
+1705	Horizon
+1706	Stocks and crypto at {0}% with a {1}-{2} year horizon: above the indicative {3}% for this horizon.
+1707	not suitable
+1708	The heaviest instrument (S&P {0}) is at {1}%.
+1709	Complex instruments
+1710	No leveraged, inverse or crypto instruments.
+1711	Edit the profile
+1712	Suitability statement (PDF)
+1713	✓ Saved in the archive as
+1714	Open
+1715	Only if you press the button
+1716	Quanta Portfolio · How we handle your data
+1717	Portfolio A
+1718	+ Compare with B
+1719	A single ETF on the whole world, developed and emerging markets. Simple and highly diversified.
+1720	The classic balanced: {0}% global stocks, {1}% currency-hedged global bonds.
+1721	A developed-world core, plus emerging markets, small companies and US tech.
+1722	{0} more models: three ETFs, permanent, All Weather…
+1723	Search stocks, ETFs, bonds, crypto: name, ticker or ISIN
+1724	Search an instrument to add
+1725	Instrument type
+1726	Weights add up to {0}%
+1727	{0} instruments recognized
+1728	{0} instruments, {1} asset class
+1729	Loading stocks…
+1730	Industrials and defense ({0})
+1731	Telecommunications and media ({0})
+1732	United Kingdom ({0})
+1733	Germany ({0})
+1734	France ({0})
+1735	Spain ({0})
+1736	Netherlands ({0})
+1737	Switzerland ({0})
+1738	Belgium ({0})
+1739	Finland ({0})
+1741	NVDA · USA · Technology
+1743	AAPL · USA · Technology
+1745	MSFT · USA · Technology
+1747	AMZN · USA · Consumer discretionary
+1749	GOOGL · USA · Telecommunications and media
+1751	META · USA · Telecommunications and media
+1753	TSLA · USA · Consumer discretionary
+1755	BRK-B · USA · Financials
+1757	AVGO · USA · Technology
+1759	ALV.DEX · Germany · Financials
+1761	RHM.DEX · Germany · Industrials and defense
+1762	SAP.DEX · Germany · Technology
+1764	ASML.AMS · Netherlands · Technology
+1765	MC.PAR · France · Consumer discretionary
+1767	KO · USA · Consumer staples
+1770	V · USA · Financials
+1772	MA · USA · Financials
+1774	NFLX · USA · Telecommunications and media
+1776	AMD · USA · Technology
+1778	PLTR · USA · Technology
+1780	LLY · USA · Health care
+1782	JNJ · USA · Health care
+1784	PG · USA · Consumer staples
+1786	MCD · USA · Consumer discretionary
+1788	DIS · USA · Telecommunications and media
+1790	XOM · USA · Energy
+1792	WMT · USA · Consumer staples
+1794	COST · USA · Consumer staples
+1796	INTC · USA · Technology
+1798	ENEL.MIL · Italy · Utilities
+1800	ENI.MIL · Italy · Energy
+1802	ISP.MIL · Italy · Financials
+1804	UCG.MIL · Italy · Financials
+1806	RACE.MIL · Italy · Consumer discretionary
+1808	STLAM.MIL · Italy · Consumer discretionary
+1810	LDO.MIL · Italy · Industrials and defense
+1812	G.MIL · Italy · Financials
+1814	PST.MIL · Italy · Financials
+1816	MONC.MIL · Italy · Consumer discretionary
+1817	Three questions about you, then relive the crises with your capital today ({0} €) and choose what you would have done. At the end I compare the loss you can take with the one your portfolio actually had.
+1818	Your portfolio's data contains no complete crisis with a fall of at least {0}%: the test is limited to the three questions and historical losses.
+1819	Educational tool, not advice: I don't tell you what to buy. It only uses your portfolio's historical prices.
+1820	Start · {0} minutes
+1821	How long until you'll need this money?
+1822	Here you'll find the portfolios you save: by client, with notes and review history.
+1823	Value in the archive
+1824	{0} portfolios
+1825	Average return (IRR)
+1826	transactions in the file are needed
+1827	all in order
+1828	Last review
+1831	The archive is empty
+1832	Upload a file (the client's Excel or the broker's statement), build the lab and choose
+1833	I'm looking at your file with the engine. If something doesn't add up, ask me.
+1834	Portfolio_OS_esempio · rebuilt · sheet «Prezzi mensili» · {0} assets from Jan {1} to Oct {2}.
+1835	Weight of EUNL in portfolio A
+1836	Weight of EUNL in portfolio B
+1837	Weight of IEAG in portfolio A
+1838	Weight of IEAG in portfolio B
+1839	Weight of CSSPX in portfolio A
+1840	Weight of CSSPX in portfolio B
+1841	Weight of IS{0}N in portfolio A
+1842	Weight of IS{0}N in portfolio B
+1843	Weight of IBGS in portfolio A
+1844	Weight of IBGS in portfolio B
+1845	Weight of IUSN in portfolio A
+1846	Weight of IUSN in portfolio B
+1847	Weight of {0}GLD in portfolio A
+1848	Weight of {0}GLD in portfolio B
+1849	no cost: EUNL, IEAG, IS{0}N, IBGS, IUSN, {1}GLD
+1850	no cost: IEAG, IS{0}N, IBGS, IUSN, {1}GLD
+1851	no cost: IS{0}N, IBGS, IUSN, {1}GLD
+1852	no cost: IBGS, IUSN, {0}GLD
+1853	no cost: IUSN, {0}GLD
+1854	no cost: {0}GLD
+1855	By asset class
+1856	Net contributed
+1857	and I know your
+1858	. Ask me about gains, taxes and coupons, or tell me what you bought: I prepare the transaction and you save it with «Confirm».
+1859	How much have I gained in total?
+1860	How much tax would I pay if I sold today?
+1861	no quote for the day
+1862	Updating today's prices…
+1863	updating prices…
+1864	· Fri {0}/{1}, versus Thu {2}/{3}
+1865	price as of {0}/{1}/{2}
+1866	estimated with rates of {0}/{1}/{2} (Bank of Italy) · matures {3}/{4}/{5} · yield to maturity {6}% gross
+1867	Fixed-rate BTP: the price is
+1868	estimated
+1869	every day from the yields of the benchmark BTPs published by the Bank of Italy (data as of {0}/{1}/{2}), aligned to the last price you entered: it moves with rates, but the real price may differ by a few tenths. Source: Bank of Italy. With «Update price» enter the price from your online banking.
+1870	on the {0} € you hold today in listed securities
+1871	In a bad year ({0} in {1})
+1872	−{0}% in {1} months: happens about one year in twenty
+1873	The worst year
+1874	−{0}% in the {1} months to Jun {2}
+1875	The biggest fall
+1876	−{0}% from Jul {1} to Jan {2}, recovered in {3} months
+1877	Feb {0} – Mar {1}
+1878	Jan {0} – Sep {1}
+1879	How the securities you hold today, with today's weights, would have moved over the last {0} years of prices (since Feb {1}). Homes and unlisted assets are not included. It's not a forecast: it shows how much it moved in the past, so you can tell whether you're fine seeing it happen.
+1880	with {0} € invested today and {1} € a month (average of the last {2} months)
+1881	Home, children's education, retirement: write your goals and see how much you already have, how likely you are to get there with what you contribute and how much more to set aside.
+1882	Supplementary pension · {0} € in {1} years
+1883	I contribute monthly
+1884	How much you contribute each month
+1885	Fri {0}/{1}
+1886	Fri {0}/{1} +{2} € (+{3}%) · gain +{4} €
+1887	You own {0} shares
+1888	Shares sold
+1890	Fees and taxes (€)
+1891	Save the sale
+1892	Save the income
+1893	Asset
+1894	New asset (home, policy, physical gold, stake…)
+1895	Deposit account, physical gold, apartment…
+1896	I can tell from the name
+1897	Cash and accounts
+1898	Gold and metals
+1899	Home and property
+1900	Policies and pension
+1901	Other
+1902	Add the asset
+1903	Monthly amount (€)
+1904	Day of the month
+1905	Save the plan
+1906	On savings plan day I'll remind you to record it, with the amount already filled in: you only enter the actual shares from your broker.
+1907	In the last week
+1908	Return over the last week without counting the money contributed; the line rises when you invest too.
+1909	Pick up where you left off
+1910	{0} instruments · {1} € · reviewed on {2} Nov
+1911	Delete Mario Rossi
+1912	Back to the open results
+1913	Who to contact
+1914	{0} thing to do, most urgent first
+1915	risk above the profile
+1916	Risk number {0} versus {1} for the cautious profile.
+1917	largest first · risk from {0} to {1}
+1918	Return
+1919	Profile
+1920	Model
+1921	Review
+1922	Mario Rossi's model
+1923	no model
+1924	today
+1925	← Back to the site
+1926	How we handle your
+1927	data
+1928	In short: your browser reads the file and we don't save it on any server. To understand a new file we send the AI only an excerpt, and you can turn it off. Below you'll find everything in detail, and at the bottom the settings to change or delete everything.
+1929	The file stays yours
+1930	It's read in the browser. No server keeps a copy.
+1931	The AI only sees excerpts
+1932	Only the necessary parts, only for the features that use it. It can be turned off.
+1933	Anonymous statistics
+1934	No cookies, no saved IP address, no values from your files.
+1935	{0}. Your file
+1936	When you upload an Excel or a CSV, the file is opened and read
+1937	by your browser
+1938	, on your computer. The calculation engine (returns, risk, simulations, stress tests, FIRE) also runs in the browser. We don't upload the file to a server and we don't keep copies.
+1939	{0}. When the AI steps in
+1940	Some features use an artificial intelligence model from an external provider (depending on availability: Google Gemini, Groq or Anthropic Claude). Our server forwards the request and doesn't keep it. Here's what is sent:
+1941	Feature
+1942	What is sent
+1943	File reading
+1944	When you upload a new type of file. If you've already confirmed that type of file in the past, the AI isn't called. It can be turned off, see below.
+1945	An excerpt to understand its structure: file name, sheet names, headers and a few sample rows, with values cut to {0} characters. Not the whole file.
+1946	Rebuilding with market prices
+1947	When the file is a summary or a list of transactions to understand
+1948	The first rows of each sheet (about thirty at most), to recognize instruments and quantities.
+1949	«Upload a screenshot»
+1950	Only if you choose the images and tick «Got it: send the images to the AI»
+1951	The whole images, shrunk by the browser, to read securities, quantities and values. We don't save them. Before sending them you can cover what isn't needed (name, account number). For securities with only a name, we also send the AI the name to find the ISIN, then verified on OpenFIGI.
+1952	«Fix with AI»
+1953	The headers and the rows with a possible problem (at most {0}), to propose a fix.
+1954	Looking up missing ISINs
+1955	When the file lacks ISINs
+1956	Name and ticker of the instruments without an ISIN. No quantities or values.
+1957	Quanta, the AI analyst
+1958	Only when you write or speak to her
+1959	Your messages and the calculation results needed to answer (for example return, risk or values in euro). If you ask about your net worth, also its summary: instruments, shares, values, gains, estimated taxes and goals. Not the file. Transactions you dictate aren't saved until you press «Confirm».
+1960	Photos sent to Quanta
+1961	Only if you choose a photo, after permission («Got it, choose the photo»)
+1962	The photo, shrunk by the browser, only to Google Gemini, to read it and answer you. We don't save it. You can cover your name, address or account number first.
+1963	Only if you start the call, after permission («Start the call»)
+1964	Your voice goes to Google (Gemini Live) in real time to understand and answer you, together with a summary of the context (for example whether you have a net worth) and the calculation results Quanta asks for. We don't record the audio; at the end only the text stays in the chat. A transaction is saved only if you say «yes» or press «Confirm».
+1965	Quanta's voice
+1966	When Quanta reads an answer («Listen» or in conversation)
+1967	The text of the answer goes to Google (Gemini TTS) to become voice. If the service doesn't respond, your device's voice reads it.
+1968	Quanta's voice and dictation
+1969	Only if you press the microphone or turn on «Voice»
+1970	No audio on our side: dictation is your browser's (Chrome entrusts it to Google's servers, Safari to Apple's, under their rules) and reaches Quanta as text. Reading aloud is done by your device.
+1971	«What was happening in the markets?»
+1972	The instrument names, the period and the loss of the worst fall.
+1973	AI providers handle this data under their developer terms. If you'd rather not send anything to the AI, turn off automatic reading below and don't use Quanta or the AI buttons: the rest of the site works just the same.
+1974	{0}. Prices and market data
+1975	To calculate returns we download public data. To the sources we send
+1976	only the symbol or ISIN
+1977	of the instrument, never quantities, values or the name of your file.
+1978	Yahoo Finance
+1979	: historical prices of ETFs and indices.
+1980	European Central Bank
+1981	: rates, inflation and exchange rates.
+1982	: fund factsheets (countries, sectors, costs), looked up by ISIN.
+1983	OpenFIGI
+1984	: checks that an ISIN matches the right instrument (for government bonds: coupon and maturity).
+1985	Bank of Italy
+1986	: yields of BTPs at {0}, {1}, {2} and {3} years, used to
+1987	estimate
+1988	the price of fixed-rate BTPs. It receives nothing of yours: the curve is the same for everyone.
+1989	Italian Ministry of Economy and Finance
+1990	: list of outstanding BTPs (copied into the site, no request from your browser).
+1991	{0}. Anonymous usage statistics
+1992	To understand how to improve the site we count a few events: visit, section opened, type of file uploaded (example, your file, portfolio created), features used, errors. Each visit has a random code that doesn't say who you are.
+1993	No cookies, no saved IP address, no values, security names or names of your files.
+1994	«The file wasn't read correctly» reports contain the text you write and, only if you tick the box, sheet and header names (never the values). We keep the last {0}.
+1995	Per-day session details expire after {0} days.
+1996	{0}. What stays in this browser
+1997	Some things are remembered
+1998	only on this computer
+1999	, in the browser's storage, to save you time:
+2000	the column map you confirmed for a type of file, so next time you don't have to redo it;
+2001	your preferences (AI reading, saving) and the data of the Independence section (age, spending, savings, pension);
+2002	fund costs
+2003	that you enter by hand (by ISIN) and other annual costs;
+2004	the firm name, contacts and logo you use in the report;
+2005	saved analyses
+2006	, only if you choose to save them: the content of the file read, the name, notes and review history;
+2007	your
+2008	, if you create it: the instruments, the assets you add by hand and the transactions (purchases, sales, dividends, estimates). To update prices the site asks for quotes by the instrument's symbol, never your quantities or amounts.
+2009	They don't leave your computer. You can delete them below or by clearing the site's data in your browser settings.
+2010	{0}. Hosting
+2011	The site is hosted on
+2012	Vercel
+2013	. Like any hosting service, it logs technical request data (for example IP address and time) for security and operation, under its own terms.
+2014	{0}. What we don't do
+2015	We don't sell data and we don't use it for advertising.
+2016	We don't build profiles of people.
+2017	We don't give financial advice: the site analyzes historical data and shows how the numbers are calculated; the decisions are yours.
+2018	Your settings on this browser
+2019	Automatic reading with AI
+2020	When you upload a new type of file, it sends an excerpt to the AI to understand it. Off: the file is read only by the site's recognizers, and if needed you map it by hand.
+2021	Always save analyses on this computer
+2022	Off: the site asks you every time (or never again, if you said so).
+2023	Saved analyses
+2024	Checking…
+2025	Delete the analyses
+2026	Everything the site remembers
+2027	Analyses, net worth, file maps, preferences and Independence section data.
+2028	Delete everything
+2029	Last updated: {0} November {1}. Quanta Portfolio (formerly Portfolio OS) is a project in beta. If something isn't clear or you want to know more about some data, write to us from the site with «Your file wasn't read correctly? Let us know» or contact us on LinkedIn.
+2030	{0} analysis saved on this computer.
