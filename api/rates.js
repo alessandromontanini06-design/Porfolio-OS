@@ -3,8 +3,30 @@
 // - FRED (facoltativo, chiave gratuita in FRED_API_KEY): T-bill USA a 3 mesi e indice CPI USA.
 // GET /api/rates?from=2010-01&to=2024-12
 // GET /api/rates?serie=btp → curva dei rendimenti dei BTP benchmark (Banca d'Italia, 3-5-10-30 anni): serve a STIMARE i prezzi dei BTP a tasso fisso.
+// GET /api/rates?serie=stati → ultimi 14 mesi della curva AAA dell'area euro (BCE, rendimenti alla pari 1-30 anni, ogni giorno)
+//   e dei rendimenti a 10 anni di Germania, Francia e Spagna (BCE, mensili): servono a STIMARE i loro titoli di Stato.
+//   Lo storico più vecchio è nel sito (js/data/curve-euro.json, rigenerato con tools/catalogo/stati/curve.mjs).
 import { fetchCurva } from "./_lib/bdi.js";
-let btpCache = null;
+let btpCache = null, statiCache = null;
+const SC_STATI = [1, 2, 3, 5, 7, 10, 15, 20, 30], PAESI_STATI = ["DE", "FR", "ES"];
+async function ecbCsv(url) {
+  const r = await fetch(url, { signal: AbortSignal.timeout(25_000) });
+  if (!r.ok) throw new Error(`BCE ${r.status}`);
+  const L = (await r.text()).trim().split(/\r?\n/), h = L.shift().split(","), iK = h.indexOf("KEY"), iP = h.indexOf("TIME_PERIOD"), iV = h.indexOf("OBS_VALUE");
+  return L.map(l => l.split(",")).map(c => ({ k: c[iK], p: c[iP], v: Number(c[iV]) })).filter(x => Number.isFinite(x.v));
+}
+async function curveStati() {
+  const da = new Date(Date.now() - 430 * 864e5).toISOString().slice(0, 10), daM = da.slice(0, 7);
+  const [yc, irs] = await Promise.all([
+    ecbCsv(`${ECB}/YC/B.U2.EUR.4F.G_N_A.SV_C_YM.${SC_STATI.map(s => "PY_" + s + "Y").join("+")}?format=csvdata&detail=dataonly&startPeriod=${da}`),
+    ecbCsv(`${ECB}/IRS/M.${PAESI_STATI.join("+")}.L.L40.CI.0000.EUR.N.Z?format=csvdata&detail=dataonly&startPeriod=${daM}`)]);
+  const g = new Map();
+  for (const x of yc) { const m = SC_STATI.indexOf(+(x.k.match(/PY_(\d+)Y$/) || [])[1]); if (m < 0) continue; if (!g.has(x.p)) g.set(x.p, Array(SC_STATI.length).fill(null)); g.get(x.p)[m] = +x.v.toFixed(4); }
+  const giorni = [...g.entries()].filter(([d, ys]) => /^\d{4}-\d{2}-\d{2}$/.test(d) && ys.every(v => v != null)).sort((a, b) => a[0] < b[0] ? -1 : 1);
+  if (giorni.length < 20) throw new Error("curva troppo corta");
+  return { fonte: "BCE · curva AAA dell'area euro e rendimenti a 10 anni dei paesi", scadenze: SC_STATI, al: giorni[giorni.length - 1][0], giorni,
+    irs: Object.fromEntries(PAESI_STATI.map(p => [p, irs.filter(x => x.k.split(".")[2] === p).map(x => [x.p, x.v]).sort((a, b) => a[0] < b[0] ? -1 : 1)])) };
+}
 
 const ECB = "https://data-api.ecb.europa.eu/service/data";
 const SERIES_ECB = {
@@ -52,6 +74,19 @@ export default async function handler(req, res) {
     } catch (e) {
       if (btpCache) { res.status(200).json(btpCache.data); return; }
       res.status(502).json({ error: `Curva dei BTP della Banca d'Italia non disponibile (${e.message}). Riprova tra poco.` });
+    }
+    return;
+  }
+  if (String(req.query.serie || "") === "stati") {
+    if (statiCache && Date.now() - statiCache.t < TTL) { res.setHeader("Cache-Control", "s-maxage=21600, stale-while-revalidate=86400"); res.status(200).json(statiCache.data); return; }
+    try {
+      const data = await curveStati();
+      statiCache = { t: Date.now(), data };
+      res.setHeader("Cache-Control", "s-maxage=21600, stale-while-revalidate=86400");
+      res.status(200).json(data);
+    } catch (e) {
+      if (statiCache) { res.status(200).json(statiCache.data); return; }
+      res.status(502).json({ error: `Curve dei titoli di Stato della BCE non disponibili (${e.message}). Riprova tra poco.` });
     }
     return;
   }

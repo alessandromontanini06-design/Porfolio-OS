@@ -43,7 +43,7 @@ function pmSave() {
 const pmDb = () => PM.db ||= { v: 1, strumenti: {}, operazioni: [], creato: new Date().toISOString() };
 
 /* BTP, BOT e CTZ a tasso fisso nel patrimonio: simbolo della stima dalla curva della Banca d'Italia (o null) */
-const pmBtpSym = s => s && s.per100 && !s.manuale && s.governativo !== false && P.btpTipo(s.nome, s.isin) === "fisso" && s.cedola != null && s.scadenza ? btpSym(+s.cedola, s.scadenza) : null;
+const pmBtpSym = s => s && s.per100 && !s.manuale && s.governativo !== false && P.btpTipo(s.nome, s.isin) === "fisso" && s.cedola != null && s.scadenza ? btpSym(+s.cedola, s.scadenza, P.btpPaese(s.nome, s.isin) || "IT") : null;
 /* ultimo prezzo vero scritto dall'utente (acquisto, vendita o «Aggiorna prezzo»): la stima si allinea a quello */
 function pmAncora(id) {
   const gone = new Set(PM.db.operazioni.filter(o => o.tipo === "annulla").map(o => String(o.rif)));
@@ -668,7 +668,7 @@ async function pmFromFile() {
   for (const [k, B] of bonds) {
     /* cedola e scadenza dal nome; se il nome non le dice, dalla stima del laboratorio (OpenFIGI con l'ISIN) */
     const id = B.isin || "b-" + k.replace(/[^a-z0-9]+/g, "-").slice(0, 40), b = bondInfo(B.nome), est = S.portfolio && (S.portfolio.positions || []).find(q => q.stima && ((B.isin && q.isin === B.isin) || q.nome === B.nome)), es = est && est.stima;
-    if (!db.strumenti[id]) db.strumenti[id] = { nome: B.nome, isin: B.isin, valuta: "EUR", per100: true, classe: "Obbligazioni", cedola: b && b.cpn != null ? b.cpn : es ? es.cedola : null, scadenza: b && b.mat ? b.mat.toISOString().slice(0, 10) : es ? es.scadenza : null, freq: 2 };
+    if (!db.strumenti[id]) db.strumenti[id] = { nome: B.nome, isin: B.isin, valuta: "EUR", per100: true, classe: "Obbligazioni", cedola: b && b.cpn != null ? b.cpn : es ? es.cedola : null, scadenza: b && b.mat ? b.mat.toISOString().slice(0, 10) : es ? es.scadenza : null, freq: (P.TDS[P.btpPaese(B.nome, B.isin)] || P.TDS.IT).freq };   /* Bund, OAT, Bonos: cedola annuale */
     db.strumenti[id].governativo = isGovt(db.strumenti[id]);
     let held = 0;
     if (B.rows.length) {

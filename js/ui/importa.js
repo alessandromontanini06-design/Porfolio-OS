@@ -7,7 +7,7 @@ import { showLab } from "./archivio.js";
 import { fmtEur, getJSON, netClear, netGet, netPut } from "./analisi.js";
 import { detectTx } from "./rendimento.js";
 import { renderChat } from "./quanta.js";
-import { btpEtichetta, btpNota, btpPrezzi, btpSym, isBtpSym } from "./btp.js";
+import { btpEtichetta, btpNota, btpPrezzi, btpSym, isBtpSym, statiLista } from "./btp.js";
 
 /* ---------- Caricamento ---------- */
 function load(sheets,source,fromUser,opts={}){
@@ -289,9 +289,9 @@ function bdHint(v){const t=String(v||"").trim();if(!t)return "";const f=bdFind(t
 async function bdCheck(v){const k=String(v).trim().toUpperCase();if(BDCHK.has(k))return;BDCHK.set(k,{st:"wait"});
   try{const isin=(k.match(/^[A-Z]{2}[A-Z0-9]{9}\d$/)||[])[0];
     if(isin){const j=await getJSON(`/api/isin?isin=${isin}`),r=(j.results||[])[0];
-      if(r&&!r.simbolo&&r.stato){const st=r.stato,sym=st.tipo==="fisso"?btpSym(st.cedola,st.scadenza):null;
-        if(sym){BDMETA.set(k,{nome:st.nome,tipo:"BTP",borsa:"prezzo stimato (Banca d'Italia)",btp:true,sym,isin});BDCHK.set(k,{st:"ok",name:st.nome,sym});}
-        else BDCHK.set(k,{st:"no",why:st.tipo==="fisso"?`${st.nome}: già scaduto`:st.tipo==="estero"?`${st.nome}: titolo di Stato estero, nessuna fonte gratuita dei prezzi`:`${st.nome}: le cedole cambiano nel tempo, il prezzo non si può stimare`});}
+      if(r&&!r.simbolo&&r.stato){const st=r.stato,sym=st.tipo==="fisso"?btpSym(st.cedola,st.scadenza,st.paese):null;
+        if(sym){BDMETA.set(k,{nome:st.nome,tipo:st.paese&&st.paese!=="IT"?"Titolo di Stato":"BTP",borsa:st.paese&&st.paese!=="IT"?"prezzo stimato (BCE)":"prezzo stimato (Banca d'Italia)",btp:true,sym,isin});BDCHK.set(k,{st:"ok",name:st.nome,sym});}
+        else BDCHK.set(k,{st:"no",why:st.tipo==="fisso"?`${st.nome}: già scaduto`:st.tipo==="estero"?`${st.nome}: titolo di Stato di un paese che il sito non stima (solo Italia, Germania, Francia, Spagna)`:`${st.nome}: le cedole cambiano nel tempo, il prezzo non si può stimare`});}
       else BDCHK.set(k,r&&r.simbolo?{st:"ok",name:r.nome||r.simbolo,sym:r.simbolo}:{st:"no"});}
     else{const sym=guessSymbol(k,"ETF",null)||k,j=await getJSON(`/api/prices?symbol=${encodeURIComponent(sym)}&v=4`);BDCHK.set(k,j&&!j.error&&j.points&&j.points.length?{st:"ok",name:(j.info||"").split(" · ")[0]||sym,sym}:{st:"no"});}
   }catch{BDCHK.set(k,{st:"no"});}
@@ -337,9 +337,16 @@ function btpLoad(){if(BTPS||btpLoading)return btpLoading;btpLoading=fetch("/js/d
   if($("#builder").classList.contains("open"))bdCatRender();}).catch(()=>{BTPS=[];});return btpLoading;}
 const btpItem=b=>({code:b.isin,n:b.nome,sub:`${b.isin} · ${b.anni<1?"meno di un anno":fmtN(b.anni,1)+" anni"} alla scadenza · prezzo stimato`,cls:"Obbligazioni",tab:"Obbligazioni",f1:"BTP singoli",f2:BTP_FASCIA(b.anni),area:"Italia",btp:b});
 const btpMeta=b=>({nome:b.nome,tipo:"BTP",borsa:"prezzo stimato (Banca d'Italia)",btp:true,sym:b.sym,isin:b.isin});
+/* titoli di Stato di Germania, Francia e Spagna (js/data/stati.json): compaiono solo dopo aver scelto il paese in «Emittente» (o cercandoli per nome) */
+const STATO_F1={DE:"Bund (Germania)",FR:"OAT (Francia)",ES:"Bonos (Spagna)"},STATO_AREA={DE:"Germania",FR:"Francia",ES:"Spagna"},STATO_SIG={DE:"DE",FR:"FR",ES:"ES"};
+let STATI=null,statiLoading=null,STATI_AL=null;
+function statiLoad(){if(STATI||statiLoading)return statiLoading;statiLoading=statiLista().then(L=>{STATI_AL=L.al;STATI=Object.values(L.paesi).flat().map(b=>({...b,anni:(Date.parse(b.sc)-Date.now())/(365.25*864e5)}));
+  if($("#builder").classList.contains("open"))bdCatRender();}).catch(()=>{STATI=[];});return statiLoading;}
+const statoItem=b=>({code:b.isin||b.sym,n:b.nome,sub:`${[b.isin,STATO_AREA[b.paese]].filter(Boolean).join(" · ")} · ${b.anni<1?"meno di un anno":fmtN(b.anni,1)+" anni"} alla scadenza · prezzo stimato`,cls:"Obbligazioni",tab:"Obbligazioni",f1:STATO_F1[b.paese],f2:BTP_FASCIA(b.anni),area:STATO_AREA[b.paese],btp:b,soloScelto:true});
+const statoMeta=b=>({nome:b.nome,tipo:"Titolo di Stato",borsa:"prezzo stimato (BCE)",btp:true,sym:b.sym,isin:b.isin||null});
 /* un BTP che arriva da fuori (patrimonio): codice della riga = ISIN o simbolo della stima */
 function bdBtpMeta(code,nome,sym,isin){BDMETA.set(String(code).toUpperCase(),{nome,tipo:"BTP",borsa:"prezzo stimato (Banca d'Italia)",btp:true,sym,isin:isin||null});}
-const tabBase=tab=>tab==="Azioni"?(AZIONI||[]).map(azItem):[...POPULAR.filter(p=>p[4]===tab).map(etfItem),...(tab==="Obbligazioni"?(BTPS||[]).map(btpItem):[])];
+const tabBase=tab=>tab==="Azioni"?(AZIONI||[]).map(azItem):[...POPULAR.filter(p=>p[4]===tab).map(etfItem),...(tab==="Obbligazioni"?[...(BTPS||[]).map(btpItem),...(STATI||[]).map(statoItem)]:[])];
 function azLoad(){if(AZIONI||azLoading)return azLoading;azLoading=fetch("/js/data/azioni.json").then(r=>r.json()).then(a=>{AZIONI=a.map(x=>({s:x[0],n:x[1],set:x[2],paese:x[3],isin:x[4],idx:x[5]}));if($("#builder").classList.contains("open"))bdCatRender();}).catch(()=>{AZIONI=[];});return azLoading;}
 /* un elemento uniforme per l'elenco: codice da mettere nella riga, nome, riga sotto, settore o classe per il colore */
 /* area delle obbligazioni, dal nome: dove sono gli emittenti (e quindi la valuta) */
@@ -354,9 +361,9 @@ function bdItems(){
   const tab=BDCAT.tab,f=BDCAT.f[tab]||{};
   let L=tabBase(tab);
   for(const [k] of BD_FILT[tab]||[])if(f[k])L=L.filter(x=>x[k]===f[k]);
-  return L;
+  return L.filter(x=>!x.soloScelto||f.f1===x.f1);
 }
-function bdAll(){return [...POPULAR.filter(p=>p[4]!=="Azioni").map(etfItem),...(BTPS||[]).map(btpItem),...(AZIONI||[]).map(azItem)];}
+function bdAll(){return [...POPULAR.filter(p=>p[4]!=="Azioni").map(etfItem),...(BTPS||[]).map(btpItem),...(STATI||[]).map(statoItem),...(AZIONI||[]).map(azItem)];}
 const BDREM={q:"",res:[],busy:false,err:"",t:null},BDREMC=new Map();
 function bdRemote(q){
   clearTimeout(BDREM.t);q=String(q||"").trim();BDREM.q=q;
@@ -377,15 +384,15 @@ function bdCatRender(have){
   /* filtri della scheda: le voci si contano sull'elenco con gli altri filtri già scelti */
   const fl=box.querySelector(".bd-filt");
   if(q){fl.innerHTML="";}else{const tab=BDCAT.tab,f=BDCAT.f[tab]||{},base=tabBase(tab);
-    fl.innerHTML=(BD_FILT[tab]||[]).map(([k,lab])=>{const other=base.filter(x=>(BD_FILT[tab]||[]).every(([k2])=>k2===k||!f[k2]||x[k2]===f[k2])),cnt={};other.forEach(x=>{if(x[k])cnt[x[k]]=(cnt[x[k]]||0)+1;});
+    fl.innerHTML=(BD_FILT[tab]||[]).map(([k,lab])=>{const other=base.filter(x=>(k==="f1"||!x.soloScelto||f.f1===x.f1)&&(BD_FILT[tab]||[]).every(([k2])=>k2===k||!f[k2]||x[k2]===f[k2])),cnt={};other.forEach(x=>{if(x[k])cnt[x[k]]=(cnt[x[k]]||0)+1;});
       const opts=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
       return `<label class="bd-sel${f[k]?" on":""}"><span>${lab}</span><select data-bdf="${k}" aria-label="${lab}"><option value="">${lab}: tutti</option>${opts.map(([v,n])=>`<option value="${esc(v)}"${f[k]===v?" selected":""}>${esc(v)} (${n})</option>`).join("")}</select></label>`;}).join("")+
       (Object.values(f).some(Boolean)?`<button type="button" class="btn sm" data-bdfx="1">Togli i filtri</button>`:"");}
   /* elenco */
   const all=q?bdAll().filter(x=>words.every(w=>normQ(x.n+" "+x.code+" "+x.sub).includes(w))):bdItems();
   const list=all.slice(0,BDCAT.n),cnt=box.querySelector(".bd-count");
-  cnt.textContent=BDCAT.tab==="Azioni"&&!AZIONI&&!q?"Carico le azioni…":`${all.length.toLocaleString("it-IT")} ${all.length===1?"risultato":"risultati"}${q?" nel catalogo":""}${!q&&BDCAT.tab==="Obbligazioni"&&(BDCAT.f.Obbligazioni||{}).f1==="BTP singoli"?` · elenco del MEF${BTP_AL?" al "+BTP_AL.split("-").reverse().join("/"):""}, prezzi stimati dalla curva dei BTP della Banca d'Italia`:""}`;
-  const row=x=>{const on=have.has(String(x.code).toUpperCase());return `<button type="button" class="bd-it${on?" in":""}" role="listitem" data-bdc="${esc(x.code)}"${on?' aria-disabled="true"':""}><i style="background:${itemCol(x)}" aria-hidden="true">${esc(x.btp?"BTP":initials(x.n))}</i><span><b>${esc(x.n)}</b><small>${esc(x.sub)}</small></span><em aria-hidden="true">${on?"✓":"+"}</em></button>`;};
+  cnt.textContent=BDCAT.tab==="Azioni"&&!AZIONI&&!q?"Carico le azioni…":`${all.length.toLocaleString("it-IT")} ${all.length===1?"risultato":"risultati"}${q?" nel catalogo":""}${!q&&BDCAT.tab==="Obbligazioni"&&(BDCAT.f.Obbligazioni||{}).f1==="BTP singoli"?` · elenco del MEF${BTP_AL?" al "+BTP_AL.split("-").reverse().join("/"):""}, prezzi stimati dalla curva dei BTP della Banca d'Italia`:!q&&BDCAT.tab==="Obbligazioni"&&Object.values(STATO_F1).includes((BDCAT.f.Obbligazioni||{}).f1)?` · elenco${STATI_AL?" al "+STATI_AL.split("-").reverse().join("/"):""}, prezzi stimati dalla curva dei titoli di Stato AAA della BCE più lo scarto del paese`:!q&&BDCAT.tab==="Obbligazioni"&&!(BDCAT.f.Obbligazioni||{}).f1&&STATI&&STATI.length?" · Bund, OAT e Bonos: scegli il paese in «Emittente»":""}`;
+  const row=x=>{const on=have.has(String(x.code).toUpperCase());return `<button type="button" class="bd-it${on?" in":""}" role="listitem" data-bdc="${esc(x.code)}"${on?' aria-disabled="true"':""}><i style="background:${itemCol(x)}" aria-hidden="true">${esc(x.btp?(STATO_SIG[x.btp.paese]||"BTP"):initials(x.n))}</i><span><b>${esc(x.n)}</b><small>${esc(x.sub)}</small></span><em aria-hidden="true">${on?"✓":"+"}</em></button>`;};
   box.querySelector(".bd-clist").innerHTML=list.map(row).join("")+(all.length>list.length?`<button type="button" class="btn sm bd-moreit" data-bdmoreit="1">Mostra altri ${Math.min(40,all.length-list.length)} di ${all.length-list.length}</button>`:"")+(q&&!all.length?`<p class="caption">Niente nel catalogo: guarda qui sotto tra tutte le borse.</p>`:"");
   /* da tutte le borse: quello che il catalogo non ha (azioni di altre borse, altri ETF, fondi comuni) */
   const rl=box.querySelector(".bd-rlist"),isinQ=/^[A-Z]{2}[A-Z0-9]{9}\d$/i.test(BDCAT.q.trim());
@@ -404,13 +411,13 @@ function bdAddSym(code,meta){
 }
 document.addEventListener("click",e=>{const r=e.target.closest("[data-bdr]");if(r&&!r.classList.contains("in")){const x=(BDREM.view||[])[+r.dataset.bdr];if(x)bdAddSym(String(x.simbolo).toUpperCase(),{nome:x.nome,tipo:x.tipo,borsa:x.borsa});return;}
   const z=e.target.closest("[data-bdisin]");if(z)bdAddSym(z.dataset.bdisin,null);});
-document.addEventListener("input",e=>{if(e.target.classList&&e.target.classList.contains("bd-cq")){BDCAT.q=e.target.value;BDCAT.n=40;bdRemote(e.target.value);if(BDCAT.q){azLoad();btpLoad();}bdCatRender();}});
+document.addEventListener("input",e=>{if(e.target.classList&&e.target.classList.contains("bd-cq")){BDCAT.q=e.target.value;BDCAT.n=40;bdRemote(e.target.value);if(BDCAT.q){azLoad();btpLoad();statiLoad();}bdCatRender();}});
 document.addEventListener("click",e=>{if(e.target.closest("[data-bdmore]")){BDCAT.allModels=!BDCAT.allModels;bdRender();return;}
-  const t=e.target.closest("[data-bdtab]");if(t){BDCAT.tab=t.dataset.bdtab;BDCAT.q="";BDCAT.n=40;const i=document.querySelector(".bd-cq");if(i)i.value="";if(BDCAT.tab==="Azioni")azLoad();if(BDCAT.tab==="Obbligazioni")btpLoad();bdCatRender();return;}
+  const t=e.target.closest("[data-bdtab]");if(t){BDCAT.tab=t.dataset.bdtab;BDCAT.q="";BDCAT.n=40;const i=document.querySelector(".bd-cq");if(i)i.value="";if(BDCAT.tab==="Azioni")azLoad();if(BDCAT.tab==="Obbligazioni"){btpLoad();statiLoad();}bdCatRender();return;}
   if(e.target.closest("[data-bdmoreit]")){BDCAT.n+=40;bdCatRender();return;}
   if(e.target.closest("[data-bdfx]")){BDCAT.f[BDCAT.tab]={};BDCAT.n=40;bdCatRender();return;}
   /* un titolo dell'elenco delle azioni: codice con la borsa, nome e settore restano per la riga */
-  const c=e.target.closest(".bd-it[data-bdc]");if(c&&!c.classList.contains("in")){const code=c.dataset.bdc,az=(AZIONI||[]).find(a=>a.s===code),bt=(BTPS||[]).find(b=>b.isin===code);bdAddSym(String(code).toUpperCase(),bt?btpMeta(bt):az?{nome:az.n,tipo:"Azione",borsa:az.paese,set:az.set}:null);e.stopImmediatePropagation();}});
+  const c=e.target.closest(".bd-it[data-bdc]");if(c&&!c.classList.contains("in")){const code=c.dataset.bdc,az=(AZIONI||[]).find(a=>a.s===code),bt=(BTPS||[]).find(b=>b.isin===code),so=(STATI||[]).find(b=>(b.isin||b.sym)===code);bdAddSym(String(code).toUpperCase(),bt?btpMeta(bt):so?statoMeta(so):az?{nome:az.n,tipo:"Azione",borsa:az.paese,set:az.set}:null);e.stopImmediatePropagation();}});
 document.addEventListener("change",e=>{const s=e.target.closest("[data-bdf]");if(!s)return;(BDCAT.f[BDCAT.tab]||=({}))[s.dataset.bdf]=s.value;BDCAT.n=40;bdCatRender();});
 function openBuilder(){trackOnce("feature","pannello_crea",{name:"pannello_crea"});bdRender();$("#builder").classList.add("open");document.body.classList.add("bd-on");$("#builder").scrollTop=0;$("#builder").setAttribute("aria-hidden","false");setTimeout(()=>{const i=document.querySelector("#bdRows input");if(i)i.focus();},350);}
 function closeBuilder(){$("#builder").classList.remove("open");document.body.classList.remove("bd-on");if(!$("#drawer").classList.contains("open"))$("#scrim").classList.remove("open");$("#builder").setAttribute("aria-hidden","true");}
@@ -886,15 +893,15 @@ function btpAssign(pos){
   pos.forEach(p=>{if(p.simbolo&&!isBtpSym(p.simbolo))return;
     let sym=isBtpSym(p.simbolo)?p.simbolo:null;
     if(!sym){const st=p.stato,nm=p.nome||p.titolo||p.ticker||"",tipo=st?st.tipo:P.btpTipo(nm,p.isin);if(tipo!=="fisso")return;
-      const bi=st?null:bondInfo(nm);sym=st?btpSym(st.cedola,st.scadenza):bi?btpSym(bi.cpn,bi.mat):null;if(!sym)return;}
+      const bi=st?null:bondInfo(nm);sym=st?btpSym(st.cedola,st.scadenza,st.paese):bi?btpSym(bi.cpn,bi.mat,P.btpPaese(nm,p.isin)||"IT"):null;if(!sym)return;}
     p.simbolo=sym;p.btp=true;p.per100=true;
     const px=+p.prezzo,d=p.data?String(p.data).slice(0,10):null;p.ancora=px>40&&px<200&&d&&/^\d{4}-\d{2}-\d{2}$/.test(d)?{prezzo:px,data:d}:null;
     if(!p.ticker||ISIN_RX.test(p.ticker)||p.labelIsName||bondInfo(p.ticker)||isBtpSym(p.ticker))p.ticker=btpEtichetta(sym);});
 }
 const whyNoSym=p=>{const t=p.stato?p.stato.tipo:P.btpTipo(p.nome||p.ticker||"",p.isin);
-  if(t==="indicizzato")return "titolo di Stato con cedole che cambiano (legate all'inflazione o crescenti): il prezzo non si può stimare dalla curva dei BTP, quindi resta fuori dalle analisi";
+  if(t==="indicizzato")return "titolo di Stato con cedole che cambiano (legate all'inflazione o crescenti): il prezzo non si può stimare dalla curva dei rendimenti, quindi resta fuori dalle analisi";
   if(t==="variabile")return "CCT a tasso variabile: il prezzo non si può stimare dalla curva dei BTP, quindi resta fuori dalle analisi";
-  if(t==="estero")return "titolo di Stato estero: le fonti gratuite non pubblicano lo storico dei prezzi, quindi resta fuori dalle analisi";
+  if(t==="estero")return "titolo di Stato di un paese che il sito non stima (oggi: Italia, Germania, Francia, Spagna): le fonti gratuite non pubblicano lo storico dei prezzi, quindi resta fuori dalle analisi";
   if(t==="fisso")return "titolo di Stato a tasso fisso, ma dal nome non si leggono cedola e scadenza: scrivi l'ISIN, oppure il simbolo BTP:cedola:scadenza (es. BTP:3.35:2035-03-01)";
   if(isBondPos(p))return "obbligazione: le fonti gratuite non pubblicano lo storico dei prezzi, quindi resta fuori dalle analisi";
   return "senza simbolo di borsa: scrivilo nella tabella per includerlo";};

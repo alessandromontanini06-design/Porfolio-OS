@@ -47,6 +47,8 @@ http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://localhost");
   /* curva dei BTP: copia salvata (dati veri della Banca d'Italia al 30/10/2026), con BDI_REAL=1 quella di oggi; BDI_DOWN=1 simula il servizio fermo */
   if (u.pathname === "/api/rates" && u.searchParams.get("serie") === "btp" && !process.env.BDI_REAL) { if (process.env.BDI_DOWN) { res.writeHead(502, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Curva dei BTP della Banca d'Italia non disponibile (prova)." })); return; } res.writeHead(200, { "Content-Type": "application/json" }); res.end(fs.readFileSync(path.join(import.meta.dirname, "files", "bdi-curva.json"))); return; }
+  /* curve dei titoli di Stato esteri: copia salvata (dati veri della BCE al 19/11/2026), con STATI_REAL=1 quelle di oggi; STATI_DOWN=1 simula la BCE ferma */
+  if (u.pathname === "/api/rates" && u.searchParams.get("serie") === "stati" && !process.env.STATI_REAL) { if (process.env.STATI_DOWN) { res.writeHead(502, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Curve della BCE non disponibili (simulazione)" })); return; } res.writeHead(200, { "Content-Type": "application/json" }); res.end(fs.readFileSync(path.join(here, "files", "stati-curva.json"))); return; }
   if (u.pathname === "/api/rates") { await rates({ method: req.method, query: Object.fromEntries(u.searchParams), headers: req.headers }, wrapRes(res)); return; }
   if (u.pathname === "/api/understand") {
     req.resume();

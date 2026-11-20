@@ -61,15 +61,20 @@ function govtInfo(isin, all) {
   const d = all.find(x => x.marketSector === "Govt" && x.securityDescription); if (!d) return null;
   const tok = String(d.securityDescription).trim().split(/\s+/), dm = tok.length && tok[tok.length - 1].match(/^(\d{2})\/(\d{2})\/(\d{2,4})$/);
   if (!dm) return null;
-  const y = dm[3].length === 2 ? 2000 + +dm[3] : +dm[3], scadenza = `${y}-${dm[1]}-${dm[2]}`;
+  const y = dm[3].length === 2 ? (+dm[3] < 70 ? 2000 : 1900) + +dm[3] : +dm[3], scadenza = `${y}-${dm[1]}-${dm[2]}`;   /* «95» = 1995 */
   let cpn = 0, num = true;
   for (const t of tok.slice(1, -1)) { const f = t.match(/^(\d+)\/(\d+)$/); if (f) cpn += +f[1] / +f[2]; else if (/^\d+(\.\d+)?$/.test(t)) cpn += +t; else num = false; }
   const tk = String(d.ticker || "").trim().split(/\s+/), suf = tk.slice(tk.findIndex(t => /^\d{2}\/\d{2}\/\d{2,4}$/.test(t)) + 1).join(" ");
   const fam = tok[0].toUpperCase(), it = /^IT/.test(isin);
-  const tipo = !it ? "estero" : !num || /F(LOAT)?\b|EU\b/.test(suf) || /^CCT/.test(fam) ? "variabile" : /^(BTPS|BOTS|CTZS?)$/.test(fam) && (!suf || /^\d+Y$/.test(suf)) ? "fisso" : "indicizzato";
-  const nm = fam === "BTPS" ? "BTP" : fam === "BOTS" ? "BOT" : /^CTZ/.test(fam) ? "CTZ" : /^CCT/.test(fam) ? "CCT" : (d.name || fam);
+  /* dal 20/11/2026 anche Germania (Bund, Bobl, Schatz), Francia (OAT) e Spagna (Bonos) a tasso fisso: il sito ne stima il prezzo con la curva della BCE.
+     Gli indicizzati all'inflazione hanno «I/L», «OATe»/«OATi» nel ticker o le famiglie DBRI, OBLI, SPGBEI. */
+  const ESTERI = { DBR: "DE", OBL: "DE", BKO: "DE", FRTR: "FR", SPGB: "ES" }, IL = { DBRI: "DE", OBLI: "DE", SPGBEI: "ES" };
+  const paese = it ? "IT" : ESTERI[fam] || IL[fam] || null;
+  const tipo = !it ? (ESTERI[fam] && num && !/OAT[EI]|I\/L|FRN|FLOAT/i.test(suf) ? "fisso" : paese ? "indicizzato" : "estero")
+    : !num || /F(LOAT)?\b|EU\b/.test(suf) || /^CCT/.test(fam) ? "variabile" : /^(BTPS|BOTS|CTZS?)$/.test(fam) && (!suf || /^\d+Y$/.test(suf)) ? "fisso" : "indicizzato";
+  const nm = fam === "BTPS" ? "BTP" : fam === "BOTS" ? "BOT" : /^CTZ/.test(fam) ? "CTZ" : /^CCT/.test(fam) ? "CCT" : paese === "DE" ? "Bund" : paese === "FR" ? "OAT" : paese === "ES" ? "Bonos" : (d.name || fam);
   const it2 = n => String(+n.toFixed(3)).replace(".", ",");
-  return { tipo, cedola: num ? +(cpn / 100).toFixed(6) : null, scadenza, nome: `${nm}${num && !/^CCT/.test(fam) ? " " + it2(cpn) + "%" : ""} ${dm[2]}/${dm[1]}/${y}${tipo === "indicizzato" ? (/VALR|PIU/.test(suf) ? " (cedole crescenti)" : " (indicizzato all'inflazione)") : tipo === "variabile" ? " (tasso variabile)" : ""}`, descrizione: d.securityDescription, emittente: d.name || null };
+  return { tipo, paese, cedola: num ? +(cpn / 100).toFixed(6) : null, scadenza, nome: `${nm}${num && !/^CCT/.test(fam) ? " " + it2(cpn) + "%" : ""} ${dm[2]}/${dm[1]}/${y}${tipo === "indicizzato" ? (/VALR|PIU/.test(suf) ? " (cedole crescenti)" : " (indicizzato all'inflazione)") : tipo === "variabile" ? " (tasso variabile)" : ""}`, descrizione: d.securityDescription, emittente: d.name || null };
 }
 
 export default async function handler(req, res) {

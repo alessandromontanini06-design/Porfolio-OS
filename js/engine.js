@@ -1926,19 +1926,54 @@ function btpSerie(b,curva,opz){
   const giorni=(curva.giorni||[]).filter(x=>x[0]<=oggi&&btpD(x[0])<M).slice(-10).map(([d])=>({d,v:+btpStima(b,curva,d,spread).toFixed(4)})).filter(x=>x.v>0);
   return {prezzi,indice,giorni,spread,curvaAl:curva.al||null};
 }
+/* titoli di Stato a tasso fisso stimati dal sito: Italia (curva della Banca d'Italia, cedola semestrale) e, dal 20/11/2026,
+   Germania, Francia e Spagna (curva AAA della BCE + scarto del paese sul decennale, cedola annuale). Il simbolo dice il paese: BTP:, BUND:, OAT:, BONOS: */
+const TDS={IT:{pre:"BTP",freq:2,nome:"BTP",stato:"Italia"},DE:{pre:"BUND",freq:1,nome:"Bund",stato:"Germania"},FR:{pre:"OAT",freq:1,nome:"OAT",stato:"Francia"},ES:{pre:"BONOS",freq:1,nome:"Bonos",stato:"Spagna"}};
+const TDS_PRE=Object.fromEntries(Object.entries(TDS).map(([k,v])=>[v.pre,k]));
+/* paese del titolo di Stato dal nome o dall'ISIN (solo i quattro stimati) */
+function btpPaese(nome,isin){
+  const t=String(nome||"").toUpperCase(),i=String(isin||"").toUpperCase();
+  if(/\b(BUNDE?S?ANLEIHE|BUND|BOBL|SCHATZ|DBR|OBL|BKO|BUNDESOBLIGATION)\b/.test(t)||/^DE000(1|BU)/.test(i))return "DE";
+  if(/\b(OAT|FRTR|BTAN)\b/.test(t)||/^FR00/.test(i)&&/\b(OAT|FRANCE|R[EÉ]PUBLIQUE)\b/.test(t))return "FR";
+  if(/\b(BONOS?|OBLIGACI[OÓ]N(ES)?|SPGB)\b/.test(t)||/^ES0000/.test(i))return "ES";
+  if(/^IT/.test(i)||/\b(BTPS?|BOTS?|CTZS?|CCT)\b/.test(t))return "IT";
+  return null;
+}
 /* tipo di titolo di Stato dal nome (e dall'ISIN): «fisso» si può stimare con la curva; gli altri no */
 function btpTipo(nome,isin){
-  const t=String(nome||"").toUpperCase();
+  const t=String(nome||"").toUpperCase(),pa=btpPaese(nome,isin);
+  if(pa&&pa!=="IT"){
+    if(/€I|\bOATE?I\b|\bOAT€I\b|\/I\b|\bINFL|\bINDEX|\bI\/L\b|\bEI\b|\bSPGBEI\b|\bDBRI\b|\bOBLI\b|FLOAT|VARIAB/.test(t))return "indicizzato";
+    return "fisso";
+  }
   if(/\bCCT|FLOAT|\bTV\b|VARIABIL/.test(t))return "variabile";
   if(/ITALIA|€I|\bBTPEI\b|\bEI\b|INFLA|INDICIZ|\bCPI\b|\bICPI\b|\bIL\b|VALORE|\bVALR\b|\bPI[UÙ]\b|FUTURA|STEP/.test(t))return "indicizzato";
   if(isin&&!/^IT/.test(isin)&&!/\b(BTP|BOT|CTZ)/.test(t))return "estero";
-  if(/\b(BUND|OAT|BONOS|TREASURY|T-NOTE|GILT|DBR|OBL)\b/.test(t))return "estero";
+  if(/\b(TREASURY|T-NOTE|GILT)\b/.test(t))return "estero";
   if(/\b(BTPS?|BOTS?|CTZS?|BUONI)\b/.test(t)||/^IT000[0-9]/.test(isin||""))return "fisso";
   return null;
 }
-const btpSimbolo=b=>`BTP:${+(+b.cedola*100).toFixed(4)}:${String(b.scadenza).slice(0,10)}`;
-function btpDaSimbolo(s){const m=String(s||"").toUpperCase().match(/^BTP:(\d+(?:\.\d+)?):(\d{4}-\d{2}-\d{2})$/);return m?{cedola:+m[1]/100,scadenza:m[2],freq:2}:null;}
-const btpNome=b=>{const d=btpD(b.scadenza),c=+(+b.cedola*100).toFixed(3);return `BTP ${String(c).replace(".",",")}% ${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;};
+/* curva di un paese (DE, FR, ES) = curva AAA dell'area euro + scarto del paese sul 10 anni (rendimento IRS del mese − media del 10 anni AAA nello stesso mese).
+   h = storico nel sito (js/data/curve-euro.json), r = ultimi mesi dal server (api/rates?serie=stati, può mancare).
+   Nei mesi dopo l'ultimo dato IRS vale l'ultimo scarto noto. Restituisce una curva nello stesso formato di quella della Banca d'Italia. */
+function tdsCurva(h,r,p){
+  if(!h||!h.mesi||!h.mesi.length)return null;
+  const sc=h.scadenze,i10=sc.indexOf(10),rg=(r&&r.giorni||[]).filter(g=>Array.isArray(g[1])&&g[1].length===sc.length);
+  const mesiM=new Map(h.mesi.map(x=>[x[0].slice(0,7),x])),avg=new Map(h.aaa10||[]),acc=new Map();
+  for(const g of rg){const m=g[0].slice(0,7);if(g[0]>h.al)mesiM.set(m,g);const a=acc.get(m)||[0,0];a[0]+=g[1][i10];a[1]++;acc.set(m,a);}
+  acc.forEach(([s,n],m)=>{if(!avg.has(m)||m>=String(h.al).slice(0,7))avg.set(m,s/n);});
+  const irs=new Map([...((h.irs||{})[p]||[]),...(((r&&r.irs)||{})[p]||[])]);if(!irs.size)return null;
+  const K=[...new Set([...avg.keys(),...irs.keys()])].sort(),SP=[];let last=null;
+  for(const m of K){if(irs.has(m)&&avg.has(m))last=irs.get(m)-avg.get(m);if(last!=null)SP.push([m,last]);}
+  if(!SP.length)return null;
+  const sp=m=>{let v=SP[0][1];for(const [k,x] of SP){if(k<=m)v=x;else break;}return v;};
+  const sposta=([d,ys])=>[d,ys.map(y=>+(y+sp(d.slice(0,7))).toFixed(4))];
+  const mesi=[...mesiM.values()].sort((a,b)=>a[0]<b[0]?-1:1).map(sposta),giorni=rg.map(sposta),al=giorni.length?giorni[giorni.length-1][0]:h.al;
+  return {fonte:"BCE",scadenze:sc,mesi,giorni,al,paese:p,scarto:+sp(al.slice(0,7)).toFixed(4),irsAl:[...irs.keys()].sort().pop()};
+}
+const btpSimbolo=b=>`${(TDS[b.paese]||TDS.IT).pre}:${+(+b.cedola*100).toFixed(4)}:${String(b.scadenza).slice(0,10)}`;
+function btpDaSimbolo(s){const m=String(s||"").toUpperCase().match(/^(BTP|BUND|OAT|BONOS):(\d+(?:\.\d+)?):(\d{4}-\d{2}-\d{2})$/);if(!m)return null;const paese=TDS_PRE[m[1]];return {cedola:+m[2]/100,scadenza:m[3],freq:TDS[paese].freq,paese};}
+const btpNome=b=>{const d=btpD(b.scadenza),c=+(+b.cedola*100).toFixed(3);return `${(TDS[b.paese]||TDS.IT).nome} ${String(c).replace(".",",")}% ${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;};
 
 /* ===== Studio del consulente (20/11/2026): numero di rischio, profilo del cliente, adeguatezza, portafogli modello =====
    Strumenti di SUPPORTO: la valutazione di adeguatezza resta del consulente e delle procedure del suo studio. */
@@ -2014,6 +2049,6 @@ function peggiore12(r,f){const n=Math.round(f||12);if(!r||r.length<n)return NaN;
   for(let i=n-1;i<r.length;i++){let v=1,ok=true;for(let j=i-n+1;j<=i;j++){if(!Number.isFinite(r[j])){ok=false;break;}v*=1+r[j];}if(ok)worst=Math.min(worst,v-1);}
   return Number.isFinite(worst)?worst:NaN;}
 
-export const POS={numeroRischio,classeRischio,NR_CLASSI,PROFILO_Q,profiloPunteggio,classeDaNome,adeguatezza,pesiPerClasse,scostamento,peggiore12,personalPerformanceQty,bkNum,mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
+export const POS={TDS,btpPaese,tdsCurva,numeroRischio,classeRischio,NR_CLASSI,PROFILO_Q,profiloPunteggio,classeDaNome,adeguatezza,pesiPerClasse,scostamento,peggiore12,personalPerformanceQty,bkNum,mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;
