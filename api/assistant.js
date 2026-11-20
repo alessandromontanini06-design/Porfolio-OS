@@ -68,7 +68,13 @@ const TOOLS = [
     patrimonio_medio: { type: "string", description: "Solo il numero, come scritto: «100.000,00» o «0,9%»." }, costi_servizi: { type: "string", description: "Solo il numero." }, costi_prodotti: { type: "string", description: "Solo il numero." },
     incentivi: { type: "string", description: "Solo il numero della riga degli incentivi (nel rendiconto si chiama «pagamenti ricevuti da terzi» o retrocessioni), già compresi nei costi; vuoto se non c'è." } }, required: ["patrimonio_medio"] } },
   { name: "vai_a", description: "Porta l'utente a una pagina del sito quando lo chiede («portami alle simulazioni», «apri il patrimonio»).", parameters: { type: "object", properties: {
-    pagina: { type: "string", enum: ["home", "patrimonio", "laboratorio", "strumenti", "rischio", "simulazioni", "indipendenza_finanziaria", "crisi", "frontiera", "benchmark", "costi_banca"] } }, required: ["pagina"] } },
+    pagina: { type: "string", enum: ["home", "patrimonio", "laboratorio", "strumenti", "rischio", "simulazioni", "indipendenza_finanziaria", "crisi", "frontiera", "benchmark", "costi_banca", "studio"] } }, required: ["pagina"] } },
+  { name: "mostra_sul_sito", description: "Guida: porta l'utente al punto giusto del sito, lo fa scorrere fin lì e lo illumina con un anello e una nota. Usalo quando chiede come si fa qualcosa o dove trovare qualcosa («come carico il file?», «dove vedo le tasse?»).", parameters: { type: "object", properties: {
+    cosa: { type: "string", enum: ["carica_file", "costruisci_portafoglio", "patrimonio_aggiungi", "patrimonio_grafico", "patrimonio_tasse", "patrimonio_obiettivi", "rendimento_reale", "costi", "adeguatezza", "confronta_allocazioni", "correlazioni", "dove_sei_investito", "salva_archivio", "report_pdf", "rischio", "simulazioni", "costi_banca", "studio_avvisi", "studio_clienti", "studio_modelli", "impostazioni"] },
+    nota: { type: "string", description: "frase breve (massimo 80 caratteri) da mostrare accanto al punto, per esempio «Premi qui e scegli il file della banca»" } }, required: ["cosa"] } },
+  { name: "apri_strumento", description: "Apre un pannello del sito senza salvare niente: il costruttore di portafogli, il profilo del cliente (questionario), l'archivio dei portafogli salvati o la finestra del report PDF.", parameters: { type: "object", properties: {
+    cosa: { type: "string", enum: ["costruttore", "profilo_cliente", "archivio", "report"] } }, required: ["cosa"] } },
+  { name: "cosa_vedo", description: "Cosa ha davanti l'utente adesso: pagina, titolo, pannelli aperti e numeri visibili sullo schermo. Usalo quando chiede «cosa sto guardando», «cosa vuol dire questo numero» o prima di guidarlo.", parameters: { type: "object", properties: {} } },
   { name: "profilo_rischio", description: "Risultato del test «La tua allocazione è coerente con te?», se l'utente lo ha fatto: perdita che regge, perdita peggiore del portafoglio, coerenza, quota investibile entro la soglia, risposte su orizzonte e liquidità.", parameters: { type: "object", properties: {} } }
 ];
 
@@ -90,7 +96,8 @@ Regole:
 - Operazioni dette a parole («ho comprato 20 SWDA a 100 euro»): chiama registra_operazione. Non dire mai che è salvata: l'utente la vede in una scheda e la salva lui con «Conferma». Se mancano quote, prezzo o importo, chiedili prima.
 - Foto: descrivi solo ciò che vedi davvero, senza inventare numeri illeggibili. Se è un rendiconto costi e oneri della banca, leggi patrimonio medio, costi dei servizi, costi dei prodotti e incentivi e chiama costi_banca. Se è l'elenco delle posizioni di un broker, riassumilo e suggerisci «Carica uno screenshot» nella home per importarlo. Non ripetere dati personali (nomi, numeri di conto) che vedi nella foto.
 - Se l'utente parla a voce, la risposta sarà letta ad alta voce: frasi brevi e naturali, niente tabelle, niente elenchi lunghi, al massimo tre numeri importanti.
-- Se l'utente chiede di andare in una pagina, usa vai_a.`;
+- Se l'utente chiede di andare in una pagina, usa vai_a.
+- Sei anche la guida del sito. Se l'utente chiede come si fa qualcosa o dove si trova, usa mostra_sul_sito per illuminare il punto giusto e di' in una o due frasi cosa premere. Per un processo lungo (costruire un portafoglio, caricare il file della banca, compilare il profilo di un cliente) accompagnalo un passo alla volta: mostra il primo passo, aspetta che ti dica che l'ha fatto, poi il successivo. Per aprire costruttore, profilo del cliente, archivio o report usa apri_strumento. Se ti chiede cosa sta guardando o cosa vuol dire un numero sullo schermo, usa cosa_vedo. Non dire mai che hai premuto, scelto o salvato qualcosa al posto suo: tu indichi e apri pannelli, le scelte le fa l'utente.`;
 
 export default async function handler(req, res) {
   /* la voce di Quanta (testo → audio) sta qui dentro: il piano gratuito di Vercel ammette 12 funzioni */

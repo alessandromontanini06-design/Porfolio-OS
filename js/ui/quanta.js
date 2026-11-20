@@ -1,7 +1,7 @@
 /* Portfolio OS · interfaccia · Quanta: la chat con l'analista e la sua presentazione.
    Parte di app.js divisa in moduli: il codice è lo stesso, cambiano solo import ed export. */
 import { $, CALM, G, HAS_G, P, REDUCE, S, esc, fmtDate, fmtN, fmtPct } from "./core.js";
-import { current, go } from "./scene.js";
+import { SCENE_L, current, go } from "./scene.js";
 import { pmHas, pmQuantaOp, pmQuantaSummary } from "./patrimonio.js";
 import { cbSet } from "./costibanca.js";
 import { callStart, callSupported } from "./chiamata.js";
@@ -21,7 +21,7 @@ $("#chatClose").addEventListener("click",closeChat);
 $("#chatNew").addEventListener("click",()=>{if(chatBusy)return;S.chat=[];S.chatView=[];renderChat();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#chat").classList.contains("open"))closeChat();});
 function chatContext(){
-  const oggi=oggiLoc(),pm=pmHas()?"l'utente ha un patrimonio salvato (strumento patrimonio)":"nessun patrimonio salvato",extra=`oggi è il ${oggi}; ${pm}${Q.lastSaved?`; appena salvato: ${Q.lastSaved}`:""}${Q.fromVoice?"; l'utente sta parlando a voce: rispondi breve e naturale":""}`;
+  const oggi=oggiLoc(),pm=pmHas()?"l'utente ha un patrimonio salvato (strumento patrimonio)":"nessun patrimonio salvato",extra=`oggi è il ${oggi}; ${pm}${Q.lastSaved?`; appena salvato: ${Q.lastSaved}`:""}${Q.fromVoice?"; l'utente sta parlando a voce: rispondi breve e naturale":""}; l'utente ora è nella pagina «${SCENE_L[current]||current}»${document.body.dataset.ruolo==="pro"?" e usa il sito da consulente (c'è la pagina Studio)":""}`;
   if(!S.lab||!S.ds||!S.ds.ok)return `${extra}; nessun laboratorio costruito: rispondi a domande generali sul sito e sui concetti, senza inventare numeri del portafoglio dell'utente (quelli del patrimonio si leggono con lo strumento patrimonio)`;
   return extra+"; "+chatContextLab();
 }

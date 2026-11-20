@@ -39,10 +39,10 @@ p.on("request", r => {
   const call = (name, args) => ({ text: "", calls: [{ id: "c" + bodies.length, name, args }], provider: "gemini", model: "test" });
   const out = last.role === "tool" ? { text: last.name === "registra_operazione" ? "Ti ho preparato l'operazione: dimmi se la confermo." : `Fatto. ${last.name}: ${JSON.stringify(last.result).slice(0, 120)}`, calls: [], provider: "gemini" }
     : /guadagnato/.test(t) ? call("patrimonio", {})
+    : /2 SWDA ieri/.test(t) ? call("registra_operazione", { tipo: "acquisto", strumento: "SWDA", quantita: 2, prezzo: 99, data: "ieri" })
     : /comprato/.test(t) ? call("registra_operazione", OP.acquisto)
     : /venduto 5 /.test(t) ? call("registra_operazione", OP.v5)
     : /venduto 1000/.test(t) ? call("registra_operazione", OP.v1000)
-    : /2 SWDA ieri/.test(t) ? call("registra_operazione", { tipo: "acquisto", strumento: "SWDA", quantita: 2, prezzo: 99, data: "ieri" })
     : /data strana/.test(t) ? call("registra_operazione", { tipo: "acquisto", strumento: "SWDA", quantita: 2, prezzo: 99, data: "il giorno di Natale" })
     : /costa/.test(t) ? call("costi_banca", { patrimonio_medio: "100.000", costi_servizi: "800", costi_prodotti: "700", incentivi: "300" })
     : /portami/.test(t) ? call("vai_a", { pagina: "costi_banca" })

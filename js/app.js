@@ -14,6 +14,7 @@ import "./ui/tema.js";
 import "./ui/vetrina.js";
 import "./ui/costibanca.js";
 import "./ui/studio.js";
+import "./ui/guida.js";
 
 /* ---------- Avvio ---------- */
 load(P.sampleSheets(),{name:"esempio_portafoglio.xlsx",size:0,kind:"sample"},false);/* subito qualcosa da mostrare, poi il portafoglio di esempio vero */

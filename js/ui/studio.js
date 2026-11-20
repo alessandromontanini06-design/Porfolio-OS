@@ -1,4 +1,4 @@
-/* Studio del consulente (20/11/2026, ramo studio-consulente, NON pubblicato).
+/* Studio del consulente (20/11/2026, pubblicato il 20/11).
    - pagina «Studio» (scena studio, solo con ruolo consulente): chi sentire, clienti, portafogli modello;
    - profilo del cliente: questionario di 8 domande → numero di rischio da 1 a 100 (POS.profiloPunteggio);
    - adeguatezza nei Risultati del laboratorio (#adeCard): profilo contro portafoglio (POS.adeguatezza), dichiarazione in PDF;
@@ -234,16 +234,16 @@ async function stRender() {
       <div class="kpi"><span class="eyebrow">Fuori profilo o modello</span><div class="v">${fuori}</div><small>da sentire</small></div>
     </div>
     ${!rows.length ? `<section class="card st-empty"><h3>Il tuo studio è vuoto</h3><p>Carica il file della banca di un cliente, oppure costruisci un portafoglio, poi salvalo dai Risultati: comparirà qui con profilo, rischio e revisioni.</p></section>` : `
-    <section class="card st-card"><div class="st-h"><h3>Chi sentire</h3><small>${al.length ? `${al.length} ${al.length === 1 ? "cosa da fare" : "cose da fare"}, le più urgenti prima` : "tutto in ordine"}</small></div>
+    <section class="card st-card" id="stAvvisi"><div class="st-h"><h3>Chi sentire</h3><small>${al.length ? `${al.length} ${al.length === 1 ? "cosa da fare" : "cose da fare"}, le più urgenti prima` : "tutto in ordine"}</small></div>
       ${al.length ? `<ul class="st-al">${al.map(a => `<li><i class="st-sev l${a.l}"></i><div>${a.h}</div><button type="button" class="btn sm" ${a.prof ? `data-stprof="${a.prof}"` : `data-stopen="${a.id}"`}>${a.b}</button></li>`).join("")}</ul>` : `<p class="caption">Nessuna revisione scaduta, nessun cliente fuori profilo o fuori modello.</p>`}</section>
-    <section class="card st-card"><div class="st-h"><h3>Clienti</h3><small>dal più grande · rischio da 1 a 100</small></div>
+    <section class="card st-card" id="stClienti"><div class="st-h"><h3>Clienti</h3><small>dal più grande · rischio da 1 a 100</small></div>
       <div class="tablewrap"><table class="mt st-t"><thead><tr><th>Cliente</th><th>Valore</th><th>Rendimento</th><th>Rischio</th><th>Profilo</th><th>Modello</th><th>Revisione</th><th></th></tr></thead><tbody>
       ${rows.map(x => `<tr><td><b>${esc(x.r.name)}</b>${barra(x.by)}</td><td class="mono">${x.s.value > 0 ? fmtEur(x.s.value) : "—"}</td><td class="mono">${Number.isFinite(x.s.xirr) ? fmtPct(x.s.xirr, 1, true) : Number.isFinite(x.s.cagr) ? fmtPct(x.s.cagr, 1, true) : "—"}</td>
         <td class="mono">${Number.isFinite(x.n) ? x.n : "—"}</td><td>${x.pr ? `<span class="st-tag ${x.n - x.pr.n > 15 ? "ko" : x.n - x.pr.n > 5 ? "warn" : "ok"}">${x.pr.n} · ${x.pr.classe.toLowerCase()}</span>` : `<button type="button" class="st-link" data-stprof="${x.r.id}">compila</button>`}</td>
         <td><select class="st-sel" data-stmod="${x.r.id}" aria-label="Modello di ${esc(x.r.name)}">${modOpts(x.r.modello)}</select>${x.sc ? `<small class="${x.sc.fuori ? "dn" : "up"}">scarto max ${pc(x.sc.max)}</small>` : ""}</td>
         <td>${arAgo(x.r.reviewedAt)}</td><td><button type="button" class="btn sm" data-stopen="${x.r.id}">Apri</button></td></tr>`).join("")}
       </tbody></table></div></section>`}
-    <section class="card st-card"><div class="st-h"><h3>Portafogli modello</h3><small>i modelli dello studio: si aprono nel costruttore e si assegnano ai clienti</small></div>
+    <section class="card st-card" id="stModelli"><div class="st-h"><h3>Portafogli modello</h3><small>i modelli dello studio: si aprono nel costruttore e si assegnano ai clienti</small></div>
       <div class="st-acts"><button type="button" class="btn" data-stgo="fromBuild">Salva il portafoglio del costruttore</button><select class="st-sel" id="stEs" aria-label="Parti da un esempio"><option value="">Parti da un esempio…</option>${PRESETS.map((p, i) => `<option value="${i}">${esc(p[0])}</option>`).join("")}</select></div>
       ${M.length ? `<div class="st-mods">${M.map(m => { const pe = modPesi(m), by = P.pesiPerClasse(pe), n_ = rows.filter(x => x.r.modello === m.id).length;
         return `<article class="st-mod"><div class="st-mod-h"><input class="st-mod-n" data-stren="${m.id}" value="${esc(m.nome)}" aria-label="Nome del modello" maxlength="60"><small>${n_} ${n_ === 1 ? "cliente" : "clienti"}</small></div>${barra(by)}<small class="st-leg">${legenda(by)}</small>

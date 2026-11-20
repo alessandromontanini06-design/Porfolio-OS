@@ -6,7 +6,7 @@
    - Alla fine la trascrizione resta nella chat. Se la chiamata non parte, resta la conversazione a voce semplice. */
 import { $, S, esc } from "./core.js";
 import { trackOnce } from "./importa.js";
-import { NO_LAB, Q, TOOLS_LOCAL, chatContext, hush, opDecide, opText, openChat, renderChat, talkStart } from "./quanta.js";
+import { NO_LAB, Q, TOOLS_LOCAL, chatContext, closeChat, hush, opDecide, opText, openChat, renderChat, talkStart } from "./quanta.js";
 
 const WSS = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=";
 const C = { on: false, ws: null, ctx: null, stream: null, node: null, inAn: null, outAn: null, gain: null, next: 0, play: new Set(), muted: false, t0: 0, timer: 0, raf: 0,
@@ -145,7 +145,7 @@ export async function callStart() {
   if (C.on) return;
   if (!callSupported()) { talkStart(); return; }
   const box = $("#qCall"); hush(); if (Q.talk) Q.talk = false;
-  box.hidden = false; document.body.classList.add("q-calling");
+  box.hidden = false; miniBtns(); C.mini = false; box.classList.remove("mini"); document.body.classList.remove("q-mini"); document.body.classList.add("q-calling");
   $("#qcMsg").hidden = true; $("#qcNote").textContent = ""; $("#qcCap").innerHTML = ""; $("#qcOp").hidden = true; $("#qcTime").textContent = "0:00";
   if (!consentOk()) { $("#qcConsent").hidden = false; state("connecting"); $("#qcState").textContent = "Prima di iniziare"; $("#qcConsentOk").focus(); return; }
   $("#qcConsent").hidden = true;
@@ -171,10 +171,29 @@ export async function callStart() {
   C.t0 = Date.now(); C.timer = setInterval(clock, 1000);
   if (!REDUCE) C.raf = requestAnimationFrame(level);
 }
+/* chiamata ridotta: una pillola in basso, il sito resta usabile e Quanta continua ad ascoltare (20/11/2026) */
+function miniBtns() {
+  const top = document.querySelector("#qCall .qc-top"), bar = document.querySelector("#qCall .qc-bar");
+  if (top && !$("#qcMin")) top.insertAdjacentHTML("beforeend", `<button type="button" class="qc-round qc-min" id="qcMin" aria-label="Riduci la chiamata e usa il sito" title="Riduci: continua a parlare mentre usi il sito"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 14l6 6 6-6M12 4v15"/></svg></button>`);
+  if (bar && !$("#qcMax")) bar.insertAdjacentHTML("afterbegin", `<button type="button" class="qc-round qc-max" id="qcMax" aria-label="Ingrandisci la chiamata" title="Ingrandisci"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 10l6-6 6 6M12 20V5"/></svg></button>`);
+}
+export function callMini(on) {
+  const box = $("#qCall"); if (!box || box.hidden) return; miniBtns(); C.mini = !!on;
+  if (C.mini && $("#chat") && $("#chat").classList.contains("open")) closeChat(); /* il pannello della chat coprirebbe il sito: la trascrizione torna nella chat alla fine */
+  box.classList.toggle("mini", C.mini); box.setAttribute("aria-modal", String(!C.mini));
+  document.body.classList.toggle("q-calling", !C.mini); document.body.classList.toggle("q-mini", C.mini);
+}
+export const callIsMini = () => !!C.mini;
+/* durante la chiamata Quanta sa in che pagina è l'utente: una nota di contesto che non chiede risposta */
+document.addEventListener("pos-scena", e => {
+  if (!C.on || !C.ready) return;
+  send({ clientContent: { turns: [{ role: "user", parts: [{ text: `(Nota del sito, non rispondere: ora l'utente è nella pagina «${e.detail}». Se ti chiede cosa vede usa cosa_vedo.)` }] }], turnComplete: false } });
+});
 export function callEnd(note) {
   const was = C.on, secs = C.t0 ? Math.round((Date.now() - C.t0) / 1000) : 0;
   if (C.user) commitUser(); if (C.ai) commitAi(C.play.size > 0);
   cleanup();
+  C.mini = false; $("#qCall").classList.remove("mini"); document.body.classList.remove("q-mini");
   $("#qCall").hidden = true; document.body.classList.remove("q-calling"); $("#qcConsent").hidden = true; $("#qcMsg").hidden = true;
   if (was && secs > 0) S.chatView.push({ k: "sys", t: `Chiamata con Quanta · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}${note ? ` · ${note}` : ""}` });
   renderChat(); if (was) openChat();
@@ -191,6 +210,8 @@ function muteUi() { const b = $("#qcMute"); b.setAttribute("aria-pressed", Strin
 
 document.addEventListener("click", e => {
   if (e.target.closest("#qcEnd")) { if (C.on) callEnd(); else callEnd(); return; }
+  if (e.target.closest("#qcMin")) { callMini(true); return; }
+  if (e.target.closest("#qcMax")) { callMini(false); return; }
   if (e.target.closest("#qcMute")) { C.muted = !C.muted; if (C.muted) send({ realtimeInput: { audioStreamEnd: true } }); muteUi(); return; }
   if (e.target.closest("#qcConsentOk")) { try { localStorage.setItem("pos-quanta-chiamata-ok", "1"); } catch {} callStart(); return; }
   if (e.target.closest("#qcConsentNo")) { callEnd(); return; }
@@ -203,4 +224,4 @@ document.addEventListener("click", e => {
 document.addEventListener("submit", e => { if (e.target.id !== "qcForm") return; e.preventDefault(); sendText(); });
 document.addEventListener("input", e => { if (e.target.id === "qcText") $("#qcForm").classList.toggle("has", !!e.target.value.trim()); });
 document.addEventListener("click", e => { if (!e.target.closest("#qcCC")) return; try { localStorage.setItem("pos-quanta-cc", ccOn() ? "0" : "1"); } catch {} ccUi(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#qCall").hidden && e.target.id !== "qcText") callEnd(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#qCall").hidden && !C.mini && e.target.id !== "qcText") callEnd(); });
