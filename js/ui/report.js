@@ -148,6 +148,7 @@ function buildReport(o={}){
     :`<header class="rp-h"><div><b class="rp-brand">Quanta Portfolio</b><span>Report del portafoglio</span></div><div class="rp-meta">${esc(S.source&&S.source.name||"")}<br>${today}</div></header>`}
   <h1>${o.cliente?`Il portafoglio di ${esc(o.cliente)}`:o.studio?"Analisi del portafoglio":"Il tuo portafoglio in una pagina"}</h1>
   <p class="rp-sub">${ds.assets.length} strumenti · dati ${ds.freq.adj} da ${fmtDate(ds.dates[0],f)} a ${fmtDate(ds.dates[ds.dates.length-1],f)} · pesi: ${esc(R.wLabel)}</p>
+  ${o.studio&&window.__stReport?window.__stReport():""}
   ${real?`<h2>Il tuo rendimento</h2><table class="rp-t">${row("Rendimento annuo (TIR)",fmtPct(real.pp.xirr,1,true),"tiene conto di quando hai versato")}${row("Al netto delle tasse",fmtPct(real.taxes.xirr,1,true),`imposte stimate ${fmtEur(real.taxes.tax)} se vendessi oggi`)}${row("Valore stimato oggi",fmtEur(real.pp.value),"")}${row("Versato",fmtEur(real.pp.invested),"")}${row("Guadagno",(real.pp.gain>=0?"+":"−")+fmtEur(Math.abs(real.pp.gain)),fmtPct(real.pp.gainPct,1,true)+" sul versato")}${real.bm?row(`Stessi versamenti in ${real.bm.label}`,fmtEur(real.bm.value),`TIR ${fmtPct(real.bm.xirr,1,true)}`):""}</table>${svg("#realChart")}`:""}
   <h2>Allocazione e rischio per strumento</h2>
   <table class="rp-t rp-wide"><thead><tr><th>Strumento</th><th class="n">Peso</th><th class="n">Quota del rischio</th><th class="n">Rendimento annuo</th><th class="n">Volatilità</th><th class="n">Calo massimo</th></tr></thead><tbody>

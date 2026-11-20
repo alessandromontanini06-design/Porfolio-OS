@@ -1399,6 +1399,9 @@ td .st-tag{margin-left:0}
 .st-doc-firme{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:26px}
 .st-doc-firme div{display:flex;flex-direction:column;gap:30px;font-size:9.5pt}.st-doc-firme span{border-bottom:1px solid #111}
 .st-doc-n{font-size:8.5pt;color:#555;margin-top:18px}
+.st-prop{border:1px dashed var(--line-2);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.st-prop-r{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;font-size:.9rem}
+.st-prop-r small{grid-column:1/-1;color:var(--muted);font-size:.82rem}
 
 /* ---- generate: testo che era lime, ora verde-oliva leggibile ---- */
 .chip.live{color:var(--lime-text)}

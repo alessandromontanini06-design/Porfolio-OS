@@ -17,8 +17,9 @@ await wait(1500);
 const b = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true, args: ["--no-sandbox"] });
 const errs = [];
 try {
-  const p = await b.newPage(); await p.setViewport({ width: 1440, height: 900 }); p.on("pageerror", e => errs.push(e.message)); p.on("dialog", d => d.accept());
-  await p.evaluateOnNewDocument(() => { window.print = () => { window.__stampato = (window.__stampato || 0) + 1; }; if (!sessionStorage.getItem("st")) { localStorage.clear(); localStorage.setItem("pos-ruolo-v1", "pro"); sessionStorage.setItem("st", "1"); } });
+  const p = await b.newPage(); await p.setViewport({ width: +(process.env.W || 1440), height: +(process.env.W || 1440) < 700 ? 844 : 900 }); p.on("pageerror", e => errs.push(e.message)); p.on("dialog", d => d.accept());
+  if (process.env.TEMA) await p.evaluateOnNewDocument(t => { window.__TEMA = t; }, process.env.TEMA);
+  await p.evaluateOnNewDocument(() => { window.print = () => { window.__stampato = (window.__stampato || 0) + 1; }; if (!sessionStorage.getItem("st")) { localStorage.clear(); localStorage.setItem("pos-ruolo-v1", "pro"); if (window.__TEMA) localStorage.setItem("pos-tema-v1", window.__TEMA); sessionStorage.setItem("st", "1"); } });
   await p.goto(`http://localhost:${PORT}/?home`, { waitUntil: "networkidle2" }); await wait(2500);
   await p.evaluate(() => window.__saved.clear());
   const shot = async n => { if (shots) await p.screenshot({ path: path.join(shots, `studio-${n}.png`) }); };
@@ -56,11 +57,20 @@ try {
   t("il riquadro mostra il nome del cliente", /Mario Bianchi/.test(ade.txt));
   await p.evaluate(() => document.getElementById("adeCard").scrollIntoView()); await wait(400); await shot("adeguatezza");
 
+  /* 3b. la proposta B del confronto passa dagli stessi controlli */
+  const setW = async (j, i, v) => p.evaluate((j, i, v) => { const el = document.querySelector(`#cmpCard input.cmp-w[data-cp="${j}"][data-ci="${i}"]`); if (!el) return false; el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); return true; }, j, i, v);
+  const okW = await setW(1, 0, 10) && await setW(1, 1, 30);
+  await wait(1200);
+  const prop = await p.evaluate(() => (document.querySelector("#adeCard .st-prop") || {}).innerText || "");
+  t("la proposta B del confronto ha il suo esito di adeguatezza", okW && /Allocazione B/.test(prop) && /rischio \d+/.test(prop), JSON.stringify({ okW, prop: prop.slice(0, 200) }));
   /* 4. dichiarazione di adeguatezza */
   const dich = await p.evaluate(() => window.__dichiarazione() || "");
   t("dichiarazione: titolo, cliente, risposte, controlli, firme", /Dichiarazione di adeguatezza/.test(dich) && /Mario Bianchi/.test(dich) && /Motivazione del consulente/.test(dich) && /Il cliente/.test(dich) && /Fra quanto tempo/.test(dich));
   await p.evaluate(() => document.querySelector('[data-stact="dich"]').click()); await wait(400);
   t("il pulsante prepara la stampa", await p.evaluate(() => window.__stampato === 1 && /Dichiarazione di adeguatezza/.test(document.getElementById("report").innerText)));
+  const rep = await p.evaluate(() => window.__report({ studio: "Studio Rossi", cliente: "Mario Bianchi" }) || "");
+  t("il report per il cliente apre con la sintesi: rischio, profilo, adeguatezza", /In sintesi/.test(rep) && /Numero di rischio/.test(rep) && /Profilo del cliente/.test(rep) && /Adeguatezza/.test(rep));
+  t("il report personale resta senza sintesi del consulente", !/In sintesi/.test(await p.evaluate(() => window.__report({}) || "")));
 
   /* 5. salva il cliente e il portafoglio come modello */
   await p.evaluate(() => { const i = document.getElementById("svName"); if (i) { i.value = "Mario Bianchi"; document.querySelector('[data-sv="yes"]').click(); } }); await wait(900);

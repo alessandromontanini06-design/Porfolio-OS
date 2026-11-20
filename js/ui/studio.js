@@ -51,10 +51,10 @@ function modAdd(nome, righe, banda = .05) {
 function modNome(base) { const a = modLoad(); let n = base, i = 2; while (a.some(m => m.nome === n)) n = `${base} ${i++}`; return n; }
 
 /* ---------- dati del portafoglio aperto nel laboratorio ---------- */
-function pfDati() {
+function pfDati(wIn) {
   if (!S.lab || !S.ds || !S.ds.ok) return null;
   try {
-    const ds = S.ds, f = ds.freq.f, { w } = riskWeights(), pa = pfAsset(w, "Portafoglio"), st = P.stats(pa, f, ds.dates), r = P.portfolioReturns(ds.assets, w);
+    const ds = S.ds, f = ds.freq.f, w = wIn || riskWeights().w, pa = pfAsset(w, "Portafoglio"), st = P.stats(pa, f, ds.dates), r = P.portfolioReturns(ds.assets, w);
     const pesi = ds.assets.map((a, i) => ({ ...strumento(a.name), w: w[i] })).filter(x => x.w > 0.0005);
     return { vol: st.vol, cagr: st.cagr, mdd: st.mdd, peggiore12: P.peggiore12(r, f), pesi };
   } catch { return null; }
@@ -127,12 +127,27 @@ function renderAde() {
       <div><span>Composizione</span>${barra(by)}<small class="st-leg">${legenda(by)}</small></div></div>
     ${A ? `<ul class="st-checks">${A.controlli.map(c => `<li class="${c.esito}"><span class="st-ico" aria-hidden="true">${ICO[c.esito]}</span><div><b>${esc(c.titolo)}</b><p>${esc(c.testo)}</p></div><span class="st-tag ${c.esito}">${c.esito === "ok" ? "ok" : c.esito === "warn" ? "da motivare" : "non adeguato"}</span></li>`).join("")}</ul>`
       : `<p class="st-noprof">Manca il profilo del cliente: con 8 domande controllo rischio, perdita sopportabile, orizzonte, concentrazione e strumenti complessi.</p>`}
+    ${A ? proposteHTML(pr) : ""}
     <div class="st-acts"><button type="button" class="btn ${A ? "" : "lime"}" data-stact="profilo">${A ? "Modifica il profilo" : "Compila il profilo del cliente · 8 domande"}</button>
       ${A ? `<button type="button" class="btn lime" data-stact="dich">Dichiarazione di adeguatezza (PDF)</button>` : ""}
       <button type="button" class="btn" data-stact="modello">Salva come portafoglio modello</button></div>
     <p class="caption" id="stAdeMsg" role="status"></p>
     <p class="caption">Strumento di supporto alla valutazione di adeguatezza: rischio dalla volatilità storica dei prezzi mensili, perdite storiche con i pesi di oggi. La valutazione finale spetta al consulente secondo le procedure del suo studio.</p>`;
 }
+/* le allocazioni del confronto A/B (le proposte al cliente) passano dagli stessi controlli */
+function proposte(pr) {
+  if (!S.cmp || !S.cmp.ports || !S.ds) return [];
+  const cur = riskWeights().w, norm = w => { const t = w.reduce((a, x) => a + (x > 0 ? x : 0), 0); return t > 0 ? w.map(x => (x > 0 ? x : 0) / t) : null; };
+  return S.cmp.ports.map(p => ({ name: p.name, w: norm(p.w || []) })).filter(p => p.w && p.w.some((x, i) => Math.abs(x - (cur[i] || 0)) > .005))
+    .map(p => { const d = pfDati(p.w), A = d && P.adeguatezza(pr, d); return A ? { name: p.name, A } : null; }).filter(Boolean);
+}
+function proposteHTML(pr) {
+  const L = proposte(pr); if (!L.length) return "";
+  return `<div class="st-prop"><b>Le proposte del confronto</b>${L.map(x => `<div class="st-prop-r"><span>Allocazione ${esc(x.name)} · rischio ${x.A.numero}</span><span class="st-tag ${x.A.esito}">${ESITO_L[x.A.esito]}</span><small>${x.A.controlli.filter(c => c.esito !== "ok").map(c => esc(c.testo)).join(" ") || "Tutti i controlli superati."}</small></div>`).join("")}</div>`;
+}
+let adeT = null;
+document.addEventListener("input", e => { if (e.target.closest("#cmpCard")) { clearTimeout(adeT); adeT = setTimeout(renderAde, 400); } });
+document.addEventListener("click", e => { if (e.target.closest("#cmpCard")) { clearTimeout(adeT); adeT = setTimeout(renderAde, 400); } });
 document.addEventListener("pos-lab", renderAde);
 document.addEventListener("click", e => {
   const a = e.target.closest("[data-stact]"); if (!a) return;
@@ -171,6 +186,18 @@ function dichiarazione() {
   setTimeout(() => { window.print(); document.title = old; }, 80);
 }
 window.__dichiarazione = dichiarazioneHTML; // per i test
+/* nel report «per un cliente» (report.js): rischio, profilo e adeguatezza in apertura, il «secondo parere» in una tabella */
+window.__stReport = () => {
+  const d = pfDati(); if (!d) return "";
+  const p = S.stProfilo, pr = p && P.profiloPunteggio(p.ans), A = pr && pr.completo ? P.adeguatezza(pr, d) : null, n = P.numeroRischio(d.vol), by = P.pesiPerClasse(d.pesi);
+  const row = (k, v, x) => `<tr><td>${esc(k)}</td><td class="n">${v}</td><td class="d">${x}</td></tr>`;
+  return `<h2>In sintesi</h2><table class="rp-t">
+    ${row("Numero di rischio", `${Number.isFinite(n) ? n : "—"} su 100`, `${P.classeRischio(n).toLowerCase()} · volatilità ${pc(d.vol, 1)} l'anno`)}
+    ${row("12 mesi peggiori", pc(d.peggiore12, 0), "nei dati storici, con i pesi di oggi")}
+    ${row("Composizione", CLS_ORD.filter(c => by[c] > .001).map(c => `${c} ${pc(by[c])}`).join(" · "), "per classe di strumenti")}
+    ${A ? row("Profilo del cliente", `${pr.n} su 100`, `${pr.classe.toLowerCase()} · perdita accettata fino al ${pc(pr.perdita)} · orizzonte ${pr.orizzonte}`) + row("Adeguatezza", ESITO_L[A.esito], A.controlli.filter(c => c.esito !== "ok").map(c => c.titolo.toLowerCase()).join(", ") || "tutti i controlli superati") : ""}
+  </table>${A ? `<table class="rp-t">${A.controlli.map(c => row(c.titolo, c.esito === "ok" ? "ok" : c.esito === "warn" ? "da motivare" : "non adeguato", esc(c.testo))).join("")}</table>` : ""}`;
+};
 
 /* ---------- pagina Studio ---------- */
 const ST = { mod: null, conf: null };
