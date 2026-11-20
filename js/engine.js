@@ -1940,6 +1940,80 @@ const btpSimbolo=b=>`BTP:${+(+b.cedola*100).toFixed(4)}:${String(b.scadenza).sli
 function btpDaSimbolo(s){const m=String(s||"").toUpperCase().match(/^BTP:(\d+(?:\.\d+)?):(\d{4}-\d{2}-\d{2})$/);return m?{cedola:+m[1]/100,scadenza:m[2],freq:2}:null;}
 const btpNome=b=>{const d=btpD(b.scadenza),c=+(+b.cedola*100).toFixed(3);return `BTP ${String(c).replace(".",",")}% ${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;};
 
-export const POS={personalPerformanceQty,bkNum,mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
+/* ===== Studio del consulente (20/11/2026): numero di rischio, profilo del cliente, adeguatezza, portafogli modello =====
+   Strumenti di SUPPORTO: la valutazione di adeguatezza resta del consulente e delle procedure del suo studio. */
+/* numero di rischio da 1 a 100 dalla volatilità annua (spezzata lineare, scelta per essere spiegabile):
+   2% → 10 (monetari), 5% → 28 (obbligazioni), 10% → 51 (bilanciato), 15% → 70 (azioni mondo), 20% → 82, 30% → 94 */
+const NR_PTS=[[0,1],[.02,10],[.05,28],[.08,42],[.11,56],[.15,70],[.20,82],[.30,94],[.45,100]];
+function numeroRischio(vol){if(!Number.isFinite(vol)||vol<0)return NaN;for(let i=1;i<NR_PTS.length;i++){const [x0,y0]=NR_PTS[i-1],[x1,y1]=NR_PTS[i];if(vol<=x1)return Math.round(y0+(vol-x0)/(x1-x0)*(y1-y0));}return 100;}
+const NR_CLASSI=[[30,"Prudente"],[50,"Moderato"],[70,"Bilanciato"],[100,"Dinamico"]];
+const classeRischio=n=>Number.isFinite(n)?(NR_CLASSI.find(c=>n<=c[0])||NR_CLASSI[3])[1]:"";
+/* questionario del profilo: ogni risposta vale da 0 a 3 punti */
+const PROFILO_Q=[
+  {k:"hor",g:"cap",q:"Fra quanto tempo potrebbero servire questi soldi?",o:["Meno di 2 anni","Da 2 a 5 anni","Da 5 a 10 anni","Oltre 10 anni"]},
+  {k:"obj",g:"tol",q:"Qual è l'obiettivo principale?",o:["Proteggere il capitale","Un reddito regolare","Crescita con oscillazioni contenute","Massima crescita nel lungo periodo"]},
+  {k:"loss",g:"tol",q:"Quanto potrebbe perdere in un anno senza cambiare strategia?",o:["Fino al 5%","Fino al 10%","Fino al 20%","Oltre il 30%"]},
+  {k:"react",g:"tol",q:"Se il portafoglio perdesse il 20% in pochi mesi, cosa farebbe?",o:["Vendo tutto","Vendo una parte","Aspetto","Investo ancora"]},
+  {k:"exp",g:"exp",q:"Con quali strumenti ha già investito?",o:["Solo conti e titoli di Stato","Anche fondi e obbligazioni","Anche azioni ed ETF","Anche leva, derivati o cripto"]},
+  {k:"know",g:"exp",q:"Come valuta la sua conoscenza dei mercati finanziari?",o:["Di base","Discreta","Buona","Professionale"]},
+  {k:"res",g:"cap",q:"Fuori da questo portafoglio, quanti mesi di spese ha da parte?",o:["Meno di 3 mesi","Da 3 a 6 mesi","Da 6 a 12 mesi","Più di un anno"]},
+  {k:"share",g:"cap",q:"Quanta parte del suo patrimonio è questo portafoglio?",o:["Più del 75%","Dal 50 al 75%","Dal 25 al 50%","Meno del 25%"]}];
+const PERDITA_ACC=[.05,.10,.20,.30];
+/* punteggio: tolleranza (obiettivo, perdita, reazione) 60%, capacità (orizzonte, riserva, peso) 40%; tetti per orizzonte breve e perdita accettata bassa */
+function profiloPunteggio(ans){
+  ans=ans||{};const v=k=>Number.isInteger(ans[k])&&ans[k]>=0&&ans[k]<=3?ans[k]:null;
+  const miss=PROFILO_Q.filter(q=>v(q.k)==null).map(q=>q.k);if(miss.length)return {completo:false,mancano:miss};
+  const tol=(v("obj")+v("loss")+v("react"))/9,cap=(v("hor")+v("res")+v("share"))/9;
+  let n=Math.round(5+90*(.6*tol+.4*cap));const tetti=[];
+  if(v("hor")===0&&n>30){n=30;tetti.push("orizzonte sotto i 2 anni");}
+  else if(v("hor")===1&&n>55){n=55;tetti.push("orizzonte sotto i 5 anni");}
+  const capL=[30,50,75,100][v("loss")];if(n>capL){n=capL;tetti.push(`perdita accettata fino al ${Math.round(PERDITA_ACC[v("loss")]*100)}%`);}
+  return {completo:true,n,classe:classeRischio(n),perdita:PERDITA_ACC[v("loss")],orizzonte:["meno di 2 anni","2-5 anni","5-10 anni","oltre 10 anni"][v("hor")],
+    complessi:v("exp")>=3&&v("know")>=2,riservaBassa:v("res")===0,tolleranza:tol,capacita:cap,tetti};
+}
+/* classe di uno strumento dal nome (quando non c'è una scheda): Azioni, Obbligazioni, Liquidità, Oro, Cripto */
+function classeDaNome(n){const s=String(n||"");
+  if(/bitcoin|\bbtc\b|ethereum|\beth\b|crypto|cripto|solana|-USD$/i.test(s))return "Cripto";
+  if(/money market|monetar|overnight|\bcash\b|liquidit|conto deposito|\b€str\b|\bestr\b|ultrashort|ultra short/i.test(s))return "Liquidità";
+  if(/\bgold\b|\boro\b|silver|argento|commodit|materie prime|precious/i.test(s))return "Oro";
+  if(/bond|obblig|treasury|\bgovt\b|government|aggregate|corporate|\bbtp\b|\bbot\b|\bcct\b|\bbund\b|\boat\b|inflation|tips|duration|high yield|\bhy\b|€ ?gov|income/i.test(s))return "Obbligazioni";
+  return "Azioni";}
+const COMPLESSO_RX=/\b(2x|3x|-2x|-3x)\b|leva|leverag|\bshort\b|inverse|ultra(?!short| short)|\bdaily\b|turbo|certificat|warrant|bitcoin|crypto|cripto|ethereum|solana/i;
+const AMPIO_RX=/world|all.?world|acwi|global|mondo|s&p ?500|sp ?500|stoxx (europe )?600|msci (europe|emu|usa)|ftse (all|developed)|total (market|world)|aggregate|eurozone gov|euro gov/i;
+const FONDO_RX=/\b(etf|ucits|fund|fondo|sicav|ishares|vanguard|xtrackers|amundi|spdr|invesco|lyxor|vaneck|wisdomtree)\b/i;
+/* adeguatezza: profilo (da profiloPunteggio) contro portafoglio {vol, peggiore12, pesi:[{nome,w,classe?,ampio?,fondo?}]} → controlli con esito ok / warn / ko */
+function adeguatezza(pr,pf){
+  if(!pr||!pr.completo||!pf)return null;const out=[],pn=numeroRischio(pf.vol),pesi=(pf.pesi||[]).filter(x=>x.w>0);
+  const pct=x=>`${Math.round(x*100)}%`;
+  const d=pn-pr.n;out.push({k:"rischio",titolo:"Rischio",esito:!Number.isFinite(pn)?"warn":d<=5?"ok":d<=15?"warn":"ko",
+    testo:Number.isFinite(pn)?`Numero di rischio del portafoglio ${pn} (${classeRischio(pn).toLowerCase()}) contro ${pr.n} del profilo (${pr.classe.toLowerCase()}).`:"Rischio del portafoglio non calcolabile: servono più dati storici."});
+  if(Number.isFinite(pf.peggiore12)){const w=Math.max(0,-pf.peggiore12),L=pr.perdita;
+    out.push({k:"perdita",titolo:"Perdita sopportabile",esito:w<=L?"ok":w<=L*1.5?"warn":"ko",testo:`Nei 12 mesi peggiori dei dati il portafoglio ha perso il ${pct(w)}; il cliente accetta fino al ${pct(L)} in un anno.`});}
+  const cls=x=>x.classe||classeDaNome(x.nome),az=pesi.filter(x=>cls(x)==="Azioni"||cls(x)==="Cripto").reduce((a,x)=>a+x.w,0);
+  const lim=pr.orizzonte==="meno di 2 anni"?.2:pr.orizzonte==="2-5 anni"?.5:null;
+  if(lim!=null)out.push({k:"orizzonte",titolo:"Orizzonte",esito:az<=lim+1e-9?"ok":az<=lim+.15?"warn":"ko",testo:`Azioni e cripto al ${pct(az)} con un orizzonte di ${pr.orizzonte}${az>lim+1e-9?`: oltre il ${pct(lim)} indicativo per questo orizzonte`:""}.`});
+  else out.push({k:"orizzonte",titolo:"Orizzonte",esito:"ok",testo:`Orizzonte di ${pr.orizzonte}: nessun limite particolare sulle azioni (${pct(az)}).`});
+  const big=pesi.slice().sort((a,b)=>b.w-a.w)[0];
+  if(big){const ampio=big.ampio!=null?big.ampio:AMPIO_RX.test(big.nome),fondo=ampio||(big.fondo!=null?big.fondo:FONDO_RX.test(big.nome)),lim2=ampio?.6:fondo?.4:.2;
+    out.push({k:"concentrazione",titolo:"Concentrazione",esito:big.w<=lim2+1e-9?"ok":"warn",testo:big.w<=lim2+1e-9?`Lo strumento più pesante (${big.nome}) è al ${pct(big.w)}.`:`${big.nome} pesa il ${pct(big.w)}: oltre il ${pct(lim2)} indicativo per ${ampio?"un fondo molto diversificato":fondo?"un fondo":"un singolo titolo"}. Da motivare.`});}
+  const cx=pesi.filter(x=>COMPLESSO_RX.test(x.nome)||cls(x)==="Cripto");
+  out.push({k:"complessita",titolo:"Strumenti complessi",esito:!cx.length||pr.complessi?"ok":"ko",testo:!cx.length?"Nessuno strumento con leva, a replica inversa o cripto.":pr.complessi?`${cx.map(x=>x.nome).join(", ")}: compatibili con l'esperienza dichiarata.`:`${cx.map(x=>x.nome).join(", ")}: richiedono esperienza e conoscenza che il profilo non indica.`});
+  if(pr.riservaBassa)out.push({k:"riserva",titolo:"Riserva per imprevisti",esito:"warn",testo:"Il cliente ha meno di 3 mesi di spese da parte: un imprevisto potrebbe costringerlo a vendere in perdita."});
+  const esito=out.some(x=>x.esito==="ko")?"ko":out.some(x=>x.esito==="warn")?"warn":"ok";
+  return {esito,numero:pn,classe:classeRischio(pn),profilo:pr.n,controlli:out};
+}
+/* pesi per classe: [{nome,w,classe?}] → {Azioni:…, Obbligazioni:…} (somma 1) */
+function pesiPerClasse(pesi){const by={},t=(pesi||[]).reduce((a,x)=>a+(x.w>0?x.w:0),0);if(!(t>0))return by;
+  for(const x of pesi){if(!(x.w>0))continue;const c=x.classe||classeDaNome(x.nome);by[c]=(by[c]||0)+x.w/t;}return by;}
+/* scostamento dal modello per classe; banda in punti (0,05 = ±5%) */
+function scostamento(modello,cliente,banda){banda=Number.isFinite(banda)?banda:.05;const M=pesiPerClasse(modello),C=pesiPerClasse(cliente),cl=[...new Set([...Object.keys(M),...Object.keys(C)])];
+  const righe=cl.map(c=>({classe:c,modello:M[c]||0,cliente:C[c]||0,diff:(C[c]||0)-(M[c]||0)})).sort((a,b)=>b.modello-a.modello||b.cliente-a.cliente);
+  const max=righe.reduce((a,r)=>Math.max(a,Math.abs(r.diff)),0);return {righe,max,fuori:max>banda+1e-9,banda};}
+/* rendimento peggiore su 12 mesi mobili (f periodi all'anno) da una serie di rendimenti di periodo */
+function peggiore12(r,f){const n=Math.round(f||12);if(!r||r.length<n)return NaN;let worst=Infinity;
+  for(let i=n-1;i<r.length;i++){let v=1,ok=true;for(let j=i-n+1;j<=i;j++){if(!Number.isFinite(r[j])){ok=false;break;}v*=1+r[j];}if(ok)worst=Math.min(worst,v-1);}
+  return Number.isFinite(worst)?worst:NaN;}
+
+export const POS={numeroRischio,classeRischio,NR_CLASSI,PROFILO_Q,profiloPunteggio,classeDaNome,adeguatezza,pesiPerClasse,scostamento,peggiore12,personalPerformanceQty,bkNum,mcVersamentoPer,btpRendimento,btpPrezzo,btpRateo,btpTir,btpCurvaAl,btpStima,btpSpread,btpSerie,btpTipo,btpSimbolo,btpDaSimbolo,btpNome,fisco,fiscoCat,FISCO_CAT_L,sideBySideQuotes,accountReturn,accountFromSheets,brokerMoves,bkDate,fireSwr,fireLife,fireAge,fireSaveFor,firePaths,fireRealRet,fireRate,fireWhen,normalizeExports,companyExposure,coKey,contributionSplit,monthsToTarget,lookThrough,weightedTer,exposures,etfClass,terDrag,bayesStein,invSym,reshapeWide,applyRecipe,colIdx,localRecipe,structureFingerprint,headerTag,ccyOf,parseNum,parseDate,analyzeSheet,buildDataset,stats,corr,wealth,capabilities,parseCSV,sampleSheets,fmtN,fmtPct,fmtDate,ASSET_ROLES,quantile,riskStats,covMatrix,riskContrib,portfolioReturns,makeRng,monteCarlo,CRISES,crisisAnalysis,avgCorr,conditionalShock,stressImpact,annualInputs,projBox,qpSolve,optimize,riskParity,pStats,randomPortfolios,benchPrices,benchAlign,benchStats,benchAsset,xirr,personalPerformance,sameFlows,normCdf,tCdf,tInv975,pTwoSided,chi2p1,varBacktest,ledger,lgSteps};
 if (typeof window !== "undefined") window.POS = POS;
 export default POS;

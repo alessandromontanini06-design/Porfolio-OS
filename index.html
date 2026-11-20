@@ -57,6 +57,7 @@
 <link rel="modulepreload" href="/js/ui/scene.js">
 <link rel="modulepreload" href="/js/ui/screenshot.js">
 <link rel="modulepreload" href="/js/ui/vetrina.js">
+<link rel="modulepreload" href="/js/ui/studio.js">
 </head>
 <body data-scene="home">
 
@@ -235,6 +236,13 @@
   </section>
 
   <!-- STRUMENTI -->
+  <!-- STUDIO DEL CONSULENTE (20/11/2026, js/ui/studio.js) -->
+  <section class="scene" data-scene="studio" id="scene-studio" aria-label="Studio" hidden>
+    <div class="inner">
+      <div class="scene-title"><div><span class="idx">Per il consulente</span><h2>Il tuo <em>studio</em></h2></div><p>Clienti, profili, adeguatezza e portafogli modello. Tutto resta in questo browser.</p></div>
+      <div id="stBody" aria-live="polite"></div>
+    </div>
+  </section>
   <section class="scene" data-scene="strumenti" id="scene-strumenti" aria-label="Strumenti" hidden>
     <div class="inner">
       <div class="scene-title"><div><span class="idx">Strumenti</span><h2>Gli <em>strumenti</em></h2></div><p id="toolsSrc">Le analisi del portafoglio che hai nel laboratorio.</p></div>
@@ -337,6 +345,7 @@
             <div id="macro"></div>
           </div>
           <div class="card s12" id="profCard" hidden></div>
+          <div class="card s12 ade-card" id="adeCard" hidden></div>
           <div class="card s12" id="pfCard" hidden></div>
           <div class="card s12" id="cmpCard" hidden></div>
           <div class="card s12">
@@ -575,6 +584,7 @@
   <button type="button" data-go="home" aria-current="true" data-l="Home"><span class="n">01</span><span class="lbl">Home</span></button>
   <button type="button" data-nav="lab" id="navMainLab" data-l="Laboratorio"><span class="n">02</span><span class="lbl">Laboratorio</span></button>
   <button type="button" data-go="patrimonio" id="navPm" data-l="Patrimonio"><span class="n">03</span><span class="lbl">Patrimonio</span></button>
+  <button type="button" data-go="studio" id="navStudio" class="st-nav" data-l="Studio"><span class="n">05</span><span class="lbl">Studio</span></button>
   <button type="button" data-nav="strumenti" id="navTools" data-l="Strumenti"><span class="n">04</span><span class="lbl">Strumenti</span></button>
   <button type="button" class="dk-old" data-go="scan" data-l="Scansione"><span class="n">03</span><span class="lbl">Scansione</span></button>
   <button type="button" class="dk-old" data-go="map" data-l="Mappa"><span class="n">04</span><span class="lbl">Mappa</span></button>

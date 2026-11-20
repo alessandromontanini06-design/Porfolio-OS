@@ -9,10 +9,10 @@ import { quantaScene } from "./quanta.js";
 import { pmEnter, pmHas, pmToLab } from "./patrimonio.js";
 
 /* ---------- Scene e dock ---------- */
-const SCENES=["home","scan","map","lab","patrimonio","strumenti","risk","sim","fire","stress","opt","bench"],SCENE_L={home:"Home",patrimonio:"Patrimonio",strumenti:"Strumenti",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",fire:"Indipendenza",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
+const SCENES=["home","scan","map","lab","patrimonio","studio","strumenti","risk","sim","fire","stress","opt","bench"],SCENE_L={home:"Home",patrimonio:"Patrimonio",studio:"Studio",strumenti:"Strumenti",scan:"Scansione",map:"Mappa",lab:"Laboratorio",risk:"Rischio",sim:"Simulazioni",fire:"Indipendenza",stress:"Stress test",opt:"Frontiera",bench:"Benchmark"};
 let current="home";
 /* colore d'accento di ogni sezione (lo stesso del CSS) */
-const ACC={home:"212,255,58",patrimonio:"201,242,74",strumenti:"201,242,74",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",fire:"201,242,74",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165"};
+const ACC={home:"212,255,58",patrimonio:"201,242,74",studio:"201,242,74",strumenti:"201,242,74",scan:"212,255,58",map:"212,255,58",lab:"212,255,58",risk:"255,122,61",sim:"71,229,255",fire:"201,242,74",stress:"255,194,75",opt:"255,122,217",bench:"91,240,165"};
 /* la pillola del dock insegue il pulsante attivo con una molla, anche mentre l'etichetta si allarga */
 const pillS={x:0,w:0,on:false,until:0};
 function movePill(){pillS.until=performance.now()+900;if(pillS.on)return;pillS.on=true;
@@ -27,7 +27,7 @@ function movePill(){pillS.until=performance.now()+900;if(pillS.on)return;pillS.o
 const avail=n=>{const b=document.querySelector(`.dock [data-go="${n}"]`);return !!b&&!b.disabled&&!b.classList.contains("off");};
 const neighbor=(name,dir)=>{for(let i=SCENES.indexOf(name)+dir;i>=0&&i<SCENES.length;i+=dir)if(avail(SCENES[i]))return SCENES[i];return null;};
 /* il menu ha 4 voci: Home, Laboratorio (analisi del file → mappa → risultati), Patrimonio, Strumenti (le 6 analisi) */
-const GROUP={home:"home",patrimonio:"patrimonio",scan:"lab",map:"lab",lab:"lab",strumenti:"strumenti",risk:"strumenti",sim:"strumenti",fire:"strumenti",stress:"strumenti",opt:"strumenti",bench:"strumenti"};
+const GROUP={home:"home",patrimonio:"patrimonio",studio:"studio",scan:"lab",map:"lab",lab:"lab",strumenti:"strumenti",risk:"strumenti",sim:"strumenti",fire:"strumenti",stress:"strumenti",opt:"strumenti",bench:"strumenti"};
 const navBtn=n=>document.querySelector(`.dock [data-nav="${GROUP[n]}"]`)||document.querySelector(`.dock button[data-go="${n}"]:not(.dk-old)`);
 /* «Laboratorio» porta al passo a cui sei arrivato: i risultati se ci sono, altrimenti l'analisi del file */
 const labTarget=()=>["lab","map","scan"].includes(current)?current:avail("lab")?"lab":"scan";
@@ -136,6 +136,7 @@ function onEnter(name){
   if(name==="sim"&&needRender("sim")){renderSim();rendered("sim");}
   if(name==="home")svHome();
   if(name==="patrimonio")pmEnter();
+  document.dispatchEvent(new CustomEvent("pos-scena",{detail:name})); /* lo Studio (studio.js) ascolta qui: niente import circolari */
   if(name==="strumenti")renderTools();
   if(name==="fire"&&needRender("fire")){renderFI();rendered("fire");}
   if(name==="stress"&&needRender("stress")){renderStress();rendered("stress");}

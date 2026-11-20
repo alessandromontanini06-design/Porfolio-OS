@@ -52,7 +52,7 @@ async function svSave(name){
   if(!lastH||now-lastH.at>864e5||Math.abs((lastH.value||0)-(snap.value||0))>1)hist.push(snap);else hist[hist.length-1]=snap;
   const rec={...(old||{}),id:old?old.id:svNewId(),name:(name||old&&old.name||svFileName()).slice(0,80),file:svFileName(),note:old?old.note:"",
     createdAt:old?old.createdAt:now,savedAt:now,reviewedAt:now,sheets:S.fileSheets.map(x=>({name:x.name,aoa:x.aoa})),
-    assets:ds.assets.map(a=>a.name),period:`${fmtDate(ds.dates[0],f)} – ${fmtDate(ds.dates[ds.dates.length-1],f)}`,riskW:S.riskW||null,fi:S.fi?S.fi.in:null,ob:S.mcOb?S.mcOb.slice(0,8):(old&&old.ob)||null,snap,history:hist.slice(-60),fast:svFast()||(old&&old.fast)||null};
+    assets:ds.assets.map(a=>a.name),period:`${fmtDate(ds.dates[0],f)} – ${fmtDate(ds.dates[ds.dates.length-1],f)}`,riskW:S.riskW||null,fi:S.fi?S.fi.in:null,ob:S.mcOb?S.mcOb.slice(0,8):(old&&old.ob)||null,profilo:S.stProfilo||(old&&old.profilo)||null,snap,history:hist.slice(-60),fast:svFast()||(old&&old.fast)||null};
   try{await svPut(rec);S.svSaved=rec.id;trackOnce("feature","salva",{name:"salva"});svBadge();return rec;}catch{return null;}
 }
 async function svOfferRender(){
@@ -93,7 +93,7 @@ function svOpenFast(r){
   S.fileSheets=r.sheets;S.tx=detectTx(r.sheets);
   S.rb={...F.rb,cols:F.rb.cols.map(c=>({...c,map:new Map(c.map),proxy:c.proxy?new Map(c.proxy):null})),fxm:Object.fromEntries(Object.entries(F.rb.fxm||{}).map(([k,v])=>[k,new Map(v)]))};
   S.youngRes={...(F.youngRes||{})};S.lastUnd=F.lastUnd||null;
-  if(r.riskW)S.riskW=r.riskW;if(r.fi)S.fi={in:{...fiDefaults(),...r.fi,cap:fiDefaults().cap}};S.mcOb=svOb(r);
+  if(r.riskW)S.riskW=r.riskW;if(r.fi)S.fi={in:{...fiDefaults(),...r.fi,cap:fiDefaults().cap}};S.mcOb=svOb(r);S.stProfilo=r.profilo||null;
   if(F.pz){PZ.client=F.pz.client||"";PZ.next=F.pz.next||"";}
   S.fastOpen={at:F.at,id:r.id};
   load([F.sheet],{name:`${r.file||r.name} · ricostruito`,size:0,kind:"rebuilt"},false);
@@ -112,7 +112,7 @@ async function svOpen(id,opts={}){
     try{svOpenFast(r);return;}catch(e){S.fastOpen=null;/* dati rapidi non utilizzabili: si va col percorso completo */}}
   trackOnce("feature","riprendi",{name:"riprendi"});closeArchive();
   if(isSim())spaceSwitch("real",{stay:true});
-  S.fastOpen=null;S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi,ob:svOb(r)};S.svSaved=id;S.svPrev=opts.keepPrev?S.svPrev:(r.snap||null);
+  S.stProfilo=r.profilo||null;S.fastOpen=null;S.svResume={id,t0:Date.now(),riskW:r.riskW,fi:r.fi,ob:svOb(r)};S.svSaved=id;S.svPrev=opts.keepPrev?S.svPrev:(r.snap||null);
   /* niente analisi del file né mappa a vista: un riquadro d'attesa, i passi li rifà il sito da solo, poi direttamente i Risultati */
   svBusy(true,opts.full?`Aggiorno i prezzi di «${r.name}»…`:`Apro «${r.name}»…`);
   load(r.sheets,{name:r.file||r.name,size:0,kind:"file"},true);

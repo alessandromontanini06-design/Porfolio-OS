@@ -151,7 +151,7 @@ function renderLook(){
 const artIl=v=>/^(8|11(?!\d))/.test(String(Math.round(v*100)))?"l'":"il ";
 const hedgedTxt=e=>{const c=String(e.copertura||"").replace(/^Con copertura valutaria\s*/i,"").trim();return c&&!/^(no|nessuna?)$/i.test(c)?"coperto":null;};
 /* indice delle schede del laboratorio: solo quelle visibili, nell'ordine in cui compaiono; un clic porta alla scheda */
-const LAB_IDX=[["chgCard","Cosa è cambiato"],["realCard","Rendimento reale"],["costCard","Costi"],["chartbox","Crescita"],["profCard","Il tuo profilo"],["pfCard","Portafoglio e ribilanciamento"],["cmpCard","Confronta allocazioni"],["lookCard","Dove sei investito"],["metrics","Metriche"],["corr","Correlazioni"]];
+const LAB_IDX=[["chgCard","Cosa è cambiato"],["realCard","Rendimento reale"],["costCard","Costi"],["chartbox","Crescita"],["profCard","Il tuo profilo"],["adeCard","Adeguatezza"],["pfCard","Portafoglio e ribilanciamento"],["cmpCard","Confronta allocazioni"],["lookCard","Dove sei investito"],["metrics","Metriche"],["corr","Correlazioni"]];
 function labIndex(){
   const nav=$("#labIdx");if(!nav)return;
   const vis=LAB_IDX.map(([id,l])=>{const el=document.getElementById(id),card=el&&(el.classList.contains("card")?el:el.closest(".card"));return card&&!card.hidden&&card.offsetParent!==null?{card,l,y:card.getBoundingClientRect().top}:null;}).filter(Boolean).sort((a,b)=>a.y-b.y);
@@ -179,6 +179,7 @@ function renderLab(){
   renderMetrics();
   renderMacro();
   renderProfileCard();
+  document.dispatchEvent(new CustomEvent("pos-lab")); /* adeguatezza al profilo del cliente (studio.js) */
   renderPortfolio();
   renderCompare();
   renderReal();
