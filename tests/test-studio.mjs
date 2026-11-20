@@ -24,6 +24,7 @@ try {
   await p.evaluate(() => window.__saved.clear());
   const shot = async n => { if (shots) await p.screenshot({ path: path.join(shots, `studio-${n}.png`) }); };
   const vis = sel => p.evaluate(s => { const e = document.querySelector(s); return !!e && e.offsetParent !== null && !e.hidden; }, sel);
+  const vedi = async sel => { await p.evaluate(q => { const e = document.querySelector(q); if (!e) return; const sc = e.closest(".scene"); if (sc) sc.scrollTop += e.getBoundingClientRect().top - 80; }, sel); await wait(500); };
 
   /* 1. voce Studio e pagina vuota */
   t("da consulente c'è la voce «Studio» nel menu", await vis("#navStudio"));
@@ -63,11 +64,13 @@ try {
   await wait(1200);
   const prop = await p.evaluate(() => (document.querySelector("#adeCard .st-prop") || {}).innerText || "");
   t("la proposta B del confronto ha il suo esito di adeguatezza", okW && /Allocazione B/.test(prop) && /rischio \d+/.test(prop), JSON.stringify({ okW, prop: prop.slice(0, 200) }));
+  if (shots) { await vedi("#adeCard .st-checks"); await shot("proposta"); }
   /* 4. dichiarazione di adeguatezza */
   const dich = await p.evaluate(() => window.__dichiarazione() || "");
   t("dichiarazione: titolo, cliente, risposte, controlli, firme", /Dichiarazione di adeguatezza/.test(dich) && /Mario Bianchi/.test(dich) && /Motivazione del consulente/.test(dich) && /Il cliente/.test(dich) && /Fra quanto tempo/.test(dich));
   await p.evaluate(() => document.querySelector('[data-stact="dich"]').click()); await wait(400);
   t("il pulsante prepara la stampa", await p.evaluate(() => window.__stampato === 1 && /Dichiarazione di adeguatezza/.test(document.getElementById("report").innerText)));
+  if (shots) { await p.emulateMediaType("print"); await p.screenshot({ path: path.join(shots, "studio-dichiarazione.png"), fullPage: true }); await p.emulateMediaType(null); }
   const rep = await p.evaluate(() => window.__report({ studio: "Studio Rossi", cliente: "Mario Bianchi" }) || "");
   t("il report per il cliente apre con la sintesi: rischio, profilo, adeguatezza", /In sintesi/.test(rep) && /Numero di rischio/.test(rep) && /Profilo del cliente/.test(rep) && /Adeguatezza/.test(rep));
   t("il report personale resta senza sintesi del consulente", !/In sintesi/.test(await p.evaluate(() => window.__report({}) || "")));
@@ -102,6 +105,7 @@ try {
   t("avviso «revisione scaduta» in cima", al.length >= 1 && /revisione scaduta/.test(al[0]), JSON.stringify(al));
   t("avviso sul rischio se il portafoglio supera il profilo", n0 - 29 <= 5 || al.some(a => /rischio sopra il profilo/.test(a)), `${n0} ${JSON.stringify(al)}`);
   await shot("pagina");
+  if (shots) { await vedi("#stBody .st-t"); await shot("clienti"); await vedi("#stBody .st-mods"); await shot("modelli"); }
 
   /* 8. modello nel costruttore */
   await p.evaluate(id => document.querySelector(`[data-stbuild="${id}"]`).click(), M[1].id); await wait(800);
