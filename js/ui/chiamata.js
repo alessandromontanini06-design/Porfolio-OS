@@ -22,7 +22,23 @@ process(i){const ch=i[0]&&i[0][0];if(!ch)return true;for(let k=0;k<ch.length;k++
 registerProcessor("q-cap",QCap);`;
 const toB64 = i16 => { const u = new Uint8Array(i16.buffer, i16.byteOffset, i16.byteLength); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
 const fromB64 = b => { const s = atob(b), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return new Int16Array(u.buffer, 0, u.length >> 1); };
-function sendMic(i16) { if (!C.ready || C.muted || !C.ws || C.ws.readyState !== 1) return; send({ realtimeInput: { audio: { data: toB64(i16), mimeType: "audio/pcm;rate=16000" } } }); }
+function sendMic(i16) { if (!C.ready || C.muted || !C.ws || C.ws.readyState !== 1) return; send({ realtimeInput: { audio: { data: toB64(i16), mimeType: "audio/pcm;rate=16000" } } }); fineTurno(i16); }
+/* fine del turno decisa anche dal sito (21/11/2026): Google a volte sente l'inizio di una frase ma non la fine (succedeva sempre in italiano
+   e in francese: Quanta restava in ascolto e non rispondeva). Il sito misura il volume del microfono: dopo 1 secondo di silenzio,
+   se Google non ha già chiuso il turno, manda audioStreamEnd (lo stesso segnale del pulsante del microfono) e Google risponde. */
+const VAD_SILENZIO = 1000;
+function fineTurno(i16) {
+  let e = 0; for (let k = 0; k < i16.length; k += 2) e += i16[k] * i16[k];
+  const rms = Math.sqrt(e / Math.ceil(i16.length / 2)), now = performance.now(), V = C.vad || (C.vad = { floor: rms, on: false, last: 0, t0: 0, finito: false });
+  V.floor = rms < V.floor ? rms : V.floor + (rms - V.floor) * 0.02;   /* rumore di fondo: scende subito, sale piano */
+  if (C.st !== "listening") { V.on = false; return; }   /* mentre Quanta parla o pensa il microfono sente la sua voce: non conta */
+  const parla = rms > Math.max(600, V.floor * 3.5);
+  if (parla) { if (!V.on) { V.on = true; V.t0 = now; V.finito = false; } V.last = now; return; }
+  if (V.on && now - V.last > VAD_SILENZIO) {
+    V.on = false;
+    if (!V.finito && V.last - V.t0 > 250) { V.finito = true; send({ realtimeInput: { audioStreamEnd: true } }); }
+  }
+}
 async function micStart() {
   C.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
   const src = C.ctx.createMediaStreamSource(C.stream); C.inAn = C.ctx.createAnalyser(); C.inAn.fftSize = 512; src.connect(C.inAn);
@@ -119,6 +135,8 @@ async function onMsg(ev) {
   let m; try { m = JSON.parse(typeof ev.data === "string" ? ev.data : await ev.data.text()); } catch { return; }
   if (m.setupComplete) { C.ready = true; state("listening"); send({ realtimeInput: { text: "(La chiamata è appena iniziata: saluta in una frase breve e chiedi come puoi aiutare.)" } }); return; }
   if (m.toolCall) { onTool(m.toolCall); return; }
+  /* Google dice quando sente iniziare e finire una frase: se l'ha chiusa lui, il sito non manda niente */
+  if (m.voiceActivity) { const V = C.vad || (C.vad = { floor: 0, on: false, last: 0, t0: 0, finito: false }); if (m.voiceActivity.type === "ACTIVITY_END") V.finito = true; else if (m.voiceActivity.type === "ACTIVITY_START") V.finito = false; return; }
   if (m.goAway) { C.goAway = true; $("#qcNote").textContent = "La chiamata sta per chiudersi."; return; }
   const sc = m.serverContent; if (!sc) return;
   if (sc.inputTranscription && sc.inputTranscription.text) { C.user += sc.inputTranscription.text; caption(); }
@@ -136,7 +154,7 @@ function fail(msg, offerSimple) {
   cleanup(); box.dataset.st = "error";
 }
 function cleanup() {
-  C.on = false; C.ready = false; clearInterval(C.timer); cancelAnimationFrame(C.raf);
+  C.on = false; C.ready = false; C.vad = null; clearInterval(C.timer); cancelAnimationFrame(C.raf);
   try { if (C.ws) { C.ws.onclose = null; C.ws.close(1000); } } catch {} C.ws = null;
   try { C.node && C.node.disconnect(); } catch {} C.node = null;
   if (C.stream) C.stream.getTracks().forEach(t => t.stop()); C.stream = null;
