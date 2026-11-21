@@ -108,8 +108,8 @@ function commitAi(cut) { const t = clean(C.ai); if (t) { S.chatView.push({ k: "a
 
 /* ---------- strumenti: gli stessi della chat, più la conferma a voce ---------- */
 /* sì e no nelle quattro lingue del sito (italiano, inglese, spagnolo, francese) */
-const YES = /(^|[^a-zà-ÿ])(s[iìí]|conferm\w*|ok|okay|va bene|salva\w*|certo|esatto|giusto|procedi|yes|yeah|yep|sure|confirm\w*|go ahead|correct|that's right|save it|vale|claro|correcto|adelante|guárdala|oui|ouais|d'accord|exact|vas-y|enregistre\w*)(?![a-zà-ÿ])/,
-  NO = /(^|[^a-zà-ÿ])(no|non|annulla\w*|aspetta|lascia|nope|not|don't|cancel\w*|wait|cancela\w*|espera|déjalo|annule\w*|attends|laisse)(?![a-zà-ÿ])/;   /* niente «pas»: «oui, pas de souci» è un sì */
+export const YES = /(^|[^a-zà-ÿ])(s[iìí]|conferm\w*|ok|okay|va bene|salva\w*|certo|esatto|giusto|procedi|yes|yeah|yep|sure|confirm\w*|go ahead|correct|that's right|save it|vale|claro|correcto|adelante|guárdala|oui|ouais|d'accord|exact|vas-y|enregistre\w*)(?![a-zà-ÿ])/;
+export const NO = /(^|[^a-zà-ÿ])(no|non|annulla\w*|aspetta|lascia|nope|not|don't|cancel\w*|wait|cancela\w*|espera|déjalo|annule\w*|attends|laisse)(?![a-zà-ÿ])/;   /* niente «pas»: «oui, pas de souci» è un sì */
 async function runTool(name, a) {
   if (name === "conferma_operazione") {
     const v = [...S.chatView].reverse().find(x => x.k === "op" && x.st === "wait"); if (!v) return { error: "nessuna operazione in attesa di conferma" };
