@@ -409,6 +409,54 @@ function bdAddSym(code,meta){
   if(meta)BDCHK.set(code,{st:"ok",name:meta.nome,sym:code});
   bdRender();const k=BD.rows.findIndex(r=>String(r[0]).toUpperCase()===code),w=document.querySelectorAll("#bdRows input[data-bdw]");if(w[k])w[k].focus();
 }
+/* ---------- Quanta compila il costruttore (21/11/2026): «mettimi 80% Nasdaq, 15% oro, 5% obbligazioni» ----------
+   Ogni voce si trasforma in uno strumento del catalogo: prima le parole comuni (sotto), poi la ricerca su tutto il catalogo
+   (ETF, azioni, BTP, Bund, OAT, Bonos). Quanta sceglie solo come scrivere quello che l'utente ha chiesto, non cosa comprare. */
+const BD_PAROLE=[[/^(nasdaq|nasdaq ?100|nasdaq-100)$/,"CSNDX"],[/^(s ?& ?p ?500|s&p|sp ?500|standard (and|&) poor'?s?( 500)?)$/,"CSSPX"],[/^(msci world|world|mondo|azioni (del )?mondo|azionario (mondiale|mondo|globale)|azioni globali|global stocks|world stocks)$/,"SWDA"],
+  [/^(all[ -]?world|ftse all[ -]?world|tutto il mondo|azioni di tutto il mondo)$/,"VWCE"],[/^((mercati )?emergenti|emerging( markets)?|azioni emergenti|paesi emergenti)$/,"EIMI"],[/^(small ?cap|piccole aziende|small caps?)$/,"IUSN"],
+  [/^(europa|azioni europee|europe|azioni europa|stoxx 600)$/,"IMEU"],[/^(euro stoxx 50|eurostoxx|stoxx 50)$/,"CSX5"],[/^(italia|azioni italiane|ftse mib|borsa italiana)$/,"CSMIB"],[/^(giappone|japan)$/,"SJPA"],
+  [/^(oro|gold|oro fisico|physical gold|or|l'or)$/,"SGLD"],[/^(obbligazioni|obbligazionario|bond|bonds|obbligazioni globali|global bonds|bonos|obligations)$/,"AGGH"],
+  [/^(titoli di stato( europei| euro)?|obbligazioni (europee|euro|governative)|government bonds|govt bonds|bund generici)$/,"IEGA"],[/^(obbligazioni (a )?brev[ei]|titoli di stato brevi|short bonds)$/,"IBGS"],
+  [/^(btp|titoli di stato italiani|obbligazioni italiane|italian bonds)$/,"IITB"],[/^(treasury|treasuries|titoli di stato (usa|americani)|us treasuries)$/,"VDTY"],[/^(inflazione|obbligazioni (legate all'|indicizzate all')inflazione|inflation[- ]linked)$/,"IBCI"],
+  [/^(liquidit[aà]|monetario|cash|conto|overnight|liquidez|liquidités)$/,"XEON"]];
+const BD_STOP=new Set(["di","del","della","dei","il","lo","la","le","l","un","una","etf","in","the","a","of","de","du","des","el","los","las"]);
+async function bdTrova(q){
+  const n=normQ(q).replace(/[.,;:!?]+$/,"").trim();if(!n)return null;
+  if(/\b(btp|bund|bobl|schatz|oat|bonos)\b/.test(n)&&/\d/.test(n)){await btpLoad();await statiLoad();}
+  const up=n.toUpperCase(),byCode=x=>String(x.code).toUpperCase()===up||(x.pop&&String(x.pop[2]).toUpperCase()===up)||(x.az&&String(x.az.isin||"").toUpperCase()===up);
+  let L=bdAll(),hit=L.find(byCode);if(hit)return hit;
+  for(const [rx,code] of BD_PAROLE)if(rx.test(n)){hit=L.find(x=>x.code===code);if(hit)return hit;}
+  const words=n.split(/[\s/-]+/).filter(w=>w&&!BD_STOP.has(w));if(!words.length)return null;
+  const best=lst=>{let b=null,bs=0;lst.forEach((x,i)=>{const nm=normQ(x.n),cd=normQ(x.code),sb=normQ(x.sub);let s=0;
+    for(const w of words){if(cd===w)s+=10;else if(new RegExp("(^|[^a-z0-9])"+w.replace(/[.*+?^${}()|[\]\\&]/g,"\\$&")+"([^a-z0-9]|$)").test(nm))s+=3;else if(nm.includes(w))s+=2;else if(sb.includes(w))s+=1;else return;}
+    s+=(x.tab==="ETF"||x.tab==="Obbligazioni"?0.5:0)-i/100000;if(s>bs){bs=s;b=x;}});return b;};
+  hit=best(L);if(hit)return hit;
+  if(!AZIONI){await azLoad();hit=best(bdAll());}
+  return hit||null;
+}
+const bdMetaDi=x=>x.btp?((BTPS||[]).includes(x.btp)?btpMeta(x.btp):statoMeta(x.btp)):x.az?{nome:x.az.n,tipo:"Azione",borsa:x.az.paese,set:x.az.set}:null;
+async function bdQuanta(a){
+  a=a||{};const voci=(Array.isArray(a.strumenti)?a.strumenti:[]).slice(0,15);if(!voci.length)return {error:"servono gli strumenti con il peso: [{cerca:\"Nasdaq\",peso:80}, …]"};
+  const presi=[],mancano=[];
+  for(const v of voci){const x=await bdTrova(v.cerca||v.nome||"");const peso=Math.max(0,Math.min(100,+v.peso||0));
+    if(!x){mancano.push(String(v.cerca||v.nome||""));continue;}
+    presi.push({x,peso,richiesto:String(v.cerca||v.nome)});}
+  if(!presi.length)return {error:"non ho trovato nessuno di questi strumenti nel catalogo",non_trovati:mancano};
+  if(!$("#builder").classList.contains("open"))openBuilder();
+  if(a.sostituisci!==false)BD.rows=[];
+  for(const {x,peso} of presi){const code=String(x.code).toUpperCase(),meta=bdMetaDi(x);if(meta){BDMETA.set(code,meta);BDCHK.set(code,{st:"ok",name:meta.nome,sym:code});}
+    const i=BD.rows.findIndex(r=>String(r[0]).toUpperCase()===code);if(i>=0)BD.rows[i][1]=peso;else{const e=BD.rows.findIndex(r=>!String(r[0]).trim());if(e>=0)BD.rows[e]=[code,peso];else BD.rows.push([code,peso]);}}
+  if(+a.capitale>0)$("#bdCap").value=String(Math.round(+a.capitale));
+  bdRender();
+  const tot=BD.rows.reduce((s,r)=>s+(+r[1]||0),0);
+  if(a.analizza&&BD.rows.some(r=>String(r[0]).trim()&&+r[1]>0))setTimeout(()=>{const b=$("#bdGo");if(b&&!b.disabled)b.click();},400);
+  return {fatto:true,aggiunti:presi.map(({x,peso,richiesto})=>({richiesto,scelto:x.n,codice:x.code,peso})),non_trovati:mancano,totale_pesi:tot,
+    analisi_avviata:!!a.analizza,nota:tot&&Math.abs(tot-100)>0.01?`i pesi sommano a ${tot}%: all'analisi si riportano a 100% in proporzione`:"pesi a 100%"};
+}
+/* cosa c'è nel costruttore (per «cosa vedo» di Quanta) */
+function bdStato(){const open=$("#builder").classList.contains("open");if(!open)return null;
+  const rows=BD.rows.filter(r=>String(r[0]).trim()).map(r=>{const f=bdFind(r[0])||[];return {codice:r[0],nome:f[1]||(f[4]&&f[4].nome)||r[0],peso:+r[1]||0};});
+  return {portafoglio:"ABC"[BD.cur],portafogli:BD.ports.length,righe:rows,totale_pesi:rows.reduce((s,r)=>s+r.peso,0),capitale:+($("#bdCap").value||0),scheda_catalogo:BDCAT.tab,filtri:BDCAT.f[BDCAT.tab]||{}};}
 document.addEventListener("click",e=>{const r=e.target.closest("[data-bdr]");if(r&&!r.classList.contains("in")){const x=(BDREM.view||[])[+r.dataset.bdr];if(x)bdAddSym(String(x.simbolo).toUpperCase(),{nome:x.nome,tipo:x.tipo,borsa:x.borsa});return;}
   const z=e.target.closest("[data-bdisin]");if(z)bdAddSym(z.dataset.bdisin,null);});
 document.addEventListener("input",e=>{if(e.target.classList&&e.target.classList.contains("bd-cq")){BDCAT.q=e.target.value;BDCAT.n=40;bdRemote(e.target.value);if(BDCAT.q){azLoad();btpLoad();statiLoad();}bdCatRender();}});
@@ -1224,4 +1272,4 @@ function bondsHTML(){
     <p class="caption">${E.length?`I BTP a tasso fisso entrano in rischio, crisi e frontiera con un prezzo <b>stimato</b>: le cedole e il rimborso sono scontati ai rendimenti dei BTP benchmark a 3, 5, 10 e 30 anni pubblicati dalla Banca d'Italia (dati al ${dt(al)}); nei rendimenti le cedole lorde sono reinvestite. Il prezzo vero di ogni titolo si scosta di solito di qualche decimo: se nel file c'è un prezzo con la sua data, la stima si allinea a quello. Fonte: Banca d'Italia. `:""}${B.length?`${totB?fmtEur(totB)+" in obbligazioni restano":"Le obbligazioni qui sopra segnate «fuori dalle analisi» restano"} fuori da rischio, crisi e frontiera: per BTP indicizzati, CCT, titoli esteri e obbligazioni societarie non c'è una fonte gratuita dello storico dei prezzi. `:""}Il rendimento a scadenza è lordo.</p>`;
 }
 
-export { bdBtpMeta, posEnrich, AI_URL, ASSETR, BD, BDCHK, BMON, CLS_COL, CRYPTO, EXAMPLE, ISIN_RX, POPULAR, PRESETS, PRESET_TXT, PROXY, SPACES, SPACE_KEEP, TIPO_L, TPL_KEY, TR, aiAuto, aiPayload, aiSample, an, applyAI, applyUnderstandSeries, avSymbol, avgMonthly, bdCheck, bdCls, bdFind, bdGo, bdHint, bdRender, bdState, blockingOpen, bondInfo, bondYtm, bondsHTML, cellText, closeBuilder, colIndex, colLetter, colLetterUI, colSource, computeChecks, convertCurrency, drop, eurMap, fileStructure, fillTargets, findYoung, fixOpts, guessSymbol, handleFile, importConfidence, importKind, initRoles, isBondPos, isExample, isSim, load, loadExample, maybeAutoRebuild, needCount, normSym, openBuilder, playScan, previewHTML, rbAoa, rebuildBanner, rebuildFromPrices, rebuildRows, recipeOff, renderAI, renderCaps, renderChecks, renderConfirm, renderDeadEnd, renderImport, renderLog, renderMapping, renderQuality, renderScan, renderSheets, renderSummary, renderUnderstand, requestFix, requestRecipe, requestUnderstand, resetAI, resetImportState, resolveIsins, sheetCcy, showError, spaceBar, spaceBlank, spaceSave, spaceSwitch, spark, toastImport, tplAll, tplApply, tplForget, tplGet, tplSave, track, trackFlush, trackOnce, txLabel, txSnapshot, undPayload, undoAI, validateAI, wideSnapshot, youngDecide };
+export { bdBtpMeta, bdQuanta, bdStato, bdTrova, posEnrich, AI_URL, ASSETR, BD, BDCHK, BMON, CLS_COL, CRYPTO, EXAMPLE, ISIN_RX, POPULAR, PRESETS, PRESET_TXT, PROXY, SPACES, SPACE_KEEP, TIPO_L, TPL_KEY, TR, aiAuto, aiPayload, aiSample, an, applyAI, applyUnderstandSeries, avSymbol, avgMonthly, bdCheck, bdCls, bdFind, bdGo, bdHint, bdRender, bdState, blockingOpen, bondInfo, bondYtm, bondsHTML, cellText, closeBuilder, colIndex, colLetter, colLetterUI, colSource, computeChecks, convertCurrency, drop, eurMap, fileStructure, fillTargets, findYoung, fixOpts, guessSymbol, handleFile, importConfidence, importKind, initRoles, isBondPos, isExample, isSim, load, loadExample, maybeAutoRebuild, needCount, normSym, openBuilder, playScan, previewHTML, rbAoa, rebuildBanner, rebuildFromPrices, rebuildRows, recipeOff, renderAI, renderCaps, renderChecks, renderConfirm, renderDeadEnd, renderImport, renderLog, renderMapping, renderQuality, renderScan, renderSheets, renderSummary, renderUnderstand, requestFix, requestRecipe, requestUnderstand, resetAI, resetImportState, resolveIsins, sheetCcy, showError, spaceBar, spaceBlank, spaceSave, spaceSwitch, spark, toastImport, tplAll, tplApply, tplForget, tplGet, tplSave, track, trackFlush, trackOnce, txLabel, txSnapshot, undPayload, undoAI, validateAI, wideSnapshot, youngDecide };

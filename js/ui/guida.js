@@ -7,7 +7,7 @@
 import { $, S, esc } from "./core.js";
 import { NO_LAB, TOOLS_LOCAL, TOOL_L } from "./quanta.js";
 import { go, current, SCENE_L } from "./scene.js";
-import { openBuilder } from "./importa.js";
+import { openBuilder, bdQuanta, bdStato } from "./importa.js";
 import { openArchive } from "./archivio.js";
 import { openReportDlg } from "./report.js";
 import { prOpen } from "./studio.js";
@@ -92,11 +92,18 @@ function cosaVedo() {
     .filter(([q]) => { const e = $(q); return e && (e.classList.contains("open") || e.open); }).map(x => x[1]);
   const num = sc ? [...sc.querySelectorAll(".kpi, .pm-k, .st-ade-k > div")].filter(e => e.getClientRects().length).slice(0, 8)
     .map(e => e.innerText.replace(/\s+/g, " ").trim().slice(0, 90)) : [];
-  return { pagina: SCENE_L[current] || current, titolo: h ? h.innerText.replace(/\s+/g, " ").trim() : "", pannelli_aperti: pannelli, numeri_visibili: num,
+  const out = { pagina: SCENE_L[current] || current, titolo: h ? h.innerText.replace(/\s+/g, " ").trim() : "", pannelli_aperti: pannelli, numeri_visibili: num,
     laboratorio: !!S.lab, ruolo: document.body.dataset.ruolo || "non scelto" };
+  const bd = bdStato(); if (bd) out.costruttore = bd;   /* righe, pesi e capitale del costruttore aperto */
+  return out;
+}
+/* Quanta compila il costruttore al posto dell'utente (strumenti e pesi detti da lui); durante una chiamata la chiamata si riduce per far vedere il pannello */
+async function compila(a) {
+  if (callOn()) callMini(true);
+  return bdQuanta(a);
 }
 
-Object.assign(TOOLS_LOCAL, { mostra_sul_sito: mostra, apri_strumento: apri, cosa_vedo: cosaVedo });
+Object.assign(TOOLS_LOCAL, { mostra_sul_sito: mostra, apri_strumento: apri, cosa_vedo: cosaVedo, compila_portafoglio: compila });
 /* «portami a…» durante una chiamata: la chiamata si riduce, così l'utente vede la pagina; in più la pagina Studio */
 const vaiA = TOOLS_LOCAL.vai_a;
 TOOLS_LOCAL.vai_a = a => {
@@ -104,8 +111,8 @@ TOOLS_LOCAL.vai_a = a => {
   if (a && a.pagina === "studio") { if (document.body.dataset.ruolo !== "pro") return { error: "lo Studio c'è solo per chi usa il sito da consulente" }; setTimeout(() => go("studio"), 250); return { fatto: true, pagina: "studio" }; }
   return vaiA(a);
 };
-["mostra_sul_sito", "apri_strumento", "cosa_vedo"].forEach(n => NO_LAB.add(n));
-Object.assign(TOOL_L, { mostra_sul_sito: "ti mostro dove", apri_strumento: "apro il pannello", cosa_vedo: "guardo lo schermo" });
+["mostra_sul_sito", "apri_strumento", "cosa_vedo", "compila_portafoglio"].forEach(n => NO_LAB.add(n));
+Object.assign(TOOL_L, { mostra_sul_sito: "ti mostro dove", apri_strumento: "apro il pannello", cosa_vedo: "guardo lo schermo", compila_portafoglio: "compilo il portafoglio" });
 
-window.__guida = { mostra, apri, cosaVedo, spegni, PUNTI }; // per i test
+window.__guida = { mostra, apri, cosaVedo, compila, spegni, PUNTI }; // per i test
 export { PUNTI, mostra, apri, cosaVedo, spegni };

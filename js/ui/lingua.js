@@ -34,8 +34,8 @@ function traduci(testo) {
   const q = [], mesi = [];
   const s2 = String(testo).replace(/«[^»]*»/g, m => { q.push(m); return "«#»"; })
     .replace(/\b(gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic)(?= \d{4}\b)/g, m => { mesi.push(m); return "@"; });
-  if (!q.length && !mesi.length) return null;
-  const c = chiave(s2); t = DIZ[c.k]; if (!t) return null;
+  const c = q.length || mesi.length ? chiave(s2) : null; t = c && DIZ[c.k];
+  if (!t) return pezzi(testo);
   let i = 0, j = 0;
   return riempi(t, c.nums).replace(/«#»/g, () => (q[i++] || "«»").replace(" · ricostruito", " · " + (RICO[L] || "ricostruito")))
     .replace(/@/g, () => { const m = mesi[j++]; return (MESI[L] || MESI_IT)[MESI_IT.indexOf(m)] || m; });
@@ -64,6 +64,24 @@ function giro(root) {
 let coda = new Set(), att = false;
 function pianifica(n) { coda.add(n); if (att) return; att = true; requestAnimationFrame(() => { att = false; const c = coda; coda = new Set(); c.forEach(giro); titolo(); }); }
 function titolo() { const t = traduci(document.title); if (t && document.title !== t) document.title = t; }
+/* righe fatte a pezzi separati da « · » (catalogo, didascalie: «DE000… · Germania · 8,7 anni alla scadenza · prezzo stimato»):
+   si traduce pezzo per pezzo quello che il dizionario conosce, codici e nomi restano uguali */
+/* inizi fissi seguiti da nomi o elenchi che cambiano («senza costo: EUNL, IEAG», «Interpretazione di CSPX») */
+const INIZI = { "senza costo: ": { en: "no cost: ", es: "sin coste: ", fr: "sans coût : " }, "Interpretazione di ": { en: "Interpretation of ", es: "Interpretación de ", fr: "Interprétation de " },
+  "Simbolo di ": { en: "Symbol of ", es: "Símbolo de ", fr: "Symbole de " } };
+function pezzi(testo) {
+  const s = String(testo).trim();
+  for (const [it, tr] of Object.entries(INIZI)) if (s.startsWith(it) && tr[L]) return tr[L] + s.slice(it.length);
+  const q = [], prot = s.replace(/«[^»]*»/g, m => { q.push(m); return "\u0001" + (q.length - 1) + "\u0002"; });   /* i nomi tra «» non si spezzano */
+  const P = prot.split(/\s·\s/); if (P.length < 2) return null;
+  const back = x => x.replace(/\u0001(\d+)\u0002/g, (m, i) => q[+i]);
+  let cambiati = 0; const out = P.map(x => { const orig = back(x).trim(); if (/\u0001/.test(x)) { const t = traduci0(orig); if (t) { cambiati++; return t; } return orig; }
+    const { k, nums } = chiave(x); const t = utile(k) && DIZ[k]; if (!t) return orig; cambiati++; return riempi(t, nums); });
+  return cambiati ? out.join(" · ") : null;
+}
+/* un pezzo con un nome tra «»: la regola «#» (senza spezzare ancora) */
+function traduci0(x) { const q = []; const s2 = x.replace(/«[^»]*»/g, m => { q.push(m); return "«#»"; }); const c = chiave(s2), t = DIZ[c.k]; if (!t) return null;
+  let i = 0; return riempi(t, c.nums).replace(/«#»/g, () => (q[i++] || "«»").replace(" · ricostruito", " · " + (RICO[L] || "ricostruito"))); }
 /* titoli divisi in parole per le animazioni: si traducono interi, prima di tutto il resto */
 const INTERI = { "#heroTitle": { en: "Your <em>investments</em><br>finally clear.", es: "Tus <em>inversiones</em><br>por fin claras.", fr: "Vos <em>investissements</em><br>enfin clairs." } };
 function interi() { for (const [sel, t] of Object.entries(INTERI)) { const el = document.querySelector(sel); if (el && t[L] && !el.hasAttribute("data-noi18n")) { el.innerHTML = t[L]; el.setAttribute("data-noi18n", ""); } } }
