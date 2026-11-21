@@ -31,7 +31,9 @@ await p.evaluate(() => window.__guida.apri({ cosa: "costruttore" })); await wait
 L = await elenco();
 const cap = L.comandi.find(c => c.tipo === "campo" && /Capitale/i.test(c.nome));
 t("nel costruttore: il campo «Capitale da analizzare» con il suo valore", L.pannello && cap && cap.valore !== undefined, JSON.stringify(cap));
-r = await usa({ ref: cap.ref, valore: "25000" }); await wait(300);
+const Lc = await p.evaluate(() => window.__guida.elencoComandi({ cerca: "capitale" }));
+t("«cerca»: solo i comandi con quella parola (risposta corta per l'IA)", Lc.comandi.length >= 1 && Lc.comandi.length <= 3 && Lc.comandi.every(c => /capitale/i.test(c.nome + " " + (c.zona || ""))), JSON.stringify(Lc.comandi.map(c => c.nome)));
+r = await usa({ ref: Lc.comandi.find(c => c.tipo === "campo").ref, valore: "25000" }); await wait(300); L = await elenco();
 t("Quanta scrive 25000 nel capitale", r.fatto && await p.evaluate(() => document.getElementById("bdCap").value === "25000"));
 /* 4. un menu: scheda Obbligazioni e filtro Emittente → Bund (Germania) */
 r = await usa({ ref: trova(L, "^Obbligazioni$").ref }); await wait(900);

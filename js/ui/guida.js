@@ -129,26 +129,30 @@ function valoreDi(el) {
 /* cancellare o salvare dati (patrimonio, archivio, impostazioni, file): solo dopo un sì detto o scritto dall'utente */
 const PERICOLO = /(elimin|cancell|ricomincia|svuota|azzera|rimuov|reset|delete|remove|clear|borra|supprim|effac|ripristin|restore|importa la copia|salva|registra|conferma|metti nel|nel (mio )?patrimonio|save|confirm|record|guardar|registrar|enregistr|ajouter à mon|añadir a mi|add to my)/i;
 const pericolo = (el, nome) => PERICOLO.test(nome + " " + (el.id || ""));
-function elencoComandi() {
+const nrm = s => pulisci(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+function elencoComandi(a) {
+  const cerca = nrm((a && a.cerca) || "").split(/\s+/).filter(w => w.length > 1);   /* parole da cercare nei nomi: risposta più corta */
   const R = radice(); if (!R.el) return { error: "nessuna pagina aperta" };
   CMD.clear(); CMDD.clear(); CMDN = 0; const out = [];
   const radici = [R.el, ...(R.el === $("#scene-" + current) ? [document.querySelector("header.topbar")] : [])].filter(Boolean);   /* senza pannelli: anche la barra in alto (impostazioni, menu) */
   const els = radici.flatMap(r => [...r.querySelectorAll('button, a[href], input, select, textarea, [role="tab"], [role="switch"], [role="radio"], [data-go], [data-nav]')])
     .filter((e, i, a) => a.indexOf(e) === i && visibile(e) && !(e.tagName === "INPUT" && /hidden|file/.test(e.type)) && !e.closest("#chat, #qCall"));
-  for (const el of els.slice(0, 90)) {
-    const nome = nomeDi(el); if (!nome && tipoDi(el) === "pulsante") continue;
+  /* al massimo 60: prima campi, menu, caselle e schede (sono quelli che si cambiano), poi i pulsanti nell'ordine della pagina */
+  const cand = els.map(el => ({ el, nome: nomeDi(el) })).filter(x => (x.nome || tipoDi(x.el) !== "pulsante") && (!cerca.length || cerca.some(w => nrm(x.nome + " " + zonaDi(x.el)).includes(w))));
+  const tot = cand.length, forme = cand.filter(x => tipoDi(x.el) !== "pulsante").slice(0, 45), tieni = new Set([...forme, ...cand.filter(x => tipoDi(x.el) === "pulsante").slice(0, 60 - forme.length)].map(x => x.el));
+  for (const { el, nome } of cand) {
+    if (!tieni.has(el)) continue;
     const ref = "c" + (++CMDN); CMD.set(ref, el); CMDD.set(ref, { nome, tipo: tipoDi(el), tag: el.tagName });
-    const c = { ref, tipo: tipoDi(el), nome, zona: zonaDi(el) || undefined, valore: valoreDi(el) };
-    if (el.tagName === "SELECT") c.scelte = [...el.options].slice(0, 15).map(o => pulisci(o.text));
+    const z = zonaDi(el), c = { ref, tipo: tipoDi(el), nome: nome.slice(0, 60), zona: z && z !== nome ? z.slice(0, 40) : undefined, valore: valoreDi(el) };
+    if (el.tagName === "SELECT") c.scelte = [...el.options].slice(0, 12).map(o => pulisci(o.text).slice(0, 40));
     if (el.disabled || el.getAttribute("aria-disabled") === "true") c.disattivo = true;
     if (pericolo(el, nome)) c.serve_conferma = true;
     out.push(c);
   }
-  return { pagina: SCENE_L[current] || current, pannello: R.el === $("#scene-" + current) ? null : R.nome, comandi: out, altri: Math.max(0, els.length - 90) || undefined,
+  return { pagina: SCENE_L[current] || current, pannello: R.el === $("#scene-" + current) ? null : R.nome, comandi: out, altri: Math.max(0, tot - out.length) || undefined,
     nota: "usa_comando con il ref; i comandi con serve_conferma cancellano o salvano dati: prima chiedi all'utente" };
 }
 const lancia = (el, tipo) => el.dispatchEvent(new Event(tipo, { bubbles: true }));
-const nrm = s => pulisci(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 async function usaComando(a) {
   a = a || {}; let el = CMD.get(String(a.ref || ""));
   /* il sito ridisegna spesso i pannelli: se il comando è stato rifatto, si ritrova con lo stesso nome e tipo */
