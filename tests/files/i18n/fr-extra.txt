@@ -35,3 +35,5 @@
 =BTP singoli ({0})	BTP individuels ({0})
 =Togli i filtri	Retirer les filtres
 =Euro ({0})	Euro ({0})
+=Va bene, non ho registrato niente.	D'accord, je n'ai rien enregistré.
+=Non è stato possibile salvarla.	Impossible de l'enregistrer.

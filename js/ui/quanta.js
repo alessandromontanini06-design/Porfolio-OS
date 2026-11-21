@@ -241,7 +241,11 @@ const Q={speaking:null,rec:null,listening:false,auto:false,talk:false,imgs:[],fr
 function pickVoice(){if(!TTS)return null;const lg=document.documentElement.lang||"it",vs=TTS.getVoices().filter(v=>new RegExp("^"+lg+"([-_]|$)","i").test(v.lang));for(const re of [/natural|neural|online|premium|enhanced/i,/google/i,/alice|federica|elsa|isabella|paola|emma|diego|luca/i]){const v=vs.find(x=>re.test(x.name));if(v)return v;}return vs[0]||null;}
 if(TTS&&TTS.addEventListener)TTS.addEventListener("voiceschanged",()=>{});
 /* testo da leggere: senza grassetti ed elenchi, segni detti a parole */
-function plain(t){return String(t||"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/^\s*[-*•]\s+/gm,"").replace(/[#_`>]/g,"").replace(/−/g,"meno ").replace(/(\d)\s?%/g,"$1 per cento").replace(/€/g," euro").replace(/\s+/g," ").trim();}
+/* lingua del sito (js/ui/lingua.js): la voce legge segni e simboli nella stessa lingua; tr() traduce le frasi fisse dette a voce */
+const LG=()=>({en:"en",es:"es",fr:"fr"})[document.documentElement.lang]||"it";
+const tr=t=>(LG()!=="it"&&window.__i18n&&window.__i18n.traduci&&window.__i18n.traduci(t))||t;
+const SEGNI={it:["meno ","per cento"," euro"],en:["minus ","percent"," euros"],es:["menos ","por ciento"," euros"],fr:["moins ","pour cent"," euros"]};
+function plain(t){const [m,pc,eu]=SEGNI[LG()];return String(t||"").replace(/\*\*(.+?)\*\*/g,"$1").replace(/^\s*[-*•]\s+/gm,"").replace(/[#_`>]/g,"").replace(/−/g,m).replace(/(\d)\s?%/g,"$1 "+pc).replace(/€/g,eu).replace(/\s+/g," ").trim();}
 /* ---------- voce: prima quella naturale online (Gemini TTS da /api/assistant?modo=voce), se non risponde quella del dispositivo ----------
    L'audio arriva a pezzi di frasi: il primo suona mentre si prepara il secondo. Se la voce online fallisce, per 5 minuti si usa quella del dispositivo. */
 const VOX={ctx:null,src:null,off:0,cache:new Map()};
@@ -254,7 +258,7 @@ const cloudOn=()=>Date.now()>VOX.off&&!!(window.AudioContext||window.webkitAudio
 const voceScelta=()=>{try{return localStorage.getItem("pos-quanta-voce-v1")||undefined;}catch{return undefined;}};
 async function cloudAudio(text){
   const k=(voceScelta()||"")+"|"+text;if(VOX.cache.has(k))return VOX.cache.get(k);
-  const r=await fetch("/api/assistant?modo=voce",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({testo:text,voce:voceScelta()}),signal:AbortSignal.timeout(30000)});
+  const r=await fetch("/api/assistant?modo=voce",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({testo:text,voce:voceScelta(),lingua:LG()}),signal:AbortSignal.timeout(30000)});
   const j=await r.json().catch(()=>({}));if(!r.ok||!j.audio)throw new Error(j.error||"voce online non disponibile");
   const bin=atob(j.audio),u8=new Uint8Array(bin.length);for(let n=0;n<bin.length;n++)u8[n]=bin.charCodeAt(n);
   if(VOX.cache.size>24)VOX.cache.delete(VOX.cache.keys().next().value);VOX.cache.set(k,u8.buffer);return u8.buffer;
@@ -325,11 +329,11 @@ function talkNext(){if(Q.talk)setTimeout(()=>listen(true),350);}
 /* in conversazione, la scheda da confermare si conferma a voce: «sì», «conferma», «annulla», «no»; «basta» chiude */
 function voiceCmd(t){
   const s=t.toLowerCase().trim(),v=[...S.chatView].reverse().find(x=>x.k==="op"&&x.st==="wait");
-  const W="(?![a-zà-ù])";if(new RegExp("^(basta|stop|fine|chiudi|ho finito)"+W).test(s)){talkStop();return true;}
+  const W="(?![a-zà-ÿ])";if(new RegExp("^(basta|stop|fine|chiudi|ho finito|that's all|i'm done|enough|ya está|termina|c'est tout|arrête|j'ai fini)"+W).test(s)){talkStop();return true;}
   if(!v)return false;
-  const yes=new RegExp("^(s[iì]|conferma|confermo|ok|okay|va bene|salva|salvala|certo)"+W).test(s),no=new RegExp("^(no|annulla|lascia|non salvare)"+W).test(s);if(!yes&&!no)return false;
+  const yes=new RegExp("^(s[iìí]|conferma|confermo|ok|okay|va bene|salva|salvala|certo|yes|yeah|yep|confirm|sure|save it|confirmo|confirma|vale|claro|guárdala|oui|ouais|confirme|d'accord|enregistre)"+W).test(s),no=new RegExp("^(no|annulla|lascia|non salvare|nope|cancel|don't|cancela|déjalo|non|annule|laisse)"+W).test(s);if(!yes&&!no)return false;
   S.chatView.push({k:"user",t,voce:true});renderChat();
-  opDecide(v,yes).then(()=>speakText(v.st==="done"?v.msg:v.st==="no"?"Va bene, non ho registrato niente.":v.msg||"Non è stato possibile salvarla.",null,talkNext));return true;
+  opDecide(v,yes).then(()=>speakText(v.st==="done"?v.msg:v.st==="no"?tr("Va bene, non ho registrato niente."):v.msg||tr("Non è stato possibile salvarla."),null,talkNext));return true;
 }
 function chatNote(t){S.chatView.push({k:"error",t});renderChat();}
 document.addEventListener("click",e=>{if(!e.target.closest("#chatMic"))return;ttsUnlock();if(Q.listening){if(Q.rec)Q.rec.stop();}else listen(false);});

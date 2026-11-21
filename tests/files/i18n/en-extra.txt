@@ -35,3 +35,5 @@
 =BTP singoli ({0})	Individual BTPs ({0})
 =Togli i filtri	Clear filters
 =Euro ({0})	Euro ({0})
+=Va bene, non ho registrato niente.	All right, I haven't recorded anything.
+=Non è stato possibile salvarla.	It couldn't be saved.

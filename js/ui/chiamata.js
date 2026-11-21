@@ -91,7 +91,9 @@ function commitUser() { const t = clean(C.user); if (t) { S.chatView.push({ k: "
 function commitAi(cut) { const t = clean(C.ai); if (t) { S.chatView.push({ k: "ai", t: cut ? t + "…" : t }); S.chat.push({ role: "assistant", text: t }); } C.ai = ""; }
 
 /* ---------- strumenti: gli stessi della chat, più la conferma a voce ---------- */
-const YES = /(^|[^a-zà-ù])(s[iì]|conferm\w*|ok|okay|va bene|salva\w*|certo|esatto|giusto|procedi)(?![a-zà-ù])/, NO = /(^|[^a-zà-ù])(no|non|annulla\w*|aspetta|lascia)(?![a-zà-ù])/;
+/* sì e no nelle quattro lingue del sito (italiano, inglese, spagnolo, francese) */
+const YES = /(^|[^a-zà-ÿ])(s[iìí]|conferm\w*|ok|okay|va bene|salva\w*|certo|esatto|giusto|procedi|yes|yeah|yep|sure|confirm\w*|go ahead|correct|that's right|save it|vale|claro|correcto|adelante|guárdala|oui|ouais|d'accord|exact|vas-y|enregistre\w*)(?![a-zà-ÿ])/,
+  NO = /(^|[^a-zà-ÿ])(no|non|annulla\w*|aspetta|lascia|nope|not|don't|cancel\w*|wait|cancela\w*|espera|déjalo|annule\w*|attends|laisse)(?![a-zà-ÿ])/;   /* niente «pas»: «oui, pas de souci» è un sì */
 async function runTool(name, a) {
   if (name === "conferma_operazione") {
     const v = [...S.chatView].reverse().find(x => x.k === "op" && x.st === "wait"); if (!v) return { error: "nessuna operazione in attesa di conferma" };
@@ -167,7 +169,7 @@ export async function callStart() {
   if (!C.on) return;
   let j;
   /* il biglietto per la chiamata: se la richiesta si interrompe per strada (Safari: «Load failed», Chrome: «Failed to fetch») si riprova una volta */
-  const biglietto = () => fetch("/api/assistant?modo=chiamata", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context: chatContext() }), signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined });
+  const biglietto = () => fetch("/api/assistant?modo=chiamata", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context: chatContext(), lingua: ({ en: "en", es: "es", fr: "fr" })[document.documentElement.lang] || "it" }), signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined });
   try { let r; try { r = await biglietto(); } catch (e) { if (e.name !== "TypeError" || !C.on) throw e; await new Promise(ok => setTimeout(ok, 1200)); if (!C.on) return; r = await biglietto(); }
     j = await r.json().catch(() => ({})); if (!r.ok || !j.token) throw new Error(j.error || "La chiamata non è disponibile ora."); }
   catch (e) { if (C.on) fail(e.name === "TimeoutError" ? "Il server non ha risposto in tempo." : e.name === "TypeError" ? "Non riesco a raggiungere il server: controlla la connessione e riprova tra qualche secondo." : String(e.message || e), true); return; }

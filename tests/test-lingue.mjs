@@ -56,5 +56,13 @@ for (const L of ["en", "es", "fr"]) {
   const ph = s => (s.match(/\{\d+\}/g) || []).sort().join(); const male = Object.entries(d).filter(([k, t]) => ph(k) !== ph(t));
   check(Object.keys(d).length > 1900 && male.length === 0, `${L}.json: ${Object.keys(d).length} frasi, segnaposto giusti`);
 }
+/* la chiamata con Quanta nella lingua del sito: istruzioni, saluto e trascrizione */
+{ const { setupFor } = await import("file:///" + path.join(import.meta.dirname, "..", "api", "_lib", "chiamata-setup.js").replace(/\\/g, "/"));
+  const base = { system: "Ti chiami Quanta.", tools: [], ctx: "", voice: "Algieba" };
+  const it = setupFor(base), en = setupFor({ ...base, lingua: "en" }), fr = setupFor({ ...base, lingua: "fr" }), txt = s => s.systemInstruction.parts[0].text;
+  check(/Parla sempre in italiano/.test(txt(it)) && it.inputAudioTranscription.languageCodes[0] === "it" && !/IMPORTANTE/.test(txt(it)), "chiamata in italiano: come prima");
+  check(/Parla sempre in inglese/.test(txt(en)) && /Hi, I'm Quanta/.test(txt(en)) && en.inputAudioTranscription.languageCodes[0] === "en", "chiamata in inglese: parla inglese, saluto inglese, trascrive l'inglese");
+  check(/Parla sempre in francese/.test(txt(fr)) && /Salut, je suis Quanta/.test(txt(fr)) && fr.inputAudioTranscription.languageCodes[0] === "fr", "chiamata in francese");
+}
 await b.close(); srv.kill();
 console.log(`\n${ok} ok, ${ko} da sistemare`); process.exit(ko ? 1 : 0);

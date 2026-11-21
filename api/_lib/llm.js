@@ -4,6 +4,7 @@
 // Ogni fornitore ha un tempo massimo; se fallisce o è sovraccarico si passa al successivo.
 // I file in api/_lib non diventano indirizzi del sito: sono solo codice condiviso.
 import Anthropic from "@anthropic-ai/sdk";
+import { upperTypes } from "./schema.js";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { createHash } from "node:crypto";
@@ -90,18 +91,6 @@ async function geminiCall(body, ms) {
     throw last;
   }
 }
-const upperTypes = s => {
-  if (Array.isArray(s)) return s.map(upperTypes);
-  if (!s || typeof s !== "object") return s;
-  const o = {};
-  for (const [k, v] of Object.entries(s)) {
-    if (k === "additionalProperties" || k === "$schema") continue;
-    if (k === "type" && typeof v === "string") o.type = v.toUpperCase();
-    else if (k === "type" && Array.isArray(v)) { const t = v.find(x => x !== "null"); o.type = String(t).toUpperCase(); if (v.includes("null")) o.nullable = true; }
-    else o[k] = upperTypes(v);
-  }
-  return o;
-};
 
 /* ---------- Groq (formato compatibile OpenAI) ---------- */
 let groqModel = env.GROQ_MODEL || null;

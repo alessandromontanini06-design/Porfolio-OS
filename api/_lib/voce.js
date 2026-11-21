@@ -1,4 +1,4 @@
-// Voce di Quanta: il testo di una risposta diventa audio con Gemini TTS (voci naturali, italiano compreso).
+// Voce di Quanta: il testo di una risposta diventa audio con Gemini TTS (voci naturali, nella lingua del sito: italiano, inglese, spagnolo, francese).
 // Si chiama da api/assistant.js con ?modo=voce (il piano gratuito di Vercel ammette 12 funzioni: questa non è una funzione nuova).
 // Prima l'API Interactions (quella documentata per i modelli 3.8), poi generateContent; prima il modello Flash, poi Flash-Lite.
 // La risposta è un WAV (24 kHz, mono, 16 bit) in base64. Nel browser, se qui qualcosa non va, resta la voce del dispositivo.
@@ -10,7 +10,12 @@ const MODELS = (env.GEMINI_TTS_MODEL || "gemini-3.8-flash-tts,gemini-3.8-flash-l
 export const VOCI = ["Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina",
   "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"];
 const VOCE = VOCI.includes(env.GEMINI_TTS_VOICE) ? env.GEMINI_TTS_VOICE : "Algieba";
-const STILE = "Italiano naturale e colloquiale, voce calda e sicura, ritmo scorrevole come una consulente che parla con un amico. Non da annuncio, non da centralino.";
+/* stile della lettura nella lingua del sito (20/11/2026: italiano, inglese, spagnolo, francese) */
+const STILI = {
+  it: "Italiano naturale e colloquiale, voce calda e sicura, ritmo scorrevole come una consulente che parla con un amico. Non da annuncio, non da centralino.",
+  en: "Natural, conversational English; warm and confident voice; easy flowing pace, like an advisor talking to a friend. Not like an announcement or a call centre.",
+  es: "Español natural y coloquial; voz cálida y segura; ritmo fluido, como una asesora que habla con un amigo. Ni de anuncio ni de centralita.",
+  fr: "Français naturel et familier ; voix chaleureuse et assurée ; rythme fluide, comme une conseillère qui parle à un ami. Pas comme une annonce ni un standard téléphonique." };
 const MAX = 600, BUDGET = 28_000;
 
 /* poche risposte già pronte in memoria: «Ascolta» due volte non rifà la richiesta */
@@ -43,8 +48,8 @@ async function call(url, body, ms) {
   const a = findAudio(j); if (!a) throw new Error("risposta senza audio");
   return toWav(a.data, a.mime);
 }
-const viaInteractions = (model, text, voice, ms) => call("https://generativelanguage.googleapis.com/v1beta/interactions", {
-  model, input: [{ type: "user_input", content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: STILE }] }] }],
+const viaInteractions = (model, text, voice, ms, lingua) => call("https://generativelanguage.googleapis.com/v1beta/interactions", {
+  model, input: [{ type: "user_input", content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: STILI[lingua] || STILI.it }] }] }],
   response_format: { type: "audio" }, generation_config: { speech_config: [{ voice }] } }, ms);
 const viaGenerate = (model, text, voice, ms) => call(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
   contents: [{ role: "user", parts: [{ text }] }],
@@ -55,16 +60,16 @@ export async function voce(req, res) {
   if (!fromOwnSite(req)) { res.status(403).json({ error: "Richiesta da un sito non autorizzato." }); return; }
   if (!env.GEMINI_API_KEY) { res.status(503).json({ error: "Voce online non configurata." }); return; }
   if (rateLimited(req, "voce", Number(env.VOICE_HOURLY_LIMIT || 200))) { res.status(429).json({ error: "Troppe letture in quest'ora: uso la voce del dispositivo." }); return; }
-  const b = readBody(req) || {}, text = String(b.testo || "").replace(/\s+/g, " ").trim().slice(0, MAX), voice = VOCI.includes(b.voce) ? b.voce : VOCE;
+  const b = readBody(req) || {}, text = String(b.testo || "").replace(/\s+/g, " ").trim().slice(0, MAX), voice = VOCI.includes(b.voce) ? b.voce : VOCE, lingua = STILI[b.lingua] ? b.lingua : "it";
   if (!text) { res.status(400).json({ error: "Manca il testo." }); return; }
   const models = MODELS.includes(b.modello) ? [b.modello, ...MODELS.filter(m => m !== b.modello)] : MODELS;
-  const k = keyOf({ text, voice, m: models[0] }), hit = cache.get(k);
+  const k = keyOf({ text, voice, m: models[0], lingua }), hit = cache.get(k);
   if (hit) { res.status(200).json({ ...hit, cached: true }); return; }
   const started = Date.now(), errors = [];
   for (const model of models) for (const via of [viaInteractions, viaGenerate]) {
     const left = BUDGET - (Date.now() - started); if (left < 3000) break;
     try {
-      const audio = await via(model, text, voice, Math.min(18_000, left));
+      const audio = await via(model, text, voice, Math.min(18_000, left), lingua);
       const out = { audio, mime: "audio/wav", modello: model, voce: voice, ms: Date.now() - started };
       if (cache.size > 40) cache.delete(cache.keys().next().value); cache.set(k, out);
       res.status(200).json(out); return;
